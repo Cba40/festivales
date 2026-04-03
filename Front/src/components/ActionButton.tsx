@@ -18,8 +18,8 @@ export const ActionButton = ({
   const baseClasses = 'rounded-xl font-bold transition-all active:scale-95 shadow-lg';
 
   const variantClasses = {
-    primary: 'bg-[#1e3a8a] text-white hover:bg-[#1e3a8a]/90',
-    secondary: 'bg-gray-100 text-gray-800 hover:bg-gray-200',
+    primary: 'bg-primary text-white hover:bg-primary/90 dark:hover:bg-primary/80',
+    secondary: 'bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-slate-800 dark:text-gray-100 dark:hover:bg-slate-700',
   };
 
   const sizeClasses = {
@@ -48,10 +48,10 @@ export const QuickAction = ({ emoji, label, onClick }: QuickActionProps) => {
   return (
     <button
       onClick={onClick}
-      className="bg-white rounded-lg p-4 shadow-md hover:shadow-lg transition-all active:scale-95 flex flex-col items-center gap-2"
+      className="bg-white dark:bg-slate-800 rounded-lg p-4 shadow-md hover:shadow-lg transition-all active:scale-95 flex flex-col items-center gap-2"
     >
       <span className="text-3xl">{emoji}</span>
-      <span className="text-xs font-semibold text-gray-800">{label}</span>
+      <span className="text-xs font-semibold text-gray-800 dark:text-gray-100">{label}</span>
     </button>
   );
 };

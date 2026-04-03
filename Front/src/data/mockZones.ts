@@ -1,49 +1,63 @@
-export interface Zona {
-  id: string;
-  nombre: string;
-  distancia_min: number;
-  estado: 'bajo' | 'medio' | 'alto' | 'colapsado';
-  capacidad_estimada: number;
-  tendencia: 'subiendo' | 'estable' | 'bajando';
-  timestamp: string;
-}
+import { Zona } from '../types';
+
+const now = Date.now()
 
 export const mockZones: Zona[] = [
   {
     id: 'zona-actual',
     nombre: 'Zona Centro',
+    tipo: 'estacionamiento',
     distancia_min: 0,
     estado: 'colapsado',
     capacidad_estimada: 0,
     tendencia: 'estable',
-    timestamp: 'actualizado hace 2 min'
+    timestamp: 'actualizado hace 2 min',
+    lat: -30.978107,
+    lng: -64.094779,
+    referencia: 'Plaza Principal / Iglesia',
+    updatedAt: now - 2 * 60000
   },
   {
     id: 'zona-norte',
     nombre: 'Zona Norte',
-    distancia_min: 7,
+    tipo: 'estacionamiento',
+    distancia_min: 6,
     estado: 'alto',
     capacidad_estimada: 15,
     tendencia: 'subiendo',
-    timestamp: 'actualizado hace 3 min'
+    timestamp: 'actualizado hace 3 min',
+    lat: -30.973313,
+    lng: -64.088529,
+    referencia: 'Barrio Norte / Terminal',
+    updatedAt: now - 3 * 60000
   },
   {
-    id: 'zona-este',
-    nombre: 'Zona Este',
-    distancia_min: 12,
+    id: 'zona-oeste',
+    nombre: 'Zona Oeste',
+    tipo: 'estacionamiento',
+    distancia_min: 8,
     estado: 'medio',
     capacidad_estimada: 45,
     tendencia: 'estable',
-    timestamp: 'actualizado hace 5 min'
+    timestamp: 'actualizado hace 5 min',
+    lat: -30.981249,
+    lng: -64.099398,
+    referencia: 'Parque Autódromo',
+    updatedAt: now - 5 * 60000
   },
   {
     id: 'zona-sur',
     nombre: 'Zona Sur',
-    distancia_min: 20,
+    tipo: 'estacionamiento',
+    distancia_min: 10,
     estado: 'bajo',
     capacidad_estimada: 120,
     tendencia: 'bajando',
-    timestamp: 'actualizado hace 1 min'
+    timestamp: 'actualizado hace 1 min',
+    lat: -30.985337,
+    lng: -64.094209,
+    referencia: 'Predio Ferial / Costanera',
+    updatedAt: now - 1 * 60000
   }
 ];
 

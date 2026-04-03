@@ -8,15 +8,15 @@ interface StatusBannerProps {
 export const StatusBanner = ({ estado, mensaje }: StatusBannerProps) => {
   const config = {
     disponible: {
-      bg: 'bg-[#22c55e]',
+      bg: 'bg-success',
       icon: <CheckCircle size={20} />,
     },
     alerta: {
-      bg: 'bg-[#f59e0b]',
+      bg: 'bg-warning',
       icon: <AlertTriangle size={20} />,
     },
     critico: {
-      bg: 'bg-[#dc2626]',
+      bg: 'bg-danger',
       icon: <AlertCircle size={20} />,
     },
   };

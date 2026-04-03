@@ -9,7 +9,7 @@ interface HeaderProps {
 
 export const Header = ({ title, showBack, onBack, ubicacion }: HeaderProps) => {
   return (
-    <header className="bg-[#1e3a8a] text-white px-4 py-4 shadow-lg">
+    <header className="bg-primary text-white px-4 py-4 shadow-lg">
       <div className="flex items-center justify-between">
         {showBack ? (
           <button

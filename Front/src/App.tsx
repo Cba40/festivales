@@ -1,25 +1,25 @@
-import { useState } from 'react';
-import { Home } from './screens/Home';
-import { Estacionar } from './screens/Estacionar';
-
-type Screen = 'home' | 'estacionar';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import Home from './screens/Home';
+import Estacionar from './screens/Estacionar';
+import Emergencia from './screens/Emergencia';
+import Salir from './screens/Salir';
+import ResolverAhora from './screens/ResolverAhora';
 
 function App() {
-  const [currentScreen, setCurrentScreen] = useState<Screen>('home');
-
-  const handleNavigate = (screen: string) => {
-    setCurrentScreen(screen as Screen);
-  };
-
-  const handleBack = () => {
-    setCurrentScreen('home');
-  };
-
   return (
-    <div className="max-w-md mx-auto bg-white min-h-screen shadow-xl">
-      {currentScreen === 'home' && <Home onNavigate={handleNavigate} />}
-      {currentScreen === 'estacionar' && <Estacionar onBack={handleBack} />}
-    </div>
+    <BrowserRouter>
+      <div className="min-h-screen bg-slate-50 flex justify-center">
+        <div className="w-full max-w-md bg-white min-h-screen relative shadow-lg">
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/estacionar" element={<Estacionar />} />
+            <Route path="/emergencia" element={<Emergencia />} />
+            <Route path="/salir" element={<Salir />} />
+            <Route path="/resolver-ahora" element={<ResolverAhora />} />
+          </Routes>
+        </div>
+      </div>
+    </BrowserRouter>
   );
 }
 

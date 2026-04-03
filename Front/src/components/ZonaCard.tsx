@@ -1,5 +1,5 @@
 import { Navigation, TrendingUp, TrendingDown, Minus } from 'lucide-react';
-import { Zona } from '../data/mockZones';
+import { Zona } from '../types';
 
 interface ZonaCardProps {
   zona: Zona;
@@ -11,28 +11,28 @@ interface ZonaCardProps {
 export const ZonaCard = ({ zona, tipo, distanciaTexto, accionTexto }: ZonaCardProps) => {
   const tipoConfig = {
     primaria: {
-      bg: 'bg-[#22c55e]',
-      border: 'border-[#22c55e]',
+      bg: 'bg-success',
+      border: 'border-success',
       icon: '🟢',
       textColor: 'text-white',
     },
     fallback: {
-      bg: 'bg-[#f59e0b]',
-      border: 'border-[#f59e0b]',
+      bg: 'bg-warning',
+      border: 'border-warning',
       icon: '🟡',
       textColor: 'text-white',
     },
     advertencia: {
-      bg: 'bg-[#dc2626]',
-      border: 'border-[#dc2626]',
+      bg: 'bg-danger',
+      border: 'border-danger',
       icon: '🔴',
       textColor: 'text-white',
     },
     completa: {
-      bg: 'bg-gray-100',
-      border: 'border-gray-300',
+      bg: 'bg-gray-100 dark:bg-slate-800',
+      border: 'border-gray-300 dark:border-slate-600',
       icon: '⚪',
-      textColor: 'text-gray-800',
+      textColor: 'text-gray-800 dark:text-gray-100',
     },
   };
 
@@ -47,7 +47,7 @@ export const ZonaCard = ({ zona, tipo, distanciaTexto, accionTexto }: ZonaCardPr
   return (
     <div className={`${config.bg} ${config.textColor} rounded-xl p-4 shadow-lg`}>
       <div className="flex items-start gap-3">
-        <span className="text-2xl">{config.icon}</span>
+        <span className="text-xl">{config.icon}</span>
         <div className="flex-1">
           <h3 className="font-bold text-lg mb-1">
             {accionTexto || zona.nombre}

@@ -1,50 +1,72 @@
 const CACHE_NAME = 'festival-jm-v1';
-const OFFLINE_URL = '/';
-
-const urlsToCache = [
+const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/src/main.tsx',
-  '/src/App.tsx',
-  '/src/index.css',
+  '/manifest.json',
+  '/icon-192.svg',
+  '/icon-512.svg',
 ];
 
+// Install: cachear assets estáticos
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(urlsToCache);
+      return cache.addAll(STATIC_ASSETS);
     })
   );
   self.skipWaiting();
 });
 
+// Activate: limpiar caches viejas
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
+    caches.keys().then((keys) => {
       return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
-        })
+        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
       );
     })
   );
   self.clients.claim();
 });
 
+// Fetch: estrategia cache-first para navegación y assets estáticos
 self.addEventListener('fetch', (event) => {
-  if (event.request.mode === 'navigate') {
+  const { request } = event;
+
+  // Navegación HTML: cache-first
+  if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request).catch(() => {
-        return caches.match(OFFLINE_URL);
+      caches.match(request).then((cached) => {
+        return cached || fetch(request);
       })
     );
-  } else {
-    event.respondWith(
-      caches.match(event.request).then((response) => {
-        return response || fetch(event.request);
-      })
-    );
+    return;
   }
+
+  // Assets estáticos (JS/CSS generados por Vite): cache-first
+  if (request.url.includes('/assets/') || request.url.endsWith('.js') || request.url.endsWith('.css')) {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        return cached || fetch(request);
+      })
+    );
+    return;
+  }
+
+  // API calls: network-first con fallback a cache (para futuro backend)
+  if (request.url.includes('/api/')) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          return response;
+        })
+        .catch(() => caches.match(request))
+    );
+    return;
+  }
+
+  // Default: network
+  event.respondWith(fetch(request));
 });
