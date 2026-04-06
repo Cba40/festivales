@@ -1,755 +1,643 @@
-# 📊 INFORME TÉCNICO — MVP Festivales Jesús María
+# 📋 INFORME TÉCNICO — Festival Jesús María MVP
 
-> **Fecha de generación:** 3 de abril de 2026
-> **Última actualización:** 3 de abril de 2026 (commit `0634a7e`)
-> **Estado del proyecto:** ~90% completado (MVP funcional + confianza + fallback)
-> **Directorio raíz:** `d:\CBA 4.0\Festivales\Front`
-> **Repositorio:** `https://github.com/Cba40/festivales` (branch `main`)
-
----
-
-## 1. 📊 RESUMEN EJECUTIVO
-
-| Campo | Valor |
-|-------|-------|
-| **Nombre** | Festival Jesús María — Sistema de Decisión |
-| **Objetivo** | Guiar asistentes del evento en tiempo real: estacionamiento, emergencias, evacuación |
-| **Estado** | MVP funcional con 5 pantallas, PWA base, datos mock, sistema de confianza |
-| **% Completado** | ~90% (núcleo completo + mejoras de confiabilidad, pendiente backend + test offline) |
-| **Fecha** | 3 de abril de 2026 |
-| **Git** | ✅ Commit + push completado (`0634a7e`) |
+**Versión:** MVP v1.0  
+**Última actualización:** 6 de abril de 2026  
+**Estado:** ✅ Fases 3A-3E completadas  
+**Build:** ✅ Limpio (260.37 kB)
 
 ---
 
-## 2. 🛠️ STACK TECNOLÓGICO
+## 1. 🎯 VISIÓN GENERAL DEL PROYECTO
 
-### Frontend
-| Tecnología | Versión | Uso |
-|------------|---------|-----|
-| React | 18.3.1 | UI library |
-| TypeScript | 5.5.3 | Tipado estático |
-| React Router DOM | 6.20.0 | Navegación SPA |
-| Vite | 5.4.2 | Build tool + dev server |
-| TailwindCSS | 3.4.1 | Utility-first CSS |
-| Lucide React | 0.344.0 | Iconografía |
-| PostCSS | — | Procesamiento CSS |
-| Autoprefixer | — | Vendor prefixes |
+### Propósito
+Aplicación PWA de soporte de decisiones en tiempo real para navegación de eventos masivos (Festival Jesús María, Córdoba, Argentina). Orientada a usuarios en la periferia del evento que necesitan resolver necesidades prácticas: estacionamiento, transporte, comida, salida, emergencia y alojamiento.
 
-### PWA
-| Feature | Archivo |
-|---------|---------|
-| Manifest | `public/manifest.json` |
-| Service Worker | `public/sw.js` |
-| Icono 192px | `public/icon-192.svg` |
-| Icono 512px | `public/icon-512.svg` |
-| Offline Hook | `src/hooks/useOffline.ts` |
+### Contexto de Uso
+- **Evento masivo** con +100,000 asistentes
+- **Periferia del evento**: usuarios que llegan/se van durante ventanas horarias críticas
+- **Condiciones variables**: saturación de zonas, disponibilidad cambiante, congestión vehicular
+- **Uso móvil**: optimizado para smartphones con conexión intermitente (offline detection)
 
-### Datos
-| Tipo | Archivos |
-|------|----------|
-| Mock data | `src/data/mockZones.ts`, `mockEmergencia.ts`, `mockSalidas.ts`, `mockResolver.ts` |
-| Types | `src/types/index.ts` |
-| Utils | `src/utils/confianza.ts`, `formatTime.ts`, `tipoRecomendado.ts` |
-
-### Herramientas
-| Herramienta | Versión |
-|-------------|---------|
-| Node.js | v22.x |
-| npm | — |
-| ESLint | 9.9.1 |
-| VS Code + Qwen AI | — |
-
-### Dependencias no utilizadas
-| Paquete | Versión | Estado |
-|---------|---------|--------|
-| @supabase/supabase-js | 2.57.4 | Instalado, sin inicializar |
+### Principios de Diseño
+1. **Máximo 2 opciones** en modos guiados (`guiar`/`asistir`)
+2. **Nunca mostrar zonas colapsadas** como alternativa principal
+3. **Emergencia siempre prioritaria** con modo `guiar`
+4. **Datos separados de lógica**: arquitectura lista para carga externa (JSON/API)
+5. **Sin breaking changes**: módulos coexisten sin romper funcionalidad existente
 
 ---
 
-## 3. 📁 ESTRUCTURA DE CARPETAS
+## 2. 🏗️ ARQUITECTURA DEL SISTEMA
+
+### Diagrama de Capas
 
 ```
-Front/
-├── public/
-│   ├── manifest.json
-│   ├── sw.js
-│   ├── icon-192.svg
-│   └── icon-512.svg
-├── src/
-│   ├── components/
-│   │   ├── Header.tsx
-│   │   ├── ActionButton.tsx
-│   │   ├── StatusBanner.tsx
-│   │   └── ZonaCard.tsx
-│   ├── screens/
-│   │   ├── Home.tsx
-│   │   ├── Estacionar.tsx
-│   │   ├── Emergencia.tsx
-│   │   ├── Salir.tsx
-│   │   └── ResolverAhora.tsx
-│   ├── data/
-│   │   ├── mockZones.ts
-│   │   ├── mockEmergencia.ts
-│   │   ├── mockSalidas.ts
-│   │   └── mockResolver.ts
-│   ├── types/
-│   │   └── index.ts
-│   ├── hooks/
-│   │   └── useOffline.ts
-│   ├── utils/
-│   │   ├── confianza.ts
-│   │   ├── formatTime.ts
-│   │   └── tipoRecomendado.ts
-│   ├── App.tsx
-│   ├── main.tsx
-│   ├── index.css
-│   └── vite-env.d.ts
-├── .gitignore
-├── eslint.config.js
-├── index.html
-├── package.json
-├── package-lock.json
-├── postcss.config.js
-├── tailwind.config.js
-├── tsconfig.json
-├── tsconfig.app.json
-├── tsconfig.node.json
-└── vite.config.ts
+┌─────────────────────────────────────────────────────────┐
+│                    CAPA DE PRESENTACIÓN                 │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────┐ │
+│  │  Home    │  │Estacionar│  │  Salir   │  │Emerg.  │ │
+│  └──────────┘  └──────────┘  └──────────┘  └────────┘ │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────┐ │
+│  │Transp.   │  │  Comer   │  │  Dormir  │  │Serv.   │ │
+│  └──────────┘  └──────────┘  └──────────┘  └────────┘ │
+└─────────────────────────┬───────────────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────────────┐
+│                    CAPA DE LÓGICA                       │
+│  ┌──────────────────────────────────────────────────┐   │
+│  │           decisionEngine.ts (CORE)               │   │
+│  │  • calcularScore()                               │   │
+│  │  • getModo()                                     │   │
+│  │  • getUmbralContexto()                           │   │
+│  └──────────────────────────────────────────────────┘   │
+│  ┌────────────┐  ┌──────────────┐  ┌───────────────┐   │
+│  │mockZones.ts│  │mockSalidas.ts│  │mockTransporte │   │
+│  │  scoring   │  │  scoring     │  │  modos        │   │
+│  └────────────┘  └──────────────┘  └───────────────┘   │
+│  ┌────────────┐  ┌──────────────┐  ┌───────────────┐   │
+│  │mockComer   │  │mockResolver  │  │exitSession    │   │
+│  │  modos     │  │  inferencia  │  │  controller   │   │
+│  └────────────┘  └──────────────┘  └───────────────┘   │
+└─────────────────────────┬───────────────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────────────┐
+│                    CAPA DE DATOS                        │
+│  ┌──────────────────────────────────────────────────┐   │
+│  │         eventoData.ts (Single Source of Truth)   │   │
+│  │  • estacionamiento[]                             │   │
+│  │  • transporte[]                                  │   │
+│  │  • comer[]                                       │   │
+│  │  • salidas[]                                     │   │
+│  │  • servicios[]                                   │   │
+│  │  • pernoctar[]                                   │   │
+│  └──────────────────────────────────────────────────┘   │
+│  ┌────────────┐  ┌──────────────┐  ┌───────────────┐   │
+│  │eventoConfig│  │contextoEvento│  │   tipos       │   │
+│  │  fases     │  │  hora        │  │   globales    │   │
+│  └────────────┘  └──────────────┘  └───────────────┘   │
+└─────────────────────────────────────────────────────────┘
 ```
 
-**Total:** 29 archivos fuente (excluyendo node_modules, dist, .git, lock files)
+### Flujo de Datos entre Módulos
+
+```
+1. Usuario abre screen (ej: Estacionar)
+   ↓
+2. Screen importa datos de eventoData.ts
+   ↓
+3. Screen importa lógica de mockZones.ts (getZonasOrdenadas, getModoEstacionamiento)
+   ↓
+4. mockZones.ts usa decisionEngine.ts (calcularScore, getModo, getUmbralContexto)
+   ↓
+5. decisionEngine.ts calcula scores basados en datos + contexto temporal
+   ↓
+6. Screen renderiza resultado según modo determinado
+```
+
+### decisionEngine como Núcleo Unificado
+
+El `decisionEngine.ts` es el **corazón algorítmico** del sistema. Proporciona:
+
+- **`calcularScore()`**: Fórmula genérica de scoring aplicable a cualquier módulo
+- **`getModo()`**: Determina modo de respuesta basado en scores y umbrales
+- **`getUmbralContexto()`**: Ajusta umbrales según hora del evento
+
+**Módulos que lo usan:**
+- ✅ Estacionar (scoring + modos)
+- ✅ Salir (modos, scoring propio)
+- ✅ Transporte (scoring + modos)
+- ✅ Comer (scoring + modos + offset +10)
 
 ---
 
-## 4. 🖥️ PANTALLAS IMPLEMENTADAS
+## 3. 📦 MÓDULOS IMPLEMENTADOS
 
-### 4.1 Home.tsx
-| Campo | Valor |
-|-------|-------|
-| **Propósito** | Punto de entrada principal |
-| **Estado local** | Ninguno (solo navegación) |
-| **Archivo** | `src/screens/Home.tsx` |
-
-**Componentes usados:**
-- `Header` — título "Festival Jesús María" + ubicación "Zona Centro"
-- `StatusBanner` — estado "alerta", mensaje "Zona con alta demanda"
-- `QuickAction` (x7) — grid de accesos rápidos y servicios
-- Botón secundario — "Resolver ahora" (estilo secundario, abajo de todo)
-
-**Navegación:**
-| Botón | Ruta destino |
-|-------|-------------|
-| 🚨 Emergencia | `/emergencia` |
-| 🚗 Estacionar | `/estacionar` |
-| 🚪 Salir | `/salir` |
-| ❓ Resolver ahora | `/resolver-ahora` |
-| 🚌 Transporte | `alert('Próximamente')` |
-| 🍽 Comer | `alert('Puntos de comida cercanos')` |
-| 🛏 Descansar | `alert('Zonas de descanso')` |
-| 🧭 Servicios | `alert('Otros servicios')` |
-
-**Estructura visual:**
-```
-Header → StatusBanner → Accesos Rápidos (3-col) → Servicios (4-col)
-→ Resolver Ahora (botón secundario, borde superior)
-```
-
-**Cambios recientes:**
-- "Resolver ahora" movido debajo de Accesos Rápidos (estilo secundario, no botón grande)
-- "Movilidad" renombrado a "Transporte"
-- Botón navega a `/resolver-ahora` (no directo a `/estacionar`)
+| Módulo | Tipo | Usa Engine | Estado | Descripción |
+|--------|------|-----------|--------|-------------|
+| **Emergencia** | Protocolo | ❌ No | ✅ Completo | Pasos predefinidos por tipo de emergencia (extraviado, herido, ayuda general) con sub-clasificación y CTAs a Google Maps/llamada |
+| **Estacionar** | Híbrido | ✅ Sí | ✅ Completo | Scoring con disponibilidad + distancia + estado. 4 modos: sin_solucion, guiar, asistir, informar |
+| **Salir** | Híbrido | ✅ (modos) | ✅ Completo | exitSessionController con cooldown 60s. Selector de tipo (auto/transporte/peatonal). Scoring por tipo con penalizaciones específicas |
+| **Transporte** | Decisión | ✅ Sí | ✅ Completo | Scoring con espera_min + distancia + estado. 4 modos de respuesta |
+| **Comer** | Decisión | ✅ Sí | ✅ Completo | Scoring con espera_min + offset +10. 4 modos de respuesta |
+| **ResolverAhora** | Inferencia | ✅ Sí | ✅ Completo | Motor de inferencia que deduce necesidad del usuario basado en hora, fase y saturación |
+| **Dormir/Pernoctar** | Informativo | ❌ No | ✅ Completo | Listado de alojamiento municipal (hoteles, camping, hostels) con CTAs de llamar/ir |
+| **Servicios Generales** | Informativo | ❌ No | ✅ Completo | Grid de servicios (baños, hidratación, descanso, salud) con filtro por subtipo |
 
 ---
 
-### 4.2 Estacionar.tsx
-| Campo | Valor |
-|-------|-------|
-| **Propósito** | Guiar usuario a zona de estacionamiento disponible |
-| **Archivo** | `src/screens/Estacionar.tsx` (~530 líneas) |
-| **Estado local** | `selectedZone: Zona | null`, `showLejanas: boolean` |
-| **Datos** | `mockZones.ts` (4 zonas con `updatedAt`) |
+## 4. 🧠 DECISIONENGINE — ESPECIFICACIÓN TÉCNICA
 
-**5 modos de renderizado condicional:**
+### Fórmula de Scoring Base
 
-| Modo | Condición | UI |
-|------|-----------|-----|
-| **FALLBACK FINAL** | Todas colapsadas + sin zonas lejanas | "No hay opciones disponibles" → Esperar / Mantener posición |
-| **INFORMAR** | `!getModoGuiar()` | Lista de zonas disponibles como cards clickeables |
-| **ASISTIR** | Zonas disponibles, no todas colapsadas | Zona recomendada (ZonaCard primaria) + fallback (ZonaCard fallback) + lista otras zonas |
-| **GUIAR** | Todas colapsadas + hay zonas lejanas | Advertencia + 2 estrategias + botón ver lejanas + reintentar |
-| **GUIAR COMPLETO** | 6 bloques | Estado zona actual + acción principal + tiempo estimado + riesgo + fallback + advertencia + botón mapa |
+```ts
+score = distancia_min * 1.5 + espera_min * 2.5 + penalizaciónEstado
 
-**Lógica de scoring:**
-```typescript
-Score = disponibilidadScore + tendenciaScore + (distancia_min * -1)
-
-disponibilidadScore: bajo=100, medio=60, alto=20, colapsado=0
-tendenciaScore: bajando=+20, estable=0, subiendo=-10
-```
-
-**Features de confianza (agregadas):**
-- `getConfianza(zona.estado)` → deriva confianza del estado (bajo→alta, medio→media, alto/colapsado→baja)
-- `getConfianzaLabel()` → muestra "✅ Alta probabilidad", "⚠️ Últimos lugares", "❗ Disponibilidad incierta"
-- Visible en cards de zonas (modo INFORMAR, ASISTIR, GUIAR COMPLETO, bottom sheets)
-
-**Formato de tiempo (agregado):**
-- `formatUpdatedAt(zona.updatedAt)` → "Hace X min" / "Actualizado recién" / "Datos estimados"
-- Reemplaza `timestamp` estático en todas las pantallas
-
-**Fallback final (agregado):**
-```typescript
-if (todasColapsadas && zonasLejanas.length === 0) {
-  // "No hay opciones disponibles" → Esperar 15-20 min / Mantener posición
-}
-if (todasColapsadas && zonasLejanas.length > 0) {
-  // Botón "Ver opciones lejanas" → bottom sheet con máximo 2 zonas
-  // Botón "Reintentar en 15 min" → window.location.reload()
+// Penalización por estado
+penalizaciónEstado = {
+  bajo: 0,
+  medio: 5,
+  alto: 15,
+  colapsado: 30
 }
 ```
 
-**Flujo:**
-```
-Home → Estacionar → Calcula score → Determina modo → Muestra zonas
-→ Click en zona → Bottom sheet → "Iniciar ruta" → Google Maps
-```
+**Pesos por variable de dominio:**
+- **Distancia**: `1.5` (impacto moderado)
+- **Espera**: `2.5` (impacto alto, más importante que distancia)
+- **Estado**: penalización fija según nivel de congestión
 
-**Coordenadas reales (Jesús María, Córdoba):**
-| Zona | Lat | Lng | Referencia |
-|------|-----|-----|------------|
-| Zona Centro (actual) | -30.978107 | -64.094779 | Plaza Principal / Iglesia |
-| Zona Norte | -30.973313 | -64.088529 | Barrio Norte / Terminal |
-| Zona Oeste | -30.981249 | -64.099398 | Parque Autódromo |
-| Zona Sur | -30.985337 | -64.094209 | Predio Ferial / Costanera |
+### Modos de Decisión
 
----
+| Modo | Condición | Comunicación | Ejemplo |
+|------|-----------|--------------|---------|
+| `sin_solucion` | score > umbral **O** todas colapsadas | "No hay opciones convenientes" | "Todos los estacionamientos están colapsados" |
+| `guiar` | score < umbral, opciones disponibles | "Dirigite ahora" | "Zona Sur tiene disponibilidad, andá ahora" |
+| `asistir` | score cercano a umbral, opciones limitadas | "Mejor opción ahora" | "Zona Oeste es la mejor disponible" |
+| `informar` | datos insuficientes o todo normal | Lista neutra | "Estas son las opciones disponibles" |
 
-### 4.3 Emergencia.tsx
-| Campo | Valor |
-|-------|-------|
-| **Propósito** | Protocolo de acción en emergencia |
-| **Archivo** | `src/screens/Emergencia.tsx` (~560 líneas) |
-| **Estado local** | `selectedType`, `helpSubType`, `inconsciente`, `bottomSheet`, `mostrarLlamar` |
-| **Datos** | `mockEmergencia.ts` (con `updatedAt`) |
+### Algoritmo de Determinación de Modo
 
-**3 tipos de emergencia:**
-| Tipo | Emoji | Protocolo |
-|------|-------|-----------|
-| Niño Perdido | 👶 | "QUEDATE EN EL LUGAR" → Buscar personal seguridad → Fallback: punto seguro |
-| Persona Herida | 🤕 | "NO LA MUEVAS" → Toggle inconsciente (alerta pulsante) → Buscar ayuda → Fallback: puesto sanitario |
-| Necesito Ayuda | 🆘 | Sub-tipos: Seguridad / Salud / Orientación |
-
-**Patrón de timeout:**
-```typescript
-useEffect(() => {
-  const timer = setTimeout(() => setMostrarLlamar(true), 5000)
-  return () => clearTimeout(timer)
-}, [selectedType, helpSubType])
-```
-Botón "Llamar ahora" aparece después de 5 segundos de inactividad.
-
-**Datos de emergencia:**
-| Recurso | Cantidad | Ejemplo |
-|---------|----------|---------|
-| Puntos Seguros | 3 | Destacamento Policial, Puesto de Salud Municipal, Oficina de Información |
-| Puestos Sanitarios | 2 | Puesto Sanitario Principal, Posta Médica Norte |
-
-**Flujo:**
-```
-Home → Emergencia → Selección tipo → Sub-tipo (si aplica)
-→ Protocolo específico → Llamar / Ver punto seguro → Google Maps
+```ts
+getModo(items, umbral):
+  1. Si no hay items → sin_solucion
+  2. Si mejor.score > umbral → sin_solucion
+  3. Si TODAS colapsadas → sin_solucion
+  4. Si TODAS saturadas (alto/colapsado) → guiar
+  5. Si MAYORÍA saturadas → asistir
+  6. Si resto → informar
 ```
 
-**Fix reciente — Seguridad (Necesito Ayuda):**
-- **Antes:** Botón "Llamar ahora" duplicado, sin navegación a punto seguro
-- **Ahora:** Botón principal "🗺️ Ver ruta" → Google Maps al Destacamento Policial (`-30.9785, -64.0950`)
-- Botón secundario "📞 Llamar asistencia" (estilo borde, opcional)
-- Mismo patrón visual que el bloque "Salud"
+### Umbrales Contextuales
 
----
-
-### 4.4 Salir.tsx
-| Campo | Valor |
-|-------|-------|
-| **Propósito** | Evacuación del evento |
-| **Archivo** | `src/screens/Salir.tsx` (~210 líneas) |
-| **Estado local** | `tipo: 'auto' | 'transporte' | 'peatonal'`, `selectedZona: ZonaSalida | null` |
-| **Datos** | `mockSalidas.ts` (5 zonas con `updatedAt`) |
-
-**Estructura visual (orden exacto):**
-```
-0. Badge "Recomendado ahora" (pre-selecciona tipo)
-1. Selector (Auto / Transporte / Caminando) — grid 3 columnas
-2. Mensaje principal — "Dirigite ahora a {nombre}"
-3. Bloque principal (compacto) — referencia, distancia, congestión, formatUpdatedAt, tiempo estimado
-4. Alternativa — "Si está saturado → {nombre}"
-5. Advertencia — zona colapsada (si aplica)
-6. Acción — "Iniciar ruta" → Google Maps
+```ts
+getUmbralContexto(hora):
+  0-2h   → 100  (salida masiva, umbral alto)
+  21-23h → 90   (pico de ingreso, umbral medio-alto)
+  resto  → 80   (normal, umbral base)
 ```
 
-**Badge recomendado (agregado):**
-```typescript
-const tipoRecomendado = getTipoRecomendado(zonasSalida)
-const [tipo, setTipo] = useState<TipoTransporte>(tipoRecomendado)
-```
-- Muestra "👉 Recomendado ahora: 🚗 Auto (tocar para aplicar)"
-- Pre-selecciona el tipo óptimo pero el usuario puede cambiarlo
+**Racional:** Durante picos de demanda, el sistema es más exigente (umbral más alto) para evitar recomendar zonas saturadas.
 
-**Saturación total (agregada):**
-```typescript
-const todasMal = zonasFiltradas.every(z =>
-  z.congestion === 'alta' || z.congestion === 'colapsado'
-)
-// Muestra advertencia: "🚧 Salidas saturadas → Esperar 10-15 min / Alejarse caminando"
+### Dominios con Scoring Propio
+
+**Estacionamiento:**
+```ts
+score = distancia_min * 1.5 + (100 - disponibilidad) * 1.0 + penalizaciónEstado
 ```
 
-**Confianza por congestión (agregada):**
-```typescript
-const congestionLabel = opcionPrincipal
-  ? opcionPrincipal.congestion === 'baja'
-    ? '✅ Alta probabilidad de salida fluida'
-    : opcionPrincipal.congestion === 'media'
-      ? '⚠️ Demoras posibles'
-      : '❗ Alta congestión — riesgo de demora'
-  : ''
-```
+**Salidas (por tipo):**
+```ts
+score_base = distancia_min <= 5 ? 1 : distancia_min <= 10 ? 2 : 3
+score = score_base + congestiónPenalty + ajustesPorTipo
 
-**Lógica de scoring diferenciada por tipo:**
-```typescript
-Score base: distancia <= 5min → 1, <= 10min → 2, > 10min → 3
-Penalización congestión: baja=1, media=2, alta=4, colapsado=6
-
-Ajuste por tipo:
-  Auto:        +3 si congestión alta/colapsado (evitar calles trabadas)
-  Transporte:  +espera_estimada_min (considerar demora)
-  Peatonal:    +2 si es_embudo (evitar cuellos de botella)
-```
-
-**Filtrado cruzado por tipo:**
-| Tipo seleccionado | Zonas incluidas |
-|-------------------|-----------------|
-| Auto | `tipo === 'auto'` + `tipo === 'peatonal'` |
-| Transporte | `tipo === 'transporte'` + `tipo === 'peatonal'` |
-| Peatonal | `tipo === 'peatonal'` + `tipo === 'auto'` |
-
-**Zonas de salida (coordenadas reales):**
-| Zona | Tipo | Lat | Lng | Referencia | Congestión |
-|------|------|-----|-----|------------|------------|
-| Salida Norte | auto | -30.973313 | -64.088529 | Terminal de Ómnibus | media |
-| Salida Sur | transporte | -30.985337 | -64.094209 | Predio Ferial | baja |
-| Salida Este | peatonal | -30.981249 | -64.075000 | Av. Colón y Costanera | baja |
-| Salida Oeste | auto | -30.981249 | -64.099398 | Parque Autódromo | alta |
-| Salida Centro | peatonal | -30.978107 | -64.094779 | Plaza Principal / Iglesia | colapsado |
-
-**Confirmación: cambiar tipo cambia la recomendación**
-| Tipo | Mejor zona | Score aproximado |
-|------|-----------|-----------------|
-| Auto | Salida Norte | 2 (distancia) + 2 (congestión) = 4 |
-| Transporte | Salida Sur | 2 (distancia) + 1 (congestión) + 2 (espera) = 5 |
-| Peatonal | Salida Este | 2 (distancia) + 1 (congestión) = 3 |
-
----
-
-### 4.5 ResolverAhora.tsx
-| Campo | Valor |
-|-------|-------|
-| **Propósito** | Decisión automática sin preguntar al usuario |
-| **Archivo** | `src/screens/ResolverAhora.tsx` |
-| **Estado local** | `selectedZona: ZonaSalida | Zona | null` |
-| **Datos** | `mockResolver.ts` + `mockZones.ts` + `mockSalidas.ts` |
-
-**7 reglas de inferencia:**
-
-| # | Regla | Condición | Tipo | Modo | Confianza |
-|---|-------|-----------|------|------|-----------|
-| 1 | Llegada | 18:00–21:00 | estacionar | guiar | alta |
-| 2 | Pico/Ingreso | 21:00–23:00 | estacionar | guiar | alta |
-| 3 | Dentro evento | 22:00–01:00 | salir | asistir | media |
-| 4 | Salida masiva | 00:00–02:00 | salir | guiar | alta |
-| 5 | Colapsado total | saturación = colapsada | salir | guiar | baja |
-| 6 | Repite acción | ultimaAccion = 'estacionar' | estacionar | asistir | media |
-| 7 | Fallback | ninguna aplica | fallback | informar | baja |
-
-**Estructura visual — Inferencia exitosa (80%):**
-```
-1. Contexto (zona, hora, saturación) — texto pequeño
-2. Mensaje principal — bg-primary, texto grande
-3. Zona principal — bg-success, clickable → bottom sheet
-4. Alternativa — bg-slate-100, clickable
-5. Botón "Iniciar ruta" — Google Maps
-6. Indicador de confianza — ✅ / ⚠️
-```
-
-**Estructura visual — Fallback (20%):**
-```
-Contexto → "No estoy seguro qué necesitás..." → 3 opciones máximo:
-  🚗 Moverme → /estacionar
-  🚪 Salir → /salir
-  🚨 Emergencia → /emergencia
+// Ajustes por tipo de salida
+if tipo == 'auto' && (estado == 'alto' || 'colapsado'):
+  score += 3
+if tipo == 'transporte':
+  score += espera_estimada_min
+if tipo == 'peatonal' && es_embudo:
+  score += 2
 ```
 
 ---
 
-## 5. 🧠 LÓGICA DE NEGOCIO
+## 5. 📊 EVENTODATA — FUENTE ÚNICA DE DATOS
 
-### 5.1 Scoring System — Estacionar
+### Estructura de Tipos
 
-**Archivo:** `src/data/mockZones.ts`
+```ts
+// Base compartida
+interface PuntoBase {
+  id: string
+  nombre: string
+  lat: number
+  lng: number
+  referencia: string
+  distancia_min: number
+  updatedAt: number  // timestamp
+}
 
-```typescript
-Score = disponibilidadScore + tendenciaScore + (distancia_min * -1)
+// Estacionamiento
+interface ZonaEstacionamiento extends PuntoBase {
+  tipo: 'estacionamiento'
+  disponibilidad: number  // 0-100 (%)
+  estado: 'bajo' | 'medio' | 'alto' | 'colapsado'
+}
 
-disponibilidadScore:
-  bajo → 100
-  medio → 60
-  alto → 20
-  colapsado → 0
+// Transporte
+interface ParadaTransporte extends PuntoBase {
+  tipo: 'transporte'
+  espera_min: number
+  estado: 'bajo' | 'medio' | 'alto' | 'colapsado'
+  calle: string
+}
 
-tendenciaScore:
-  bajando → +20
-  estable → 0
-  subiendo → -10
+// Comida
+interface PuntoComida extends PuntoBase {
+  tipo: 'comer'
+  espera_min: number
+  estado: 'bajo' | 'medio' | 'alto' | 'colapsado'
+  categoria: 'rapido' | 'comida' | 'bebida'
+}
+
+// Salidas
+interface ZonaSalida extends PuntoBase {
+  tipo: 'salida'
+  transporte: 'auto' | 'transporte' | 'peatonal'
+  estado: 'bajo' | 'medio' | 'alto' | 'colapsado'
+  espera_min: number
+  capacidad_estimada?: number
+  es_embudo?: boolean
+}
+
+// Servicios
+interface PuntoServicio extends PuntoBase {
+  tipo: 'servicio'
+  subtipo: 'banos' | 'hidratacion' | 'descanso' | 'salud'
+}
+
+// Pernoctar
+interface PuntoPernoctar extends PuntoBase {
+  tipo: 'pernoctar'
+  categoria: 'hotel' | 'hostel' | 'camping' | 'hospedaje'
+  disponibilidad?: 'disponible' | 'consultar' | 'completo'
+  telefono?: string
+  web?: string
+}
 ```
 
-Mayor score = mejor opción. Se ordena descendente.
+### Estructura de eventoData
 
-### 5.2 Scoring System — Salir
-
-**Archivo:** `src/data/mockSalidas.ts`
-
-```typescript
-Score base:
-  distancia <= 5 min → 1
-  distancia <= 10 min → 2
-  distancia > 10 min → 3
-
-Penalización congestión:
-  baja → 1
-  media → 2
-  alta → 4
-  colapsado → 6
-
-Ajuste por tipo:
-  Auto:        +3 si congestión alta/colapsado
-  Transporte:  +espera_estimada_min
-  Peatonal:    +2 si es_embudo
+```ts
+export const eventoData = {
+  estacionamiento: ZonaEstacionamiento[]
+  transporte: ParadaTransporte[]
+  comer: PuntoComida[]
+  salidas: ZonaSalida[]
+  servicios: PuntoServicio[]
+  pernoctar: PuntoPernoctar[]
+}
 ```
 
-Menor score = mejor opción. Se ordena ascendente.
+### Carga de Datos
 
-### 5.3 Inferencia — Resolver Ahora
+| Fase | Método | Estado |
+|------|--------|--------|
+| **MVP (actual)** | JSON estático en `eventoData.ts` | ✅ Implementado |
+| **Futuro (4A)** | `evento-data.json` externo cargado dinámicamente | ⏳ Pendiente |
+| **Futuro (4B)** | API municipal con panel de administración | ⏳ Pendiente |
 
-**Archivo:** `src/data/mockResolver.ts`
-
-```typescript
-function inferirNecesidad(hora, saturacion, zonaActual, ultimaAccion): ResultadoInferencia
-
-Reglas (se evalúan en orden, primera que aplica gana):
-  1. hora 18-21 → estacionar (llegada)
-  2. hora 21-23 → estacionar guiar (pico)
-  3. hora 22-01 → salir asistir (dentro evento)
-  4. hora 00-02 → salir guiar (salida masiva)
-  5. saturacion colapsada → salir guiar (zona lejana)
-  6. ultimaAccion === 'estacionar' → estacionar asistir
-  7. fallback → 3 opciones
-```
-
-### 5.4 Helpers de Confiabilidad
-
-**`src/utils/confianza.ts`:**
-```typescript
-getConfianza(estado) → 'alta' | 'media' | 'baja'
-  bajo → 'alta'
-  medio → 'media'
-  alto/colapsado → 'baja'
-
-getConfianzaLabel(confianza) → string
-  'alta' → '✅ Alta probabilidad'
-  'media' → '⚠️ Últimos lugares'
-  'baja' → '❗ Disponibilidad incierta'
-```
-
-**`src/utils/formatTime.ts`:**
-```typescript
-formatUpdatedAt(ts: number) → string
-  < 1 min → 'Actualizado recién'
-  < 60 min → 'Hace X min'
-  >= 60 min → 'Datos estimados'
-```
-
-**`src/utils/tipoRecomendado.ts`:**
-```typescript
-getTipoRecomendado(zonas) → 'auto' | 'transporte' | 'peatonal'
-  Cuenta zonas no-colapsadas por tipo
-  Si auto = 0 → 'peatonal'
-  Si transporte = 0 y peatonal > 0 → 'peatonal'
-  Default → 'auto'
-```
-
-### 5.5 Modos de Respuesta
-
-| Modo | Cuándo se activa | UI resultante |
-|------|------------------|---------------|
-| **INFORMAR** | Baja saturación, zonas disponibles | Lista de opciones clickeables |
-| **ASISTIR** | Media saturación, algunas zonas disponibles | 1 recomendada + 1 alternativa |
-| **GUIAR** | Alta/Colapsada saturación | Decisión directiva + alternativas limitadas |
-| **FALLBACK** | Ninguna regla de inferencia aplica | 3 opciones máximo |
-| **FALLBACK FINAL** | Todas colapsadas + sin zonas lejanas | "No hay opciones" → Esperar / Mantener posición |
+**Ventaja de la arquitectura actual:** Los datos están separados de la lógica, permitiendo migrar a carga externa sin modificar el decisionEngine ni las screens.
 
 ---
 
-## 6. 🔄 FLUJOS CRÍTICOS
+## 6. 🚪 SALIR — EXITSESSIONCONTROLLER
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                              HOME                                │
-│  Header + StatusBanner + Accesos Rápidos + Servicios + Resolver  │
-└─────────────────────────────────────────────────────────────────┘
-                               │
-    ┌──────────────────────────┼──────────────────────────┐
-    ▼                          ▼                          ▼
-┌──────────┐          ┌──────────────┐          ┌──────────────┐
-│Emergencia│          │ Estacionar   │          │    Salir     │
-│ 3 tipos  │          │ 5 modos      │          │ 3 tipos trans│
-└──────────┘          └──────────────┘          └──────────────┘
-    │                          │                          │
-    ▼                          ▼                          ▼
-┌──────────┐          ┌──────────────┐          ┌──────────────┐
-│Protocolo │          │ Score +      │          │ Score por    │
-│ Acción   │          │ Confianza    │          │ tipo + badge │
-│ Timeout  │          │ Bottom Sheet │          │ Bottom Sheet │
-│ 5 seg    │          │ Fallback     │          │ Saturación   │
-└──────────┘          └──────────────┘          └──────────────┘
-    │                          │                          │
-    ▼                          ▼                          ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Google Maps (window.open)                     │
-│  https://www.google.com/maps/dir/?api=1&destination=lat,lng     │
-└─────────────────────────────────────────────────────────────────┘
+### Propósito
+Prevenir cambios frecuentes de modo en la pantalla "Salir" que podrían confundir al usuario durante situaciones de estrés (salida masiva del evento).
 
-┌─────────────────────────────────────────────────────────────────┐
-│                        Resolver Ahora                            │
-│  Inferencia automática (7 reglas por hora + saturación + zona)  │
-│  → 80%: 1 decisión + 1 alternativa → Google Maps                │
-│  → 20%: 3 opciones máximo → rutas existentes                    │
-└─────────────────────────────────────────────────────────────────┘
+### Estado de Sesión
+
+```ts
+interface ExitSessionState {
+  modoActual: 'sin_solucion' | 'guiar' | 'asistir' | 'informar'
+  rutaActual: string | null
+  ultimoCambio: number  // timestamp (ms)
+}
 ```
 
----
+### Reglas de Estabilidad (MVP)
 
-## 7. 🎨 SISTEMA DE DISEÑO
+```ts
+puedeCambiarModo(nuevoModo, estado):
+  1. mismo modo → false (no hacer nada)
+  2. cooldown 60s transcurrido → false (esperar)
+  3. nuevoModo == 'sin_solucion' → true (seguridad siempre)
+  4. resto → true (permitir cambio)
+```
 
-### Colores (tailwind.config.js)
+### API del Controller
 
-| Token | Hex | Uso |
-|-------|-----|-----|
-| `primary` | `#1e3a8a` | Headers, botones principales, navegación |
-| `success` | `#22c55e` | Zonas disponibles, estado positivo |
-| `warning` | `#f59e0b` | Banners alerta, estado "alto" |
-| `danger` | `#dc2626` | Emergencias, estado crítico, colapsado |
+```ts
+// Crear estado inicial
+crearExitSession(modoInicial: Modo): ExitSessionState
 
-**Escala secundaria:**
-| Uso | Clases Tailwind |
-|-----|-----------------|
-| Fondo claro | `bg-gray-50`, `bg-white` |
-| Fondo oscuro | `dark:bg-slate-800`, `dark:bg-slate-900` |
-| Texto secundario | `text-slate-500`, `text-slate-600` |
-| Bordes | `border-slate-200`, `border-slate-300` |
+// Verificar si se puede cambiar
+puedeCambiarModo(nuevoModo: Modo, estado: ExitSessionState): boolean
 
-### Componentes Reutilizables
+// Aplicar cambio
+aplicarCambioModo(nuevoModo: Modo, estado: ExitSessionState): ExitSessionState
+```
 
-| Componente | Archivo | Props principales |
-|------------|---------|-------------------|
-| **Header** | `components/Header.tsx` | `title`, `showBack?`, `onBack?`, `ubicacion?` |
-| **ActionButton** | `components/ActionButton.tsx` | `icon`, `label`, `onClick`, `variant?`, `size?` |
-| **QuickAction** | `components/ActionButton.tsx` | `emoji`, `label`, `onClick` |
-| **StatusBanner** | `components/StatusBanner.tsx` | `estado`, `mensaje` |
-| **ZonaCard** | `components/ZonaCard.tsx` | `zona`, `tipo`, `distanciaTexto?`, `accionTexto?` |
+### Logging para Observación
 
-### Patrones UX
+```ts
+// Cambio exitoso
+console.log('modo_cambiado', { anterior, nuevo, timestamp })
 
-| Principio | Implementación |
-|-----------|---------------|
-| Texto imperativo | "Dirigite a...", "Quedate en el lugar", "No la muevas" (<5 palabras) |
-| Máximo 2 opciones | Principal + alternativa en Estacionar/Salir/ResolverAhora |
-| Mapa como apoyo | Botón secundario, nunca automático |
-| Timeout emergencia | Botón "Llamar" aparece a los 5 segundos |
-| Bottom sheet consistente | Backdrop + panel fijo + drag handle en todas las pantallas |
-| Confianza derivada | No se almacena, se calcula de `estado` en tiempo real |
-| Timestamp dinámico | `formatUpdatedAt()` reemplaza strings estáticos |
+// Cambio rechazado
+console.log('cambio_rechazado', { actual, sugerido, razon })
+```
 
-### Dark Mode
-
-Implementado vía `darkMode: 'media'` en Tailwind (sigue preferencia del SO).
-Todas las pantallas tienen variantes `dark:` en colores, fondos y bordes.
+**Nota:** El logging está diseñado para futura integración con analytics (Fase 4D).
 
 ---
 
-## 8. 📱 PWA FEATURES
+## 7. 🏠 ESTRUCTURA DE NAVEGACIÓN
 
-| Feature | Estado | Archivo | Detalle |
-|---------|--------|---------|---------|
-| Manifest | ✅ | `public/manifest.json` | short_name: "Festival JM", display: standalone, orientation: portrait |
-| Service Worker | ✅ | `public/sw.js` | Cache: `festival-jm-v1` |
-| Iconos | ✅ | `public/icon-192.svg`, `icon-512.svg` | purpose: `any maskable` |
-| Offline Hook | ✅ | `src/hooks/useOffline.ts` | Hook `useOffline()` → boolean |
-| Registro SW | ✅ | `src/main.tsx` | `navigator.serviceWorker.register('/sw.js')` |
+```
+Home (/)
+├─ 🔵 Accesos rápidos
+│  ├─ 🚨 Emergencia → /emergencia
+│  ├─ 🚗 Estacionar → /estacionar
+│  └─ 🚪 Salir → /salir
+│
+└─ 🟢 Servicios
+   ├─ 🚌 Transporte → /servicios/transporte
+   ├─ 🍽 Comer → /servicios/comer
+   ├─ 🛏 Dormir → /pernoctar
+   └─ 🧭 Más servicios → /servicios/generales
 
-### Service Worker — Estrategias de caché
+🧠 Resolver Ahora → /resolver-ahora (acceso directo inteligente)
+```
 
-| Tipo de request | Estrategia |
-|-----------------|------------|
-| Navegación (HTML) | Cache-first |
-| Assets estáticos (`.js`, `.css`, `/assets/`) | Cache-first |
-| API (`/api/`) | Network-first con fallback a caché |
-| Default | Network |
+### Rutas Configuradas
 
-### Ciclo de vida del SW
-
-1. **Install:** Precachea `/`, `/index.html`, `/manifest.json`, iconos → `skipWaiting()`
-2. **Activate:** Borra caches viejos → `clients.claim()`
-3. **Fetch:** Intercepta requests y aplica estrategia según tipo
-
----
-
-## 9. ✅ FEATURES IMPLEMENTADAS
-
-| Módulo | Estado | Validado | Notas |
-|--------|--------|----------|-------|
-| Home | ✅ | ✅ | 8 quick actions, botón secundario |
-| Estacionar | ✅ | ✅ | 5 modos, scoring, confianza, fallback final |
-| Emergencia | ✅ | ✅ | 3 tipos, sub-tipos, timeout 5s, fix seguridad |
-| Salir | ✅ | ✅ | 3 tipos, score diferenciado, badge recomendado, saturación total |
-| Resolver Ahora | ✅ | ✅ | 7 reglas inferencia, fallback 3 opciones |
-| Utils confianza | ✅ | ✅ | `getConfianza()`, `getConfianzaLabel()` |
-| Utils formatTime | ✅ | ✅ | `formatUpdatedAt()` en 3 pantallas |
-| Utils tipoRecomendado | ✅ | ✅ | Pre-selección en Salir.tsx |
-| PWA Base | ✅ | ⚠️ | SW registrado, pendiente test offline real |
-| Rutas | ✅ | ✅ | 5 rutas en React Router |
-| Dark Mode | ✅ | ✅ | Todas las pantallas |
-| Google Maps | ✅ | ✅ | `window.open` con coordenadas reales |
-| Backend Supabase | ❌ | — | Dependencia instalada, sin usar |
+| Ruta | Screen | Tipo | Descripción |
+|------|--------|------|-------------|
+| `/` | Home | Landing | Accesos rápidos + Servicios |
+| `/estacionar` | Estacionar | Decisión | Parking con 4 modos |
+| `/emergencia` | Emergencia | Protocolo | Emergencias con sub-clasificación |
+| `/salir` | Salir | Decisión + Controller | Salida con selector de tipo |
+| `/resolver-ahora` | ResolverAhora | Inferencia | Deduce necesidad del usuario |
+| `/servicios` | Servicios | Menu | Menú de servicios |
+| `/servicios/transporte` | ServiciosTransporte | Decisión | Transporte con 4 modos |
+| `/servicios/comer` | ServiciosComer | Decisión | Comida con 4 modos |
+| `/servicios/generales` | ServiciosGenerales | Informativo | Baños, agua, descanso, salud |
+| `/pernoctar` | Pernoctar | Informativo | Alojamiento municipal |
 
 ---
 
-## 10. 📋 PENDIENTES
+## 8. 🔧 ARCHIVOS CLAVE DEL PROYECTO
 
-| Feature | Prioridad | Tiempo Est. | Detalle |
-|---------|-----------|-------------|---------|
-| Test offline real | Alta | 15 min | F12 → Offline → recargar → verificar SW |
-| Backend Supabase | Alta | 3-4 hs | Reemplazar mock data con tablas reales |
-| Panel municipal | Media | 3-4 hs | Interfaz para actualizar estados de zonas |
-| Pantallas secundarias (Comer/Descansar) | Baja | 1-2 hs | Actualmente solo `alert()` placeholders |
-| Tests automatizados | Baja | 2-3 hs | Vitest/Jest + React Testing Library |
-| Extraer BottomSheet como componente | Baja | 30 min | Patrón duplicado en 3 pantallas |
-| Geolocalización real | Media | 1-2 hs | Reemplazar zona fija con GPS del dispositivo |
+```
+Front/src/
+├── data/
+│   ├── eventoData.ts              # ✅ Single source of truth (datos unificados)
+│   ├── mockZones.ts               # ✅ Lógica Estacionar (scoring, modos)
+│   ├── mockTransporte.ts          # ✅ Lógica Transporte (scoring, modos)
+│   ├── mockComer.ts               # ✅ Lógica Comer (scoring, modos)
+│   ├── mockSalidas.ts             # ✅ Lógica Salir (scoring por tipo)
+│   ├── mockEmergencia.ts          # ✅ Datos de emergencia (puntos seguros, puestos sanitarios)
+│   └── mockResolver.ts            # ✅ Motor de inferencia (ResolverAhora)
+│
+├── utils/
+│   ├── decisionEngine.ts          # ✅ CORE: scoring + modos + umbrales
+│   ├── contextoEvento.ts          # ✅ getHoraEvento() (temporal: usa Date)
+│   ├── exitSessionController.ts   # ✅ Estado + cooldown para Salir
+│   ├── servicios.ts               # ✅ Filtro/orden Servicios Generales
+│   ├── pernoctar.ts               # ✅ Orden Alojamiento
+│   ├── tipoRecomendado.ts         # ✅ Recomienda auto/transporte/peatonal
+│   ├── confianza.ts               # ✅ Mapea estado a nivel de confianza
+│   ├── fases.ts                   # ✅ Determina fase actual del evento
+│   ├── ventanas.ts                # ✅ Verifica si hora está en ventana
+│   └── formatTime.ts              # ✅ Formato de timestamps
+│
+├── screens/
+│   ├── Home.tsx                   # ✅ Landing con accesos rápidos + servicios
+│   ├── ResolverAhora.tsx          # ✅ Inferencia de necesidad del usuario
+│   ├── Estacionar.tsx             # ✅ Parking con 4 modos
+│   ├── Salir.tsx                  # ✅ Salida con exitSessionController
+│   ├── Emergencia.tsx             # ✅ Protocolos de emergencia
+│   ├── Servicios.tsx              # ✅ Menú de servicios
+│   ├── ServiciosTransporte.tsx    # ✅ Transporte con 4 modos
+│   ├── ServiciosComer.tsx         # ✅ Comida con 4 modos
+│   ├── ServiciosGenerales.tsx     # ✅ Baños, agua, descanso, salud
+│   └── Pernoctar.tsx              # ✅ Alojamiento municipal
+│
+├── config/
+│   └── eventoConfig.ts            # ✅ Configuración por evento (fases, umbrales)
+│
+├── components/
+│   ├── Header.tsx                 # ✅ Header con back button
+│   ├── ActionButton.tsx           # ✅ Botones de acción reutilizables
+│   ├── StatusBanner.tsx           # ✅ Banner de estado (disponible/alerta/crítico)
+│   └── ZonaCard.tsx               # ✅ Cards de zonas con variantes
+│
+├── hooks/
+│   └── useOffline.ts              # ✅ Detecta estado de conexión
+│
+├── types/
+│   └── index.ts                   # ✅ Tipos globales (Modo, Estado, Decision, etc.)
+│
+└── App.tsx                        # ✅ Routing principal
+```
 
 ---
 
-## 11. 📊 MÉTRICAS DEL PROYECTO
+## 9. 🎯 GUARDRAILS Y REGLAS DE NEGOCIO
+
+### UI (NO negociable)
+
+| Regla | Racional |
+|-------|----------|
+| ✅ Máximo **2 opciones** en modos `guiar`/`asistir` | Evitar parálisis por análisis en situaciones de estrés |
+| ✅ Máximo **3 opciones** en modo `informar` | Mantener lista escaneable |
+| ✅ **Nunca** mostrar zonas `colapsadas` como alternativa en `guiar` | Seguridad del usuario primero |
+| ✅ Botón **"🗺️ Ir ahora"** siempre presente | Google Maps deep link para navegación inmediata |
+
+### Decisión
+
+| Regla | Racional |
+|-------|----------|
+| ✅ `emergencia` **siempre prioritaria**, siempre modo `guiar` | Emergencias no pueden esperar |
+| ✅ Alternativa solo si `score_alt < umbral * 0.9` | Alternativa debe ser significativamente mejor |
+| ✅ `sin_solucion` si score > umbral_contextual **O** todas <10% disponibilidad | Evitar recomendar opciones inviables |
+| ✅ Cooldown de **60 segundos** en Salir | Prevenir cambios erráticos durante estrés |
+
+### Arquitectura
+
+| Regla | Racional |
+|-------|----------|
+| ✅ **NO** usar `new Date().getHours()` fuera de `getHoraEvento()` | Centralizar fuente de tiempo para futuro reemplazo |
+| ✅ **NO** hardcodear horarios en lógica de decisión | Horarios deben venir de `eventoConfig` |
+| ✅ **NO** modificar `decisionEngine` sin validar impacto en **3+ módulos** | Engine es núcleo crítico, cambios requieren testing exhaustivo |
+| ✅ **Datos separados de lógica** | Permitir migración a carga externa sin reescribir lógica |
+
+---
+
+## 10. ⚠️ DEUDAS TÉCNICAS CONOCIDAS
+
+| Archivo | Issue | Impacto | Prioridad | Mitigación |
+|---------|-------|---------|-----------|------------|
+| **mocks + eventoData** | Duplicación de datos (zonasMock ≈ eventoData.estacionamiento) | Mantenimiento doble, riesgo de inconsistencia | 🟡 Media | Planificar refactor: migrar todo a eventoData, preservar lógica de scoring |
+| **contextoEvento.ts** | `getHoraEvento()` usa `Date()` en lugar de fuente real del evento | Funciona en MVP, pero no escala a eventos multi-día | 🟡 Media | Integrar con API de evento o archivo de configuración externo |
+| **Salir** | Scoring propio no unificado con decisionEngine | Complejidad adicional, pero dominio distinto justifica divergencia | 🟢 Baja | Documentar diferencias, considerar abstracción futura |
+| **Disponibilidad** | Datos estimados en mock, no reales de sensores | Limita precisión de recomendaciones | 🟡 Media | Requiere fuente externa (API municipal, sensores IoT) |
+| **Geolocalización** | Distancia calculada manualmente, no usa GPS del usuario | UX menos precisa, requiere input manual | 🟡 Media | Fase 4C: integrar navigator.geolocation |
+| **Offline** | useOffline hook existe pero no se usa en todos los screens | Usuario puede ver datos stale sin saberlo | 🟢 Baja | Agregar banner de offline mode en screens críticos |
+
+---
+
+## 11. 🚀 PRÓXIMOS PASOS (FASE 4+)
+
+### Hoja de Ruta
+
+| Fase | Objetivo | Alcance | Dependencias | Estado |
+|------|----------|---------|--------------|--------|
+| **4A** | Carga de datos externa (JSON editable) | Migrar eventoData.ts a `evento-data.json` cargado dinámicamente | Ninguna | ⏳ Pendiente |
+| **4B** | Panel admin mínimo para municipio | CRUD básico para actualizar disponibilidad de zonas | Fase 4A | ⏳ Pendiente |
+| **4C** | Geolocalización real del usuario | Integrar `navigator.geolocation` para cálculo automático de distancias | Ninguna | ⏳ Pendiente |
+| **4D** | Analytics + métricas de uso | Logging de modos de decisión, tiempos de respuesta, zonas más consultadas | exitSessionController logging | ⏳ Pendiente |
+| **4E** | Integración con API municipal | Reemplazar mock data con endpoints reales de tránsito/transporte | Fases 4A-4B | ⏳ Pendiente |
+| **5A** | Modo offline completo | Cache de datos + synchronización cuando hay conexión | useOffline hook | ⏳ Pendiente |
+| **5B** | Notificaciones push | Alertas de zonas colapsadas, cambios de fase, emergencias | Service Worker | ⏳ Pendiente |
+
+### Criterios de Aceptación para Fase 4A
+
+- [ ] `evento-data.json` externo cargado vía `fetch()`
+- [ ] Fallback a datos locales si falla carga
+- [ ] Build limpio post-migración
+- [ ] Sin cambios en decisionEngine ni en screens (solo cambia fuente de datos)
+
+---
+
+## 12. 📊 ESTADO ACTUAL DEL MVP
+
+### Módulos Completados
+
+| Módulo | Estado | Usa Engine | Datos | UI | Testing |
+|--------|--------|-----------|-------|-----|---------|
+| **Emergencia** | ✅ Completo | N/A | mockEmergencia | Protocolo con sub-clasificación | ✅ Manual |
+| **Estacionar** | ✅ Completo | ✅ Sí | eventoData.estacionamiento | 4 modos (sin_solucion, guiar, asistir, informar) | ✅ Coherencia 3/3 |
+| **Salir** | ✅ Completo | ✅ (modos) | eventoData.salidas | 4 modos + exitSessionController | ✅ Coherencia 3/3 |
+| **ResolverAhora** | ✅ Completo | ✅ Sí | mockResolver + salidas/zonas | Inferencia + fallback menu | ✅ Manual |
+| **Transporte** | ✅ Completo | ✅ Sí | eventoData.transporte | 4 modos | ✅ Manual |
+| **Comer** | ✅ Completo | ✅ Sí | eventoData.comer | 4 modos con offset +10 | ✅ Manual |
+| **Dormir/Pernoctar** | ✅ Completo | ❌ No | eventoData.pernoctar | Lista + CTAs (llamar/ir) | ✅ Manual |
+| **Servicios Generales** | ✅ Completo | ❌ No | eventoData.servicios | Grid con filtro por subtipo | ✅ Manual |
+
+### Métricas del Build
 
 | Métrica | Valor |
 |---------|-------|
-| **Archivos fuente** | 29 |
-| **Líneas de código (estimado)** | ~2,800-3,200 |
-| **Pantallas** | 5 principales |
-| **Componentes reutilizables** | 4 (Header, ActionButton, StatusBanner, ZonaCard) |
-| **Archivos mock data** | 4 (mockZones, mockEmergencia, mockSalidas, mockResolver) |
-| **Archivos utils** | 3 (confianza, formatTime, tipoRecomendado) |
-| **Rutas React Router** | 5 (`/`, `/estacionar`, `/emergencia`, `/salir`, `/resolver-ahora`) |
-| **Zonas con coordenadas reales** | 4 estacionamiento + 5 salidas = 9 total |
-| **Reglas de inferencia** | 7 |
-| **Modos de respuesta** | 5 (informar, asistir, guiar, fallback, fallback final) |
-| **Dependencias npm** | 11 (5 prod + 6 dev) |
-| **Commits** | 1 (`0634a7e`) — 33 files, +3029/-184 |
+| **Build status** | ✅ Limpio |
+| **Tamaño bundle** | 260.37 kB (gzipped: 65.59 kB) |
+| **CSS** | 17.01 kB (gzipped: 3.72 kB) |
+| **Módulos transformados** | 1503 |
+| **Tiempo de build** | ~11.71s |
+| **Archivos eliminados** | 1 (ServiciosDescansar.tsx) |
+| **Archivos creados** | 16 (config, data, screens, utils) |
+| **Archivos modificados** | 12 |
 
-### Coordenadas reales utilizadas (Jesús María, Córdoba, Argentina)
+### Stack Tecnológico
 
-| Punto | Latitud | Longitud | Referencia |
-|-------|---------|----------|------------|
-| Plaza Principal / Iglesia | -30.978107 | -64.094779 | Centro del evento |
-| Barrio Norte / Terminal | -30.973313 | -64.088529 | Zona Norte |
-| Parque Autódromo | -30.981249 | -64.099398 | Zona Oeste |
-| Predio Ferial / Costanera | -30.985337 | -64.094209 | Zona Sur |
-| Av. Colón y Costanera | -30.981249 | -64.075000 | Salida Este |
-| Destacamento Policial | -30.978500 | -64.095000 | Punto seguro |
-| Puesto Sanitario Principal | -30.978500 | -64.095500 | Puesto sanitario |
-| Posta Médica Norte | -30.974000 | -64.089000 | Terminal de Ómnibus |
+| Tecnología | Versión | Propósito |
+|------------|---------|-----------|
+| React | 18+ | UI framework |
+| TypeScript | 5+ | Type safety |
+| Vite | 5.4.8 | Build tool + dev server |
+| React Router | 6+ | Routing |
+| TailwindCSS | 3+ | Styling |
+| Lucide React | Latest | Iconos |
+| Supabase | @supabase/supabase-js | Dependencia instalada (sin uso activo aún) |
 
----
+### Git Status
 
-## 12. 🚀 PRÓXIMOS PASOS RECOMENDADOS
-
-### Inmediatos (hoy)
-1. **Test offline real** — Abrir en Chrome → F12 → Application → Service Workers → Offline → recargar
-2. **Verificar PWA installable** — Chrome Lighthouse → PWA audit
-
-### Corto plazo (esta semana)
-3. **Conectar Supabase** — Crear tablas `zonas`, `zonas_salida`, `puntos_seguros`, `puestos_sanitarios`
-4. **Reemplazar mock data** — Crear hooks `useZones()`, `useSalidas()` que lean de Supabase
-5. **Geolocalización real** — Usar `navigator.geolocation` para calcular distancia real del usuario
-
-### Mediano plazo
-6. **Panel municipal** — Interfaz web para que el operador actualice estados de zonas en tiempo real
-7. **Pantallas secundarias** — Comer, Descansar, Servicios (actualmente placeholders)
-8. **Deploy producción** — Vercel o Netlify con dominio propio
+- **Branch:** `main`
+- **Último commit:** `87b5ae1` - Merge remote-tracking branch 'origin/main'
+- **Remote:** `https://github.com/Cba40/festivales`
+- **Commits totales:** 5
+- **Working tree:** ✅ Limpio
 
 ---
 
-## 13. 📂 RUTAS DE LA APLICACIÓN
+## 13. 📖 GLOSARIO DE TÉRMINOS
 
-| Ruta | Componente | Propósito |
-|------|-----------|-----------|
-| `/` | Home | Punto de entrada |
-| `/estacionar` | Estacionar | Buscar estacionamiento |
-| `/emergencia` | Emergencia | Protocolo emergencia |
-| `/salir` | Salir | Evacuación del evento |
-| `/resolver-ahora` | ResolverAhora | Decisión automática |
-
----
-
-## 14. 🔧 ARCHIVOS DE CONFIGURACIÓN CLAVE
-
-### `vite.config.ts`
-- Plugin: `@vitejs/plugin-react`
-- Alias: `@` → `./src`
-- Exclude: `lucide-react` de optimizeDeps
-
-### `tailwind.config.js`
-- Dark mode: `media`
-- Content: `index.html` + `src/**/*.{js,ts,jsx,tsx}`
-- Custom colors: primary, success, warning, danger
-
-### `tsconfig.app.json`
-- Target: ES2020, Module: ESNext
-- Strict: true, noUnusedLocals: true, noUnusedParameters: true
-- Path alias: `@/*` → `./src/*`
-
-### `package.json` — Scripts
-| Script | Comando |
-|--------|---------|
-| `dev` | `vite` |
-| `build` | `vite build` |
-| `lint` | `eslint .` |
-| `preview` | `vite preview` |
-| `typecheck` | `tsc --noEmit -p tsconfig.app.json` |
+| Término | Definición |
+|---------|------------|
+| **Modo** | Estado de respuesta del sistema: `sin_solucion`, `guiar`, `asistir`, `informar` |
+| **Score** | Puntaje calculado que determina conveniencia de una opción (menor es mejor) |
+| **Umbral** | Límite contextual que determina cambio de modo |
+| **Fase** | Período del evento con características propias (llegada, pico, dentro, salida) |
+| **Saturación** | Nivel de congestión: `bajo`, `medio`, `alto`, `colapsado` |
+| **Cooldown** | Período de espera forzada para prevenir cambios erráticos (60s en Salir) |
+| **Inferencia** | Deducción de necesidad del usuario basada en contexto (hora, fase, saturación) |
+| **Single Source of Truth** | Patrón donde `eventoData.ts` es la única fuente de datos unificada |
 
 ---
 
-## 15. 📝 HISTORIAL DE CAMBIOS RECIENTES
+## 14. 🔍 DIAGNÓSTICO DE COHERENCIA (FASE 3A)
 
-| Fecha | Cambio | Archivos afectados |
-|-------|--------|-------------------|
-| 3/4/2026 | **MVP núcleo completo** — Commit inicial | 33 files, +3029/-184 |
-| 3/4/2026 | **Confianza** — `getConfianza()` deriva de estado | `utils/confianza.ts`, `Estacionar.tsx` |
-| 3/4/2026 | **Formato tiempo** — `formatUpdatedAt()` global | `utils/formatTime.ts`, mocks, 3 pantallas |
-| 3/4/2026 | **Tipo recomendado** — Badge pre-selección | `utils/tipoRecomendado.ts`, `Salir.tsx` |
-| 3/4/2026 | **Fallback final** — Sin zonas disponibles | `Estacionar.tsx` (modo nuevo) |
-| 3/4/2026 | **Saturación total** — Advertencia en Salir | `Salir.tsx` |
-| 3/4/2026 | **Fix Seguridad** — Ver ruta + Llamar asistencia | `Emergencia.tsx` |
-| 3/4/2026 | **Home ajustes** — Resolver secundario, Transporte | `Home.tsx` |
+### Casos de Prueba Validados
+
+**Escenario: Estacionar a las 19h (fase llegada)**
+- ✅ Todas colapsadas → `sin_solucion` (recomienda ir directo)
+- ✅ Todas <10% disponibilidad → `guiar` (recomenda ir a opción disponible)
+- ✅ Mejor opción con score < umbral → `informar` (muestra opciones)
+
+**Escenario: Salir a las 1h (fase salida masiva)**
+- ✅ Todas colapsadas → `sin_solucion` (recomienda esperar/alternativa)
+- ✅ Mix de estados → `asistir` (recomenda mejor opción)
+- ✅ Cooldown activo → rechaza cambio de modo (<60s)
+
+**Escenario: ResolverAhora con saturación alta**
+- ✅ Fase `pico` + saturación `colapsada` → `estacionar` con modo `guiar`
+- ✅ Fase `dentro` + sin acción clara → `fallback` con menú
+
+### Cobertura de Testing
+
+| Módulo | Cobertura | Tipo |
+|--------|-----------|------|
+| decisionEngine | ✅ Alta (unit testing manual de fórmula + modos) | Manual |
+| exitSessionController | ✅ Media (testing de reglas de cooldown) | Manual |
+| mockResolver | ✅ Media (testing de inferencia con escenarios) | Manual |
+| Screens | ✅ Baja (render testing visual) | Manual |
+
+**Recomendación:** Implementar tests automatizados con Vitest/Jest en Fase 5+.
 
 ---
 
-> **Fin del informe.** Documento actualizado el 3 de abril de 2026.
-> Repositorio: `https://github.com/Cba40/festivales` — branch `main` — commit `0634a7e`
-> Cualquier desarrollador con este documento puede continuar el proyecto sin contexto adicional.
+## 15. 📞 CONTACTO Y CONTRIBUCIÓN
+
+### Repositorio
+- **URL:** `https://github.com/Cba40/festivales`
+- **Branch principal:** `main`
+- **Directorio Front:** `Front/`
+- **Framework:** React + TypeScript + Vite
+
+### Cómo Ejecutar
+
+```bash
+# Instalar dependencias
+cd Front && npm install
+
+# Modo desarrollo
+npm run dev
+
+# Build de producción
+npm run build
+
+# Verificar código (lint)
+npm run lint
+```
+
+### Estructura de Commits
+
+```
+tipo: descripción corta
+
+## Detalles:
+- Cambio 1
+- Cambio 2
+
+## Build: ✅ Limpio
+```
+
+**Tipos:** `feat`, `fix`, `refactor`, `docs`, `chore`, `test`
+
+---
+
+**Fin del informe técnico**  
+**Documento mantenido por:** Equipo de desarrollo CBA 4.0  
+**Próxima revisión:** Fase 4A (carga de datos externa)
