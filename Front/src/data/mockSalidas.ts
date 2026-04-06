@@ -1,3 +1,6 @@
+import { getModo, getUmbralContexto, type Estado } from '@/utils/decisionEngine'
+import { getHoraEvento } from '@/utils/contextoEvento'
+
 export interface ZonaSalida {
   id: string
   nombre: string
@@ -6,7 +9,7 @@ export interface ZonaSalida {
   lng: number
   referencia: string
   distancia_min: number
-  congestion: 'baja' | 'media' | 'alta' | 'colapsado'
+  estado: Estado
   capacidad_estimada?: number
   espera_estimada_min?: number
   es_embudo?: boolean
@@ -15,9 +18,9 @@ export interface ZonaSalida {
 }
 
 const CONGESTION_PENALIZATION = {
-  baja: 1,
-  media: 2,
-  alta: 4,
+  bajo: 1,
+  medio: 2,
+  alto: 4,
   colapsado: 6
 }
 
@@ -32,7 +35,7 @@ export const zonasSalida: ZonaSalida[] = [
     lng: -64.088529,
     referencia: 'Terminal de Ómnibus',
     distancia_min: 6,
-    congestion: 'media',
+    estado: 'medio',
     capacidad_estimada: 200,
     espera_estimada_min: 3,
     timestamp: 'hace 2 min',
@@ -46,7 +49,7 @@ export const zonasSalida: ZonaSalida[] = [
     lng: -64.094209,
     referencia: 'Predio Ferial',
     distancia_min: 10,
-    congestion: 'baja',
+    estado: 'bajo',
     capacidad_estimada: 500,
     espera_estimada_min: 2,
     timestamp: 'hace 2 min',
@@ -60,7 +63,7 @@ export const zonasSalida: ZonaSalida[] = [
     lng: -64.075000,
     referencia: 'Av. Colón y Costanera',
     distancia_min: 8,
-    congestion: 'baja',
+    estado: 'bajo',
     capacidad_estimada: 300,
     es_embudo: false,
     timestamp: 'hace 2 min',
@@ -74,7 +77,7 @@ export const zonasSalida: ZonaSalida[] = [
     lng: -64.099398,
     referencia: 'Parque Autódromo',
     distancia_min: 12,
-    congestion: 'alta',
+    estado: 'alto',
     capacidad_estimada: 150,
     espera_estimada_min: 5,
     timestamp: 'hace 2 min',
@@ -88,7 +91,7 @@ export const zonasSalida: ZonaSalida[] = [
     lng: -64.094779,
     referencia: 'Plaza Principal / Iglesia',
     distancia_min: 3,
-    congestion: 'colapsado',
+    estado: 'colapsado',
     capacidad_estimada: 100,
     es_embudo: true,
     timestamp: 'hace 2 min',
@@ -104,12 +107,12 @@ export const calcularScoreSalida = (
   let score = zona.distancia_min <= 5 ? 1 : zona.distancia_min <= 10 ? 2 : 3
 
   // Penalización por congestión
-  const congestionPenalty = CONGESTION_PENALIZATION[zona.congestion]
+  const congestionPenalty = CONGESTION_PENALIZATION[zona.estado]
 
   // AJUSTE POR TIPO (cambia el resultado según modo)
   if (tipo === 'auto') {
     // Auto: evitar calles colapsadas, penalización extra
-    if (zona.congestion === 'alta' || zona.congestion === 'colapsado') {
+    if (zona.estado === 'alto' || zona.estado === 'colapsado') {
       score += 3
     }
   }
@@ -148,8 +151,8 @@ export const getSalidasOrdenadas = (
   }))
 
   // SEPARAR colapsadas
-  const colapsadas = conScore.filter(z => z.congestion === 'colapsado')
-  const disponibles = conScore.filter(z => z.congestion !== 'colapsado')
+  const colapsadas = conScore.filter(z => z.estado === 'colapsado')
+  const disponibles = conScore.filter(z => z.estado !== 'colapsado')
 
   // ORDENAR por score y devolver sin el campo interno
   const ordenar = (arr: typeof conScore) =>
@@ -158,5 +161,75 @@ export const getSalidasOrdenadas = (
   return [
     ...ordenar(disponibles),
     ...ordenar(colapsadas)
+  ]
+}
+
+export const getModoSalida = (zonas: ZonaSalida[], tipo: 'auto' | 'transporte' | 'peatonal'): 'sin_solucion' | 'guiar' | 'asistir' | 'informar' => {
+  const h = getHoraEvento()
+  const umbral = getUmbralContexto(h)
+
+  const zonasOrdenadas = getSalidasOrdenadas(zonas, tipo)
+  const mejor = zonasOrdenadas[0]
+
+  if (!mejor) return 'sin_solucion'
+
+  const todasColapsadas = zonas.every(z => z.estado === 'colapsado')
+  if (todasColapsadas) return 'sin_solucion'
+
+  // Usar engine SOLO para determinar modo
+  return getModo(
+    zonasOrdenadas.map(z => ({ estado: z.estado, score: calcularScoreSalida(z, tipo) })),
+    umbral
+  )
+}
+
+// ============================================
+// ⚠️ SOLO PARA TESTING FASE 3A — BORRAR DESPUÉS
+// ============================================
+export const escenariosTestSalida = {
+  medio: [
+    {
+      id: 'test-1',
+      nombre: 'Salida Test Medio',
+      tipo: 'auto' as const,
+      estado: 'medio' as const,
+      distancia_min: 8,
+      espera_estimada_min: 5,
+      referencia: 'Test',
+      lat: -30.9785,
+      lng: -64.0950,
+      timestamp: 'test',
+      updatedAt: Date.now()
+    }
+  ],
+  alto: [
+    {
+      id: 'test-2',
+      nombre: 'Salida Test Alto',
+      tipo: 'auto' as const,
+      estado: 'alto' as const,
+      distancia_min: 10,
+      espera_estimada_min: 8,
+      referencia: 'Test',
+      lat: -30.9785,
+      lng: -64.0950,
+      timestamp: 'test',
+      updatedAt: Date.now()
+    }
+  ],
+  colapsado: [
+    {
+      id: 'test-3',
+      nombre: 'Salida Test Colapsado',
+      tipo: 'auto' as const,
+      estado: 'colapsado' as const,
+      distancia_min: 12,
+      espera_estimada_min: 15,
+      referencia: 'Test',
+      lat: -30.9785,
+      lng: -64.0950,
+      timestamp: 'test',
+      updatedAt: Date.now()
+    }
   ]
 }

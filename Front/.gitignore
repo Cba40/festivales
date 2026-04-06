@@ -1,3 +1,6 @@
+# ============================================
+# LOGS
+# ============================================
 logs
 *.log
 npm-debug.log*
@@ -6,11 +9,17 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# ============================================
+# DEPENDENCIES
+# ============================================
 node_modules
 dist
 dist-ssr
 *.local
 
+# ============================================
+# IDE / EDITOR
+# ============================================
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -20,4 +29,103 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# ============================================
+# ENV / SECRETOS
+# ============================================
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ============================================
+# QWEN / AI GENERATED DOCS
+# ============================================
+# Archivos markdown generados por Qwen/AI
+qwen*.md
+qwen-*.md
+ai-*.md
+prompt-*.md
+prompt_*.md
+docs-*.md
+docs_*.md
+notas-*.md
+notas_*.md
+notas.md
+nota.md
+resumen-*.md
+resumen_*.md
+audit-*.md
+audit_*.md
+auditoria-*.md
+auditoria_*.md
+fase-*.md
+fase_*.md
+FASE-*.md
+FASE_*.md
+CHANGELOG-*.md
+diff-*.md
+diff_*.md
+
+# Archivos temporales de documentación
+*-temp.md
+*-backup.md
+*-old.md
+*.md.bak
+*.md.old
+*.md.temp
+
+# Carpetas de documentación temporal
+docs-temp/
+docs-backup/
+qwen-docs/
+ai-docs/
+prompts/
+outputs/
+
+# ============================================
+# TYPESCRIPT / JAVASCRIPT
+# ============================================
+*.tsbuildinfo
+next-env.d.ts
+
+# ============================================
+# TESTING
+# ============================================
+coverage
+*.lcov
+.nyc_output
+
+# ============================================
+# BUILD
+# ============================================
+build/
+out/
+.next/
+.vercel/
+
+# ============================================
+# CACHE
+# ============================================
+.turbo
+.parcel-cache
+.eslintcache
+.stylelintcache
+
+# ============================================
+# OPTIONAL (SEGÚN TU PROYECTO)
+# ============================================
+# Si usás SQLite
+*.db
+*.sqlite
+*.sqlite3
+
+# Si usás uploads temporales
+uploads/
+temp/
+tmp/
+
+# Si usás snapshots de testing
+__snapshots__/
+*.snap

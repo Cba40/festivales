@@ -193,9 +193,13 @@ const ResolverAhora = () => {
         </div>
 
         {/* 7. FALLBACK: ¿Qué necesitás ahora? */}
-        <div className="text-center mb-6 mt-8">
-          <p className="text-lg text-slate-600 dark:text-slate-300">No estoy seguro qué necesitás...</p>
-          <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">Elegí una opción:</p>
+        <div className="text-center mb-4 mt-8">
+          <p className="text-slate-600 dark:text-slate-300 text-sm">
+            No puedo determinar exactamente qué necesitás ahora
+          </p>
+          <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">
+            Elegí una acción:
+          </p>
         </div>
 
         <div className="space-y-3">
@@ -203,7 +207,13 @@ const ResolverAhora = () => {
             onClick={() => navigate('/estacionar')}
             className="w-full bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 p-4 rounded-xl text-left font-bold text-slate-800 dark:text-slate-100 transition-colors"
           >
-            🚗 Moverme
+            🚗 Estacionar
+          </button>
+          <button
+            onClick={() => navigate('/emergencia')}
+            className="w-full bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 p-4 rounded-xl text-left font-bold text-slate-800 dark:text-slate-100 transition-colors"
+          >
+            🚨 Emergencia
           </button>
           <button
             onClick={() => navigate('/salir')}
@@ -212,10 +222,10 @@ const ResolverAhora = () => {
             🚪 Salir
           </button>
           <button
-            onClick={() => navigate('/emergencia')}
+            onClick={() => navigate('/servicios/transporte')}
             className="w-full bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 p-4 rounded-xl text-left font-bold text-slate-800 dark:text-slate-100 transition-colors"
           >
-            🚨 Emergencia
+            🚌 Moverme
           </button>
         </div>
       </div>

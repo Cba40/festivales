@@ -44,22 +44,22 @@ const Home = () => {
             <QuickAction
               emoji="🚌"
               label="Transporte"
-              onClick={() => alert('Próximamente')}
+              onClick={() => navigate('/servicios/transporte')}
             />
             <QuickAction
               emoji="🍽"
               label="Comer"
-              onClick={() => alert('Puntos de comida cercanos')}
+              onClick={() => navigate('/servicios/comer')}
             />
             <QuickAction
               emoji="🛏"
-              label="Descansar"
-              onClick={() => alert('Zonas de descanso')}
+              label="Dormir"
+              onClick={() => navigate('/pernoctar')}
             />
             <QuickAction
               emoji="🧭"
-              label="Servicios"
-              onClick={() => alert('Otros servicios')}
+              label="Más servicios"
+              onClick={() => navigate('/servicios')}
             />
           </div>
         </div>

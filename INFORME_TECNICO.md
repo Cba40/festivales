@@ -1,8 +1,10 @@
 # 📊 INFORME TÉCNICO — MVP Festivales Jesús María
 
 > **Fecha de generación:** 3 de abril de 2026
-> **Estado del proyecto:** ~85% completado (MVP funcional)
+> **Última actualización:** 3 de abril de 2026 (commit `0634a7e`)
+> **Estado del proyecto:** ~90% completado (MVP funcional + confianza + fallback)
 > **Directorio raíz:** `d:\CBA 4.0\Festivales\Front`
+> **Repositorio:** `https://github.com/Cba40/festivales` (branch `main`)
 
 ---
 
@@ -12,9 +14,10 @@
 |-------|-------|
 | **Nombre** | Festival Jesús María — Sistema de Decisión |
 | **Objetivo** | Guiar asistentes del evento en tiempo real: estacionamiento, emergencias, evacuación |
-| **Estado** | MVP funcional con 5 pantallas, PWA base, datos mock |
-| **% Completado** | ~85% (núcleo completo, pendiente backend + test offline) |
+| **Estado** | MVP funcional con 5 pantallas, PWA base, datos mock, sistema de confianza |
+| **% Completado** | ~90% (núcleo completo + mejoras de confiabilidad, pendiente backend + test offline) |
 | **Fecha** | 3 de abril de 2026 |
+| **Git** | ✅ Commit + push completado (`0634a7e`) |
 
 ---
 
@@ -46,6 +49,7 @@
 |------|----------|
 | Mock data | `src/data/mockZones.ts`, `mockEmergencia.ts`, `mockSalidas.ts`, `mockResolver.ts` |
 | Types | `src/types/index.ts` |
+| Utils | `src/utils/confianza.ts`, `formatTime.ts`, `tipoRecomendado.ts` |
 
 ### Herramientas
 | Herramienta | Versión |
@@ -92,6 +96,10 @@ Front/
 │   │   └── index.ts
 │   ├── hooks/
 │   │   └── useOffline.ts
+│   ├── utils/
+│   │   ├── confianza.ts
+│   │   ├── formatTime.ts
+│   │   └── tipoRecomendado.ts
 │   ├── App.tsx
 │   ├── main.tsx
 │   ├── index.css
@@ -109,7 +117,7 @@ Front/
 └── vite.config.ts
 ```
 
-**Total:** 26 archivos fuente (excluyendo node_modules, dist, .git, lock files)
+**Total:** 29 archivos fuente (excluyendo node_modules, dist, .git, lock files)
 
 ---
 
@@ -126,7 +134,7 @@ Front/
 - `Header` — título "Festival Jesús María" + ubicación "Zona Centro"
 - `StatusBanner` — estado "alerta", mensaje "Zona con alta demanda"
 - `QuickAction` (x7) — grid de accesos rápidos y servicios
-- Botón secundario — "Resolver ahora"
+- Botón secundario — "Resolver ahora" (estilo secundario, abajo de todo)
 
 **Navegación:**
 | Botón | Ruta destino |
@@ -142,8 +150,14 @@ Front/
 
 **Estructura visual:**
 ```
-Header → StatusBanner → Accesos Rápidos (3-col) → Servicios (4-col) → Resolver Ahora (secundario)
+Header → StatusBanner → Accesos Rápidos (3-col) → Servicios (4-col)
+→ Resolver Ahora (botón secundario, borde superior)
 ```
+
+**Cambios recientes:**
+- "Resolver ahora" movido debajo de Accesos Rápidos (estilo secundario, no botón grande)
+- "Movilidad" renombrado a "Transporte"
+- Botón navega a `/resolver-ahora` (no directo a `/estacionar`)
 
 ---
 
@@ -151,17 +165,18 @@ Header → StatusBanner → Accesos Rápidos (3-col) → Servicios (4-col) → R
 | Campo | Valor |
 |-------|-------|
 | **Propósito** | Guiar usuario a zona de estacionamiento disponible |
-| **Archivo** | `src/screens/Estacionar.tsx` (~420 líneas) |
-| **Estado local** | `selectedZone: Zona \| null` |
-| **Datos** | `mockZones.ts` (4 zonas) |
+| **Archivo** | `src/screens/Estacionar.tsx` (~530 líneas) |
+| **Estado local** | `selectedZone: Zona | null`, `showLejanas: boolean` |
+| **Datos** | `mockZones.ts` (4 zonas con `updatedAt`) |
 
-**4 modos de renderizado condicional:**
+**5 modos de renderizado condicional:**
 
 | Modo | Condición | UI |
 |------|-----------|-----|
+| **FALLBACK FINAL** | Todas colapsadas + sin zonas lejanas | "No hay opciones disponibles" → Esperar / Mantener posición |
 | **INFORMAR** | `!getModoGuiar()` | Lista de zonas disponibles como cards clickeables |
 | **ASISTIR** | Zonas disponibles, no todas colapsadas | Zona recomendada (ZonaCard primaria) + fallback (ZonaCard fallback) + lista otras zonas |
-| **GUIAR** | Todas colapsadas | Advertencia + 2 estrategias (ir lejos / esperar 15-20 min) |
+| **GUIAR** | Todas colapsadas + hay zonas lejanas | Advertencia + 2 estrategias + botón ver lejanas + reintentar |
 | **GUIAR COMPLETO** | 6 bloques | Estado zona actual + acción principal + tiempo estimado + riesgo + fallback + advertencia + botón mapa |
 
 **Lógica de scoring:**
@@ -170,6 +185,26 @@ Score = disponibilidadScore + tendenciaScore + (distancia_min * -1)
 
 disponibilidadScore: bajo=100, medio=60, alto=20, colapsado=0
 tendenciaScore: bajando=+20, estable=0, subiendo=-10
+```
+
+**Features de confianza (agregadas):**
+- `getConfianza(zona.estado)` → deriva confianza del estado (bajo→alta, medio→media, alto/colapsado→baja)
+- `getConfianzaLabel()` → muestra "✅ Alta probabilidad", "⚠️ Últimos lugares", "❗ Disponibilidad incierta"
+- Visible en cards de zonas (modo INFORMAR, ASISTIR, GUIAR COMPLETO, bottom sheets)
+
+**Formato de tiempo (agregado):**
+- `formatUpdatedAt(zona.updatedAt)` → "Hace X min" / "Actualizado recién" / "Datos estimados"
+- Reemplaza `timestamp` estático en todas las pantallas
+
+**Fallback final (agregado):**
+```typescript
+if (todasColapsadas && zonasLejanas.length === 0) {
+  // "No hay opciones disponibles" → Esperar 15-20 min / Mantener posición
+}
+if (todasColapsadas && zonasLejanas.length > 0) {
+  // Botón "Ver opciones lejanas" → bottom sheet con máximo 2 zonas
+  // Botón "Reintentar en 15 min" → window.location.reload()
+}
 ```
 
 **Flujo:**
@@ -192,9 +227,9 @@ Home → Estacionar → Calcula score → Determina modo → Muestra zonas
 | Campo | Valor |
 |-------|-------|
 | **Propósito** | Protocolo de acción en emergencia |
-| **Archivo** | `src/screens/Emergencia.tsx` (~440 líneas) |
+| **Archivo** | `src/screens/Emergencia.tsx` (~560 líneas) |
 | **Estado local** | `selectedType`, `helpSubType`, `inconsciente`, `bottomSheet`, `mostrarLlamar` |
-| **Datos** | `mockEmergencia.ts` |
+| **Datos** | `mockEmergencia.ts` (con `updatedAt`) |
 
 **3 tipos de emergencia:**
 | Tipo | Emoji | Protocolo |
@@ -208,7 +243,7 @@ Home → Estacionar → Calcula score → Determina modo → Muestra zonas
 useEffect(() => {
   const timer = setTimeout(() => setMostrarLlamar(true), 5000)
   return () => clearTimeout(timer)
-}, [])
+}, [selectedType, helpSubType])
 ```
 Botón "Llamar ahora" aparece después de 5 segundos de inactividad.
 
@@ -224,24 +259,58 @@ Home → Emergencia → Selección tipo → Sub-tipo (si aplica)
 → Protocolo específico → Llamar / Ver punto seguro → Google Maps
 ```
 
+**Fix reciente — Seguridad (Necesito Ayuda):**
+- **Antes:** Botón "Llamar ahora" duplicado, sin navegación a punto seguro
+- **Ahora:** Botón principal "🗺️ Ver ruta" → Google Maps al Destacamento Policial (`-30.9785, -64.0950`)
+- Botón secundario "📞 Llamar asistencia" (estilo borde, opcional)
+- Mismo patrón visual que el bloque "Salud"
+
 ---
 
 ### 4.4 Salir.tsx
 | Campo | Valor |
 |-------|-------|
 | **Propósito** | Evacuación del evento |
-| **Archivo** | `src/screens/Salir.tsx` |
-| **Estado local** | `tipo: 'auto' \| 'transporte' \| 'peatonal'`, `selectedZona: ZonaSalida \| null` |
-| **Datos** | `mockSalidas.ts` (5 zonas) |
+| **Archivo** | `src/screens/Salir.tsx` (~210 líneas) |
+| **Estado local** | `tipo: 'auto' | 'transporte' | 'peatonal'`, `selectedZona: ZonaSalida | null` |
+| **Datos** | `mockSalidas.ts` (5 zonas con `updatedAt`) |
 
 **Estructura visual (orden exacto):**
 ```
+0. Badge "Recomendado ahora" (pre-selecciona tipo)
 1. Selector (Auto / Transporte / Caminando) — grid 3 columnas
 2. Mensaje principal — "Dirigite ahora a {nombre}"
-3. Bloque principal (compacto) — referencia, distancia, congestión, timestamp, tiempo estimado
+3. Bloque principal (compacto) — referencia, distancia, congestión, formatUpdatedAt, tiempo estimado
 4. Alternativa — "Si está saturado → {nombre}"
 5. Advertencia — zona colapsada (si aplica)
 6. Acción — "Iniciar ruta" → Google Maps
+```
+
+**Badge recomendado (agregado):**
+```typescript
+const tipoRecomendado = getTipoRecomendado(zonasSalida)
+const [tipo, setTipo] = useState<TipoTransporte>(tipoRecomendado)
+```
+- Muestra "👉 Recomendado ahora: 🚗 Auto (tocar para aplicar)"
+- Pre-selecciona el tipo óptimo pero el usuario puede cambiarlo
+
+**Saturación total (agregada):**
+```typescript
+const todasMal = zonasFiltradas.every(z =>
+  z.congestion === 'alta' || z.congestion === 'colapsado'
+)
+// Muestra advertencia: "🚧 Salidas saturadas → Esperar 10-15 min / Alejarse caminando"
+```
+
+**Confianza por congestión (agregada):**
+```typescript
+const congestionLabel = opcionPrincipal
+  ? opcionPrincipal.congestion === 'baja'
+    ? '✅ Alta probabilidad de salida fluida'
+    : opcionPrincipal.congestion === 'media'
+      ? '⚠️ Demoras posibles'
+      : '❗ Alta congestión — riesgo de demora'
+  : ''
 ```
 
 **Lógica de scoring diferenciada por tipo:**
@@ -285,7 +354,7 @@ Ajuste por tipo:
 |-------|-------|
 | **Propósito** | Decisión automática sin preguntar al usuario |
 | **Archivo** | `src/screens/ResolverAhora.tsx` |
-| **Estado local** | `selectedZona: ZonaSalida \| Zona \| null` |
+| **Estado local** | `selectedZona: ZonaSalida | Zona | null` |
 | **Datos** | `mockResolver.ts` + `mockZones.ts` + `mockSalidas.ts` |
 
 **7 reglas de inferencia:**
@@ -384,7 +453,39 @@ Reglas (se evalúan en orden, primera que aplica gana):
   7. fallback → 3 opciones
 ```
 
-### 5.4 Modos de Respuesta
+### 5.4 Helpers de Confiabilidad
+
+**`src/utils/confianza.ts`:**
+```typescript
+getConfianza(estado) → 'alta' | 'media' | 'baja'
+  bajo → 'alta'
+  medio → 'media'
+  alto/colapsado → 'baja'
+
+getConfianzaLabel(confianza) → string
+  'alta' → '✅ Alta probabilidad'
+  'media' → '⚠️ Últimos lugares'
+  'baja' → '❗ Disponibilidad incierta'
+```
+
+**`src/utils/formatTime.ts`:**
+```typescript
+formatUpdatedAt(ts: number) → string
+  < 1 min → 'Actualizado recién'
+  < 60 min → 'Hace X min'
+  >= 60 min → 'Datos estimados'
+```
+
+**`src/utils/tipoRecomendado.ts`:**
+```typescript
+getTipoRecomendado(zonas) → 'auto' | 'transporte' | 'peatonal'
+  Cuenta zonas no-colapsadas por tipo
+  Si auto = 0 → 'peatonal'
+  Si transporte = 0 y peatonal > 0 → 'peatonal'
+  Default → 'auto'
+```
+
+### 5.5 Modos de Respuesta
 
 | Modo | Cuándo se activa | UI resultante |
 |------|------------------|---------------|
@@ -392,6 +493,7 @@ Reglas (se evalúan en orden, primera que aplica gana):
 | **ASISTIR** | Media saturación, algunas zonas disponibles | 1 recomendada + 1 alternativa |
 | **GUIAR** | Alta/Colapsada saturación | Decisión directiva + alternativas limitadas |
 | **FALLBACK** | Ninguna regla de inferencia aplica | 3 opciones máximo |
+| **FALLBACK FINAL** | Todas colapsadas + sin zonas lejanas | "No hay opciones" → Esperar / Mantener posición |
 
 ---
 
@@ -407,18 +509,18 @@ Reglas (se evalúan en orden, primera que aplica gana):
     ▼                          ▼                          ▼
 ┌──────────┐          ┌──────────────┐          ┌──────────────┐
 │Emergencia│          │ Estacionar   │          │    Salir     │
-│ 3 tipos  │          │ 4 modos      │          │ 3 tipos trans│
+│ 3 tipos  │          │ 5 modos      │          │ 3 tipos trans│
 └──────────┘          └──────────────┘          └──────────────┘
     │                          │                          │
     ▼                          ▼                          ▼
 ┌──────────┐          ┌──────────────┐          ┌──────────────┐
 │Protocolo │          │ Score +      │          │ Score por    │
-│ Acción   │          │ ZonaCard     │          │ tipo + cards │
+│ Acción   │          │ Confianza    │          │ tipo + badge │
 │ Timeout  │          │ Bottom Sheet │          │ Bottom Sheet │
-│ 5 seg    │          └──────────────┘          └──────────────┘
-└──────────┘                   │                          │
-    │                          └──────────┬───────────────┘
-    ▼                                     ▼
+│ 5 seg    │          │ Fallback     │          │ Saturación   │
+└──────────┘          └──────────────┘          └──────────────┘
+    │                          │                          │
+    ▼                          ▼                          ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Google Maps (window.open)                     │
 │  https://www.google.com/maps/dir/?api=1&destination=lat,lng     │
@@ -472,6 +574,8 @@ Reglas (se evalúan en orden, primera que aplica gana):
 | Mapa como apoyo | Botón secundario, nunca automático |
 | Timeout emergencia | Botón "Llamar" aparece a los 5 segundos |
 | Bottom sheet consistente | Backdrop + panel fijo + drag handle en todas las pantallas |
+| Confianza derivada | No se almacena, se calcula de `estado` en tiempo real |
+| Timestamp dinámico | `formatUpdatedAt()` reemplaza strings estáticos |
 
 ### Dark Mode
 
@@ -512,10 +616,13 @@ Todas las pantallas tienen variantes `dark:` en colores, fondos y bordes.
 | Módulo | Estado | Validado | Notas |
 |--------|--------|----------|-------|
 | Home | ✅ | ✅ | 8 quick actions, botón secundario |
-| Estacionar | ✅ | ✅ | 4 modos, scoring, bottom sheet |
-| Emergencia | ✅ | ✅ | 3 tipos, sub-tipos, timeout 5s |
-| Salir | ✅ | ✅ | 3 tipos, score diferenciado, 5 zonas |
+| Estacionar | ✅ | ✅ | 5 modos, scoring, confianza, fallback final |
+| Emergencia | ✅ | ✅ | 3 tipos, sub-tipos, timeout 5s, fix seguridad |
+| Salir | ✅ | ✅ | 3 tipos, score diferenciado, badge recomendado, saturación total |
 | Resolver Ahora | ✅ | ✅ | 7 reglas inferencia, fallback 3 opciones |
+| Utils confianza | ✅ | ✅ | `getConfianza()`, `getConfianzaLabel()` |
+| Utils formatTime | ✅ | ✅ | `formatUpdatedAt()` en 3 pantallas |
+| Utils tipoRecomendado | ✅ | ✅ | Pre-selección en Salir.tsx |
 | PWA Base | ✅ | ⚠️ | SW registrado, pendiente test offline real |
 | Rutas | ✅ | ✅ | 5 rutas en React Router |
 | Dark Mode | ✅ | ✅ | Todas las pantallas |
@@ -542,16 +649,18 @@ Todas las pantallas tienen variantes `dark:` en colores, fondos y bordes.
 
 | Métrica | Valor |
 |---------|-------|
-| **Archivos fuente** | 26 |
-| **Líneas de código (estimado)** | ~2,200-2,500 |
+| **Archivos fuente** | 29 |
+| **Líneas de código (estimado)** | ~2,800-3,200 |
 | **Pantallas** | 5 principales |
 | **Componentes reutilizables** | 4 (Header, ActionButton, StatusBanner, ZonaCard) |
 | **Archivos mock data** | 4 (mockZones, mockEmergencia, mockSalidas, mockResolver) |
+| **Archivos utils** | 3 (confianza, formatTime, tipoRecomendado) |
 | **Rutas React Router** | 5 (`/`, `/estacionar`, `/emergencia`, `/salir`, `/resolver-ahora`) |
 | **Zonas con coordenadas reales** | 4 estacionamiento + 5 salidas = 9 total |
 | **Reglas de inferencia** | 7 |
-| **Modos de respuesta** | 4 (informar, asistir, guiar, fallback) |
+| **Modos de respuesta** | 5 (informar, asistir, guiar, fallback, fallback final) |
 | **Dependencias npm** | 11 (5 prod + 6 dev) |
+| **Commits** | 1 (`0634a7e`) — 33 files, +3029/-184 |
 
 ### Coordenadas reales utilizadas (Jesús María, Córdoba, Argentina)
 
@@ -563,7 +672,8 @@ Todas las pantallas tienen variantes `dark:` en colores, fondos y bordes.
 | Predio Ferial / Costanera | -30.985337 | -64.094209 | Zona Sur |
 | Av. Colón y Costanera | -30.981249 | -64.075000 | Salida Este |
 | Destacamento Policial | -30.978500 | -64.095000 | Punto seguro |
-| Puesto Sanitario Principal | -30.978200 | -64.094500 | Puesto sanitario |
+| Puesto Sanitario Principal | -30.978500 | -64.095500 | Puesto sanitario |
+| Posta Médica Norte | -30.974000 | -64.089000 | Terminal de Ómnibus |
 
 ---
 
@@ -625,5 +735,21 @@ Todas las pantallas tienen variantes `dark:` en colores, fondos y bordes.
 
 ---
 
-> **Fin del informe.** Documento generado el 3 de abril de 2026.
+## 15. 📝 HISTORIAL DE CAMBIOS RECIENTES
+
+| Fecha | Cambio | Archivos afectados |
+|-------|--------|-------------------|
+| 3/4/2026 | **MVP núcleo completo** — Commit inicial | 33 files, +3029/-184 |
+| 3/4/2026 | **Confianza** — `getConfianza()` deriva de estado | `utils/confianza.ts`, `Estacionar.tsx` |
+| 3/4/2026 | **Formato tiempo** — `formatUpdatedAt()` global | `utils/formatTime.ts`, mocks, 3 pantallas |
+| 3/4/2026 | **Tipo recomendado** — Badge pre-selección | `utils/tipoRecomendado.ts`, `Salir.tsx` |
+| 3/4/2026 | **Fallback final** — Sin zonas disponibles | `Estacionar.tsx` (modo nuevo) |
+| 3/4/2026 | **Saturación total** — Advertencia en Salir | `Salir.tsx` |
+| 3/4/2026 | **Fix Seguridad** — Ver ruta + Llamar asistencia | `Emergencia.tsx` |
+| 3/4/2026 | **Home ajustes** — Resolver secundario, Transporte | `Home.tsx` |
+
+---
+
+> **Fin del informe.** Documento actualizado el 3 de abril de 2026.
+> Repositorio: `https://github.com/Cba40/festivales` — branch `main` — commit `0634a7e`
 > Cualquier desarrollador con este documento puede continuar el proyecto sin contexto adicional.
