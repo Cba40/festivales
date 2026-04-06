@@ -6,19 +6,9 @@ import {
   getSalidasOrdenadas,
   getModoSalida,
   calcularScoreSalida,
-  escenariosTestSalida,
   ZonaSalida
 } from '@/data/mockSalidas'
 import { eventoData } from '@/data/eventoData'
-
-// ============================================
-// ⚠️ PARA TEST: CAMBIAR ESCENARIO ACÁ
-// Usar SOLO uno a la vez
-// ============================================
-const zonasMock = eventoData.salidas
-// const zonasMock = escenariosTestSalida.medio
-// const zonasMock = escenariosTestSalida.alto
-// const zonasMock = escenariosTestSalida.colapsado
 import { getConfianza, getConfianzaLabel } from '@/utils/confianza'
 import { formatUpdatedAt } from '@/utils/formatTime'
 import {
@@ -35,14 +25,8 @@ const Salir = () => {
   const [tipo, setTipo] = useState<TipoTransporte>('auto')
   const [selectedZona, setSelectedZona] = useState<ZonaSalida | null>(null)
 
-  // ============================================
-  // ⚠️ PARA TEST: CAMBIAR ESCENARIO ACÁ
-  // Usar SOLO uno a la vez
-  // ============================================
-  const zonasMock = zonasSalida
-  // const zonasMock = escenariosTestSalida.medio
-  //const zonasMock = escenariosTestSalida.alto
-  //const zonasMock = escenariosTestSalida.colapsado
+  // Usar datos de eventoData (single source of truth)
+  const zonasMock = eventoData.salidas
 
   // Modo inicial desde engine
   const modoInicial = getModoSalida(zonasMock, tipo)

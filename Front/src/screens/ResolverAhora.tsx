@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '../components/Header'
 import { inferirNecesidad, ResultadoInferencia } from '../data/mockResolver'
-import { ZonaSalida } from '../data/mockSalidas'
+import { eventoData } from '@/data/eventoData'
+import type { ZonaSalida } from '@/data/eventoData'
 import { Zona } from '../types'
 
 type ZonaSeleccionada = ZonaSalida | Zona | null

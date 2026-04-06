@@ -1,5 +1,6 @@
-import { zonasSalida, ZonaSalida, getSalidasOrdenadas } from './mockSalidas'
-import { zonasMock, ZonaEstacionamiento, getZonasOrdenadas } from './mockZones'
+import { eventoData } from '@/data/eventoData'
+import { getSalidasOrdenadas } from './mockSalidas'
+import { getZonasOrdenadas } from './mockZones'
 import { getHoraEvento } from '@/utils/contextoEvento'
 import { getFaseActual } from '@/utils/fases'
 import { getEventoConfig } from '@/config/eventoConfig'
@@ -28,28 +29,28 @@ export interface ResultadoInferencia {
   }
 }
 
-const getZonaConMejorScore = (): ZonaEstacionamiento | undefined => {
-  const ordenadas = getZonasOrdenadas(zonasMock)
+const getZonaConMejorScore = () => {
+  const ordenadas = getZonasOrdenadas(eventoData.estacionamiento)
   return ordenadas.find(z => z.estado !== 'colapsado')
 }
 
-const getZonaAlternativa = (): ZonaEstacionamiento | undefined => {
-  const ordenadas = getZonasOrdenadas(zonasMock).filter(z => z.estado !== 'colapsado')
+const getZonaAlternativa = () => {
+  const ordenadas = getZonasOrdenadas(eventoData.estacionamiento).filter(z => z.estado !== 'colapsado')
   return ordenadas[1]
 }
 
-const getSalidaConMenorCongestion = (): ZonaSalida | undefined => {
-  const ordenadas = getSalidasOrdenadas(zonasSalida, 'auto')
+const getSalidaConMenorCongestion = () => {
+  const ordenadas = getSalidasOrdenadas(eventoData.salidas, 'auto')
   return ordenadas.find(z => z.estado !== 'colapsado')
 }
 
-const getSalidaAlternativa = (): ZonaSalida | undefined => {
-  const ordenadas = getSalidasOrdenadas(zonasSalida, 'auto').filter(z => z.estado !== 'colapsado')
+const getSalidaAlternativa = () => {
+  const ordenadas = getSalidasOrdenadas(eventoData.salidas, 'auto').filter(z => z.estado !== 'colapsado')
   return ordenadas[1]
 }
 
-const getZonaLejana = (): ZonaEstacionamiento | undefined => {
-  const ordenadas = getZonasOrdenadas(zonasMock)
+const getZonaLejana = () => {
+  const ordenadas = getZonasOrdenadas(eventoData.estacionamiento)
   return ordenadas[ordenadas.length - 1]
 }
 
