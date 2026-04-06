@@ -6,6 +6,11 @@ import path from 'path';
 export default defineConfig({
   plugins: [react()],
   base: '/',  // CRÍTICO para Vercel (NO usar '/festivales-mocha')
+  build: {
+    outDir: 'dist',  // debe coincidir con vercel.json
+    emptyOutDir: true,
+    sourcemap: false
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -14,13 +19,4 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
-  build: {
-    outDir: 'dist',
-    sourcemap: false,
-    rollupOptions: {
-      output: {
-        manualChunks: undefined  // evitar problemas con chunks
-      }
-    }
-  }
 });
