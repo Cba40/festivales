@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Phone, MapPin, Navigation, Clock } from 'lucide-react'
+import { ArrowLeft, Phone, MapPin, Navigation, Clock, Home } from 'lucide-react'
 import { getPuntoSeguroCercano, getPuestoCercano, zonasReferencia, type PuntoSeguro, type PuestoSanitario } from '@/data/mockEmergencia'
 
 type EmergencyType = 'nino-perdido' | 'persona-herida' | 'necesito-ayuda' | null
@@ -136,13 +136,20 @@ const Emergencia = () => {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
         {/* Header */}
-        <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-4">
+        <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-4 flex items-center justify-between">
           <button
             onClick={() => setSelectedType(null)}
             className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-semibold"
           >
             <ArrowLeft size={20} />
             Volver
+          </button>
+          <button
+            onClick={() => navigate('/')}
+            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+            aria-label="Ir al Home"
+          >
+            <Home size={24} className="text-slate-700 dark:text-slate-300" />
           </button>
         </div>
 
@@ -211,7 +218,7 @@ const Emergencia = () => {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
         {/* Header */}
-        <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-4">
+        <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-4 flex items-center justify-between">
           <button
             onClick={() => {
               setSelectedType(null)
@@ -221,6 +228,13 @@ const Emergencia = () => {
           >
             <ArrowLeft size={20} />
             Volver
+          </button>
+          <button
+            onClick={() => navigate('/')}
+            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+            aria-label="Ir al Home"
+          >
+            <Home size={24} className="text-slate-700 dark:text-slate-300" />
           </button>
         </div>
 
@@ -309,13 +323,20 @@ const Emergencia = () => {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
         {/* Header */}
-        <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-4">
+        <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-4 flex items-center justify-between">
           <button
             onClick={() => setSelectedType(null)}
             className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-semibold"
           >
             <ArrowLeft size={20} />
             Volver
+          </button>
+          <button
+            onClick={() => navigate('/')}
+            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+            aria-label="Ir al Home"
+          >
+            <Home size={24} className="text-slate-700 dark:text-slate-300" />
           </button>
         </div>
 
@@ -354,13 +375,20 @@ const Emergencia = () => {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
         {/* Header */}
-        <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-4">
+        <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-4 flex items-center justify-between">
           <button
             onClick={() => setHelpSubType(null)}
             className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-semibold"
           >
             <ArrowLeft size={20} />
             Volver
+          </button>
+          <button
+            onClick={() => navigate('/')}
+            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+            aria-label="Ir al Home"
+          >
+            <Home size={24} className="text-slate-700 dark:text-slate-300" />
           </button>
         </div>
 
@@ -415,13 +443,20 @@ const Emergencia = () => {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
         {/* Header */}
-        <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-4">
+        <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-4 flex items-center justify-between">
           <button
             onClick={() => setHelpSubType(null)}
             className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-semibold"
           >
             <ArrowLeft size={20} />
             Volver
+          </button>
+          <button
+            onClick={() => navigate('/')}
+            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+            aria-label="Ir al Home"
+          >
+            <Home size={24} className="text-slate-700 dark:text-slate-300" />
           </button>
         </div>
 
@@ -469,13 +504,20 @@ const Emergencia = () => {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
         {/* Header */}
-        <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-4">
+        <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-4 flex items-center justify-between">
           <button
             onClick={() => setHelpSubType(null)}
             className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-semibold"
           >
             <ArrowLeft size={20} />
             Volver
+          </button>
+          <button
+            onClick={() => navigate('/')}
+            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+            aria-label="Ir al Home"
+          >
+            <Home size={24} className="text-slate-700 dark:text-slate-300" />
           </button>
         </div>
 
@@ -520,7 +562,7 @@ const Emergencia = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-4">
+      <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-4 flex items-center justify-between">
         <button
           onClick={() => navigate('/')}
           className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-semibold"
@@ -528,6 +570,8 @@ const Emergencia = () => {
           <ArrowLeft size={20} />
           Volver al inicio
         </button>
+        {/* En la pantalla principal de Emergencia, el botón Home es redundante porque "Volver al inicio" ya lleva al Home */}
+        <div className="w-10" />
       </div>
 
       <div className="flex-1 p-4 space-y-4">
