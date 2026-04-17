@@ -1,5 +1,6 @@
 import { getModo, getUmbralContexto, type Estado } from '@/utils/decisionEngine'
 import { calcularScore } from '@/utils/decisionEngine'
+import { getHoraEvento } from '@/utils/contextoEvento'
 
 export interface ZonaSalida {
   id: string
