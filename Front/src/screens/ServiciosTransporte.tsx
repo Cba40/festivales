@@ -398,7 +398,7 @@ const ServiciosTransporte = () => {
                   {getConfianzaLabel(getConfianza(parada.estado))}
                 </p>
               </button>
-            ))}
+            )})}
           </div>
         </div>
 
