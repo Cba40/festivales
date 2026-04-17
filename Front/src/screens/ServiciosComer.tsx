@@ -62,6 +62,16 @@ const ServiciosComer = () => {
     }
   }
 
+  const getEstadoLabel = (estado: string) => {
+    switch (estado) {
+      case 'bajo': return '🟢 Bajo'
+      case 'medio': return '🟡 Medio'
+      case 'alto': return '🔴 Alto'
+      case 'colapsado': return '⚫ Colapsado'
+      default: return estado
+    }
+  }
+
   // 🚧 SIN SOLUCIÓN REAL (todas colapsado)
   if (sinSolucion) {
     return (
@@ -249,6 +259,9 @@ const ServiciosComer = () => {
                   🚶 {principal.distancia_min} min · ⏱️ {principal.espera_min} min
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                  Menor espera actual
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
                   {formatUpdatedAt(principal.updatedAt)}
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
@@ -360,37 +373,43 @@ const ServiciosComer = () => {
           <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4">
             Puntos de comida disponibles
           </h2>
+          <div className="text-xs text-gray-500 mt-2 mb-4">
+            🟢 Bajo: rápido · 🟡 Medio: demora moderada · 🔴 Alto: mucha demora
+          </div>
           <div className="space-y-3">
-            {puntosOrdenados.slice(0, 3).map((punto) => (
-              <button
-                key={punto.id}
-                onClick={() => setSelectedPunto(punto)}
-                className="w-full p-4 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-left hover:border-primary dark:hover:border-primary/70 transition-colors"
-              >
-                <div className="flex justify-between items-center">
-                  <span className="font-bold text-gray-900 dark:text-gray-100">
-                    {punto.nombre}
-                  </span>
-                  <span
-                    className={`px-2 py-1 rounded text-xs font-bold ${getEstadoStyles(punto.estado)}`}
-                  >
-                    {punto.estado}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-                  📍 {punto.referencia}
-                </p>
-                <p className="text-sm text-gray-600 dark:text-gray-300">
-                  🚶 {punto.distancia_min} min · ⏱️ {punto.espera_min} min
-                </p>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                  {formatUpdatedAt(punto.updatedAt)}
-                </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  {getConfianzaLabel(getConfianza(punto.estado))}
-                </p>
-              </button>
-            ))}
+            {puntosOrdenados.slice(0, 3).map((punto, index) => {
+              const isTop = index === 0
+              return (
+                <button
+                  key={punto.id}
+                  onClick={() => setSelectedPunto(punto)}
+                  className={`w-full p-4 bg-white dark:bg-slate-700 border ${isTop ? 'border-primary ring-1 ring-primary/20 bg-primary/5 dark:bg-primary/10' : 'border-slate-200 dark:border-slate-600'} rounded-xl text-left hover:border-primary dark:hover:border-primary/70 transition-colors`}
+                >
+                  <div className="flex justify-between items-center">
+                    <span className={`font-bold ${isTop ? 'text-primary' : 'text-gray-900 dark:text-gray-100'}`}>
+                      {isTop ? '🔥 Mejor opción ahora: ' : ''}{punto.nombre}
+                    </span>
+                    <span
+                      className={`px-2 py-1 rounded text-xs font-bold ${getEstadoStyles(punto.estado)}`}
+                    >
+                      {getEstadoLabel(punto.estado)}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                    📍 {punto.referencia}
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    🚶 {punto.distancia_min} min · ⏱️ {punto.espera_min} min
+                  </p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                    {formatUpdatedAt(punto.updatedAt)}
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    {getConfianzaLabel(getConfianza(punto.estado))}
+                  </p>
+                </button>
+              )
+            })}
           </div>
         </div>
 

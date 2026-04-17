@@ -64,6 +64,16 @@ const Estacionar = () => {
     }
   }
 
+  const getEstadoLabel = (estado: string) => {
+    switch (estado) {
+      case 'bajo': return '🟢 Bajo'
+      case 'medio': return '🟡 Medio'
+      case 'alto': return '🔴 Alto'
+      case 'colapsado': return '⚫ Colapsado'
+      default: return estado
+    }
+  }
+
   // SIN SOLUCIÓN
   if (modo === 'sin_solucion') {
     return (
@@ -110,7 +120,7 @@ const Estacionar = () => {
                 >
                   <span className="font-bold text-gray-900 dark:text-gray-100">{zona.nombre}</span>
                   <span className={`ml-2 px-2 py-1 rounded text-xs font-bold ${getEstadoStyles(zona.estado)}`}>
-                    {zona.estado}
+                    {getEstadoLabel(zona.estado)}
                   </span>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     🚶 {zona.distancia_min} min · 📊 {zona.disponibilidad}%
@@ -373,6 +383,9 @@ const Estacionar = () => {
           <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4">
             Zonas disponibles
           </h2>
+          <div className="text-xs text-gray-500 mt-2 mb-4">
+            🟢 Bajo: rápido · 🟡 Medio: demora moderada · 🔴 Alto: mucha demora
+          </div>
           <div className="space-y-3">
             {zonasOrdenadas.slice(0, 3).map((zona) => (
               <button
@@ -387,7 +400,7 @@ const Estacionar = () => {
                   <span
                     className={`px-2 py-1 rounded text-xs font-bold ${getEstadoStyles(zona.estado)}`}
                   >
-                    {zona.estado}
+                    {getEstadoLabel(zona.estado)}
                   </span>
                 </div>
                 <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">

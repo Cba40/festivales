@@ -48,8 +48,6 @@ const ServiciosGenerales = () => {
 
   const seleccionar = (subtipo: string) => {
     setSubtipoActivo(subtipo)
-    const masCercano = getServicioMasCercano(subtipo) as Servicio | null
-    if (masCercano) setSelected(masCercano)
   }
 
   if (!subtipoActivo) {

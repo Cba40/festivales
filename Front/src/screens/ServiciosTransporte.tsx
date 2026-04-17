@@ -46,6 +46,16 @@ const ServiciosTransporte = () => {
     }
   }
 
+  const getEstadoLabel = (estado: string) => {
+    switch (estado) {
+      case 'bajo': return '🟢 Bajo'
+      case 'medio': return '🟡 Medio'
+      case 'alto': return '🔴 Alto'
+      case 'colapsado': return '⚫ Colapsado'
+      default: return estado
+    }
+  }
+
   // SIN SOLUCIÓN por score o estado
   if (modo === 'sin_solucion') {
     return (
@@ -236,6 +246,9 @@ const ServiciosTransporte = () => {
                   🚶 {principal.distancia_min} min · ⏱️ {principal.espera_min} min
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                  Menor espera + cercanía
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
                   {formatUpdatedAt(principal.updatedAt)}
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
@@ -350,26 +363,31 @@ const ServiciosTransporte = () => {
           <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4">
             Paradas disponibles
           </h2>
+          <div className="text-xs text-gray-500 mt-2 mb-4">
+            🟢 Bajo: rápido · 🟡 Medio: demora moderada · 🔴 Alto: mucha demora
+          </div>
           <div className="space-y-3">
-            {paradasOrdenadas.slice(0, 3).map((parada) => (
-              <button
-                key={parada.id}
-                onClick={() => setSelectedParada(parada)}
-                className="w-full p-4 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-left hover:border-primary dark:hover:border-primary/70 transition-colors"
-              >
-                <div className="flex justify-between items-center">
-                  <span className="font-bold text-gray-900 dark:text-gray-100">
-                    {parada.nombre}
-                  </span>
-                  <span
-                    className={`px-2 py-1 rounded text-xs font-bold ${getEstadoStyles(parada.estado)}`}
-                  >
-                    {parada.estado}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-                  📍 {parada.referencia}
-                </p>
+            {paradasOrdenadas.slice(0, 3).map((parada, index) => {
+              const isTop = index === 0;
+              return (
+                <button
+                  key={parada.id}
+                  onClick={() => setSelectedParada(parada)}
+                  className={`w-full p-4 bg-white dark:bg-slate-700 border ${isTop ? 'border-primary ring-1 ring-primary/20' : 'border-slate-200 dark:border-slate-600'} rounded-xl text-left hover:border-primary dark:hover:border-primary/70 transition-colors`}
+                >
+                  <div className="flex justify-between items-center">
+                    <span className={`font-bold ${isTop ? 'text-primary' : 'text-gray-900 dark:text-gray-100'}`}>
+                      {isTop ? '🔥 Mejor opción ahora: ' : ''}{parada.nombre}
+                    </span>
+                    <span
+                      className={`px-2 py-1 rounded text-xs font-bold ${getEstadoStyles(parada.estado)}`}
+                    >
+                      {getEstadoLabel(parada.estado)}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                    📍 {parada.referencia}
+                  </p>
                 <p className="text-sm text-gray-600 dark:text-gray-300">
                   🚶 {parada.distancia_min} min · ⏱️ {parada.espera_min} min
                 </p>

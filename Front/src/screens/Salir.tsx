@@ -106,12 +106,27 @@ const Salir = () => {
     }
   }
 
+  const getEstadoLabel = (estado: string) => {
+    switch (estado) {
+      case 'bajo': return '🟢 Bajo'
+      case 'medio': return '🟡 Medio'
+      case 'alto': return '🔴 Alto'
+      case 'colapsado': return '⚫ Colapsado'
+      default: return estado
+    }
+  }
+
+  const salirDescription = (
+    <div className="text-xs text-gray-500 mb-2">
+      Te mostramos la forma más rápida de salir según el flujo actual
+    </div>
+  )
+
   // SIN SOLUCIÓN
   if (session.modoActual === 'sin_solucion') {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        <Header title="Salir" showBack onBack={() => navigate('/')} />
-
+        <Header title="Salir" showBack onBack={() => navigate('/')} />      {salirDescription}
         <div className="flex-1 p-4 space-y-4">
           {/* Selector tipo */}
           <div className="grid grid-cols-3 gap-2">
@@ -151,6 +166,7 @@ const Salir = () => {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
         <Header title="Salir" showBack onBack={() => navigate('/')} />
+      {salirDescription}
 
         <div className="bg-danger text-white px-4 py-3">
           <h2 className="font-bold text-lg">👉 Salidas congestionadas</h2>
@@ -174,10 +190,12 @@ const Salir = () => {
 
           {principal && (
             <button onClick={() => setSelectedZona(principal)} className="w-full">
-              <div className="bg-primary text-white p-6 rounded-xl text-left shadow-lg">
+              <div className="bg-primary text-white p-6 rounded-xl text-left shadow-lg border border-primary">
+                <p className="text-sm font-semibold mb-2">🔥 Mejor opción ahora</p>
                 <p className="text-lg font-bold">👉 Dirigite ahora a {principal.nombre}</p>
                 <p className="text-sm opacity-90 mt-2">📍 {principal.referencia}</p>
                 <p className="text-sm opacity-90">🚶 {principal.distancia_min} min</p>
+                <p className="text-xs opacity-90 mt-2">Menor tiempo total de salida</p>
                 {principal.estado === 'alto' && (
                   <p className="text-xs opacity-75 mt-2">⚠️ Congestión alta</p>
                 )}
@@ -243,6 +261,7 @@ const Salir = () => {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
         <Header title="Salir" showBack onBack={() => navigate('/')} />
+        {salirDescription}
 
         <div className="flex-1 p-4 space-y-4">
           {/* Selector tipo */}
@@ -262,12 +281,14 @@ const Salir = () => {
 
           {principal && (
             <button onClick={() => setSelectedZona(principal)} className="w-full">
-              <div className="bg-white dark:bg-slate-800 border-l-4 border-primary p-4 rounded-xl text-left shadow-md">
+              <div className="bg-white dark:bg-slate-800 border-l-4 border-primary p-4 rounded-xl text-left shadow-md ring-1 ring-primary/20">
+                <p className="text-sm font-semibold mb-2">🔥 Mejor opción ahora</p>
                 <p className="font-bold text-slate-800 dark:text-slate-100 text-lg">
                   👉 Mejor opción ahora: {principal.nombre}
                 </p>
                 <p className="text-sm text-slate-600 dark:text-slate-300 mt-2">📍 {principal.referencia}</p>
                 <p className="text-sm text-slate-600 dark:text-slate-300">🚶 {principal.distancia_min} min</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">Menor tiempo total de salida</p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">{formatUpdatedAt(principal.updatedAt)}</p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{getConfianzaLabel(getConfianza(principal.estado))}</p>
               </div>
@@ -320,6 +341,7 @@ const Salir = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
       <Header title="Salir" showBack onBack={() => navigate('/')} />
+      {salirDescription}
 
       <div className="flex-1 p-4 space-y-4">
         {/* Selector tipo */}
@@ -341,13 +363,16 @@ const Salir = () => {
           <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4">
             Salidas disponibles
           </h2>
+          <div className="text-xs text-gray-500 mt-2 mb-4">
+            🟢 Bajo: rápido · 🟡 Medio: demora moderada · 🔴 Alto: mucha demora
+          </div>
           <div className="space-y-3">
             {salidasOrdenadas.slice(0, 3).map(zona => (
               <button key={zona.id} onClick={() => setSelectedZona(zona)}
                 className="w-full p-4 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-left hover:border-primary transition-colors">
                 <div className="flex justify-between items-center">
                   <span className="font-bold text-gray-900 dark:text-gray-100">{zona.nombre}</span>
-                  <span className={`px-2 py-1 rounded text-xs font-bold ${getEstadoStyles(zona.estado)}`}>{zona.estado}</span>
+                  <span className={`px-2 py-1 rounded text-xs font-bold ${getEstadoStyles(zona.estado)}`}>{getEstadoLabel(zona.estado)}</span>
                 </div>
                 <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">📍 {zona.referencia}</p>
                 <p className="text-sm text-gray-600 dark:text-gray-300">🚶 {zona.distancia_min} min</p>

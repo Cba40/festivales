@@ -32,11 +32,18 @@ const Pernoctar = () => {
               <div>
                 <p className="font-bold text-slate-800 dark:text-slate-100">{p.nombre}</p>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
-                  {p.categoria} · {p.referencia}
+                  <div className="text-sm font-semibold">
+                    {p.categoria.toUpperCase()}
+                  </div>
+                  · {p.referencia}
                 </p>
               </div>
               <span className={`px-2 py-1 rounded text-xs font-bold ${getDispBadge(p.disponibilidad)}`}>
-                {p.disponibilidad || 'Consultar'}
+                <div className="text-sm">
+                  {p.disponibilidad === 'disponible' && '🟢 Disponible'}
+                  {p.disponibilidad === 'consultar' && '🟡 Consultar'}
+                  {p.disponibilidad === 'completo' && '🔴 Completo'}
+                </div>
               </span>
             </div>
 
@@ -45,6 +52,9 @@ const Pernoctar = () => {
             </p>
             <p className="text-xs text-slate-400 dark:text-slate-500">
               {formatUpdatedAt(p.updatedAt)}
+            </p>
+            <p className="text-xs text-gray-500">
+              ℹ️ Confirmar disponibilidad por teléfono antes de ir
             </p>
 
             <div className="flex gap-2 pt-2">

@@ -30,7 +30,7 @@ const Home = () => {
             />
             <QuickAction
               emoji="🚪"
-              label="Salir"
+              label="Salir del evento"
               onClick={() => navigate('/salir')}
             />
           </div>
@@ -53,13 +53,13 @@ const Home = () => {
             />
             <QuickAction
               emoji="🛏"
-              label="Dormir"
+              label="Hospedajes"
               onClick={() => navigate('/pernoctar')}
             />
             <QuickAction
               emoji="🧭"
               label="Más servicios"
-              onClick={() => navigate('/servicios')}
+              onClick={() => navigate('/servicios/generales')}
             />
           </div>
         </div>
