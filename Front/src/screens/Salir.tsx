@@ -44,8 +44,20 @@ const Salir = () => {
     return getSalidasOrdenadas(zonasMock, tipo)
   }, [zonasMock, tipo])
 
-  const principal = salidasOrdenadas[0]
-  const alternativaRaw = salidasOrdenadas[1]
+  const salidasModo = useMemo(() => {
+    const filtradas = zonasMock.filter(salida => salida.transporte === tipo)
+    if (filtradas.length > 0) {
+      return getSalidasOrdenadas(filtradas, tipo)
+    }
+    return [salidasOrdenadas[0]].filter(Boolean) as ZonaSalida[]
+  }, [zonasMock, tipo, salidasOrdenadas])
+
+  const mensajeModo = salidasModo[0]?.transporte !== tipo
+    ? 'No hay opciones rápidas en este modo'
+    : ''
+
+  const principal = salidasModo[0]
+  const alternativaRaw = salidasModo[1]
   const esAlternativaValida = alternativaRaw &&
     calcularScoreSalida(alternativaRaw, tipo) <
     Math.min(
@@ -142,20 +154,41 @@ const Salir = () => {
               </button>
             ))}
           </div>
+          {mensajeModo && (
+            <div className="bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700 text-yellow-900 dark:text-yellow-100 p-3 rounded-xl">
+              {mensajeModo}
+            </div>
+          )}
 
-          <div className="bg-danger text-white p-6 rounded-xl text-center">
-            <p className="text-xl font-bold">🚧 Todas las salidas saturadas</p>
-            <p className="text-sm mt-2 opacity-90">No hay opciones convenientes para salir</p>
+          <div className="bg-warning/20 text-amber-900 border border-amber-300 dark:bg-amber-950/40 dark:border-amber-700 p-6 rounded-xl text-center">
+            <p className="text-xl font-bold">⚠️ Todas las salidas con demora</p>
+            <p className="text-sm mt-2 opacity-90">Te mostramos la mejor disponible</p>
           </div>
 
-          <div className="bg-slate-100 dark:bg-slate-700 p-4 rounded-xl space-y-3">
-            <button className="w-full bg-white dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 p-3 rounded-lg font-bold active:scale-95 transition-transform">
-              ⏱️ Esperar 10–15 min
+          {principal && (
+            <button onClick={() => setSelectedZona(principal)} className="w-full">
+              <div className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 p-4 rounded-xl text-left shadow-sm">
+                <p className="font-bold text-slate-800 dark:text-slate-100">Mejor opción disponible</p>
+                <p className="text-lg font-bold mt-2">{principal.nombre}</p>
+                <p className="text-sm text-slate-600 dark:text-slate-300 mt-2">📍 {principal.referencia}</p>
+                <p className="text-sm text-slate-600 dark:text-slate-300">🚶 {principal.distancia_min} min · ⏱️ {principal.espera_min} min</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">{getEstadoLabel(principal.estado)}</p>
+              </div>
             </button>
-            <button className="w-full bg-white dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 p-3 rounded-lg font-bold active:scale-95 transition-transform">
-              🚶 Alejarse caminando
-            </button>
+          )}
+
+          <div className="bg-slate-100 dark:bg-slate-700 p-4 rounded-xl text-center text-slate-700 dark:text-slate-300">
+            {mensajeModo || 'Ningún modo rápido disponible, pero puedes usar la opción mostrada.'}
           </div>
+
+          {principal && (
+            <button
+              onClick={() => abrirMapa(principal)}
+              className="w-full bg-primary text-white py-4 rounded-xl font-bold text-lg transition-transform active:scale-95 shadow-lg flex items-center justify-center gap-2"
+            >
+              <Map size={20} /> Iniciar ruta
+            </button>
+          )}
         </div>
       </div>
     )
@@ -187,6 +220,12 @@ const Salir = () => {
               </button>
             ))}
           </div>
+
+          {mensajeModo && (
+            <div className="bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700 text-yellow-900 dark:text-yellow-100 p-3 rounded-xl">
+              {mensajeModo}
+            </div>
+          )}
 
           {principal && (
             <button onClick={() => setSelectedZona(principal)} className="w-full">
@@ -279,6 +318,12 @@ const Salir = () => {
             ))}
           </div>
 
+          {mensajeModo && (
+            <div className="bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700 text-yellow-900 dark:text-yellow-100 p-3 rounded-xl">
+              {mensajeModo}
+            </div>
+          )}
+
           {principal && (
             <button onClick={() => setSelectedZona(principal)} className="w-full">
               <div className="bg-white dark:bg-slate-800 border-l-4 border-primary p-4 rounded-xl text-left shadow-md ring-1 ring-primary/20">
@@ -359,6 +404,12 @@ const Salir = () => {
           ))}
         </div>
 
+        {mensajeModo && (
+          <div className="bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700 text-yellow-900 dark:text-yellow-100 p-3 rounded-xl">
+            {mensajeModo}
+          </div>
+        )}
+
         <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-md">
           <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4">
             Salidas disponibles
@@ -367,7 +418,7 @@ const Salir = () => {
             🟢 Bajo: rápido · 🟡 Medio: demora moderada · 🔴 Alto: mucha demora
           </div>
           <div className="space-y-3">
-            {salidasOrdenadas.slice(0, 3).map(zona => (
+            {salidasModo.slice(0, 3).map(zona => (
               <button key={zona.id} onClick={() => setSelectedZona(zona)}
                 className="w-full p-4 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-left hover:border-primary transition-colors">
                 <div className="flex justify-between items-center">

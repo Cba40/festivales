@@ -242,16 +242,16 @@ export const eventoData = {
   ] as PuntoComida[],
 
   // ============================================
-  // 🚪 SALIR (4 salidas con opciones variadas)
+  // 🚪 SALIR (3 salidas con opciones variadas)
   // ============================================
   salidas: [
     {
-      id: 'sal-1',
+      id: 's1',
       nombre: 'Salida Norte',
       tipo: 'salida' as const,
       transporte: 'auto' as const,
       estado: 'alto' as const,
-      distancia_min: 3,
+      distancia_min: 5,
       espera_min: 15,
       referencia: 'Acceso masivo',
       lat: -30.973313,
@@ -260,12 +260,12 @@ export const eventoData = {
       updatedAt: now - 2 * 60000
     },
     {
-      id: 'sal-2',
+      id: 's2',
       nombre: 'Salida Sur',
       tipo: 'salida' as const,
       transporte: 'transporte' as const,
       estado: 'medio' as const,
-      distancia_min: 5,
+      distancia_min: 4,
       espera_min: 8,
       referencia: 'Menos gente',
       lat: -30.985337,
@@ -274,14 +274,14 @@ export const eventoData = {
       updatedAt: now - 1 * 60000
     },
     {
-      id: 'sal-3',
+      id: 's3',
       nombre: 'Salida Este',
       tipo: 'salida' as const,
       transporte: 'peatonal' as const,
       estado: 'bajo' as const,
-      distancia_min: 7,
-      espera_min: 4,
-      referencia: 'Acceso restringido',
+      distancia_min: 2,
+      espera_min: 3,
+      referencia: 'Acceso peatonal',
       lat: -30.978107,
       lng: -64.094779,
       capacidad_estimada: 100,
