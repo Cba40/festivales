@@ -1,22 +1,8 @@
 import { getModo, getUmbralContexto, type Estado } from '@/utils/decisionEngine'
 import { calcularScore } from '@/utils/decisionEngine'
 import { getHoraEvento } from '@/utils/contextoEvento'
+import { type ZonaSalida } from '@/data/eventoData'
 
-export interface ZonaSalida {
-  id: string
-  nombre: string
-  tipo: 'auto' | 'transporte' | 'peatonal'
-  lat: number
-  lng: number
-  referencia: string
-  distancia_min: number
-  estado: Estado
-  capacidad_estimada?: number
-  espera_estimada_min?: number
-  es_embudo?: boolean
-  timestamp: string
-  updatedAt: number
-}
 
 const CONGESTION_PENALIZATION = {
   bajo: 1,
@@ -31,71 +17,73 @@ export const zonasSalida: ZonaSalida[] = [
   {
     id: 'salida-norte',
     nombre: 'Salida Norte',
-    tipo: 'auto',
+    tipo: 'salida' as const,
+    transporte: 'auto' as const,
     lat: -30.973313,
     lng: -64.088529,
     referencia: 'Terminal de Ómnibus',
     distancia_min: 6,
-    estado: 'medio',
+    estado: 'medio' as const,
     capacidad_estimada: 200,
-    espera_estimada_min: 3,
-    timestamp: 'hace 2 min',
+    espera_min: 3,
     updatedAt: now - 2 * 60000
   },
   {
     id: 'salida-sur',
     nombre: 'Salida Sur',
-    tipo: 'transporte',
+    tipo: 'salida' as const,
+    transporte: 'transporte' as const,
     lat: -30.985337,
     lng: -64.094209,
     referencia: 'Predio Ferial',
     distancia_min: 10,
-    estado: 'bajo',
+    estado: 'bajo' as const,
     capacidad_estimada: 500,
-    espera_estimada_min: 2,
-    timestamp: 'hace 2 min',
+    espera_min: 2,
     updatedAt: now - 2 * 60000
   },
   {
     id: 'salida-este',
     nombre: 'Salida Este',
-    tipo: 'peatonal',
+    tipo: 'salida' as const,
+    transporte: 'peatonal' as const,
     lat: -30.981249,
     lng: -64.075000,
     referencia: 'Av. Colón y Costanera',
     distancia_min: 8,
-    estado: 'bajo',
+    estado: 'bajo' as const,
     capacidad_estimada: 300,
     es_embudo: false,
-    timestamp: 'hace 2 min',
+    espera_min: 1,
     updatedAt: now - 2 * 60000
   },
   {
     id: 'salida-oeste',
     nombre: 'Salida Oeste',
-    tipo: 'auto',
+    tipo: 'salida' as const,
+    transporte: 'auto' as const,
     lat: -30.981249,
     lng: -64.099398,
     referencia: 'Parque Autódromo',
     distancia_min: 12,
-    estado: 'alto',
+    estado: 'alto' as const,
     capacidad_estimada: 150,
-    espera_estimada_min: 5,
-    timestamp: 'hace 2 min',
+    espera_min: 5,
     updatedAt: now - 2 * 60000
   },
   {
     id: 'salida-centro',
     nombre: 'Salida Centro',
-    tipo: 'peatonal',
+    tipo: 'salida' as const,
+    transporte: 'peatonal' as const,
     lat: -30.978107,
     lng: -64.094779,
     referencia: 'Plaza Principal / Iglesia',
     distancia_min: 3,
-    estado: 'colapsado',
+    estado: 'colapsado' as const,
     capacidad_estimada: 100,
     es_embudo: true,
-    timestamp: 'hace 2 min',
+    espera_min: 0,
     updatedAt: now - 2 * 60000
   }
 ]
@@ -120,7 +108,7 @@ export const calcularScoreSalida = (
 
   if (tipo === 'transporte') {
     // Transporte: considerar espera estimada
-    score += zona.espera_estimada_min || 0
+    score += zona.espera_min || 0
   }
 
   if (tipo === 'peatonal') {

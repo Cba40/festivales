@@ -5,10 +5,9 @@ import { Map, X } from 'lucide-react'
 import {
   getSalidasOrdenadas,
   getModoSalida,
-  calcularScoreSalida,
-  ZonaSalida
+  calcularScoreSalida
 } from '@/data/mockSalidas'
-import { eventoData } from '@/data/eventoData'
+import { eventoData, type ZonaSalida } from '@/data/eventoData'
 import { getConfianza, getConfianzaLabel } from '@/utils/confianza'
 import { formatUpdatedAt } from '@/utils/formatTime'
 import {
