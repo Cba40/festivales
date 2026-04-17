@@ -98,6 +98,14 @@ const Salir = () => {
     console.log('======================')
   }, [session.modoActual, zonasMock, tipo])
 
+  useEffect(() => {
+    console.log('=== TEST MODOS ===')
+    console.log('AUTO:', getSalidasOrdenadas(zonasMock, 'auto'))
+    console.log('TRANSPORTE:', getSalidasOrdenadas(zonasMock, 'transporte'))
+    console.log('PEATONAL:', getSalidasOrdenadas(zonasMock, 'peatonal'))
+    console.log('===================')
+  }, [zonasMock])
+
   const abrirMapa = (zona: ZonaSalida) => {
     if (zona.lat && zona.lng) {
       window.open(

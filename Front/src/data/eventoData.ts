@@ -242,50 +242,95 @@ export const eventoData = {
   ] as PuntoComida[],
 
   // ============================================
-  // 🚪 SALIR (3 salidas con opciones variadas)
+  // 🚪 SALIR (6 salidas con opciones variadas por modo)
   // ============================================
   salidas: [
+    // AUTO options
     {
-      id: 's1',
-      nombre: 'Salida Norte',
+      id: 'auto-norte',
+      nombre: 'Salida Norte Auto',
       tipo: 'salida' as const,
       transporte: 'auto' as const,
       estado: 'alto' as const,
       distancia_min: 5,
       espera_min: 15,
-      referencia: 'Acceso masivo',
+      referencia: 'Acceso masivo por auto',
       lat: -30.973313,
       lng: -64.088529,
       capacidad_estimada: 400,
       updatedAt: now - 2 * 60000
     },
     {
-      id: 's2',
-      nombre: 'Salida Sur',
+      id: 'auto-sur',
+      nombre: 'Salida Sur Auto',
+      tipo: 'salida' as const,
+      transporte: 'auto' as const,
+      estado: 'medio' as const,
+      distancia_min: 7,
+      espera_min: 10,
+      referencia: 'Ruta alternativa auto',
+      lat: -30.985337,
+      lng: -64.094209,
+      capacidad_estimada: 200,
+      updatedAt: now - 5 * 60000
+    },
+    // TRANSPORTE options
+    {
+      id: 'bus-central',
+      nombre: 'Parada Central Bus',
       tipo: 'salida' as const,
       transporte: 'transporte' as const,
       estado: 'medio' as const,
       distancia_min: 4,
       espera_min: 8,
-      referencia: 'Menos gente',
-      lat: -30.985337,
-      lng: -64.094209,
-      capacidad_estimada: 200,
+      referencia: 'Menos gente, buen servicio',
+      lat: -30.978107,
+      lng: -64.094779,
+      capacidad_estimada: 150,
       updatedAt: now - 1 * 60000
     },
     {
-      id: 's3',
-      nombre: 'Salida Este',
+      id: 'bus-norte',
+      nombre: 'Parada Norte Bus',
+      tipo: 'salida' as const,
+      transporte: 'transporte' as const,
+      estado: 'bajo' as const,
+      distancia_min: 6,
+      espera_min: 5,
+      referencia: 'Servicio rápido',
+      lat: -30.973313,
+      lng: -64.088529,
+      capacidad_estimada: 100,
+      updatedAt: now - 3 * 60000
+    },
+    // PEATONAL options
+    {
+      id: 'walk-este',
+      nombre: 'Salida Este Peatonal',
       tipo: 'salida' as const,
       transporte: 'peatonal' as const,
       estado: 'bajo' as const,
       distancia_min: 2,
       espera_min: 3,
-      referencia: 'Acceso peatonal',
+      referencia: 'Acceso peatonal directo',
       lat: -30.978107,
       lng: -64.094779,
       capacidad_estimada: 100,
       updatedAt: now - 3 * 60000
+    },
+    {
+      id: 'walk-sur',
+      nombre: 'Salida Sur Peatonal',
+      tipo: 'salida' as const,
+      transporte: 'peatonal' as const,
+      estado: 'medio' as const,
+      distancia_min: 3,
+      espera_min: 4,
+      referencia: 'Ruta peatonal alternativa',
+      lat: -30.985337,
+      lng: -64.094209,
+      capacidad_estimada: 80,
+      updatedAt: now - 4 * 60000
     }
   ] as ZonaSalida[],
 
