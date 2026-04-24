@@ -394,11 +394,11 @@ const Estacionar = () => {
                 className="w-full p-4 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-left hover:border-primary dark:hover:border-primary/70 transition-colors"
               >
                 <div className="flex justify-between items-center">
-                  <span className="font-bold text-gray-900 dark:text-gray-100">
+                  <span className="font-bold mr-2 text-gray-900 dark:text-gray-100">
                     {zona.nombre}
                   </span>
                   <span
-                    className={`px-2 py-1 rounded text-xs font-bold ${getEstadoStyles(zona.estado)}`}
+                    className={`px-2 py-1 rounded text-xs font-bold whitespace-nowrap shrink-0 ${getEstadoStyles(zona.estado)}`}
                   >
                     {getEstadoLabel(zona.estado)}
                   </span>

@@ -60,7 +60,7 @@ const ServiciosTransporte = () => {
   if (modo === 'sin_solucion') {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        <Header title="Transporte" showBack onBack={() => navigate('/servicios')} />
+        <Header title="Transporte" showBack onBack={() => navigate('/')} />
 
         <div className="flex-1 p-4 space-y-4">
           <div className="bg-danger text-white p-6 rounded-xl text-center">
@@ -88,7 +88,7 @@ const ServiciosTransporte = () => {
   if (modo === 'guiar') {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        <Header title="Transporte" showBack onBack={() => navigate('/servicios')} />
+        <Header title="Transporte" showBack onBack={() => navigate('/')} />
 
         <div className="bg-danger text-white px-4 py-3">
           <h2 className="font-bold text-lg">👉 Zona actual saturada</h2>
@@ -226,7 +226,7 @@ const ServiciosTransporte = () => {
   if (modo === 'asistir') {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        <Header title="Transporte" showBack onBack={() => navigate('/servicios')} />
+        <Header title="Transporte" showBack onBack={() => navigate('/')} />
 
         <div className="flex-1 p-4 space-y-4">
           {/* Mejor opción ahora */}
@@ -356,7 +356,7 @@ const ServiciosTransporte = () => {
   // MODO INFORMAR (lista de paradas, máx 3)
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-      <Header title="Transporte" showBack onBack={() => navigate('/servicios')} />
+      <Header title="Transporte" showBack onBack={() => navigate('/')} />
 
       <div className="flex-1 p-4 space-y-4">
         <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-md">
@@ -376,11 +376,11 @@ const ServiciosTransporte = () => {
                   className={`w-full p-4 bg-white dark:bg-slate-700 border ${isTop ? 'border-primary ring-1 ring-primary/20' : 'border-slate-200 dark:border-slate-600'} rounded-xl text-left hover:border-primary dark:hover:border-primary/70 transition-colors`}
                 >
                   <div className="flex justify-between items-center">
-                    <span className={`font-bold ${isTop ? 'text-primary' : 'text-gray-900 dark:text-gray-100'}`}>
+                    <span className={`font-bold mr-2 ${isTop ? 'text-primary dark:text-blue-400' : 'text-gray-900 dark:text-gray-100'}`}>
                       {isTop ? '🔥 Mejor opción ahora: ' : ''}{parada.nombre}
                     </span>
                     <span
-                      className={`px-2 py-1 rounded text-xs font-bold ${getEstadoStyles(parada.estado)}`}
+                      className={`px-2 py-1 rounded text-xs font-bold whitespace-nowrap shrink-0 ${getEstadoStyles(parada.estado)}`}
                     >
                       {getEstadoLabel(parada.estado)}
                     </span>

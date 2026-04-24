@@ -37,7 +37,7 @@ const Salir = () => {
   useEffect(() => {
     const modoInicial = getModoSalida(zonasMock, tipo)
     setSession(crearExitSession(modoInicial))
-  }, [zonasMock])
+  }, [zonasMock, tipo])
 
   const salidasOrdenadas = useMemo(() => {
     return getSalidasOrdenadas(zonasMock, tipo)
@@ -69,21 +69,24 @@ const Salir = () => {
   useEffect(() => {
     const nuevoModo = getModoSalida(zonasMock, tipo)
 
-    if (puedeCambiarModo(nuevoModo, session)) {
-      console.log('modo_cambiado', {
-        anterior: session.modoActual,
-        nuevo: nuevoModo,
-        timestamp: Date.now()
-      })
-      setSession(aplicarCambioModo(nuevoModo, session))
-    } else {
-      console.log('cambio_rechazado', {
-        actual: session.modoActual,
-        sugerido: nuevoModo,
-        razon: nuevoModo === session.modoActual ? 'mismo_modo' : 'cooldown_activo'
-      })
-    }
-  }, [tipo])
+    setSession(prev => {
+      if (puedeCambiarModo(nuevoModo, prev)) {
+        console.log('modo_cambiado', {
+          anterior: prev.modoActual,
+          nuevo: nuevoModo,
+          timestamp: Date.now()
+        })
+        return aplicarCambioModo(nuevoModo, prev)
+      } else {
+        console.log('cambio_rechazado', {
+          actual: prev.modoActual,
+          sugerido: nuevoModo,
+          razon: nuevoModo === prev.modoActual ? 'mismo_modo' : 'cooldown_activo'
+        })
+        return prev
+      }
+    })
+  }, [tipo, zonasMock])
 
   // Logging de test
   useEffect(() => {
@@ -136,8 +139,10 @@ const Salir = () => {
   }
 
   const salirDescription = (
-    <div className="text-xs text-gray-500 mb-2">
-      Te mostramos la forma más rápida de salir según el flujo actual
+    <div className="bg-white dark:bg-slate-800 px-4 py-3 shadow-sm z-10 relative">
+      <p className="text-sm text-slate-600 dark:text-slate-400 text-center font-medium">
+        ℹ️ Te mostramos la forma más rápida de salir según el flujo actual
+      </p>
     </div>
   )
 
@@ -429,8 +434,8 @@ const Salir = () => {
               <button key={zona.id} onClick={() => setSelectedZona(zona)}
                 className="w-full p-4 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-left hover:border-primary transition-colors">
                 <div className="flex justify-between items-center">
-                  <span className="font-bold text-gray-900 dark:text-gray-100">{zona.nombre}</span>
-                  <span className={`px-2 py-1 rounded text-xs font-bold ${getEstadoStyles(zona.estado)}`}>{getEstadoLabel(zona.estado)}</span>
+                  <span className="font-bold mr-2 text-gray-900 dark:text-gray-100">{zona.nombre}</span>
+                  <span className={`px-2 py-1 rounded text-xs font-bold whitespace-nowrap shrink-0 ${getEstadoStyles(zona.estado)}`}>{getEstadoLabel(zona.estado)}</span>
                 </div>
                 <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">📍 {zona.referencia}</p>
                 <p className="text-sm text-gray-600 dark:text-gray-300">🚶 {zona.distancia_min} min</p>

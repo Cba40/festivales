@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Phone, MapPin, Navigation, Clock, Home } from 'lucide-react'
+import { Header } from '@/components/Header'
+import { Phone, MapPin, Navigation, Clock } from 'lucide-react'
 import { getPuntoSeguroCercano, getPuestoCercano, zonasReferencia, type PuntoSeguro, type PuestoSanitario } from '@/data/mockEmergencia'
 
 type EmergencyType = 'nino-perdido' | 'persona-herida' | 'necesito-ayuda' | null
@@ -135,23 +136,7 @@ const Emergencia = () => {
   if (selectedType === 'nino-perdido') {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        {/* Header */}
-        <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-4 flex items-center justify-between">
-          <button
-            onClick={() => setSelectedType(null)}
-            className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-semibold"
-          >
-            <ArrowLeft size={20} />
-            Volver
-          </button>
-          <button
-            onClick={() => navigate('/')}
-            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-            aria-label="Ir al Home"
-          >
-            <Home size={24} className="text-slate-700 dark:text-slate-300" />
-          </button>
-        </div>
+        <Header title="Niño Perdido" showBack onBack={() => setSelectedType(null)} />
 
         <div className="flex-1 p-4 space-y-4 pb-24">
           {/* 1. ACCIÓN INMEDIATA (lo primero, más grande) */}
@@ -217,26 +202,7 @@ const Emergencia = () => {
   if (selectedType === 'persona-herida') {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        {/* Header */}
-        <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-4 flex items-center justify-between">
-          <button
-            onClick={() => {
-              setSelectedType(null)
-              setInconsciente(false)
-            }}
-            className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-semibold"
-          >
-            <ArrowLeft size={20} />
-            Volver
-          </button>
-          <button
-            onClick={() => navigate('/')}
-            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-            aria-label="Ir al Home"
-          >
-            <Home size={24} className="text-slate-700 dark:text-slate-300" />
-          </button>
-        </div>
+        <Header title="Persona Herida" showBack onBack={() => { setSelectedType(null); setInconsciente(false); }} />
 
         <div className="flex-1 p-4 space-y-4 pb-24">
           {/* 1. ACCIÓN INMEDIATA (lo más grande, dominante) */}
@@ -322,23 +288,7 @@ const Emergencia = () => {
   if (selectedType === 'necesito-ayuda' && !helpSubType) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        {/* Header */}
-        <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-4 flex items-center justify-between">
-          <button
-            onClick={() => setSelectedType(null)}
-            className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-semibold"
-          >
-            <ArrowLeft size={20} />
-            Volver
-          </button>
-          <button
-            onClick={() => navigate('/')}
-            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-            aria-label="Ir al Home"
-          >
-            <Home size={24} className="text-slate-700 dark:text-slate-300" />
-          </button>
-        </div>
+        <Header title="Ayuda" showBack onBack={() => setSelectedType(null)} />
 
         <div className="flex-1 p-4 space-y-4">
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white text-center mb-6">
@@ -374,23 +324,7 @@ const Emergencia = () => {
   if (selectedType === 'necesito-ayuda' && helpSubType === 'seguridad') {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        {/* Header */}
-        <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-4 flex items-center justify-between">
-          <button
-            onClick={() => setHelpSubType(null)}
-            className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-semibold"
-          >
-            <ArrowLeft size={20} />
-            Volver
-          </button>
-          <button
-            onClick={() => navigate('/')}
-            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-            aria-label="Ir al Home"
-          >
-            <Home size={24} className="text-slate-700 dark:text-slate-300" />
-          </button>
-        </div>
+        <Header title="Seguridad" showBack onBack={() => setHelpSubType(null)} />
 
         <div className="flex-1 p-4 space-y-4 pb-24">
           {/* 1. ACCIÓN INMEDIATA */}
@@ -442,23 +376,7 @@ const Emergencia = () => {
   if (selectedType === 'necesito-ayuda' && helpSubType === 'salud') {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        {/* Header */}
-        <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-4 flex items-center justify-between">
-          <button
-            onClick={() => setHelpSubType(null)}
-            className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-semibold"
-          >
-            <ArrowLeft size={20} />
-            Volver
-          </button>
-          <button
-            onClick={() => navigate('/')}
-            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-            aria-label="Ir al Home"
-          >
-            <Home size={24} className="text-slate-700 dark:text-slate-300" />
-          </button>
-        </div>
+        <Header title="Salud" showBack onBack={() => setHelpSubType(null)} />
 
         <div className="flex-1 p-4 space-y-4 pb-24">
           {/* 1. ACCIÓN INMEDIATA */}
@@ -503,23 +421,7 @@ const Emergencia = () => {
   if (selectedType === 'necesito-ayuda' && helpSubType === 'orientacion') {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        {/* Header */}
-        <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-4 flex items-center justify-between">
-          <button
-            onClick={() => setHelpSubType(null)}
-            className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-semibold"
-          >
-            <ArrowLeft size={20} />
-            Volver
-          </button>
-          <button
-            onClick={() => navigate('/')}
-            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-            aria-label="Ir al Home"
-          >
-            <Home size={24} className="text-slate-700 dark:text-slate-300" />
-          </button>
-        </div>
+        <Header title="Orientación" showBack onBack={() => setHelpSubType(null)} />
 
         <div className="flex-1 p-4 space-y-4 pb-24">
           {/* 1. INFO DE UBICACIÓN */}
@@ -561,18 +463,7 @@ const Emergencia = () => {
   // Selection Screen (default)
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-      {/* Header */}
-      <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-4 flex items-center justify-between">
-        <button
-          onClick={() => navigate('/')}
-          className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-semibold"
-        >
-          <ArrowLeft size={20} />
-          Volver al inicio
-        </button>
-        {/* En la pantalla principal de Emergencia, el botón Home es redundante porque "Volver al inicio" ya lleva al Home */}
-        <div className="w-10" />
-      </div>
+      <Header title="Emergencia" showBack onBack={() => navigate('/')} />
 
       <div className="flex-1 p-4 space-y-4">
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white text-center mb-6">
