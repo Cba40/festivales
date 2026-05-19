@@ -2,6 +2,7 @@ import { Header } from '@/components/Header';
 import { StatusBanner } from '@/components/StatusBanner';
 import { QuickAction } from '@/components/ActionButton';
 import { useNavigate } from 'react-router-dom';
+import { AlertTriangle, Car, LogOut, Bus, UtensilsCrossed, Hotel, Info } from 'lucide-react';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -19,17 +20,17 @@ const Home = () => {
           </h2>
           <div className="grid grid-cols-2 min-[400px]:grid-cols-3 gap-3">
             <QuickAction
-              emoji="🚨"
+              icon={AlertTriangle}
               label="Emergencia"
               onClick={() => navigate('/emergencia')}
             />
             <QuickAction
-              emoji="🚗"
+              icon={Car}
               label="Estacionar"
               onClick={() => navigate('/estacionar')}
             />
             <QuickAction
-              emoji="🚪"
+              icon={LogOut}
               label="Salir del evento"
               onClick={() => navigate('/salir')}
             />
@@ -42,22 +43,22 @@ const Home = () => {
           </h2>
           <div className="grid grid-cols-2 min-[400px]:grid-cols-4 gap-3">
             <QuickAction
-              emoji="🚌"
+              icon={Bus}
               label="Transporte"
               onClick={() => navigate('/servicios/transporte')}
             />
             <QuickAction
-              emoji="🍽"
+              icon={UtensilsCrossed}
               label="Comer"
               onClick={() => navigate('/servicios/comer')}
             />
             <QuickAction
-              emoji="🛏"
+              icon={Hotel}
               label="Hospedajes"
               onClick={() => navigate('/pernoctar')}
             />
             <QuickAction
-              emoji="🧭"
+              icon={Info}
               label="Más servicios"
               onClick={() => navigate('/servicios/generales')}
             />
