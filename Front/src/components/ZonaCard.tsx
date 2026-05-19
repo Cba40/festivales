@@ -1,76 +1,105 @@
-import { Navigation, TrendingUp, TrendingDown, Minus } from 'lucide-react';
-import { Zona } from '../types';
+import React from 'react';
+import { MapPin, Info, ArrowRight, Star, AlertCircle } from 'lucide-react';
 
 interface ZonaCardProps {
-  zona: Zona;
-  tipo: 'primaria' | 'fallback' | 'advertencia' | 'completa';
-  distanciaTexto?: string;
-  accionTexto?: string;
+  id: string;
+  nombre: string;
+  precio: string;
+  estado: 'disponible' | 'alerta' | 'critico';
+  recomendada?: boolean;
+  modo: 'primaria' | 'fallback' | 'advertencia' | 'completa';
+  capacidad: string;
+  ubicacion?: string;
+  onSelect: (id: string) => void;
 }
 
-export const ZonaCard = ({ zona, tipo, distanciaTexto, accionTexto }: ZonaCardProps) => {
-  const tipoConfig = {
-    primaria: {
-      bg: 'bg-success',
-      border: 'border-success',
-      icon: '🟢',
-      textColor: 'text-white',
-    },
-    fallback: {
-      bg: 'bg-warning',
-      border: 'border-warning',
-      icon: '🟡',
-      textColor: 'text-white',
-    },
-    advertencia: {
-      bg: 'bg-danger',
-      border: 'border-danger',
-      icon: '🔴',
-      textColor: 'text-white',
-    },
-    completa: {
-      bg: 'bg-gray-100 dark:bg-slate-800',
-      border: 'border-gray-300 dark:border-slate-600',
-      icon: '⚪',
-      textColor: 'text-gray-800 dark:text-gray-100',
-    },
+export const ZonaCard = ({
+  id,
+  nombre,
+  precio,
+  estado,
+  recomendada,
+  modo,
+  capacidad,
+  ubicacion,
+  onSelect
+}: ZonaCardProps) => {
+
+  const statusColors = {
+    disponible: 'border-success/30 text-success',
+    alerta: 'border-amber-500 text-amber-600',
+    critico: 'border-danger/30 text-danger'
   };
 
-  const config = tipoConfig[tipo];
-
-  const tendenciaIcon = {
-    subiendo: <TrendingUp size={16} />,
-    bajando: <TrendingDown size={16} />,
-    estable: <Minus size={16} />,
-  };
+  const isWarning = modo === 'advertencia' || estado === 'critico';
 
   return (
-    <div className={`${config.bg} ${config.textColor} rounded-xl p-4 shadow-lg`}>
-      <div className="flex items-start gap-3">
-        <span className="text-xl">{config.icon}</span>
-        <div className="flex-1">
-          <h3 className="font-bold text-lg mb-1">
-            {accionTexto || zona.nombre}
-          </h3>
+    <div 
+      onClick={() => onSelect(id)}
+      className={`
+        relative overflow-hidden rounded-3xl p-5 transition-all duration-300 active:scale-95 cursor-pointer
+        ${recomendada
+          ? 'ring-4 ring-primary ring-offset-2 scale-105 z-10 bg-white shadow-2xl'
+          : 'bg-white border border-slate-200 shadow-sm'}
+        ${isWarning ? 'bg-red-50/50' : ''}
+      `}
+    >
+      {recomendada && (
+        <div className="absolute top-3 right-3 bg-primary text-white text-[10px] px-2 py-1 rounded-full font-black uppercase flex items-center gap-1">
+          <Star size={12} />
+          Recomendado
+        </div>
+      )}
 
-          {distanciaTexto && (
-            <div className="flex items-center gap-2 mb-2">
-              <Navigation size={16} />
-              <span className="text-sm font-semibold">{distanciaTexto}</span>
+      <div className="flex justify-between items-start mb-4">
+        <div>
+          <h3 className={`text-xl font-black uppercase italic leading-none mb-1 ${recomendada ? 'text-primary' : 'text-slate-900'}`}>
+            {nombre}
+          </h3>
+          {ubicacion && (
+            <div className="flex items-center gap-1 text-xs text-slate-500 font-medium">
+              <MapPin size={12} />
+              {ubicacion}
             </div>
           )}
-
-          <div className="flex items-center gap-4 text-sm opacity-90">
-            <div className="flex items-center gap-1">
-              {tendenciaIcon[zona.tendencia]}
-              <span className="capitalize">{zona.tendencia}</span>
-            </div>
-            <span>{zona.capacidad_estimada} lugares estimados</span>
-          </div>
-
-          <div className="mt-2 text-xs opacity-75">{zona.timestamp}</div>
+        </div>
+        <div className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-tight border ${statusColors[estado]}`}>
+          {estado}
         </div>
       </div>
+
+      <div className="flex items-end justify-between">
+        <div>
+          <p className="text-xs text-slate-400 font-bold uppercase mb-0.5">Desde</p>
+          <p className={`text-2xl font-black ${recomendada ? 'text-slate-900' : 'text-slate-700'}`}>
+            {precio}
+          </p>
+        </div>
+        
+        <button 
+          className={`
+            w-12 h-12 rounded-2xl flex items-center justify-center transition-all
+            ${recomendada ? 'bg-primary text-white shadow-lg shadow-primary/30' : 'bg-slate-100 text-slate-400'}
+          `}
+        >
+          <ArrowRight size={24} />
+        </button>
+      </div>
+
+      {modo === 'completa' && (
+        <div className="mt-4 pt-4 border-t border-slate-100 flex justify-between items-center text-xs">
+          <div className="flex items-center gap-1.5 font-medium text-slate-600">
+            <Info size={14} className="text-primary" />
+            <span>Capacidad: {capacidad}</span>
+          </div>
+          {estado === 'critico' && (
+            <div className="flex items-center gap-1 text-danger font-bold">
+              <AlertCircle size={14} />
+              <span>ALTA DEMANDA</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

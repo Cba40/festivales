@@ -19,7 +19,10 @@ export const Header = ({ title, showBack, onBack, onHome, ubicacion }: HeaderPro
       <div className="flex items-center justify-between">
         {showBack ? (
           <button
-            onClick={onBack}
+            onClick={() => {
+              if (onBack) onBack();
+              else navigate(-1);
+            }}
             className="p-2 hover:bg-white/10 rounded-lg transition-colors"
             aria-label="Volver"
           >
