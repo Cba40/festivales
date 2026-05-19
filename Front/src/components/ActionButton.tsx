@@ -59,24 +59,44 @@ export const ActionButton = ({
   );
 };
 
+type ColorScheme = 'emergency' | 'primary' | 'exit' | 'transport' | 'food' | 'lodging' | 'info';
+
+interface QuickActionProps {
+  label: string;
+  icon: LucideIcon;
+  onClick?: () => void;
+  colorScheme?: ColorScheme;
+}
+
 export const QuickAction = ({ 
   label, 
   icon: Icon, 
-  onClick 
-}: { 
-  label: string; 
-  icon: LucideIcon; 
-  onClick?: () => void 
-}) => (
-  <button 
-    onClick={onClick}
-    className="flex flex-col items-center gap-2 group p-2"
-  >
-    <div className="w-14 h-14 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-primary/10 group-hover:text-primary transition-all duration-300 group-active:scale-90 border border-slate-100">
-      <Icon size={24} />
-    </div>
-    <span className="text-[10px] font-bold uppercase text-slate-500 tracking-tighter group-hover:text-primary transition-colors">
-      {label}
-    </span>
-  </button>
-);
+  onClick,
+  colorScheme = 'primary'
+}: QuickActionProps) => {
+  const colorConfig = {
+    emergency: { bg: 'bg-danger/10', text: 'text-danger', hover: 'group-hover:bg-danger/20' },
+    primary: { bg: 'bg-primary/10', text: 'text-primary', hover: 'group-hover:bg-primary/20' },
+    exit: { bg: 'bg-warning/10', text: 'text-warning', hover: 'group-hover:bg-warning/20' },
+    transport: { bg: 'bg-blue-100', text: 'text-blue-600', hover: 'group-hover:bg-blue-200' },
+    food: { bg: 'bg-success/10', text: 'text-success', hover: 'group-hover:bg-success/20' },
+    lodging: { bg: 'bg-purple-100', text: 'text-purple-600', hover: 'group-hover:bg-purple-200' },
+    info: { bg: 'bg-slate-100', text: 'text-slate-600', hover: 'group-hover:bg-slate-200' },
+  };
+
+  const colors = colorConfig[colorScheme];
+
+  return (
+    <button 
+      onClick={onClick}
+      className="flex flex-col items-center gap-2 group p-2 active:scale-95 transition-transform"
+    >
+      <div className={`w-16 h-16 rounded-2xl ${colors.bg} flex items-center justify-center ${colors.text} ${colors.hover} transition-all duration-300 group-active:scale-90 border-2 border-current border-opacity-20`}>
+        <Icon size={32} strokeWidth={2} />
+      </div>
+      <span className="text-[11px] font-bold uppercase text-slate-700 tracking-tighter text-center leading-tight max-w-[60px]">
+        {label}
+      </span>
+    </button>
+  );
+};

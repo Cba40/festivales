@@ -22,16 +22,19 @@ const Home = () => {
             <QuickAction
               icon={AlertTriangle}
               label="Emergencia"
+              colorScheme="emergency"
               onClick={() => navigate('/emergencia')}
             />
             <QuickAction
               icon={Car}
               label="Estacionar"
+              colorScheme="primary"
               onClick={() => navigate('/estacionar')}
             />
             <QuickAction
               icon={LogOut}
               label="Salir del evento"
+              colorScheme="exit"
               onClick={() => navigate('/salir')}
             />
           </div>
@@ -45,21 +48,25 @@ const Home = () => {
             <QuickAction
               icon={Bus}
               label="Transporte"
+              colorScheme="transport"
               onClick={() => navigate('/servicios/transporte')}
             />
             <QuickAction
               icon={UtensilsCrossed}
               label="Comer"
+              colorScheme="food"
               onClick={() => navigate('/servicios/comer')}
             />
             <QuickAction
               icon={Hotel}
               label="Hospedajes"
+              colorScheme="lodging"
               onClick={() => navigate('/pernoctar')}
             />
             <QuickAction
               icon={Info}
               label="Más servicios"
+              colorScheme="info"
               onClick={() => navigate('/servicios/generales')}
             />
           </div>
