@@ -2,15 +2,15 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/Header'
 import { SimpleMap } from '@/components/SimpleMap'
-import { X } from 'lucide-react'
+import { X, Bath, Droplets, Armchair, HeartPulse } from 'lucide-react'
 import { getServiciosMapPorTipo, type PuntoServicioMapa } from '@/data/mockServiciosMap'
 import { formatUpdatedAt } from '@/utils/formatTime'
 
 const opciones = [
-  { emoji: '🚻', label: 'Baños', subtipo: 'banos' },
-  { emoji: '💧', label: 'Agua', subtipo: 'hidratacion' },
-  { emoji: '🪑', label: 'Descanso', subtipo: 'descanso' },
-  { emoji: '🏥', label: 'Salud', subtipo: 'salud' }
+  { icon: Bath, label: 'Baños', subtipo: 'banos', colorScheme: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' },
+  { icon: Droplets, label: 'Agua', subtipo: 'hidratacion', colorScheme: 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400' },
+  { icon: Armchair, label: 'Descanso', subtipo: 'descanso', colorScheme: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400' },
+  { icon: HeartPulse, label: 'Salud', subtipo: 'salud', colorScheme: 'bg-danger/10 dark:bg-danger/20 text-danger' }
 ]
 
 const ServiciosGenerales = () => {
@@ -30,17 +30,22 @@ const ServiciosGenerales = () => {
         <Header title="Más servicios" showBack onBack={() => navigate('/')} />
 
         <div className="flex-1 p-4">
-          <div className="grid grid-cols-1 min-[350px]:grid-cols-2 gap-3">
-            {opciones.map(op => (
-              <button
-                key={op.subtipo}
-                onClick={() => seleccionar(op.subtipo)}
-                className="bg-white dark:bg-slate-800 p-6 rounded-xl text-center shadow-md hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
-              >
-                <p className="text-3xl mb-2">{op.emoji}</p>
-                <p className="font-bold text-slate-800 dark:text-slate-100">{op.label}</p>
-              </button>
-            ))}
+          <div className="grid grid-cols-2 gap-3">
+            {opciones.map(op => {
+              const Icon = op.icon
+              return (
+                <button
+                  key={op.subtipo}
+                  onClick={() => seleccionar(op.subtipo)}
+                  className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-md hover:shadow-lg transition-all active:scale-95 flex flex-col items-center gap-2"
+                >
+                  <div className={`w-12 h-12 rounded-xl ${op.colorScheme} flex items-center justify-center`}>
+                    <Icon size={24} />
+                  </div>
+                  <p className="font-bold text-sm text-slate-800 dark:text-slate-100">{op.label}</p>
+                </button>
+              )
+            })}
           </div>
         </div>
       </div>

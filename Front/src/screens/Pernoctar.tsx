@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/Header'
-import { Phone, Map, ChevronDown } from 'lucide-react'
+import { Phone, Map, ChevronDown, Info, Clock } from 'lucide-react'
 import { getPernoctesOrdenados } from '@/utils/pernoctar'
 import { formatUpdatedAt } from '@/utils/formatTime'
 
@@ -39,8 +39,8 @@ const Pernoctar = () => {
 
       <div className="flex-1 p-4 space-y-3 overflow-y-auto">
         {/* Microcopy informativo */}
-        <p className="text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700">
-          ℹ️ Los alojamientos pueden variar su disponibilidad durante el evento
+        <p className="text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center gap-2">
+          <Info size={14} /> Los alojamientos pueden variar su disponibilidad durante el evento
         </p>
 
         {mostrados.map(p => (
@@ -48,10 +48,10 @@ const Pernoctar = () => {
             <div className="flex justify-between items-start">
               <div>
                 <p className="font-bold text-slate-800 dark:text-slate-100">{p.nombre}</p>
+                <div className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+                  {p.categoria.toUpperCase()}
+                </div>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
-                  <div className="text-sm font-semibold">
-                    {p.categoria.toUpperCase()}
-                  </div>
                   · {p.referencia}
                 </p>
               </div>
@@ -60,21 +60,21 @@ const Pernoctar = () => {
               </span>
             </div>
 
-            <p className="text-sm text-slate-600 dark:text-slate-300">
-              🚶 {p.distancia_min} min
+            <p className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-1">
+              <Clock size={14} /> {p.distancia_min} min
             </p>
             <p className="text-xs text-slate-400 dark:text-slate-500">
               {formatUpdatedAt(p.updatedAt)}
             </p>
-            <p className="text-xs text-gray-500">
-              ℹ️ Confirmar disponibilidad por teléfono antes de ir
+            <p className="text-xs text-gray-500 flex items-center gap-1">
+              <Info size={12} /> Confirmar disponibilidad por teléfono antes de ir
             </p>
 
             <div className="flex gap-2 pt-2">
               {p.telefono && (
                 <a
                   href={`tel:${p.telefono}`}
-                  className="flex-1 flex items-center justify-center gap-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg font-bold text-sm transition-colors"
+                  className="flex-1 flex items-center justify-center gap-1 bg-success/10 hover:bg-success/20 text-success py-2 rounded-xl font-bold text-sm transition-colors"
                 >
                   <Phone size={16} /> Llamar
                 </a>
@@ -82,7 +82,7 @@ const Pernoctar = () => {
 
               <button
                 onClick={() => handleMaps(p.lat, p.lng)}
-                className="flex-1 flex items-center justify-center gap-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-bold text-sm transition-colors"
+                className="flex-1 flex items-center justify-center gap-1 bg-primary/10 hover:bg-primary/20 text-primary py-2 rounded-xl font-bold text-sm transition-colors"
               >
                 <Map size={16} /> Ir ahora
               </button>

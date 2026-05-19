@@ -10,6 +10,7 @@ import ServiciosComer from './screens/ServiciosComer';
 import GastronomiaExpanded from './screens/GastronomiaExpanded';
 import ServiciosGenerales from './screens/ServiciosGenerales';
 import Pernoctar from './screens/Pernoctar';
+import AsistenteScreen from './screens/AsistenteScreen';
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
             <Route path="/servicios/comer/mas" element={<GastronomiaExpanded />} />
             <Route path="/servicios/generales" element={<ServiciosGenerales />} />
             <Route path="/pernoctar" element={<Pernoctar />} />
+            <Route path="/asistente" element={<AsistenteScreen />} />
           </Routes>
         </div>
       </div>

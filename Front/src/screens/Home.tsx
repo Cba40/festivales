@@ -2,7 +2,7 @@ import { Header } from '@/components/Header';
 import { StatusBanner } from '@/components/StatusBanner';
 import { QuickAction } from '@/components/ActionButton';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, Car, LogOut, Bus, UtensilsCrossed, Hotel, Info } from 'lucide-react';
+import { AlertTriangle, Car, LogOut, Bus, UtensilsCrossed, Hotel, Info, MessageCircle } from 'lucide-react';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -74,10 +74,14 @@ const Home = () => {
 
         <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
           <button
-            onClick={() => navigate('/resolver-ahora')}
-            className="w-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 py-3 rounded-xl text-sm font-medium transition-colors"
+            onClick={() => navigate('/asistente')}
+            className="w-full flex items-center gap-3 bg-primary/10 dark:bg-primary/20 hover:bg-primary/15 dark:hover:bg-primary/25 text-primary py-3 px-4 rounded-xl transition-colors text-left"
           >
-            ❓ No sabés qué hacer? → Resolver ahora
+            <MessageCircle size={20} />
+            <div>
+              <p className="text-sm font-bold">Preguntá algo rápido</p>
+              <p className="text-xs opacity-75">La app te ayuda a decidir rápido</p>
+            </div>
           </button>
         </div>
       </div>

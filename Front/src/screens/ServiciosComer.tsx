@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/Header'
-import { X } from 'lucide-react'
+import { X, UtensilsCrossed, MapPin, Clock, Users } from 'lucide-react'
 import { getCorredoresOrdenados, type CorredorGastronomico, getTipoLabel, getSentarseLabel } from '@/data/mockCorredoresGastronomicos'
 import { formatUpdatedAt } from '@/utils/formatTime'
 
@@ -47,9 +47,10 @@ const ServiciosComer = () => {
           <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-3">
             Zonas gastronómicas disponibles
           </h2>
-          <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
-            <p>🟢 Baja: fácil encontrar lugar · 🟡 Media: moderadamente disponible</p>
-            <p>🔴 Alta: muy concurrido</p>
+          <div className="flex gap-3 text-xs text-gray-600 dark:text-gray-400">
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-success" /> Baja</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-warning" /> Media</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-danger" /> Alta</span>
           </div>
         </div>
 
@@ -67,26 +68,26 @@ const ServiciosComer = () => {
                   : 'bg-slate-50 dark:bg-slate-800/50 border-slate-300 dark:border-slate-700'
               }`}>
                 <div className="flex justify-between items-start gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-gray-900 dark:text-gray-100 text-base">
-                      {corredor.nombre}
-                    </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                      🍽️ {getTipoLabel(corredor.tipo)}
-                    </p>
-                  </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-gray-900 dark:text-gray-100 text-base">
+                    {corredor.nombre}
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 flex items-center gap-1">
+                    <UtensilsCrossed size={14} /> {getTipoLabel(corredor.tipo)}
+                  </p>
+                </div>
                   <span className={`px-2 py-1 rounded text-xs font-bold whitespace-nowrap ${getSaturacionColor(corredor.saturacion)}`}>
                     {getSaturacionEmoji(corredor.saturacion)} {getSaturacionLabel(corredor.saturacion)}
                   </span>
                 </div>
 
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                  📍 {corredor.referencia}
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 flex items-center gap-1">
+                  <MapPin size={14} /> {corredor.referencia}
                 </p>
 
                 <div className="flex gap-3 mt-2 text-sm text-gray-600 dark:text-gray-400">
-                  <span>🚶 {corredor.distancia} min</span>
-                  <span>{getSentarseLabel(corredor.posibilidadSentarse)}</span>
+                  <span className="flex items-center gap-1"><Clock size={14} /> {corredor.distancia} min</span>
+                  <span className="flex items-center gap-1"><Users size={14} /> {getSentarseLabel(corredor.posibilidadSentarse)}</span>
                 </div>
 
                 <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
@@ -124,20 +125,20 @@ const ServiciosComer = () => {
             </h3>
 
             <div className="space-y-2 mb-4">
-              <p className="text-sm text-slate-600 dark:text-slate-300">
-                🍽️ <strong>{getTipoLabel(selectedCorredor.tipo)}</strong>
+              <p className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-2">
+                <UtensilsCrossed size={16} /> <strong>{getTipoLabel(selectedCorredor.tipo)}</strong>
               </p>
-              <p className="text-sm text-slate-600 dark:text-slate-300">
-                📍 {selectedCorredor.referencia}
+              <p className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-2">
+                <MapPin size={16} /> {selectedCorredor.referencia}
               </p>
-              <p className="text-sm text-slate-600 dark:text-slate-300">
-                🚶 {selectedCorredor.distancia} min caminando
+              <p className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-2">
+                <Clock size={16} /> {selectedCorredor.distancia} min caminando
               </p>
-              <p className="text-sm text-slate-600 dark:text-slate-300">
-                {getSentarseLabel(selectedCorredor.posibilidadSentarse)}
+              <p className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-2">
+                <Users size={16} /> {getSentarseLabel(selectedCorredor.posibilidadSentarse)}
               </p>
               <div className={`text-sm font-semibold p-2 rounded ${getSaturacionColor(selectedCorredor.saturacion)}`}>
-                {getSaturacionEmoji(selectedCorredor.saturacion)} {getSaturacionLabel(selectedCorredor.saturacion)}
+                {getSaturacionLabel(selectedCorredor.saturacion)}
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
                 {formatUpdatedAt(selectedCorredor.updatedAt)}

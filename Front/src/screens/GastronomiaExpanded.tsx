@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/Header'
-import { X } from 'lucide-react'
+import { X, UtensilsCrossed, MapPin, Clock } from 'lucide-react'
 import { getCorredoresOrdenados, type CorredorGastronomico, getTipoLabel, getSentarseLabel } from '@/data/mockCorredoresGastronomicos'
 import { formatUpdatedAt } from '@/utils/formatTime'
 
@@ -103,11 +103,11 @@ const GastronomiaExpanded = () => {
 
         {/* Leyenda */}
         <div className="bg-white dark:bg-slate-800 rounded-xl p-3 shadow-md">
-          <p className="text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">📍 Leyenda:</p>
+          <p className="text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">Leyenda:</p>
           <div className="space-y-1 text-xs text-slate-600 dark:text-slate-400">
-            <p>🟢 Baja saturación - Fácil encontrar lugar</p>
-            <p>🟡 Media saturación - Moderadamente disponible</p>
-            <p>🔴 Alta saturación - Muy concurrido</p>
+            <p className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-success" /> Baja saturación — Fácil encontrar lugar</p>
+            <p className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-warning" /> Media saturación — Moderadamente disponible</p>
+            <p className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-danger" /> Alta saturación — Muy concurrido</p>
           </div>
         </div>
 
@@ -120,19 +120,22 @@ const GastronomiaExpanded = () => {
             <button
               key={corredor.id}
               onClick={() => setSelectedCorredor(corredor)}
-              className="w-full text-left bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-primary dark:hover:border-primary/50 transition-colors group"
+              className="w-full text-left bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-primary dark:hover:border-primary/50 transition-colors group"
             >
-              <div className="flex items-start gap-2">
-                <span className="text-lg mt-0.5">{getSaturacionEmoji(corredor.saturacion)}</span>
+              <div className="flex items-start gap-3">
+                <span className={`mt-1 w-2 h-2 rounded-full shrink-0 ${
+                  corredor.saturacion === 'baja' ? 'bg-success' :
+                  corredor.saturacion === 'media' ? 'bg-warning' : 'bg-danger'
+                }`} />
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm text-slate-800 dark:text-slate-100 group-hover:text-primary dark:group-hover:text-primary">
                     {corredor.nombre}
                   </p>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-                    🍽️ {getTipoLabel(corredor.tipo)}
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 flex items-center gap-1">
+                    <UtensilsCrossed size={12} /> {getTipoLabel(corredor.tipo)}
                   </p>
-                  <p className="text-xs text-slate-600 dark:text-slate-400">
-                    🚶 {corredor.distancia} min
+                  <p className="text-xs text-slate-600 dark:text-slate-400 flex items-center gap-1">
+                    <Clock size={12} /> {corredor.distancia} min
                   </p>
                 </div>
               </div>
@@ -159,20 +162,20 @@ const GastronomiaExpanded = () => {
             </h3>
 
             <div className="space-y-2 mb-4">
-              <p className="text-sm text-slate-600 dark:text-slate-300">
-                🍽️ <strong>{getTipoLabel(selectedCorredor.tipo)}</strong>
+              <p className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-2">
+                <UtensilsCrossed size={16} /> <strong>{getTipoLabel(selectedCorredor.tipo)}</strong>
               </p>
-              <p className="text-sm text-slate-600 dark:text-slate-300">
-                📍 {selectedCorredor.referencia}
+              <p className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-2">
+                <MapPin size={16} /> {selectedCorredor.referencia}
               </p>
-              <p className="text-sm text-slate-600 dark:text-slate-300">
-                🚶 {selectedCorredor.distancia} min caminando
+              <p className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-2">
+                <Clock size={16} /> {selectedCorredor.distancia} min caminando
               </p>
               <p className="text-sm text-slate-600 dark:text-slate-300">
                 {getSentarseLabel(selectedCorredor.posibilidadSentarse)}
               </p>
               <div className={`text-sm font-semibold p-2 rounded ${getSaturacionColor(selectedCorredor.saturacion)}`}>
-                {getSaturacionEmoji(selectedCorredor.saturacion)} {getSaturacionLabel(selectedCorredor.saturacion)}
+                {getSaturacionLabel(selectedCorredor.saturacion)}
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
                 {formatUpdatedAt(selectedCorredor.updatedAt)}
