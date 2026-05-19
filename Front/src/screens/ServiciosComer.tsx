@@ -423,6 +423,14 @@ const ServiciosComer = () => {
             Ir ahora
           </button>
         )}
+
+        {/* Botón exploración */}
+        <button
+          onClick={() => navigate('/servicios/comer/mas')}
+          className="w-full bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-100 py-3 rounded-xl font-bold transition-transform active:scale-95 border-2 border-slate-300 dark:border-slate-600"
+        >
+          🗺️ Ver más zonas gastronómicas
+        </button>
       </div>
 
       {/* Bottom Sheet */}

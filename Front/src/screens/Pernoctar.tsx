@@ -1,12 +1,14 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/Header'
-import { Phone, Map } from 'lucide-react'
+import { Phone, Map, ChevronDown } from 'lucide-react'
 import { getPernoctesOrdenados } from '@/utils/pernoctar'
 import { formatUpdatedAt } from '@/utils/formatTime'
 
 const Pernoctar = () => {
   const navigate = useNavigate()
   const puntos = getPernoctesOrdenados()
+  const [mostrarTodos, setMostrarTodos] = useState(false)
 
   const handleMaps = (lat: number, lng: number) => {
     const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`
@@ -21,12 +23,21 @@ const Pernoctar = () => {
     }
   }
 
+  const mostrados = mostrarTodos ? puntos : puntos.slice(0, 3)
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
       <Header title="Hospedajes" showBack onBack={() => navigate('/')} />
 
-      <div className="flex-1 p-4 space-y-3">
-        {puntos.map(p => (
+      <div className="flex-1 p-4 space-y-3 overflow-y-auto">
+        {/* Recomendación rápida */}
+        {puntos.length > 0 && (
+          <div className="bg-primary/10 border-2 border-primary rounded-xl p-3 text-sm text-primary dark:text-blue-400 font-bold">
+            💡 Recomendado: {puntos[0].nombre}
+          </div>
+        )}
+
+        {mostrados.map(p => (
           <div key={p.id} className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-md space-y-2">
             <div className="flex justify-between items-start">
               <div>
@@ -81,6 +92,26 @@ const Pernoctar = () => {
           <div className="text-center text-slate-500 dark:text-slate-400 py-8">
             No hay alojamientos registrados
           </div>
+        )}
+
+        {/* Botón Ver más */}
+        {!mostrarTodos && puntos.length > 3 && (
+          <button
+            onClick={() => setMostrarTodos(true)}
+            className="w-full bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-100 py-3 rounded-xl font-bold transition-transform active:scale-95 border-2 border-slate-300 dark:border-slate-600 flex items-center justify-center gap-2"
+          >
+            <ChevronDown size={18} />
+            Ver {puntos.length - 3} alojamientos más
+          </button>
+        )}
+
+        {mostrarTodos && puntos.length > 3 && (
+          <button
+            onClick={() => setMostrarTodos(false)}
+            className="w-full bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-100 py-3 rounded-xl font-bold transition-transform active:scale-95 border-2 border-slate-300 dark:border-slate-600"
+          >
+            Mostrar menos
+          </button>
         )}
       </div>
     </div>

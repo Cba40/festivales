@@ -7,6 +7,7 @@ import ResolverAhora from './screens/ResolverAhora';
 import Servicios from './screens/Servicios';
 import ServiciosTransporte from './screens/ServiciosTransporte';
 import ServiciosComer from './screens/ServiciosComer';
+import GastronomiaExpanded from './screens/GastronomiaExpanded';
 import ServiciosGenerales from './screens/ServiciosGenerales';
 import Pernoctar from './screens/Pernoctar';
 
@@ -24,6 +25,7 @@ function App() {
             <Route path="/servicios" element={<Servicios />} />
             <Route path="/servicios/transporte" element={<ServiciosTransporte />} />
             <Route path="/servicios/comer" element={<ServiciosComer />} />
+            <Route path="/servicios/comer/mas" element={<GastronomiaExpanded />} />
             <Route path="/servicios/generales" element={<ServiciosGenerales />} />
             <Route path="/pernoctar" element={<Pernoctar />} />
           </Routes>
