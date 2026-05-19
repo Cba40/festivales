@@ -23,6 +23,14 @@ const Pernoctar = () => {
     }
   }
 
+  const getDispText = (disp?: string) => {
+    switch (disp) {
+      case 'disponible': return '🟢 Probable disponibilidad'
+      case 'completo': return '🔴 Últimos lugares'
+      default: return '🟡 Consultar disponibilidad'
+    }
+  }
+
   const mostrados = mostrarTodos ? puntos : puntos.slice(0, 3)
 
   return (
@@ -30,12 +38,10 @@ const Pernoctar = () => {
       <Header title="Hospedajes" showBack onBack={() => navigate('/')} />
 
       <div className="flex-1 p-4 space-y-3 overflow-y-auto">
-        {/* Recomendación rápida */}
-        {puntos.length > 0 && (
-          <div className="bg-primary/10 border-2 border-primary rounded-xl p-3 text-sm text-primary dark:text-blue-400 font-bold">
-            💡 Recomendado: {puntos[0].nombre}
-          </div>
-        )}
+        {/* Microcopy informativo */}
+        <p className="text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700">
+          ℹ️ Los alojamientos pueden variar su disponibilidad durante el evento
+        </p>
 
         {mostrados.map(p => (
           <div key={p.id} className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-md space-y-2">
@@ -50,11 +56,7 @@ const Pernoctar = () => {
                 </p>
               </div>
               <span className={`px-2 py-1 rounded text-xs font-bold ${getDispBadge(p.disponibilidad)}`}>
-                <div className="text-sm">
-                  {p.disponibilidad === 'disponible' && '🟢 Disponible'}
-                  {p.disponibilidad === 'consultar' && '🟡 Consultar'}
-                  {p.disponibilidad === 'completo' && '🔴 Completo'}
-                </div>
+                {getDispText(p.disponibilidad)}
               </span>
             </div>
 
