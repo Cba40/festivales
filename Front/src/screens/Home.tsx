@@ -17,7 +17,7 @@ const Home = () => {
           <h2 className="text-sm font-bold text-gray-600 dark:text-gray-300 mb-3 uppercase tracking-wide">
             Accesos rápidos
           </h2>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 min-[400px]:grid-cols-3 gap-3">
             <QuickAction
               emoji="🚨"
               label="Emergencia"
@@ -40,7 +40,7 @@ const Home = () => {
           <h2 className="text-sm font-bold text-gray-600 dark:text-gray-300 mb-3 uppercase tracking-wide">
             Servicios
           </h2>
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 min-[400px]:grid-cols-4 gap-3">
             <QuickAction
               emoji="🚌"
               label="Transporte"

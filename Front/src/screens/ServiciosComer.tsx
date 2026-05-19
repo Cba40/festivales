@@ -24,7 +24,7 @@ const ServiciosComer = () => {
   if (!puntosOrdenados.length) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        <Header title="Comer" showBack onBack={() => navigate('/servicios')} />
+        <Header title="Comer" showBack onBack={() => navigate('/')} />
         <div className="flex-1 flex items-center justify-center">
           <p className="text-slate-600 dark:text-slate-300 text-center">
             No hay datos disponibles en este momento
@@ -76,7 +76,7 @@ const ServiciosComer = () => {
   if (sinSolucion) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        <Header title="Comer" showBack onBack={() => navigate('/servicios')} />
+        <Header title="Comer" showBack onBack={() => navigate('/')} />
 
         <div className="flex-1 p-4 space-y-4">
           <div className="bg-danger text-white p-6 rounded-xl text-center">
@@ -102,7 +102,7 @@ const ServiciosComer = () => {
   if (modo === 'guiar') {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        <Header title="Comer" showBack onBack={() => navigate('/servicios')} />
+        <Header title="Comer" showBack onBack={() => navigate('/')} />
 
         <div className="bg-danger text-white px-4 py-3">
           <h2 className="font-bold text-lg">👉 Alta demanda en esta zona</h2>
@@ -239,7 +239,7 @@ const ServiciosComer = () => {
   if (modo === 'asistir') {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        <Header title="Comer" showBack onBack={() => navigate('/servicios')} />
+        <Header title="Comer" showBack onBack={() => navigate('/')} />
 
         <div className="flex-1 p-4 space-y-4">
           {/* Mejor opción ahora */}
@@ -366,7 +366,7 @@ const ServiciosComer = () => {
   // MODO INFORMAR (lista, máx 3)
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-      <Header title="Comer" showBack onBack={() => navigate('/servicios')} />
+      <Header title="Comer" showBack onBack={() => navigate('/')} />
 
       <div className="flex-1 p-4 space-y-4">
         <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-md">
@@ -386,11 +386,11 @@ const ServiciosComer = () => {
                   className={`w-full p-4 bg-white dark:bg-slate-700 border ${isTop ? 'border-primary ring-1 ring-primary/20 bg-primary/5 dark:bg-primary/10' : 'border-slate-200 dark:border-slate-600'} rounded-xl text-left hover:border-primary dark:hover:border-primary/70 transition-colors`}
                 >
                   <div className="flex justify-between items-center">
-                    <span className={`font-bold ${isTop ? 'text-primary' : 'text-gray-900 dark:text-gray-100'}`}>
+                    <span className={`font-bold mr-2 ${isTop ? 'text-primary dark:text-blue-400' : 'text-gray-900 dark:text-gray-100'}`}>
                       {isTop ? '🔥 Mejor opción ahora: ' : ''}{punto.nombre}
                     </span>
                     <span
-                      className={`px-2 py-1 rounded text-xs font-bold ${getEstadoStyles(punto.estado)}`}
+                      className={`px-2 py-1 rounded text-xs font-bold whitespace-nowrap shrink-0 ${getEstadoStyles(punto.estado)}`}
                     >
                       {getEstadoLabel(punto.estado)}
                     </span>

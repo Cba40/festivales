@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/Header'
 import { Map, X } from 'lucide-react'
 import {
-  getServiciosPorSubtipo,
   getServicioMasCercano,
   getSegundoMasCercano
 } from '@/utils/servicios'
@@ -56,7 +55,7 @@ const ServiciosGenerales = () => {
         <Header title="Más servicios" showBack onBack={() => navigate('/')} />
 
         <div className="flex-1 p-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 min-[350px]:grid-cols-2 gap-3">
             {opciones.map(op => (
               <button
                 key={op.subtipo}
@@ -75,7 +74,7 @@ const ServiciosGenerales = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-      <Header title="Servicios" showBack onBack={() => setSubtipoActivo(null)} />
+      <Header title={opciones.find(o => o.subtipo === subtipoActivo)?.label || 'Servicios'} showBack onBack={() => setSubtipoActivo(null)} />
 
       <div className="flex-1 p-4 space-y-4">
         {principal && (
