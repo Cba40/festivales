@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import Home from './screens/Home';
 import Estacionar from './screens/Estacionar';
 import Emergencia from './screens/Emergencia';
@@ -11,28 +11,50 @@ import GastronomiaExpanded from './screens/GastronomiaExpanded';
 import ServiciosGenerales from './screens/ServiciosGenerales';
 import Pernoctar from './screens/Pernoctar';
 import AsistenteScreen from './screens/AsistenteScreen';
+import DashboardScreen from './features/dashboard/screens/DashboardScreen';
+import ZoneUpdateScreen from './features/dashboard/screens/ZoneUpdateScreen';
+import IncidentReportScreen from './features/dashboard/screens/IncidentReportScreen';
+
+function AppLayout() {
+  const location = useLocation();
+  const isDashboard = location.pathname.startsWith('/dashboard');
+
+  if (isDashboard) {
+    return (
+      <Routes>
+        <Route path="/dashboard" element={<DashboardScreen />} />
+        <Route path="/dashboard/zones" element={<ZoneUpdateScreen />} />
+        <Route path="/dashboard/report" element={<IncidentReportScreen />} />
+      </Routes>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex justify-center">
+      <div className="w-full max-w-md bg-white min-h-screen relative shadow-lg">
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/estacionar" element={<Estacionar />} />
+          <Route path="/emergencia" element={<Emergencia />} />
+          <Route path="/salir" element={<Salir />} />
+          <Route path="/resolver-ahora" element={<ResolverAhora />} />
+          <Route path="/servicios" element={<Servicios />} />
+          <Route path="/servicios/transporte" element={<ServiciosTransporte />} />
+          <Route path="/servicios/comer" element={<ServiciosComer />} />
+          <Route path="/servicios/comer/mas" element={<GastronomiaExpanded />} />
+          <Route path="/servicios/generales" element={<ServiciosGenerales />} />
+          <Route path="/pernoctar" element={<Pernoctar />} />
+          <Route path="/asistente" element={<AsistenteScreen />} />
+        </Routes>
+      </div>
+    </div>
+  );
+}
 
 function App() {
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-slate-50 flex justify-center">
-        <div className="w-full max-w-md bg-white min-h-screen relative shadow-lg">
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/estacionar" element={<Estacionar />} />
-            <Route path="/emergencia" element={<Emergencia />} />
-            <Route path="/salir" element={<Salir />} />
-            <Route path="/resolver-ahora" element={<ResolverAhora />} />
-            <Route path="/servicios" element={<Servicios />} />
-            <Route path="/servicios/transporte" element={<ServiciosTransporte />} />
-            <Route path="/servicios/comer" element={<ServiciosComer />} />
-            <Route path="/servicios/comer/mas" element={<GastronomiaExpanded />} />
-            <Route path="/servicios/generales" element={<ServiciosGenerales />} />
-            <Route path="/pernoctar" element={<Pernoctar />} />
-            <Route path="/asistente" element={<AsistenteScreen />} />
-          </Routes>
-        </div>
-      </div>
+      <AppLayout />
     </BrowserRouter>
   );
 }
