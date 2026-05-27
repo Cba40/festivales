@@ -84,6 +84,10 @@ const Home = () => {
             </div>
           </button>
         </div>
+      <div className="mt-8 pt-4 border-t border-slate-200 text-center">
+        <button type="button" onClick={() => navigate('/dashboard/login')} className="text-xs text-slate-500 hover:text-blue-600 font-medium underline transition-colors">
+          Acceso Operador Municipal
+        </button>
       </div>
     </div>
   );
