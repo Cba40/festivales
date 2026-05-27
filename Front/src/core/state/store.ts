@@ -135,9 +135,16 @@ const SEED_INCIDENTS: Incident[] = [
 // ============================================
 
 interface AppState {
+  // Auth
+  auth: { token: string | null; isAuthenticated: boolean };
+
   // Data
   zones: Zone[];
   incidents: Incident[];
+
+  // Actions — Auth
+  login: (token: string) => void;
+  logout: () => void;
 
   // Actions — Zones
   setZones: (zones: Zone[]) => void;
@@ -150,6 +157,22 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>((set) => ({
+  // Auth state
+  auth: {
+    token: localStorage.getItem('auth_token'),
+    isAuthenticated: !!localStorage.getItem('auth_token'),
+  },
+
+  // Auth mutations
+  login: (token) => {
+    localStorage.setItem('auth_token', token);
+    set({ auth: { token, isAuthenticated: true } });
+  },
+  logout: () => {
+    localStorage.removeItem('auth_token');
+    set({ auth: { token: null, isAuthenticated: false } });
+  },
+
   // Seed data para desarrollo
   zones: SEED_ZONES,
   incidents: SEED_INCIDENTS,

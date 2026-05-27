@@ -14,6 +14,8 @@ import AsistenteScreen from './screens/AsistenteScreen';
 import DashboardScreen from './features/dashboard/screens/DashboardScreen';
 import ZoneUpdateScreen from './features/dashboard/screens/ZoneUpdateScreen';
 import IncidentReportScreen from './features/dashboard/screens/IncidentReportScreen';
+import LoginScreen from './features/auth/screens/LoginScreen';
+import ProtectedRoute from './shared/components/ProtectedRoute';
 
 function AppLayout() {
   const location = useLocation();
@@ -22,7 +24,12 @@ function AppLayout() {
   if (isDashboard) {
     return (
       <Routes>
-        <Route path="/dashboard" element={<DashboardScreen />} />
+        <Route path="/dashboard/login" element={<LoginScreen />} />
+        <Route path="/dashboard/*" element={
+          <ProtectedRoute>
+            <DashboardScreen />
+          </ProtectedRoute>
+        } />
         <Route path="/dashboard/zones" element={<ZoneUpdateScreen />} />
         <Route path="/dashboard/report" element={<IncidentReportScreen />} />
       </Routes>
