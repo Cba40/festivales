@@ -11,9 +11,9 @@ import GastronomiaExpanded from './screens/GastronomiaExpanded';
 import ServiciosGenerales from './screens/ServiciosGenerales';
 import Pernoctar from './screens/Pernoctar';
 import AsistenteScreen from './screens/AsistenteScreen';
-import DashboardScreen from './features/dashboard/screens/DashboardScreen';
-import ZoneUpdateScreen from './features/dashboard/screens/ZoneUpdateScreen';
-import IncidentReportScreen from './features/dashboard/screens/IncidentReportScreen';
+import { DashboardScreen } from './features/dashboard/screens/DashboardScreen';
+import { ZoneUpdateScreen } from './features/dashboard/screens/ZoneUpdateScreen';
+import { IncidentReportScreen } from './features/dashboard/screens/IncidentReportScreen';
 import LoginScreen from './features/auth/screens/LoginScreen';
 import ProtectedRoute from './shared/components/ProtectedRoute';
 
