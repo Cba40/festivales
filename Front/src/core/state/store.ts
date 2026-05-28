@@ -149,6 +149,9 @@ interface AppState {
   // Actions — Zones
   setZones: (zones: Zone[]) => void;
   updateZone: (id: string, updates: Partial<Zone>) => void;
+  addZone: (zone: Zone) => void;
+  removeZone: (id: string) => void;
+  updateZoneConfig: (id: string, updates: Partial<Zone>) => void;
 
   // Actions — Incidents
   setIncidents: (incidents: Incident[]) => void;
@@ -181,6 +184,23 @@ export const useAppStore = create<AppState>((set) => ({
   setZones: (zones) => set({ zones }),
 
   updateZone: (id, updates) =>
+    set((state) => ({
+      zones: state.zones.map((z) =>
+        z.id === id ? { ...z, ...updates } : z
+      ),
+    })),
+
+  addZone: (zone) =>
+    set((state) => ({
+      zones: [...state.zones, zone],
+    })),
+
+  removeZone: (id) =>
+    set((state) => ({
+      zones: state.zones.filter((z) => z.id !== id),
+    })),
+
+  updateZoneConfig: (id, updates) =>
     set((state) => ({
       zones: state.zones.map((z) =>
         z.id === id ? { ...z, ...updates } : z

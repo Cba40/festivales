@@ -11,6 +11,8 @@ export interface Zone {
   status: StatusLevel;
   capacity: number;
   availableCapacity: number;
+  lat?: number;
+  lng?: number;
 }
 
 export interface Incident {

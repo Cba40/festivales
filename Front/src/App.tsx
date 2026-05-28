@@ -14,6 +14,7 @@ import AsistenteScreen from './screens/AsistenteScreen';
 import { DashboardScreen } from './features/dashboard/screens/DashboardScreen';
 import { ZoneUpdateScreen } from './features/dashboard/screens/ZoneUpdateScreen';
 import { IncidentReportScreen } from './features/dashboard/screens/IncidentReportScreen';
+import { ZoneAdminScreen } from './features/dashboard/screens/ZoneAdminScreen';
 import LoginScreen from './features/auth/screens/LoginScreen';
 import ProtectedRoute from './shared/components/ProtectedRoute';
 
@@ -32,6 +33,7 @@ function AppLayout() {
         } />
         <Route path="/dashboard/zones" element={<ZoneUpdateScreen />} />
         <Route path="/dashboard/report" element={<IncidentReportScreen />} />
+        <Route path="/dashboard/admin-zones" element={<ZoneAdminScreen />} />
       </Routes>
     );
   }

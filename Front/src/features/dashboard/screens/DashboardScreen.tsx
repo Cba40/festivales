@@ -20,6 +20,12 @@ export function DashboardScreen() {
       <header className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center">
         <h1 className="text-xl font-bold text-slate-800">Operación Territorial</h1>
         <div className="flex gap-4">
+          <button
+            onClick={() => navigate('/dashboard/admin-zones')}
+            className="text-sm bg-emerald-600 hover:bg-emerald-700 text-white py-1 px-3 rounded font-medium"
+          >
+            Admin. Zonas
+          </button>
           <button 
             onClick={() => navigate('/dashboard/zones')}
             className="text-sm text-blue-600 hover:text-blue-800 font-medium"
