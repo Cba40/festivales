@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import String, Integer, DateTime, ForeignKey, func
+from sqlalchemy import String, Integer, Float, DateTime, ForeignKey, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from geoalchemy2 import Geometry
 
@@ -21,6 +21,8 @@ class Zone(Base):
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="activa")
     capacity: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     available_capacity: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     geometry: Mapped[str | None] = mapped_column(Geometry("POLYGON"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

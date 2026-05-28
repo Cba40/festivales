@@ -1,8 +1,12 @@
 import { useState } from 'react';
 import { useAppStore } from '../../../core/state/store';
+import { apiClient } from '../../../core/api/client';
+import { endpoints } from '../../../core/api/endpoints';
 import { SaturationLevel } from '../types';
 
-export function useZoneMutations() {
+const DEFAULT_EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
+
+export function useZoneMutations(eventId: string = DEFAULT_EVENT_ID) {
   const updateZone = useAppStore((state) => state.updateZone);
   const zones = useAppStore((state) => state.zones);
   const [loading, setLoading] = useState(false);
@@ -15,10 +19,11 @@ export function useZoneMutations() {
     updateZone(zoneId, { saturation: newSaturation });
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 800));
-    } catch (error) {
+      await apiClient.patch(endpoints.zones.update(eventId, zoneId), {
+        saturation: newSaturation,
+      });
+    } catch {
       updateZone(zoneId, { saturation: previousZone.saturation });
-      console.error('Failed to update zone saturation');
     } finally {
       setLoading(false);
     }

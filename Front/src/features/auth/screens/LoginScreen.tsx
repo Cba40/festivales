@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../../core/state/store';
+import { apiClient } from '../../../core/api/client';
+import { endpoints } from '../../../core/api/endpoints';
 
 export default function LoginScreen() {
   const [usuario, setUsuario] = useState('');
@@ -10,21 +12,25 @@ export default function LoginScreen() {
   const navigate = useNavigate();
   const login = useAppStore((state) => state.login);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
-    if (usuario === 'admin' && password === '1234') {
-      setTimeout(() => {
-        login('mock-jwt-' + Date.now());
-        navigate('/dashboard');
-      }, 800);
-    } else {
-      setTimeout(() => {
-        setLoading(false);
-        setError('Credenciales inválidas');
-      }, 800);
+    try {
+      const res = await apiClient.post(endpoints.auth.login, {
+        username: usuario,
+        password,
+      });
+      login(res.data.access_token);
+      navigate('/dashboard');
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+        'Error de conexión con el servidor';
+      setError(message);
+    } finally {
+      setLoading(false);
     }
   };
 

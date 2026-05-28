@@ -1,8 +1,12 @@
 import { useState } from 'react';
 import { useAppStore } from '../../../core/state/store';
+import { apiClient } from '../../../core/api/client';
+import { endpoints } from '../../../core/api/endpoints';
 import type { Zone } from '../types';
 
-export function useZoneConfigMutations() {
+const DEFAULT_EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
+
+export function useZoneConfigMutations(eventId: string = DEFAULT_EVENT_ID) {
   const { removeZone, updateZoneConfig, zones } = useAppStore();
   const [loading, setLoading] = useState(false);
 
@@ -19,7 +23,7 @@ export function useZoneConfigMutations() {
     removeZone(id);
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      await apiClient.delete(endpoints.zones.delete(eventId, id));
     } catch {
       useAppStore.getState().addZone(zoneToRemove);
       return false;
@@ -37,8 +41,15 @@ export function useZoneConfigMutations() {
     setLoading(true);
     updateZoneConfig(id, updates);
 
+    const body: Record<string, unknown> = {};
+    if (updates.name !== undefined) body.name = updates.name;
+    if (updates.type !== undefined) body.type = updates.type;
+    if (updates.capacity !== undefined) body.capacity = updates.capacity;
+    if (updates.lat !== undefined) body.latitude = updates.lat;
+    if (updates.lng !== undefined) body.longitude = updates.lng;
+
     try {
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      await apiClient.put(endpoints.zones.updateConfig(eventId, id), body);
     } catch {
       useAppStore.getState().updateZoneConfig(id, previous as Partial<Zone>);
     } finally {

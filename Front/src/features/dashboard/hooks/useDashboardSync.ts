@@ -1,8 +1,64 @@
 import { useState, useCallback } from 'react';
 import { useAppStore } from '../../../core/state/store';
+import { apiClient } from '../../../core/api/client';
+import { endpoints } from '../../../core/api/endpoints';
+import type { Zone, Incident } from '../types';
 
-export function useDashboardSync() {
-  const { zones, incidents } = useAppStore();
+const DEFAULT_EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
+
+interface ApiZone {
+  id: string;
+  name: string;
+  type: string;
+  saturation: string;
+  status: string;
+  capacity: number;
+  available_capacity: number;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+interface ApiIncident {
+  id: string;
+  type: string;
+  severity: string;
+  description: string;
+  status: string;
+  zone_id: string | null;
+  created_at: string;
+}
+
+function mapZone(api: ApiZone): Zone {
+  return {
+    id: api.id,
+    name: api.name,
+    type: api.type,
+    saturation: api.saturation as Zone['saturation'],
+    status: api.status as Zone['status'],
+    capacity: api.capacity,
+    availableCapacity: api.available_capacity,
+    lat: api.latitude ?? undefined,
+    lng: api.longitude ?? undefined,
+  };
+}
+
+function mapIncident(api: ApiIncident): Incident {
+  return {
+    id: api.id,
+    type: api.type,
+    severity: api.severity as Incident['severity'],
+    description: api.description,
+    status: api.status as Incident['status'],
+    createdAt: api.created_at,
+    zoneId: api.zone_id ?? undefined,
+  };
+}
+
+export function useDashboardSync(eventId: string = DEFAULT_EVENT_ID) {
+  const setZones = useAppStore((state) => state.setZones);
+  const setIncidents = useAppStore((state) => state.setIncidents);
+  const zones = useAppStore((state) => state.zones);
+  const incidents = useAppStore((state) => state.incidents);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -10,13 +66,21 @@ export function useDashboardSync() {
     setLoading(true);
     setError(null);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      const [zonesRes, incidentsRes] = await Promise.all([
+        apiClient.get<ApiZone[]>(endpoints.zones.list(eventId)),
+        apiClient.get<ApiIncident[]>(endpoints.incidents.list(eventId)),
+      ]);
+      setZones(zonesRes.data.map(mapZone));
+      setIncidents(incidentsRes.data.map(mapIncident));
     } catch (err) {
-      setError('Error al sincronizar dashboard');
+      const msg =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+        'Error al sincronizar dashboard';
+      setError(msg);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [eventId, setZones, setIncidents]);
 
   return { zones, incidents, loading, error, refresh };
 }
