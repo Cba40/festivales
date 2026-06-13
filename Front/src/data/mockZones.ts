@@ -81,16 +81,23 @@ export const getModoEstacionamiento = (zonas: ZonaEstacionamiento[]) => {
   const zonasOrdenadas = getZonasOrdenadas(zonas)
   const mejor = zonasOrdenadas[0]
 
+  console.log('[getModoEstacionamiento] zonas:', zonas.length, 'umbral:', umbral, 'hora:', h, 'colapsadoThresh:', colapsadoThreshold, 'criticoThresh:', criticoThreshold, 'mejor score:', mejor && calcularScoreEstacionamiento(mejor), 'dists:', zonas.map(z => z.disponibilidad))
+
   if (!mejor) return 'sin_solucion'
 
   if (zonas.every(z => z.disponibilidad < colapsadoThreshold)) {
+    console.log('[getModoEstacionamiento] todas disponibilidad < colapsadoThreshold')
     return 'sin_solucion'
   }
 
   if (zonas.every(z => z.disponibilidad < criticoThreshold)) {
+    console.log('[getModoEstacionamiento] todas disponibilidad < criticoThreshold, guiar')
     return 'guiar'
   }
-  if (calcularScoreEstacionamiento(mejor) > umbral) return 'sin_solucion'
+  if (calcularScoreEstacionamiento(mejor) > umbral) {
+    console.log('[getModoEstacionamiento] mejor score > umbral, sin_solucion')
+    return 'sin_solucion'
+  }
 
   return getModo(
     zonasOrdenadas.map(z => ({ estado: z.estado, score: calcularScoreEstacionamiento(z) })),

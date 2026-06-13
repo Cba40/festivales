@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import Home from './screens/Home';
 import Estacionar from './screens/Estacionar';
@@ -12,6 +13,7 @@ import ServiciosGenerales from './screens/ServiciosGenerales';
 import Pernoctar from './screens/Pernoctar';
 import AsistenteScreen from './screens/AsistenteScreen';
 import { DashboardScreen } from './features/dashboard/screens/DashboardScreen';
+import { useDashboardSync } from './features/dashboard/hooks/useDashboardSync';
 import { ZoneUpdateScreen } from './features/dashboard/screens/ZoneUpdateScreen';
 import { IncidentReportScreen } from './features/dashboard/screens/IncidentReportScreen';
 import { ZoneAdminScreen } from './features/dashboard/screens/ZoneAdminScreen';
@@ -21,6 +23,9 @@ import ProtectedRoute from './shared/components/ProtectedRoute';
 function AppLayout() {
   const location = useLocation();
   const isDashboard = location.pathname.startsWith('/dashboard');
+  const { refresh } = useDashboardSync();
+
+  useEffect(() => { refresh(); }, [refresh]);
 
   if (isDashboard) {
     return (

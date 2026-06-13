@@ -1,14 +1,39 @@
 import { useState } from 'react';
 import { useZoneCreation } from '../hooks/useZoneCreation';
+import { ZONE_TYPES } from '../constants';
 
-const ZONE_TYPES = [
-  { value: 'estacionamiento', label: 'Estacionamiento' },
-  { value: 'transporte', label: 'Transporte' },
-  { value: 'comida', label: 'Comida' },
-  { value: 'descanso', label: 'Descanso' },
-  { value: 'servicios', label: 'Servicios' },
-  { value: 'emergencia', label: 'Emergencia' },
-];
+const dynamicFields: Record<string, { name: string; key: string; type: string; placeholder: string }[]> = {
+  estacionamiento: [
+    { name: 'Disponibilidad (%)', key: 'disponibilidad', type: 'number', placeholder: '50' },
+  ],
+  transporte: [
+    { name: 'Espera (min)', key: 'espera_min', type: 'number', placeholder: '10' },
+    { name: 'Calle', key: 'calle', type: 'text', placeholder: 'Av. Principal' },
+  ],
+  comida: [
+    { name: 'Espera (min)', key: 'espera_min', type: 'number', placeholder: '5' },
+    { name: 'Subtipo', key: 'subtipo', type: 'text', placeholder: 'rapido / comida / bebida' },
+  ],
+  servicios: [
+    { name: 'Subtipo', key: 'subtipo', type: 'text', placeholder: 'banos / hidratacion / descanso / salud' },
+  ],
+  emergencia: [
+    { name: 'Dirección', key: 'direccion', type: 'text', placeholder: 'Av. Siempre Viva 123' },
+    { name: 'Horario', key: 'horario', type: 'text', placeholder: '24hs' },
+    { name: 'Teléfono', key: 'telefono', type: 'text', placeholder: '+543511234567' },
+  ],
+  descanso: [
+    { name: 'Subtipo', key: 'subtipo', type: 'text', placeholder: 'descanso' },
+    { name: 'X (0-100)', key: 'x', type: 'number', placeholder: '50' },
+    { name: 'Y (0-100)', key: 'y', type: 'number', placeholder: '50' },
+  ],
+  salida: [
+    { name: 'Transporte', key: 'transporte', type: 'text', placeholder: 'auto / transporte / peatonal' },
+    { name: 'Espera (min)', key: 'espera_min', type: 'number', placeholder: '5' },
+    { name: 'Capacidad estimada', key: 'capacidad_estimada', type: 'number', placeholder: '200' },
+    { name: 'Es embudo', key: 'es_embudo', type: 'text', placeholder: 'true / false' },
+  ],
+};
 
 interface Props {
   onSuccess?: () => void;
@@ -22,10 +47,19 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
   const [capacity, setCapacity] = useState('');
   const [lat, setLat] = useState('');
   const [lng, setLng] = useState('');
+  const [extra, setExtra] = useState<Record<string, string>>({});
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !capacity || Number(capacity) <= 0) return;
+
+    const extraPayload: Record<string, string | number | boolean> = {};
+    for (const [k, v] of Object.entries(extra)) {
+      if (v === 'true') extraPayload[k] = true;
+      else if (v === 'false') extraPayload[k] = false;
+      else if (v && !isNaN(Number(v))) extraPayload[k] = Number(v);
+      else extraPayload[k] = v;
+    }
 
     await createZone({
       name: name.trim(),
@@ -33,6 +67,7 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
       capacity: Number(capacity),
       lat: lat ? Number(lat) : undefined,
       lng: lng ? Number(lng) : undefined,
+      ...extraPayload,
     });
 
     setName('');
@@ -40,8 +75,11 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
     setCapacity('');
     setLat('');
     setLng('');
+    setExtra({});
     if (onSuccess) onSuccess();
   };
+
+  const fields = dynamicFields[type] || [];
 
   return (
     <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg border border-slate-200 space-y-4">
@@ -61,7 +99,7 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
         <label className="block text-sm font-medium text-slate-700 mb-1">Tipo</label>
         <select
           value={type}
-          onChange={(e) => setType(e.target.value)}
+          onChange={(e) => { setType(e.target.value); setExtra({}); }}
           className="w-full border-slate-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500"
         >
           {ZONE_TYPES.map((t) => (
@@ -107,6 +145,19 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
           />
         </div>
       </div>
+
+      {fields.map((f) => (
+        <div key={f.key}>
+          <label className="block text-sm font-medium text-slate-700 mb-1">{f.name}</label>
+          <input
+            type={f.type}
+            value={extra[f.key] || ''}
+            onChange={(e) => setExtra(prev => ({ ...prev, [f.key]: e.target.value }))}
+            placeholder={f.placeholder}
+            className="w-full border-slate-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+      ))}
 
       {error && (
         <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">

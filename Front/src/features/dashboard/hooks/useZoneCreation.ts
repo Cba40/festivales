@@ -12,6 +12,7 @@ interface CreateZoneInput {
   capacity: number;
   lat?: number;
   lng?: number;
+  [key: string]: string | number | boolean | undefined;
 }
 
 interface ApiZone {
@@ -51,12 +52,29 @@ export function useZoneCreation(eventId: string = DEFAULT_EVENT_ID) {
     addZone(optimisticZone);
 
     try {
-      const res = await apiClient.post<ApiZone>(endpoints.zones.create(eventId), {
+      const body: Record<string, unknown> = {
         name: data.name,
         type: data.type,
         capacity: data.capacity,
         latitude: data.lat,
         longitude: data.lng,
+      };
+      for (const key of ['disponibilidad', 'espera_min', 'calle', 'subtipo', 'tipo_culinario', 'x', 'y', 'direccion', 'horario', 'telefono', 'transporte', 'capacidad_estimada', 'es_embudo']) {
+        if (data[key] !== undefined) body[key] = data[key];
+      }
+      const res = await apiClient.post<ApiZone>(endpoints.zones.create(eventId), body);
+
+      removeZone(optimisticZone.id);
+      addZone({
+        id: res.data.id,
+        name: res.data.name,
+        type: res.data.type,
+        saturation: res.data.saturation as Zone['saturation'],
+        status: res.data.status as Zone['status'],
+        capacity: res.data.capacity,
+        availableCapacity: res.data.available_capacity,
+        lat: res.data.latitude ?? undefined,
+        lng: res.data.longitude ?? undefined,
       });
       removeZone(optimisticZone.id);
       addZone({

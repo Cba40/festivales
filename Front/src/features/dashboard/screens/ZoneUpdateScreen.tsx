@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../../core/state/store';
 import { ZoneStatusCard } from '../components/ZoneStatusCard';
+import { ZONE_TYPES } from '../constants';
 
 export function ZoneUpdateScreen() {
   const navigate = useNavigate();
@@ -31,10 +32,9 @@ export function ZoneUpdateScreen() {
             className="border-slate-300 rounded-md py-1 px-3 text-sm focus:ring-blue-500"
           >
             <option value="all">Todas</option>
-            <option value="estacionamiento">Estacionamiento</option>
-            <option value="transporte">Transporte</option>
-            <option value="comida">Comida</option>
-            <option value="servicios">Servicios</option>
+            {ZONE_TYPES.map(t => (
+              <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
           </select>
         </div>
 

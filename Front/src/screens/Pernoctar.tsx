@@ -1,13 +1,21 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/Header'
 import { Phone, Map, ChevronDown, Info, Clock } from 'lucide-react'
 import { getPernoctesOrdenados } from '@/utils/pernoctar'
+import { useAppStore } from '@/core/state/store'
+import { mapZonesToPernoctar, type PuntoPernoctar } from '@/data/mappers'
+import { eventoData } from '@/data/eventoData'
 import { formatUpdatedAt } from '@/utils/formatTime'
 
 const Pernoctar = () => {
   const navigate = useNavigate()
-  const puntos = getPernoctesOrdenados()
+  const zones = useAppStore(s => s.zones)
+  const pernoctar: PuntoPernoctar[] = useMemo(() => {
+    const mapped = mapZonesToPernoctar(zones)
+    return mapped.length > 0 ? mapped : eventoData.pernoctar
+  }, [zones])
+  const puntos = useMemo(() => getPernoctesOrdenados(pernoctar), [pernoctar])
   const [mostrarTodos, setMostrarTodos] = useState(false)
 
   const handleMaps = (lat: number, lng: number) => {
@@ -49,7 +57,7 @@ const Pernoctar = () => {
               <div>
                 <p className="font-bold text-slate-800 dark:text-slate-100">{p.nombre}</p>
                 <div className="text-sm font-semibold text-slate-500 dark:text-slate-400">
-                  {p.categoria.toUpperCase()}
+                  {(p.categoria ?? '').toUpperCase()}
                 </div>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
                   · {p.referencia}

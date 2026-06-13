@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/Header'
 import { SimpleMap } from '@/components/SimpleMap'
 import { X, Bath, Droplets, Armchair, HeartPulse } from 'lucide-react'
-import { getServiciosMapPorTipo, type PuntoServicioMapa } from '@/data/mockServiciosMap'
+import { mapZonesToServiciosMapa, type PuntoServicioMapa } from '@/data/mappers'
+import { useAppStore } from '@/core/state/store'
 import { formatUpdatedAt } from '@/utils/formatTime'
 
 const opciones = [
@@ -15,10 +16,12 @@ const opciones = [
 
 const ServiciosGenerales = () => {
   const navigate = useNavigate()
+  const zones = useAppStore(s => s.zones)
   const [selected, setSelected] = useState<PuntoServicioMapa | null>(null)
   const [subtipoActivo, setSubtipoActivo] = useState<string | null>(null)
 
-  const puntos = subtipoActivo ? getServiciosMapPorTipo(subtipoActivo as 'banos' | 'hidratacion' | 'descanso' | 'salud') : []
+  const todosPuntos = useMemo(() => mapZonesToServiciosMapa(zones), [zones])
+  const puntos = subtipoActivo ? todosPuntos.filter(p => p.tipo === subtipoActivo) : []
 
   const seleccionar = (subtipo: string) => {
     setSubtipoActivo(subtipo)

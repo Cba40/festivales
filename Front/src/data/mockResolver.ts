@@ -1,4 +1,6 @@
 import { eventoData } from '@/data/eventoData'
+import type { ZonaEstacionamiento, ZonaSalida } from './mappers'
+import { mapZonesToEstacionamiento, mapZonesToSalidas } from './mappers'
 import { getSalidasOrdenadas } from './mockSalidas'
 import { getZonasOrdenadas } from './mockZones'
 import { getHoraEvento } from '@/utils/contextoEvento'
@@ -29,28 +31,33 @@ export interface ResultadoInferencia {
   }
 }
 
-const getZonaConMejorScore = () => {
-  const ordenadas = getZonasOrdenadas(eventoData.estacionamiento)
+const getZonaConMejorScore = (zonas?: ZonaEstacionamiento[]) => {
+  const data = zonas ?? eventoData.estacionamiento
+  const ordenadas = getZonasOrdenadas(data)
   return ordenadas.find(z => z.estado !== 'colapsado')
 }
 
-const getZonaAlternativa = () => {
-  const ordenadas = getZonasOrdenadas(eventoData.estacionamiento).filter(z => z.estado !== 'colapsado')
+const getZonaAlternativa = (zonas?: ZonaEstacionamiento[]) => {
+  const data = zonas ?? eventoData.estacionamiento
+  const ordenadas = getZonasOrdenadas(data).filter(z => z.estado !== 'colapsado')
   return ordenadas[1]
 }
 
-const getSalidaConMenorCongestion = () => {
-  const ordenadas = getSalidasOrdenadas(eventoData.salidas, 'auto')
+const getSalidaConMenorCongestion = (salidas?: ZonaSalida[]) => {
+  const data = salidas ?? eventoData.salidas
+  const ordenadas = getSalidasOrdenadas(data, 'auto')
   return ordenadas.find(z => z.estado !== 'colapsado')
 }
 
-const getSalidaAlternativa = () => {
-  const ordenadas = getSalidasOrdenadas(eventoData.salidas, 'auto').filter(z => z.estado !== 'colapsado')
+const getSalidaAlternativa = (salidas?: ZonaSalida[]) => {
+  const data = salidas ?? eventoData.salidas
+  const ordenadas = getSalidasOrdenadas(data, 'auto').filter(z => z.estado !== 'colapsado')
   return ordenadas[1]
 }
 
-const getZonaLejana = () => {
-  const ordenadas = getZonasOrdenadas(eventoData.estacionamiento)
+const getZonaLejana = (zonas?: ZonaEstacionamiento[]) => {
+  const data = zonas ?? eventoData.estacionamiento
+  const ordenadas = getZonasOrdenadas(data)
   return ordenadas[ordenadas.length - 1]
 }
 
@@ -74,7 +81,9 @@ export const inferirNecesidad = (
   hora?: number,
   saturacion?: SaturacionTipo | SaturacionContexto,
   zonaActual?: string,
-  ultimaAccion?: string
+  ultimaAccion?: string,
+  zonasEstacionamiento?: ZonaEstacionamiento[],
+  zonasSalida?: ZonaSalida[]
 ): ResultadoInferencia => {
   const h = hora ?? getHoraEvento()
   const zona = zonaActual ?? 'Zona Centro'
@@ -113,7 +122,7 @@ export const inferirNecesidad = (
         tipo: 'estacionar',
         modo: 'guiar',
         mensaje: 'Zona colapsada → Ir a zona lejana',
-        zonaPrincipal: getZonaLejana(),
+        zonaPrincipal: getZonaLejana(zonasEstacionamiento),
         zonaAlternativa: undefined,
         confianza: 'media',
         contexto: { hora: `${h}:00`, zona, saturacion: 'colapsada' }
@@ -125,8 +134,8 @@ export const inferirNecesidad = (
         tipo: 'salir',
         modo: 'guiar',
         mensaje: 'Zona colapsada → Salí ahora',
-        zonaPrincipal: getSalidaConMenorCongestion(),
-        zonaAlternativa: getSalidaAlternativa(),
+        zonaPrincipal: getSalidaConMenorCongestion(zonasSalida),
+        zonaAlternativa: getSalidaAlternativa(zonasSalida),
         confianza: 'alta',
         contexto: { hora: `${h}:00`, zona, saturacion: 'colapsada' }
       }
@@ -155,14 +164,14 @@ export const inferirNecesidad = (
         ? 'Prepará salida anticipada'
         : '¿Qué necesitás ahora?',
       zonaPrincipal: accionBase === 'estacionar'
-        ? getZonaConMejorScore()
+        ? getZonaConMejorScore(zonasEstacionamiento)
         : accionBase === 'salir'
-        ? getSalidaConMenorCongestion()
+        ? getSalidaConMenorCongestion(zonasSalida)
         : undefined,
       zonaAlternativa: accionBase === 'estacionar'
-        ? getZonaAlternativa()
+        ? getZonaAlternativa(zonasEstacionamiento)
         : accionBase === 'salir'
-        ? getSalidaAlternativa()
+        ? getSalidaAlternativa(zonasSalida)
         : undefined,
       confianza: modoFinal === 'guiar' ? 'alta' : 'media',
       contexto: { hora: `${h}:00`, zona, saturacion: sat.estacionamiento ?? 'desconocida' }

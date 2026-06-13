@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/Header'
 import { Phone, MapPin, Navigation, Clock } from 'lucide-react'
-import { getPuntoSeguroCercano, getPuestoCercano, zonasReferencia, type PuntoSeguro, type PuestoSanitario } from '@/data/mockEmergencia'
+import { useAppStore } from '@/core/state/store'
+import { mapZonesToEmergencia, type PuntoSeguro, type PuestoSanitario } from '@/data/mappers'
 
 type EmergencyType = 'nino-perdido' | 'persona-herida' | 'necesito-ayuda' | null
 type HelpSubType = 'seguridad' | 'salud' | 'orientacion' | null
@@ -13,14 +14,14 @@ type BottomSheetData =
 
 const Emergencia = () => {
   const navigate = useNavigate()
+  const zones = useAppStore(s => s.zones)
   const [selectedType, setSelectedType] = useState<EmergencyType>(null)
   const [helpSubType, setHelpSubType] = useState<HelpSubType>(null)
   const [inconsciente, setInconsciente] = useState(false)
   const [bottomSheet, setBottomSheet] = useState<BottomSheetData | null>(null)
   const [mostrarLlamar, setMostrarLlamar] = useState(false)
 
-  const puntoSeguro = getPuntoSeguroCercano()
-  const puestoSanitario = getPuestoCercano()
+  const { puntoSeguro, puestoSanitario, zonasReferencia } = useMemo(() => mapZonesToEmergencia(zones), [zones])
 
   // Timeout: show call button after 5s of inactivity
   useEffect(() => {

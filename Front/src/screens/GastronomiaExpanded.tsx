@@ -1,14 +1,17 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/Header'
 import { X, UtensilsCrossed, MapPin, Clock } from 'lucide-react'
-import { getCorredoresOrdenados, type CorredorGastronomico, getTipoLabel, getSentarseLabel } from '@/data/mockCorredoresGastronomicos'
+import { getTipoLabel, getSentarseLabel } from '@/data/mockCorredoresGastronomicos'
+import { mapZonesToParadas, type CorredorGastronomico } from '@/data/mappers'
+import { useAppStore } from '@/core/state/store'
 import { formatUpdatedAt } from '@/utils/formatTime'
 
 const GastronomiaExpanded = () => {
   const navigate = useNavigate()
+  const zones = useAppStore(s => s.zones)
   const [selectedCorredor, setSelectedCorredor] = useState<CorredorGastronomico | null>(null)
-  const corredores = getCorredoresOrdenados()
+  const corredores = useMemo(() => mapZonesToParadas(zones), [zones])
 
   const getSaturacionColor = (saturacion: string) => {
     switch (saturacion) {

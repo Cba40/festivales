@@ -3,6 +3,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.core.config import settings
 from app.api.routes.auth import router as auth_router
 from app.api.routes.events import router as events_router
 from app.api.routes.zones import router as zones_router
@@ -13,7 +14,7 @@ app = FastAPI(title="Territorial MVP", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

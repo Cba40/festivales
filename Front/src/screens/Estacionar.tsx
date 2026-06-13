@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/Header'
 import { Map, X } from 'lucide-react'
@@ -6,11 +6,9 @@ import {
   getZonasOrdenadas,
   getModoEstacionamiento,
   calcularScoreEstacionamiento,
-  ZonaEstacionamiento
 } from '@/data/mockZones'
-import { eventoData } from '@/data/eventoData'
-
-const zonasMock = eventoData.estacionamiento
+import { useAppStore } from '@/core/state/store'
+import { mapZonesToEstacionamiento, type ZonaEstacionamiento } from '@/data/mappers'
 import { getConfianza, getConfianzaLabel } from '@/utils/confianza'
 import { formatUpdatedAt } from '@/utils/formatTime'
 import { getEventoConfig } from '@/config/eventoConfig'
@@ -19,11 +17,19 @@ import { getHoraEvento } from '@/utils/contextoEvento'
 
 const Estacionar = () => {
   const navigate = useNavigate()
+  const zones = useAppStore(s => s.zones)
   const [selectedZona, setSelectedZona] = useState<ZonaEstacionamiento | null>(null)
   const [mostrarOpciones, setMostrarOpciones] = useState(false)
 
+  const zonasMock = useMemo(() => {
+    const mapped = mapZonesToEstacionamiento(zones)
+    console.log('[Estacionar] zones from store:', zones.length, 'mapped:', mapped.length, mapped.map(z => ({ n: z.nombre, d: z.disponibilidad, e: z.estado })))
+    return mapped
+  }, [zones])
+
   const zonasOrdenadas = getZonasOrdenadas(zonasMock)
   const modo = getModoEstacionamiento(zonasMock)
+  console.log('[Estacionar] modo:', modo, 'mejor:', zonasOrdenadas[0]?.nombre, 'score:', zonasOrdenadas[0] && calcularScoreEstacionamiento(zonasOrdenadas[0]), 'hora:', getHoraEvento())
 
   const principal = zonasOrdenadas[0]
   const alternativaRaw = zonasOrdenadas[1]

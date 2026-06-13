@@ -1,24 +1,13 @@
 import { calcularScore, getModo, getUmbralContexto } from '../utils/decisionEngine'
 import { getHoraEvento } from '@/utils/contextoEvento'
-
-export interface PuntoComida {
-  id: string
-  nombre: string
-  tipo: 'rapido' | 'comida' | 'bebida'
-  distancia_min: number
-  espera_min: number
-  estado: 'bajo' | 'medio' | 'alto' | 'colapsado'
-  referencia: string
-  lat: number
-  lng: number
-  updatedAt: number
-}
+import { type PuntoComida } from '@/data/mappers'
 
 export const puntosComida: PuntoComida[] = [
   {
     id: 'c1',
     nombre: 'Puesto Norte',
-    tipo: 'rapido',
+    tipo: 'comer',
+    categoria: 'rapido',
     distancia_min: 6,
     espera_min: 10,
     estado: 'bajo',
@@ -30,7 +19,8 @@ export const puntosComida: PuntoComida[] = [
   {
     id: 'c2',
     nombre: 'Zona Gastronómica Central',
-    tipo: 'comida',
+    tipo: 'comer',
+    categoria: 'comida',
     distancia_min: 3,
     espera_min: 25,
     estado: 'alto',
@@ -42,7 +32,8 @@ export const puntosComida: PuntoComida[] = [
   {
     id: 'c3',
     nombre: 'Puesto Oeste',
-    tipo: 'rapido',
+    tipo: 'comer',
+    categoria: 'bebida',
     distancia_min: 8,
     espera_min: 12,
     estado: 'medio',

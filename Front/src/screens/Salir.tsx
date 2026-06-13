@@ -7,7 +7,8 @@ import {
   getModoSalida,
   calcularScoreSalida
 } from '@/data/mockSalidas'
-import { eventoData, type ZonaSalida } from '@/data/eventoData'
+import { useAppStore } from '@/core/state/store'
+import { mapZonesToSalidas, type ZonaSalida } from '@/data/mappers'
 import { getConfianza, getConfianzaLabel } from '@/utils/confianza'
 import { formatUpdatedAt } from '@/utils/formatTime'
 import {
@@ -21,11 +22,11 @@ type TipoTransporte = 'auto' | 'transporte' | 'peatonal'
 
 const Salir = () => {
   const navigate = useNavigate()
+  const zones = useAppStore(s => s.zones)
   const [tipo, setTipo] = useState<TipoTransporte>('auto')
   const [selectedZona, setSelectedZona] = useState<ZonaSalida | null>(null)
 
-  // Usar datos de eventoData (single source of truth)
-  const zonasMock = eventoData.salidas
+  const zonasMock = useMemo(() => mapZonesToSalidas(zones), [zones])
 
   // Modo inicial desde engine
   const modoInicial = getModoSalida(zonasMock, tipo)

@@ -33,6 +33,9 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
 
+  // Dev: pasar de largo, no interceptar nada
+  if (self.location.port === '5173') return;
+
   // Navegación HTML: cache-first
   if (request.mode === 'navigate') {
     event.respondWith(
@@ -53,8 +56,9 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // API calls: network-first con fallback a cache (para futuro backend)
+  // API calls: network-first — solo cachear GET
   if (request.url.includes('/api/')) {
+    if (request.method !== 'GET') return; // POST, PUT, DELETE pasan sin SW
     event.respondWith(
       fetch(request)
         .then((response) => {

@@ -17,7 +17,6 @@ router = APIRouter(prefix="/api/events/{event_id}/incidents", tags=["incidents"]
 def list_incidents(
     event_id: str,
     db: Session = Depends(get_db),
-    _=Depends(verify_token),
 ):
     event = db.query(Event).filter(Event.id == event_id).first()
     if not event:

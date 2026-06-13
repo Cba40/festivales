@@ -1,15 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useZoneConfigMutations } from '../hooks/useZoneConfigMutations';
 import type { Zone } from '../types';
-
-const ZONE_TYPES = [
-  { value: 'estacionamiento', label: 'Estacionamiento' },
-  { value: 'transporte', label: 'Transporte' },
-  { value: 'comida', label: 'Comida' },
-  { value: 'descanso', label: 'Descanso' },
-  { value: 'servicios', label: 'Servicios' },
-  { value: 'emergencia', label: 'Emergencia' },
-];
+import { ZONE_TYPES } from '../constants';
 
 interface Props {
   zone: Zone;

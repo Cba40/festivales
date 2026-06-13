@@ -1,7 +1,7 @@
-import { eventoData, PuntoPernoctar } from '@/data/eventoData'
+import { type PuntoPernoctar } from '@/data/mappers'
 
-export const getPernoctesOrdenados = (): PuntoPernoctar[] => {
-  return [...eventoData.pernoctar].sort((a, b) => {
+export const getPernoctesOrdenados = (pernoctar: PuntoPernoctar[]): PuntoPernoctar[] => {
+  return [...pernoctar].sort((a, b) => {
     const prioridad = {
       disponible: 0,
       consultar: 1,
@@ -17,7 +17,7 @@ export const getPernoctesOrdenados = (): PuntoPernoctar[] => {
   })
 }
 
-export const getPernoctePrincipal = (): PuntoPernoctar | null => {
-  const lista = getPernoctesOrdenados()
+export const getPernoctePrincipal = (pernoctar: PuntoPernoctar[]): PuntoPernoctar | null => {
+  const lista = getPernoctesOrdenados(pernoctar)
   return lista[0] || null
 }

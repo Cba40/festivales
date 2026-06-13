@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '../components/Header'
 import { inferirNecesidad, ResultadoInferencia } from '../data/mockResolver'
-import { eventoData } from '@/data/eventoData'
-import type { ZonaSalida } from '@/data/eventoData'
+import { useAppStore } from '@/core/state/store'
+import { mapZonesToEstacionamiento, mapZonesToSalidas, type ZonaSalida, type ZonaEstacionamiento } from '@/data/mappers'
 import { Zona } from '../types'
 
 type ZonaSeleccionada = ZonaSalida | Zona | null
@@ -14,9 +14,12 @@ const hasCoords = (zona: ZonaSeleccionada): zona is (ZonaSalida | Zona) => {
 
 const ResolverAhora = () => {
   const navigate = useNavigate()
+  const zones = useAppStore(s => s.zones)
   const [selectedZona, setSelectedZona] = useState<ZonaSeleccionada>(null)
 
-  const inferencia: ResultadoInferencia = inferirNecesidad()
+  const estacionamientoZones = useMemo(() => mapZonesToEstacionamiento(zones), [zones])
+  const salidaZones = useMemo(() => mapZonesToSalidas(zones), [zones])
+  const inferencia: ResultadoInferencia = inferirNecesidad(undefined, undefined, undefined, undefined, estacionamientoZones, salidaZones)
 
   const handleIniciarRuta = (zona: ZonaSeleccionada) => {
     if (hasCoords(zona)) {

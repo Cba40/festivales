@@ -1,5 +1,5 @@
 import { Dot, Info } from 'lucide-react'
-import type { PuntoServicioMapa } from '@/data/mockServiciosMap'
+import type { PuntoServicioMapa } from '@/data/mappers'
 import { formatUpdatedAt } from '@/utils/formatTime'
 
 interface SimpleMapProps {

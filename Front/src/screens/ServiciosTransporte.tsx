@@ -1,22 +1,41 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/Header'
 import { Map, X } from 'lucide-react'
 import {
   getParadasOrdenadas,
   getModoTransporte,
-  ParadaTransporte
 } from '@/data/mockTransporte'
-import { eventoData } from '@/data/eventoData'
+import type { ParadaTransporte } from '@/data/mockTransporte'
+import { useAppStore } from '@/core/state/store'
 import { getConfianza, getConfianzaLabel } from '@/utils/confianza'
 import { formatUpdatedAt } from '@/utils/formatTime'
+import type { Zone } from '@/features/dashboard/types'
+
+const mapZoneToParada = (zones: Zone[]): ParadaTransporte[] =>
+  zones
+    .filter((z) => z.type === 'transporte')
+    .map((z) => ({
+      id: z.id,
+      nombre: z.name,
+      distancia_min: z.distancia_min ?? 5,
+      estado: z.saturation,
+      espera_min: z.espera_min ?? 10,
+      referencia: z.referencia ?? '',
+      calle: z.calle ?? '',
+      lat: z.lat ?? 0,
+      lng: z.lng ?? 0,
+      updatedAt: Date.now(),
+    }))
 
 const ServiciosTransporte = () => {
   const navigate = useNavigate()
+  const zones = useAppStore((s) => s.zones)
   const [selectedParada, setSelectedParada] = useState<ParadaTransporte | null>(null)
 
-  const paradasOrdenadas = getParadasOrdenadas(eventoData.transporte)
-  const modo = getModoTransporte(eventoData.transporte)
+  const paradasTransporte = useMemo(() => mapZoneToParada(zones), [zones])
+  const paradasOrdenadas = useMemo(() => getParadasOrdenadas(paradasTransporte), [paradasTransporte])
+  const modo = useMemo(() => getModoTransporte(paradasTransporte), [paradasTransporte])
 
   const principal = paradasOrdenadas[0]
   const alternativa = paradasOrdenadas[1]
