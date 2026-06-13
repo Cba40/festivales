@@ -1,7 +1,8 @@
 import { useState, useMemo, lazy, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/Header'
-import { Map, X, UtensilsCrossed, MapIcon, List } from 'lucide-react'
+import { Map, MapIcon, List } from 'lucide-react'
+import PuntoDetallePanel from '@/components/PuntoDetallePanel'
 
 const GastronomyMap = lazy(() => import('@/components/GastronomyMap'))
 import {
@@ -13,15 +14,6 @@ import { mapZonesToComida } from '@/data/mappers'
 import { getConfianza, getConfianzaLabel } from '@/utils/confianza'
 import { formatUpdatedAt } from '@/utils/formatTime'
 import type { PuntoComida } from '@/data/mappers'
-
-const getCategoriaLabel = (cat: string) => {
-  switch (cat) {
-    case 'rapido': return 'Comida rápida'
-    case 'comida': return 'Comida completa'
-    case 'bebida': return 'Bebidas'
-    default: return cat
-  }
-}
 
 const getEstadoStyles = (estado: string) => {
   switch (estado) {
@@ -193,62 +185,6 @@ const ServiciosComer = () => {
             </button>
           )}
         </div>
-
-        {selectedPunto && (
-          <>
-            <div
-              className="fixed inset-0 bg-black/50 z-40"
-              onClick={() => setSelectedPunto(null)}
-            />
-            <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 rounded-t-2xl p-4 z-50 max-w-md mx-auto shadow-2xl">
-              <div
-                className="w-12 h-1 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto mb-4 cursor-pointer"
-                onClick={() => setSelectedPunto(null)}
-              />
-
-              <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2">
-                {selectedPunto.nombre}
-              </h3>
-
-              <div className="space-y-2 mb-4">
-                <p className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-1">
-                  <UtensilsCrossed size={16} /> {getCategoriaLabel(selectedPunto.categoria)}
-                </p>
-                <p className="text-sm text-slate-600 dark:text-slate-300">
-                  📍 {selectedPunto.referencia}
-                </p>
-                <p className="text-sm text-slate-600 dark:text-slate-300">
-                  🚶 {selectedPunto.distancia_min} min
-                </p>
-                <p className="text-sm text-slate-600 dark:text-slate-300">
-                  ⏱️ Espera: {selectedPunto.espera_min} min
-                </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {formatUpdatedAt(selectedPunto.updatedAt)}
-                </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {getConfianzaLabel(getConfianza(selectedPunto.estado))}
-                </p>
-              </div>
-
-              <button
-                onClick={() => abrirMapa(selectedPunto)}
-                className="w-full bg-primary text-white py-3 rounded-xl font-bold mb-2 transition-transform active:scale-95 flex items-center justify-center gap-2"
-              >
-                <Map size={20} />
-                Iniciar ruta
-              </button>
-
-              <button
-                onClick={() => setSelectedPunto(null)}
-                className="w-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 py-3 rounded-xl font-bold transition-transform active:scale-95 flex items-center justify-center gap-2"
-              >
-                <X size={16} />
-                Cerrar
-              </button>
-            </div>
-          </>
-        )}
       </div>
     )
   }
@@ -313,62 +249,6 @@ const ServiciosComer = () => {
             </button>
           )}
         </div>
-
-        {selectedPunto && (
-          <>
-            <div
-              className="fixed inset-0 bg-black/50 z-40"
-              onClick={() => setSelectedPunto(null)}
-            />
-            <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 rounded-t-2xl p-4 z-50 max-w-md mx-auto shadow-2xl">
-              <div
-                className="w-12 h-1 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto mb-4 cursor-pointer"
-                onClick={() => setSelectedPunto(null)}
-              />
-
-              <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2">
-                {selectedPunto.nombre}
-              </h3>
-
-              <div className="space-y-2 mb-4">
-                <p className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-1">
-                  <UtensilsCrossed size={16} /> {getCategoriaLabel(selectedPunto.categoria)}
-                </p>
-                <p className="text-sm text-slate-600 dark:text-slate-300">
-                  📍 {selectedPunto.referencia}
-                </p>
-                <p className="text-sm text-slate-600 dark:text-slate-300">
-                  🚶 {selectedPunto.distancia_min} min
-                </p>
-                <p className="text-sm text-slate-600 dark:text-slate-300">
-                  ⏱️ Espera: {selectedPunto.espera_min} min
-                </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {formatUpdatedAt(selectedPunto.updatedAt)}
-                </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {getConfianzaLabel(getConfianza(selectedPunto.estado))}
-                </p>
-              </div>
-
-              <button
-                onClick={() => abrirMapa(selectedPunto)}
-                className="w-full bg-primary text-white py-3 rounded-xl font-bold mb-2 transition-transform active:scale-95 flex items-center justify-center gap-2"
-              >
-                <Map size={20} />
-                Iniciar ruta
-              </button>
-
-              <button
-                onClick={() => setSelectedPunto(null)}
-                className="w-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 py-3 rounded-xl font-bold transition-transform active:scale-95 flex items-center justify-center gap-2"
-              >
-                <X size={16} />
-                Cerrar
-              </button>
-            </div>
-          </>
-        )}
       </div>
     )
   }
@@ -389,7 +269,7 @@ const ServiciosComer = () => {
         {showMap ? (
           <div className="h-[60vh] min-h-[400px] rounded-xl overflow-hidden border border-slate-200 dark:border-slate-600">
             <Suspense fallback={<div className="flex items-center justify-center h-full text-slate-500">Cargando mapa...</div>}>
-              <GastronomyMap puntos={comidas} userLocation={null} />
+              <GastronomyMap puntos={comidas} userLocation={null} onSelect={setSelectedPunto} />
             </Suspense>
           </div>
         ) : (
@@ -436,61 +316,7 @@ const ServiciosComer = () => {
         )}
       </div>
 
-      {selectedPunto && (
-        <>
-          <div
-            className="fixed inset-0 bg-black/50 z-40"
-            onClick={() => setSelectedPunto(null)}
-          />
-          <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 rounded-t-2xl p-4 z-50 max-w-md mx-auto shadow-2xl">
-            <div
-              className="w-12 h-1 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto mb-4 cursor-pointer"
-              onClick={() => setSelectedPunto(null)}
-            />
-
-            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2">
-              {selectedPunto.nombre}
-            </h3>
-
-            <div className="space-y-2 mb-4">
-              <p className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-1">
-                <UtensilsCrossed size={16} /> {getCategoriaLabel(selectedPunto.categoria)}
-              </p>
-              <p className="text-sm text-slate-600 dark:text-slate-300">
-                📍 {selectedPunto.referencia}
-              </p>
-              <p className="text-sm text-slate-600 dark:text-slate-300">
-                🚶 {selectedPunto.distancia_min} min
-              </p>
-              <p className="text-sm text-slate-600 dark:text-slate-300">
-                ⏱️ Espera: {selectedPunto.espera_min} min
-              </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                {formatUpdatedAt(selectedPunto.updatedAt)}
-              </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                {getConfianzaLabel(getConfianza(selectedPunto.estado))}
-              </p>
-            </div>
-
-            <button
-              onClick={() => abrirMapa(selectedPunto)}
-              className="w-full bg-primary text-white py-3 rounded-xl font-bold mb-2 transition-transform active:scale-95 flex items-center justify-center gap-2"
-            >
-              <Map size={20} />
-              Iniciar ruta
-            </button>
-
-            <button
-              onClick={() => setSelectedPunto(null)}
-              className="w-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 py-3 rounded-xl font-bold transition-transform active:scale-95 flex items-center justify-center gap-2"
-            >
-              <X size={16} />
-              Cerrar
-            </button>
-          </div>
-        </>
-      )}
+      <PuntoDetallePanel punto={selectedPunto} onClose={() => setSelectedPunto(null)} />
     </div>
   )
 }
