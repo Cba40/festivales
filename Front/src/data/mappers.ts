@@ -21,6 +21,8 @@ export interface PuntoServicioMapa {
   y: number
   distancia: number
   referencia: string
+  lat: number
+  lng: number
   updatedAt: number
 }
 
@@ -154,6 +156,8 @@ export const mapZonesToServiciosMapa = (zones: Zone[]): PuntoServicioMapa[] => {
       y: z.y || 50,
       distancia: z.distancia_min || 5,
       referencia: z.referencia || '',
+      lat: z.lat || 0,
+      lng: z.lng || 0,
       updatedAt: Date.now()
     }))
 }
@@ -211,10 +215,19 @@ export const mapZonesToComida = (zones: Zone[]): PuntoComida[] => {
   return zones
     .filter(z => z.type === 'comida')
     .map(z => {
+      // Priorizar lat/lng directo (como todos los demás mappers),
+      // con fallback a coordinates si lat/lng no están disponibles
+      let lat: number = z.lat ?? 0
+      let lng: number = z.lng ?? 0
+
+      if (!lat && !lng && z.coordinates) {
+        const coords = parseCoords(z.coordinates)
+        const isLine = z.geometry_type === 'line' && Array.isArray(coords[0])
+        lat = isLine ? (coords as [number, number][])[0][0] : (coords as [number, number])[0]
+        lng = isLine ? (coords as [number, number][])[0][1] : (coords as [number, number])[1]
+      }
+
       const coords = parseCoords(z.coordinates)
-      const isLine = z.geometry_type === 'line' && Array.isArray(coords[0])
-      const lat = isLine ? (coords as [number, number][])[0][0] : (coords as [number, number])[0]
-      const lng = isLine ? (coords as [number, number][])[0][1] : (coords as [number, number])[1]
 
       return {
         id: z.id,

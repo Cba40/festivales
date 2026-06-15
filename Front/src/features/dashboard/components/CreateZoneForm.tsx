@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useZoneCreation } from '../hooks/useZoneCreation';
 import { ZONE_TYPES } from '../constants';
+import { AdminMapSelector } from '../../../components/AdminMapSelector';
 
 const dynamicFields: Record<string, { name: string; key: string; type: string; placeholder: string }[]> = {
   estacionamiento: [
@@ -145,6 +146,15 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
           />
         </div>
       </div>
+
+      <AdminMapSelector
+        lat={lat ? Number(lat) : undefined}
+        lng={lng ? Number(lng) : undefined}
+        onChangeLocation={(newLat, newLng) => {
+          setLat(String(newLat));
+          setLng(String(newLng));
+        }}
+      />
 
       {fields.map((f) => (
         <div key={f.key}>

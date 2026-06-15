@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useZoneConfigMutations } from '../hooks/useZoneConfigMutations';
 import type { Zone } from '../types';
 import { ZONE_TYPES } from '../constants';
+import { AdminMapSelector } from '../../../components/AdminMapSelector';
 
 interface Props {
   zone: Zone;
@@ -41,7 +42,7 @@ export function ZoneConfigModal({ zone, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
         <div className="px-6 py-4 border-b border-slate-200">
           <h2 className="text-lg font-semibold text-slate-800">Editar Zona</h2>
         </div>
@@ -101,6 +102,14 @@ export function ZoneConfigModal({ zone, onClose }: Props) {
               />
             </div>
           </div>
+          <AdminMapSelector
+            lat={lat ? Number(lat) : undefined}
+            lng={lng ? Number(lng) : undefined}
+            onChangeLocation={(newLat, newLng) => {
+              setLat(String(newLat));
+              setLng(String(newLng));
+            }}
+          />
           <div className="flex justify-end gap-3 pt-2">
             <button
               type="button"

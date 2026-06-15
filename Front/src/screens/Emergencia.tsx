@@ -1,9 +1,12 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/Header'
-import { Phone, MapPin, Navigation, Clock } from 'lucide-react'
+import { Phone, MapPin, Navigation, Clock, List, Info, Map } from 'lucide-react'
 import { useAppStore } from '@/core/state/store'
 import { mapZonesToEmergencia, type PuntoSeguro, type PuestoSanitario } from '@/data/mappers'
+import { InteractiveMap } from '@/components/InteractiveMap'
+import { getDistancias, haversine } from '@/utils/geo'
+import { useUserLocation } from '@/hooks/useUserLocation'
 
 type EmergencyType = 'nino-perdido' | 'persona-herida' | 'necesito-ayuda' | null
 type HelpSubType = 'seguridad' | 'salud' | 'orientacion' | null
@@ -20,8 +23,40 @@ const Emergencia = () => {
   const [inconsciente, setInconsciente] = useState(false)
   const [bottomSheet, setBottomSheet] = useState<BottomSheetData | null>(null)
   const [mostrarLlamar, setMostrarLlamar] = useState(false)
+  const [showMap, setShowMap] = useState(false)
+  const userLocation = useUserLocation()
 
   const { puntoSeguro, puestoSanitario, zonasReferencia } = useMemo(() => mapZonesToEmergencia(zones), [zones])
+
+  const todosPuntosEmergencia = useMemo(() => {
+    const puntos = zones
+      .filter((z) => z.type === 'emergencia')
+      .map((z) => ({
+        id: z.id,
+        nombre: z.name,
+        lat: z.lat ?? 0,
+        lng: z.lng ?? 0,
+        referencia: z.referencia ?? '',
+        direccion: z.direccion ?? '',
+        distancia_min: z.distancia_min ?? 5,
+        horario: z.horario ?? '24hs',
+        telefono: z.telefono ?? '',
+        servicios: z.servicios ?? ['Primeros auxilios'],
+        updatedAt: Date.now()
+      }))
+
+    if (userLocation) {
+      return [...puntos].sort((a, b) => {
+        if (a.lat && a.lng && b.lat && b.lng) {
+          const distA = haversine(userLocation[0], userLocation[1], a.lat, a.lng)
+          const distB = haversine(userLocation[0], userLocation[1], b.lat, b.lng)
+          return distA - distB
+        }
+        return 0
+      })
+    }
+    return puntos
+  }, [zones, userLocation])
 
   // Timeout: show call button after 5s of inactivity
   useEffect(() => {
@@ -43,93 +78,174 @@ const Emergencia = () => {
     window.open(`tel:${phone}`, '_self')
   }
 
-  // Bottom Sheet Renderer
-  if (bottomSheet) {
-    const isPuesto = bottomSheet.type === 'puesto-sanitario'
-    const item = isPuesto 
-      ? (bottomSheet.data as PuestoSanitario)
-      : (bottomSheet.data as PuntoSeguro)
-
-    return (
-      <>
-        {/* Backdrop */}
+  // Bottom Sheet Helper (Renderizado Inline en cada modo)
+  const renderBottomSheet = bottomSheet ? (
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-black/50 z-[9999]"
+        onClick={() => setBottomSheet(null)}
+      />
+      {/* Sheet */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 rounded-t-2xl p-4 z-[10000] max-w-md mx-auto shadow-2xl">
         <div
-          className="fixed inset-0 bg-black/50 z-40"
+          className="w-12 h-1 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto mb-4 cursor-pointer"
           onClick={() => setBottomSheet(null)}
         />
-        {/* Sheet */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 rounded-t-2xl p-4 z-50 max-w-md mx-auto shadow-2xl">
-          <div
-            className="w-12 h-1 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto mb-4 cursor-pointer"
-            onClick={() => setBottomSheet(null)}
-          />
 
-          <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-3">
-            {item.nombre}
-          </h3>
+        <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-3">
+          {bottomSheet.data.nombre}
+        </h3>
 
-          <div className="space-y-3 mb-6">
-            <div className="flex items-start gap-3">
-              <MapPin size={20} className="text-primary mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                  {item.direccion}
-                </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {item.referencia}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <Navigation size={20} className="text-primary flex-shrink-0" />
-              <p className="text-sm text-slate-700 dark:text-slate-300">
-                🚶 {item.distancia_min} min caminando
+        <div className="space-y-3 mb-6">
+          <div className="flex items-start gap-3">
+            <MapPin size={20} className="text-primary mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                {bottomSheet.data.direccion}
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {bottomSheet.data.referencia}
               </p>
             </div>
-
-            <div className="flex items-center gap-3">
-              <Clock size={20} className="text-primary flex-shrink-0" />
-              <p className="text-sm text-slate-700 dark:text-slate-300">
-                Horario: {item.horario}
-              </p>
-            </div>
-
-            {isPuesto && 'servicios' in item && (
-              <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
-                <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">
-                  Servicios:
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {(item as PuestoSanitario).servicios.map((s) => (
-                    <span
-                      key={s}
-                      className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full font-medium"
-                    >
-                      {s}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
 
-          <button
-            onClick={() => handleOpenMaps(item.lat, item.lng)}
-            className="w-full bg-primary text-white py-4 rounded-xl text-lg font-bold flex items-center justify-center gap-2 mb-3 active:scale-95 transition-transform"
-          >
-            <Navigation size={20} />
-            Iniciar ruta
-          </button>
+          {(() => {
+            const dist = getDistancias(bottomSheet.data.lat, bottomSheet.data.lng, userLocation, bottomSheet.data.distancia_min)
+            return (
+              <div className="space-y-1.5 pl-8">
+                <p className="text-sm text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                  🚶 <span>Caminando:</span> <span className="font-semibold text-slate-800 dark:text-slate-200">{dist.walking}</span>
+                </p>
+                <p className="text-sm text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                  🚗 <span>En auto:</span> <span className="font-semibold text-slate-800 dark:text-slate-200">{dist.driving}</span>
+                </p>
+              </div>
+            )
+          })()}
 
-          <button
-            onClick={() => setBottomSheet(null)}
-            className="w-full bg-white border-2 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 py-3 rounded-xl font-semibold active:scale-95 transition-transform"
-          >
-            Cerrar
-          </button>
+          <div className="flex items-center gap-3">
+            <Clock size={20} className="text-primary flex-shrink-0" />
+            <p className="text-sm text-slate-700 dark:text-slate-300">
+              Horario: {bottomSheet.data.horario}
+            </p>
+          </div>
+
+          {bottomSheet.type === 'puesto-sanitario' && 'servicios' in bottomSheet.data && (
+            <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
+              <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">
+                Servicios:
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {(bottomSheet.data as PuestoSanitario).servicios.map((s) => (
+                  <span
+                    key={s}
+                    className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full font-medium"
+                  >
+                    {s}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
-      </>
+
+        <button
+          onClick={() => handleOpenMaps(bottomSheet.data.lat, bottomSheet.data.lng)}
+          className="w-full bg-primary text-white py-4 rounded-xl text-lg font-bold flex items-center justify-center gap-2 mb-3 active:scale-95 transition-transform"
+        >
+          <Navigation size={20} />
+          Iniciar ruta
+        </button>
+
+        <button
+          onClick={() => setBottomSheet(null)}
+          className="w-full bg-white border-2 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 py-3 rounded-xl font-semibold active:scale-95 transition-transform"
+        >
+          Cerrar
+        </button>
+      </div>
+    </>
+  ) : null
+
+  // MAPA COMPLETO
+  if (showMap) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
+        <Header title="Puestos de Ayuda" showBack onBack={() => setShowMap(false)} />
+
+        <div className="flex-1 p-4 overflow-y-auto space-y-4">
+          <InteractiveMap
+            puntos={todosPuntosEmergencia
+              .filter(p => p.lat && p.lng)
+              .map(p => ({
+                id: p.id,
+                nombre: p.nombre,
+                lat: p.lat,
+                lng: p.lng,
+                referencia: p.referencia,
+                tipo: 'salud',
+                originalData: p
+              }))}
+            onSelectPunto={(p) => {
+              const item = p as any
+              setBottomSheet({
+                type: item.servicios ? 'puesto-sanitario' : 'punto-seguro',
+                data: item
+              })
+            }}
+            onUserLocationUpdate={() => {}}
+          />
+
+          {/* Lista de puestos de ayuda */}
+          <div className="space-y-2 pb-16">
+            <p className="text-xs font-bold text-slate-600 dark:text-slate-400 px-1 flex justify-between">
+              <span>📍 {todosPuntosEmergencia.length} puestos de ayuda disponibles</span>
+              {userLocation && <span className="text-blue-500 text-[10px] font-semibold">📡 Ubicación GPS activa</span>}
+            </p>
+            {todosPuntosEmergencia.map(p => {
+              const isSanitario = p.servicios && p.servicios.length > 0;
+              const dist = getDistancias(p.lat, p.lng, userLocation, p.distancia_min)
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => setBottomSheet({
+                    type: isSanitario ? 'puesto-sanitario' : 'punto-seguro',
+                    data: p
+                  })}
+                  className="w-full text-left bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 transition-colors group shadow-sm flex items-start gap-2"
+                >
+                  <span className="text-lg mt-0.5">{isSanitario ? '🏥' : '👮'}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm text-slate-800 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate">
+                      {p.nombre}
+                    </p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 flex flex-wrap gap-x-2 gap-y-0.5 items-center">
+                      <span>🚶 {dist.walking}</span>
+                      <span className="opacity-50">·</span>
+                      <span>🚗 {dist.driving}</span>
+                      <span className="opacity-50">·</span>
+                      <span className="truncate">{p.referencia}</span>
+                    </p>
+                  </div>
+                  <Info size={16} className="text-slate-400 flex-shrink-0" />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Botón flotante para alternar Mapa/Lista */}
+        <button
+          onClick={() => setShowMap(false)}
+          className="fixed bottom-4 right-4 bg-slate-900 text-white dark:bg-white dark:text-slate-900 py-3 px-4 rounded-full font-bold shadow-lg flex items-center gap-2 z-30 transition-transform active:scale-95 text-sm"
+        >
+          <List size={20} />
+          Ver lista
+        </button>
+
+        {renderBottomSheet}
+      </div>
     )
   }
 
@@ -158,9 +274,15 @@ const Emergencia = () => {
               Si no encontrás → Punto seguro
             </p>
             <p className="text-slate-600 dark:text-slate-400 text-sm">📍 {puntoSeguro.nombre}</p>
-            <p className="text-slate-600 dark:text-slate-400 text-sm">
-              🚶 {puntoSeguro.distancia_min} min caminando
-            </p>
+            {(() => {
+              const dist = getDistancias(puntoSeguro.lat, puntoSeguro.lng, userLocation, puntoSeguro.distancia_min)
+              return (
+                <p className="text-slate-600 dark:text-slate-400 text-sm flex gap-3">
+                  <span>🚶 {dist.walking}</span>
+                  <span>🚗 {dist.driving}</span>
+                </p>
+              )
+            })()}
             <p className="text-slate-400 dark:text-slate-500 text-xs mt-1">
               {puntoSeguro.referencia}
             </p>
@@ -195,6 +317,7 @@ const Emergencia = () => {
             🗺️ Ver punto seguro
           </button>
         </div>
+        {renderBottomSheet}
       </div>
     )
   }
@@ -244,9 +367,15 @@ const Emergencia = () => {
               Si puede moverse → Puesto sanitario
             </p>
             <p className="text-slate-600 dark:text-slate-400 text-sm">📍 {puestoSanitario.nombre}</p>
-            <p className="text-slate-600 dark:text-slate-400 text-sm">
-              🚶 {puestoSanitario.distancia_min} min caminando
-            </p>
+            {(() => {
+              const dist = getDistancias(puestoSanitario.lat, puestoSanitario.lng, userLocation, puestoSanitario.distancia_min)
+              return (
+                <p className="text-slate-600 dark:text-slate-400 text-sm flex gap-3">
+                  <span>🚶 {dist.walking}</span>
+                  <span>🚗 {dist.driving}</span>
+                </p>
+              )
+            })()}
             <p className="text-slate-400 dark:text-slate-500 text-xs mt-1">
               {puestoSanitario.referencia}
             </p>
@@ -281,6 +410,7 @@ const Emergencia = () => {
             🗺️ Ver puesto sanitario
           </button>
         </div>
+        {renderBottomSheet}
       </div>
     )
   }
@@ -336,9 +466,14 @@ const Emergencia = () => {
           {/* 2. DERIVACIÓN */}
           <div className="bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 p-4 rounded-xl">
             <p className="font-bold text-slate-800 dark:text-slate-200">Punto seguro más cercano</p>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-              {puntoSeguro.nombre} • {puntoSeguro.distancia_min} min
-            </p>
+            {(() => {
+              const dist = getDistancias(puntoSeguro.lat, puntoSeguro.lng, userLocation, puntoSeguro.distancia_min)
+              return (
+                <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                  {puntoSeguro.nombre} · 🚶 {dist.walking} · 🚗 {dist.driving}
+                </p>
+              )
+            })()}
           </div>
 
           {/* Timeout button */}
@@ -369,6 +504,7 @@ const Emergencia = () => {
             📞 Llamar asistencia
           </button>
         </div>
+        {renderBottomSheet}
       </div>
     )
   }
@@ -388,9 +524,16 @@ const Emergencia = () => {
           {/* 2. DERIVACIÓN */}
           <div className="bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 p-4 rounded-xl">
             <p className="font-bold text-slate-800 dark:text-slate-200">{puestoSanitario.nombre}</p>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-              🚶 {puestoSanitario.distancia_min} min • {puestoSanitario.referencia}
-            </p>
+            {(() => {
+              const dist = getDistancias(puestoSanitario.lat, puestoSanitario.lng, userLocation, puestoSanitario.distancia_min)
+              return (
+                <p className="text-sm text-slate-600 dark:text-slate-400 mt-1 flex gap-3">
+                  <span>🚶 {dist.walking}</span>
+                  <span>🚗 {dist.driving}</span>
+                  <span>{puestoSanitario.referencia}</span>
+                </p>
+              )
+            })()}
           </div>
 
           {/* Timeout button */}
@@ -414,6 +557,7 @@ const Emergencia = () => {
             🗺️ Ver ruta
           </button>
         </div>
+        {renderBottomSheet}
       </div>
     )
   }
@@ -457,6 +601,7 @@ const Emergencia = () => {
             🗺️ Ver en mapa
           </button>
         </div>
+        {renderBottomSheet}
       </div>
     )
   }
@@ -492,6 +637,17 @@ const Emergencia = () => {
           🆘 Necesito ayuda
         </button>
       </div>
+
+      {/* Botón flotante para alternar Mapa/Lista */}
+      <button
+        onClick={() => setShowMap(true)}
+        className="fixed bottom-4 right-4 bg-slate-900 text-white dark:bg-white dark:text-slate-900 py-3 px-4 rounded-full font-bold shadow-lg flex items-center gap-2 z-30 transition-transform active:scale-95 text-sm"
+      >
+        <Map size={20} />
+        Ver mapa completo
+      </button>
+
+      {renderBottomSheet}
     </div>
   )
 }

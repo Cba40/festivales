@@ -47,8 +47,23 @@ export const useAppStore = create<AppState>((set) => ({
     set({ auth: { token: null, isAuthenticated: false }, zones: [], incidents: [] });
   },
 
-  // Inicializar vacío — los datos se cargan desde API vía hooks
-  zones: [],
+  // Inicializar con un baño random por defecto para pruebas de mapa offline
+  zones: [
+    {
+      id: 'svc-b-random',
+      name: 'Baño Random de Prueba',
+      type: 'servicios',
+      subtipo: 'banos',
+      lat: -30.976,
+      lng: -64.090,
+      referencia: 'Al lado del escenario principal',
+      distancia_min: 3,
+      capacity: 10,
+      availableCapacity: 10,
+      saturation: 'bajo',
+      status: 'activa'
+    }
+  ],
   incidents: [],
 
   // Zone mutations

@@ -153,8 +153,8 @@ const GastronomyMap = ({ puntos, userLocation }: Props) => {
         const gmapsUrl = dest ? `https://www.google.com/maps/dir/?api=1&destination=${dest[0]},${dest[1]}` : '#'
         return (
           <>
-            <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setSelectedPunto(null)} />
-            <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 rounded-t-2xl p-4 z-50 max-w-md mx-auto shadow-2xl">
+            <div className="fixed inset-0 bg-black/50 z-[9999]" onClick={() => setSelectedPunto(null)} />
+            <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 rounded-t-2xl p-4 z-[10000] max-w-md mx-auto shadow-2xl">
               <div
                 className="w-12 h-1 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto mb-4 cursor-pointer"
                 onClick={() => setSelectedPunto(null)}

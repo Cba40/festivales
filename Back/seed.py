@@ -13,13 +13,13 @@ EVENT_SLUG = "festival-jesus-maria-2026"
 EVENT_DATA = {
     "name": "Festival de Jesús María 2026",
     "description": (
-        "El Festival de Jesús María es una de las celebraciones más "
-        "emblemáticas del Perú, combinando tradición, música y cultura "
-        "en un entorno único."
+        "El Festival Nacional de Doma y Folklore de Jesús María es una "
+        "de las celebraciones populares más importantes de Argentina y América Latina, "
+        "combinando destreza gaucha, música folklórica y tradición."
     ),
-    "location": "Jesús María, Lima, Perú",
-    "start_date": "2026-07-15T00:00:00-05:00",
-    "end_date": "2026-07-25T23:59:00-05:00",
+    "location": "Jesús María, Córdoba, Argentina",
+    "start_date": "2026-07-15T00:00:00-03:00",
+    "end_date": "2026-07-25T23:59:00-03:00",
 }
 
 ZONES_DATA = [
@@ -245,6 +245,46 @@ ZONES_DATA = [
         "subtipo": "hospedaje",
         "telefono": "+543511234571",
         "disponibilidad": 5,
+    },
+    {
+        "name": "Baños Sector Escenario",
+        "type": "servicios",
+        "capacity": 30,
+        "latitude": -30.976500,
+        "longitude": -64.093200,
+        "subtipo": "banos",
+        "x": 45,
+        "y": 45,
+    },
+    {
+        "name": "Punto de Hidratación Campo",
+        "type": "servicios",
+        "capacity": 15,
+        "latitude": -30.974800,
+        "longitude": -64.091200,
+        "subtipo": "hidratacion",
+        "x": 38,
+        "y": 32,
+    },
+    {
+        "name": "Puesto Sanitario Norte",
+        "type": "servicios",
+        "capacity": 20,
+        "latitude": -30.971500,
+        "longitude": -64.089200,
+        "subtipo": "salud",
+        "x": 20,
+        "y": 15,
+    },
+    {
+        "name": "Espacio de Descanso Preferencial",
+        "type": "servicios",
+        "capacity": 40,
+        "latitude": -30.979200,
+        "longitude": -64.096500,
+        "subtipo": "descanso",
+        "x": 55,
+        "y": 70,
     },
 ]
 
