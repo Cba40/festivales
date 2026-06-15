@@ -174,7 +174,7 @@ const GastronomyMap = ({ puntos, userLocation }: Props) => {
                 <p className="text-sm text-slate-600 dark:text-slate-300">
                   🚶 {selectedPunto.distancia_min} min · ⏱️ {selectedPunto.espera_min} min
                 </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-slate-500 dark:text-slate-300">
                   {new Date(selectedPunto.updatedAt).toLocaleString()}
                 </p>
               </div>

@@ -1,5 +1,6 @@
-import { MapPin, ArrowLeft, Home } from 'lucide-react';
+import { MapPin, ArrowLeft, Home, Sun, Moon } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useThemeStore } from '@/core/state/store';
 
 interface HeaderProps {
   title: string;
@@ -13,6 +14,7 @@ export const Header = ({ title, showBack, onBack, onHome, ubicacion }: HeaderPro
   const navigate = useNavigate();
   const location = useLocation();
   const isHome = location.pathname === '/';
+  const { isDark, toggle } = useThemeStore();
 
   return (
     <header className="bg-primary text-white px-4 py-4 shadow-lg">
@@ -42,7 +44,14 @@ export const Header = ({ title, showBack, onBack, onHome, ubicacion }: HeaderPro
           )}
         </div>
 
-        <div className="flex items-center justify-end w-10">
+        <div className="flex items-center justify-end gap-1">
+          <button
+            onClick={toggle}
+            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+            aria-label={isDark ? 'Modo claro' : 'Modo oscuro'}
+          >
+            {isDark ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
           {!isHome && (
             <button
               onClick={() => {

@@ -25,7 +25,7 @@ const AsistenteScreen = () => {
           <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-2">
             Asistente rápido
           </h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-sm text-gray-600 dark:text-gray-300">
             Próximamente podrás hacer preguntas rápidas sobre el evento
           </p>
         </div>
@@ -42,7 +42,7 @@ const AsistenteScreen = () => {
                   key={chip.label}
                   className="w-full flex items-center gap-3 bg-white dark:bg-slate-800 px-4 py-3 rounded-xl shadow-md text-left opacity-60 cursor-not-allowed"
                 >
-                  <Icon size={18} className="text-slate-400 dark:text-slate-500" />
+                  <Icon size={18} className="text-slate-400 dark:text-slate-400" />
                   <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
                     {chip.label}
                   </span>

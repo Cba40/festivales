@@ -72,7 +72,7 @@ export const SimpleMap = ({ puntos, onSelectPunto }: SimpleMapProps) => {
 
       {/* Lista de puntos para referencia rápida */}
       <div className="space-y-2">
-        <p className="text-xs font-bold text-slate-600 dark:text-slate-400 px-1">
+        <p className="text-xs font-bold text-slate-600 dark:text-slate-300 px-1">
           📍 {puntos.length} puntos disponibles
         </p>
         {puntos.map(punto => (
@@ -87,7 +87,7 @@ export const SimpleMap = ({ puntos, onSelectPunto }: SimpleMapProps) => {
                 <p className="font-semibold text-sm text-slate-800 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400">
                   {punto.nombre}
                 </p>
-                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
                   🚶 {punto.distancia} min
                 </p>
               </div>

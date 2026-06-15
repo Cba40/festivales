@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { useAppStore } from './core/state/store';
 import Home from './screens/Home';
 import Estacionar from './screens/Estacionar';
 import Emergencia from './screens/Emergencia';
@@ -24,8 +25,32 @@ function AppLayout() {
   const location = useLocation();
   const isDashboard = location.pathname.startsWith('/dashboard');
   const { refresh } = useDashboardSync();
+  const setUserLocation = useAppStore(s => s.setUserLocation);
 
   useEffect(() => { refresh(); }, [refresh]);
+
+  useEffect(() => {
+    const id = setInterval(refresh, 30000);
+    const onVisibility = () => { if (document.visibilityState === 'visible') refresh(); };
+    const onFocus = () => refresh();
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [refresh]);
+
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    const id = navigator.geolocation.watchPosition(
+      (pos) => setUserLocation([pos.coords.latitude, pos.coords.longitude]),
+      (err) => console.warn('[GPS] Error:', err.message),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
+    );
+    return () => navigator.geolocation.clearWatch(id);
+  }, [setUserLocation]);
 
   if (isDashboard) {
     return (

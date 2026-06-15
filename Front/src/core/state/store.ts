@@ -5,6 +5,26 @@ import type { Zone, Incident } from '@/features/dashboard/types';
 // STORE GLOBAL — Zustand
 // ============================================
 
+function getInitialTheme(): boolean {
+  const stored = localStorage.getItem('theme');
+  if (stored) return stored === 'dark';
+  return window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+export const useThemeStore = create<{
+  isDark: boolean;
+  toggle: () => void;
+}>((set) => ({
+  isDark: getInitialTheme(),
+  toggle: () =>
+    set((state) => {
+      const next = !state.isDark;
+      localStorage.setItem('theme', next ? 'dark' : 'light');
+      document.documentElement.classList.toggle('dark', next);
+      return { isDark: next };
+    }),
+}));
+
 interface AppState {
   // Auth
   auth: { token: string | null; isAuthenticated: boolean };
@@ -12,6 +32,9 @@ interface AppState {
   // Data
   zones: Zone[];
   incidents: Incident[];
+
+  // User location (GPS)
+  userLocation: [number, number] | null;
 
   // Actions — Auth
   login: (token: string) => void;
@@ -28,6 +51,9 @@ interface AppState {
   setIncidents: (incidents: Incident[]) => void;
   addIncident: (incident: Incident) => void;
   updateIncident: (id: string, updates: Partial<Incident>) => void;
+
+  // Actions — Location
+  setUserLocation: (loc: [number, number] | null) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -46,6 +72,9 @@ export const useAppStore = create<AppState>((set) => ({
     localStorage.removeItem('auth_token');
     set({ auth: { token: null, isAuthenticated: false }, zones: [], incidents: [] });
   },
+
+  // User location
+  userLocation: null,
 
   // Inicializar con un baño random por defecto para pruebas de mapa offline
   zones: [
@@ -92,6 +121,9 @@ export const useAppStore = create<AppState>((set) => ({
         z.id === id ? { ...z, ...updates } : z
       ),
     })),
+
+  // Location mutations
+  setUserLocation: (loc) => set({ userLocation: loc }),
 
   // Incident mutations
   setIncidents: (incidents) => set({ incidents }),

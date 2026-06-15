@@ -6,7 +6,6 @@ import { useAppStore } from '@/core/state/store'
 import { mapZonesToEmergencia, type PuntoSeguro, type PuestoSanitario } from '@/data/mappers'
 import { InteractiveMap } from '@/components/InteractiveMap'
 import { getDistancias, haversine } from '@/utils/geo'
-import { useUserLocation } from '@/hooks/useUserLocation'
 
 type EmergencyType = 'nino-perdido' | 'persona-herida' | 'necesito-ayuda' | null
 type HelpSubType = 'seguridad' | 'salud' | 'orientacion' | null
@@ -24,7 +23,7 @@ const Emergencia = () => {
   const [bottomSheet, setBottomSheet] = useState<BottomSheetData | null>(null)
   const [mostrarLlamar, setMostrarLlamar] = useState(false)
   const [showMap, setShowMap] = useState(false)
-  const userLocation = useUserLocation()
+  const userLocation = useAppStore(s => s.userLocation)
 
   const { puntoSeguro, puestoSanitario, zonasReferencia } = useMemo(() => mapZonesToEmergencia(zones), [zones])
 
@@ -104,7 +103,7 @@ const Emergencia = () => {
               <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
                 {bottomSheet.data.direccion}
               </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-xs text-slate-500 dark:text-slate-300">
                 {bottomSheet.data.referencia}
               </p>
             </div>
@@ -133,7 +132,7 @@ const Emergencia = () => {
 
           {bottomSheet.type === 'puesto-sanitario' && 'servicios' in bottomSheet.data && (
             <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
-              <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">
+              <p className="text-xs font-semibold text-slate-600 dark:text-slate-300 mb-2">
                 Servicios:
               </p>
               <div className="flex flex-wrap gap-2">
@@ -199,7 +198,7 @@ const Emergencia = () => {
 
           {/* Lista de puestos de ayuda */}
           <div className="space-y-2 pb-16">
-            <p className="text-xs font-bold text-slate-600 dark:text-slate-400 px-1 flex justify-between">
+            <p className="text-xs font-bold text-slate-600 dark:text-slate-300 px-1 flex justify-between">
               <span>📍 {todosPuntosEmergencia.length} puestos de ayuda disponibles</span>
               {userLocation && <span className="text-blue-500 text-[10px] font-semibold">📡 Ubicación GPS activa</span>}
             </p>
@@ -220,7 +219,7 @@ const Emergencia = () => {
                     <p className="font-semibold text-sm text-slate-800 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate">
                       {p.nombre}
                     </p>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 flex flex-wrap gap-x-2 gap-y-0.5 items-center">
+                    <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 flex flex-wrap gap-x-2 gap-y-0.5 items-center">
                       <span>🚶 {dist.walking}</span>
                       <span className="opacity-50">·</span>
                       <span>🚗 {dist.driving}</span>
@@ -273,17 +272,17 @@ const Emergencia = () => {
             <p className="text-slate-800 dark:text-slate-200 font-bold mb-2">
               Si no encontrás → Punto seguro
             </p>
-            <p className="text-slate-600 dark:text-slate-400 text-sm">📍 {puntoSeguro.nombre}</p>
+            <p className="text-slate-600 dark:text-slate-300 text-sm">📍 {puntoSeguro.nombre}</p>
             {(() => {
               const dist = getDistancias(puntoSeguro.lat, puntoSeguro.lng, userLocation, puntoSeguro.distancia_min)
               return (
-                <p className="text-slate-600 dark:text-slate-400 text-sm flex gap-3">
+                <p className="text-slate-600 dark:text-slate-300 text-sm flex gap-3">
                   <span>🚶 {dist.walking}</span>
                   <span>🚗 {dist.driving}</span>
                 </p>
               )
             })()}
-            <p className="text-slate-400 dark:text-slate-500 text-xs mt-1">
+            <p className="text-slate-400 dark:text-slate-400 text-xs mt-1">
               {puntoSeguro.referencia}
             </p>
           </div>
@@ -366,17 +365,17 @@ const Emergencia = () => {
             <p className="text-slate-800 dark:text-slate-200 font-bold mb-2">
               Si puede moverse → Puesto sanitario
             </p>
-            <p className="text-slate-600 dark:text-slate-400 text-sm">📍 {puestoSanitario.nombre}</p>
+            <p className="text-slate-600 dark:text-slate-300 text-sm">📍 {puestoSanitario.nombre}</p>
             {(() => {
               const dist = getDistancias(puestoSanitario.lat, puestoSanitario.lng, userLocation, puestoSanitario.distancia_min)
               return (
-                <p className="text-slate-600 dark:text-slate-400 text-sm flex gap-3">
+                <p className="text-slate-600 dark:text-slate-300 text-sm flex gap-3">
                   <span>🚶 {dist.walking}</span>
                   <span>🚗 {dist.driving}</span>
                 </p>
               )
             })()}
-            <p className="text-slate-400 dark:text-slate-500 text-xs mt-1">
+            <p className="text-slate-400 dark:text-slate-400 text-xs mt-1">
               {puestoSanitario.referencia}
             </p>
           </div>
@@ -469,7 +468,7 @@ const Emergencia = () => {
             {(() => {
               const dist = getDistancias(puntoSeguro.lat, puntoSeguro.lng, userLocation, puntoSeguro.distancia_min)
               return (
-                <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">
                   {puntoSeguro.nombre} · 🚶 {dist.walking} · 🚗 {dist.driving}
                 </p>
               )
@@ -527,7 +526,7 @@ const Emergencia = () => {
             {(() => {
               const dist = getDistancias(puestoSanitario.lat, puestoSanitario.lng, userLocation, puestoSanitario.distancia_min)
               return (
-                <p className="text-sm text-slate-600 dark:text-slate-400 mt-1 flex gap-3">
+                <p className="text-sm text-slate-600 dark:text-slate-300 mt-1 flex gap-3">
                   <span>🚶 {dist.walking}</span>
                   <span>🚗 {dist.driving}</span>
                   <span>{puestoSanitario.referencia}</span>
@@ -572,10 +571,10 @@ const Emergencia = () => {
           {/* 1. INFO DE UBICACIÓN */}
           <div className="bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 p-6 rounded-xl text-center">
             <p className="text-lg font-bold text-slate-800 dark:text-slate-200">📍 Estás en: {zonasReferencia.nombre}</p>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mt-3">
+            <p className="text-sm text-slate-600 dark:text-slate-300 mt-3">
               🚪 Salida más cercana: {zonasReferencia.salidaCercana} ({zonasReferencia.distanciaSalida} min)
             </p>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">
+            <p className="text-sm text-slate-600 dark:text-slate-300 mt-2">
               🌳 Zona tranquila: {zonasReferencia.zonaTranquila} ({zonasReferencia.distanciaTranquila} min)
             </p>
           </div>

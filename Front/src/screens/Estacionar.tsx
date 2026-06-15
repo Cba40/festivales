@@ -16,7 +16,6 @@ import { getEventoConfig } from '@/config/eventoConfig'
 import { getUmbralContexto } from '@/utils/decisionEngine'
 import { getHoraEvento } from '@/utils/contextoEvento'
 import { getDistancias, haversine } from '@/utils/geo'
-import { useUserLocation } from '@/hooks/useUserLocation'
 
 const Estacionar = () => {
   const navigate = useNavigate()
@@ -24,7 +23,7 @@ const Estacionar = () => {
   const [selectedZona, setSelectedZona] = useState<ZonaEstacionamiento | null>(null)
   const [mostrarOpciones, setMostrarOpciones] = useState(false)
   const [showMap, setShowMap] = useState(false)
-  const userLocation = useUserLocation()
+  const userLocation = useAppStore(s => s.userLocation)
 
   const zonasMock = useMemo(() => {
     const mapped = mapZonesToEstacionamiento(zones)
@@ -83,9 +82,9 @@ const Estacionar = () => {
       case 'alto':
         return 'bg-danger/20 text-danger'
       case 'colapsado':
-        return 'bg-gray-500/20 text-gray-500'
+        return 'bg-gray-500/20 text-gray-500 dark:text-gray-300'
       default:
-        return 'bg-gray-500/20 text-gray-500'
+        return 'bg-gray-500/20 text-gray-500 dark:text-gray-300'
     }
   }
 
@@ -124,7 +123,7 @@ const Estacionar = () => {
 
           {/* Lista de estacionamientos */}
           <div className="space-y-2 pb-16">
-            <p className="text-xs font-bold text-slate-600 dark:text-slate-400 px-1 flex justify-between">
+            <p className="text-xs font-bold text-slate-600 dark:text-slate-300 px-1 flex justify-between">
               <span>📍 {zonasOrdenadas.length} zonas disponibles</span>
               {userLocation && <span className="text-blue-500 text-[10px] font-semibold">📡 Ubicación GPS activa</span>}
             </p>
@@ -146,7 +145,7 @@ const Estacionar = () => {
                         {getEstadoLabel(zona.estado)}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 flex flex-wrap gap-x-2 gap-y-0.5 items-center">
+                    <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 flex flex-wrap gap-x-2 gap-y-0.5 items-center">
                       <span>🚶 {dist.walking}</span>
                       <span className="opacity-50">·</span>
                       <span>🚗 {dist.driving}</span>
@@ -209,10 +208,10 @@ const Estacionar = () => {
                 <p className="text-sm text-slate-600 dark:text-slate-300">
                   📊 Disponibilidad: {selectedZona.disponibilidad}%
                 </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-slate-500 dark:text-slate-300">
                   {formatUpdatedAt(selectedZona.updatedAt)}
                 </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-slate-500 dark:text-slate-300">
                   {getConfianzaLabel(getConfianza(selectedZona.estado))}
                 </p>
               </div>
@@ -261,11 +260,11 @@ const Estacionar = () => {
           </div>
 
           <div className="mt-4 text-center space-y-2">
-            <p className="text-xs text-slate-400 dark:text-slate-500">
+            <p className="text-xs text-slate-400 dark:text-slate-400">
               No hay opciones recomendadas en este momento
             </p>
             <button
-              className="text-xs underline text-slate-500 dark:text-slate-400"
+              className="text-xs underline text-slate-500 dark:text-slate-300"
               onClick={() => setMostrarOpciones(true)}
             >
               Ver opciones igualmente
@@ -289,7 +288,7 @@ const Estacionar = () => {
                   <span className={`ml-2 px-2 py-1 rounded text-xs font-bold ${getEstadoStyles(zona.estado)}`}>
                     {getEstadoLabel(zona.estado)}
                   </span>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex flex-wrap gap-x-2">
+                  <p className="text-xs text-gray-500 dark:text-gray-300 mt-1 flex flex-wrap gap-x-2">
                     <span>🚶 {dist.walking}</span>
                     <span>🚗 {dist.driving}</span>
                     <span>📊 {zona.disponibilidad}%</span>
@@ -343,10 +342,10 @@ const Estacionar = () => {
                 <p className="text-sm text-slate-600 dark:text-slate-300">
                   📊 Disponibilidad: {selectedZona.disponibilidad}%
                 </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-slate-500 dark:text-slate-300">
                   {formatUpdatedAt(selectedZona.updatedAt)}
                 </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-slate-500 dark:text-slate-300">
                   {getConfianzaLabel(getConfianza(selectedZona.estado))}
                 </p>
               </div>
@@ -436,7 +435,7 @@ const Estacionar = () => {
             </button>
           )}
 
-          <p className="text-xs text-slate-400 dark:text-slate-500 text-center">
+          <p className="text-xs text-slate-400 dark:text-slate-400 text-center">
             {getConfianzaLabel(getConfianza(principal?.estado || 'medio'))}
           </p>
 
@@ -493,10 +492,10 @@ const Estacionar = () => {
                 <p className="text-sm text-slate-600 dark:text-slate-300">
                   📊 Disponibilidad: {selectedZona.disponibilidad}%
                 </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-slate-500 dark:text-slate-300">
                   {formatUpdatedAt(selectedZona.updatedAt)}
                 </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-slate-500 dark:text-slate-300">
                   {getConfianzaLabel(getConfianza(selectedZona.estado))}
                 </p>
               </div>
@@ -552,10 +551,10 @@ const Estacionar = () => {
                     </p>
                   )
                 })()}
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                <p className="text-xs text-slate-500 dark:text-slate-300 mt-2">
                   {formatUpdatedAt(principal.updatedAt)}
                 </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                <p className="text-xs text-slate-500 dark:text-slate-300 mt-1">
                   {getConfianzaLabel(getConfianza(principal.estado))}
                 </p>
               </div>
@@ -641,10 +640,10 @@ const Estacionar = () => {
               <p className="text-sm text-slate-600 dark:text-slate-300">
                 📊 Disponibilidad: {selectedZona.disponibilidad}%
               </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-xs text-slate-500 dark:text-slate-300">
                 {formatUpdatedAt(selectedZona.updatedAt)}
               </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-xs text-slate-500 dark:text-slate-300">
                 {getConfianzaLabel(getConfianza(selectedZona.estado))}
               </p>
             </div>
@@ -681,7 +680,7 @@ const Estacionar = () => {
           <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4">
             Zonas disponibles
           </h2>
-          <div className="text-xs text-gray-500 mt-2 mb-4">
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 mb-4">
             🟢 Bajo: rápido · 🟡 Medio: demora moderada · 🔴 Alto: mucha demora
           </div>
           <div className="space-y-3">
@@ -711,10 +710,10 @@ const Estacionar = () => {
                   <span>🚗 {dist.driving}</span>
                   <span>📊 {zona.disponibilidad}% disp.</span>
                 </p>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                <p className="text-xs text-gray-400 dark:text-gray-300 mt-1">
                   {formatUpdatedAt(zona.updatedAt)}
                 </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                <p className="text-xs text-slate-500 dark:text-slate-300 mt-1">
                   {getConfianzaLabel(getConfianza(zona.estado))}
                 </p>
               </button>
@@ -776,10 +775,10 @@ const Estacionar = () => {
               <p className="text-sm text-slate-600 dark:text-slate-300">
                 📊 Disponibilidad: {selectedZona.disponibilidad}%
               </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-xs text-slate-500 dark:text-slate-300">
                 {formatUpdatedAt(selectedZona.updatedAt)}
               </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-xs text-slate-500 dark:text-slate-300">
                 {getConfianzaLabel(getConfianza(selectedZona.estado))}
               </p>
             </div>

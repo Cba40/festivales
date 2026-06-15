@@ -9,12 +9,11 @@ import { eventoData } from '@/data/eventoData'
 import { formatUpdatedAt } from '@/utils/formatTime'
 import { InteractiveMap } from '@/components/InteractiveMap'
 import { getDistancias, haversine } from '@/utils/geo'
-import { useUserLocation } from '@/hooks/useUserLocation'
 
 const Pernoctar = () => {
   const navigate = useNavigate()
   const zones = useAppStore(s => s.zones)
-  const userLocation = useUserLocation()
+  const userLocation = useAppStore(s => s.userLocation)
   const pernoctar: PuntoPernoctar[] = useMemo(() => {
     const mapped = mapZonesToPernoctar(zones)
     return mapped.length > 0 ? mapped : eventoData.pernoctar
@@ -82,7 +81,7 @@ const Pernoctar = () => {
 
           {/* Lista de alojamientos */}
           <div className="space-y-2 pb-16">
-            <p className="text-xs font-bold text-slate-600 dark:text-slate-400 px-1 flex justify-between">
+            <p className="text-xs font-bold text-slate-600 dark:text-slate-300 px-1 flex justify-between">
               <span>📍 {puntos.length} alojamientos disponibles</span>
               {userLocation && <span className="text-blue-500 text-[10px] font-semibold">📡 Ubicación GPS activa</span>}
             </p>
@@ -99,7 +98,7 @@ const Pernoctar = () => {
                     <p className="font-semibold text-sm text-slate-800 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate">
                       {p.nombre}
                     </p>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 flex flex-wrap gap-x-2 gap-y-0.5 items-center">
+                    <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 flex flex-wrap gap-x-2 gap-y-0.5 items-center">
                       <span>🚶 {dist.walking}</span>
                       <span className="opacity-50">·</span>
                       <span>🚗 {dist.driving}</span>
@@ -116,20 +115,22 @@ const Pernoctar = () => {
       ) : (
         <div className="flex-1 p-4 space-y-3 overflow-y-auto pb-20">
           {/* Microcopy informativo */}
-          <p className="text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center gap-2">
+          <p className="text-xs text-slate-500 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center gap-2">
             <Info size={14} /> Los alojamientos pueden variar su disponibilidad durante el evento
           </p>
 
-          {mostrados.map(p => (
+          {mostrados.map(p => {
+            const dist = getDistancias(p.lat, p.lng, userLocation, p.distancia_min)
+            return (
             <div key={p.id} className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-md space-y-2">
               <div className="flex justify-between items-start">
                 <div>
                   <p className="font-bold text-slate-800 dark:text-slate-100">{p.nombre}</p>
-                  <div className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+                  <div className="text-sm font-semibold text-slate-500 dark:text-slate-300">
                     {(p.categoria ?? '').toUpperCase()}
                   </div>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
-                    · {p.referencia}
+                  <p className="text-sm text-slate-500 dark:text-slate-300">
+                    {p.referencia}
                   </p>
                 </div>
                 <span className={`px-2 py-1 rounded text-xs font-bold ${getDispBadge(p.disponibilidad)}`}>
@@ -138,12 +139,12 @@ const Pernoctar = () => {
               </div>
 
               <p className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-1">
-                <Clock size={14} /> {p.distancia_min} min
+                <Clock size={14} /> {dist.walking} · 🚗 {dist.driving}
               </p>
-              <p className="text-xs text-slate-400 dark:text-slate-500">
+              <p className="text-xs text-slate-400 dark:text-slate-300">
                 {formatUpdatedAt(p.updatedAt)}
               </p>
-              <p className="text-xs text-gray-500 flex items-center gap-1">
+              <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
                 <Info size={12} /> Confirmar disponibilidad por teléfono antes de ir
               </p>
 
@@ -151,7 +152,7 @@ const Pernoctar = () => {
                 {p.telefono && (
                   <a
                     href={`tel:${p.telefono}`}
-                    className="flex-1 flex items-center justify-center gap-1 bg-success/10 hover:bg-success/20 text-success py-2 rounded-xl font-bold text-sm transition-colors"
+                    className="flex-1 flex items-center justify-center gap-1 bg-success/15 dark:bg-success/25 hover:bg-success/25 dark:hover:bg-success/35 text-success font-bold py-2 rounded-xl text-sm transition-colors"
                   >
                     <Phone size={16} /> Llamar
                   </a>
@@ -159,16 +160,16 @@ const Pernoctar = () => {
 
                 <button
                   onClick={() => handleMaps(p.lat, p.lng)}
-                  className="flex-1 flex items-center justify-center gap-1 bg-primary/10 hover:bg-primary/20 text-primary py-2 rounded-xl font-bold text-sm transition-colors"
+                  className="flex-1 flex items-center justify-center gap-1 bg-primary text-white hover:bg-primary/90 py-2 rounded-xl font-bold text-sm transition-colors shadow-lg shadow-primary/25"
                 >
                   <Map size={16} /> Ir ahora
                 </button>
               </div>
             </div>
-          ))}
+            )})}
 
           {puntos.length === 0 && (
-            <div className="text-center text-slate-500 dark:text-slate-400 py-8">
+            <div className="text-center text-slate-500 dark:text-slate-300 py-8">
               No hay alojamientos registrados
             </div>
           )}
@@ -215,7 +216,7 @@ const Pernoctar = () => {
               <div className="flex justify-between items-start">
                 <div>
                   <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">{selectedPunto.nombre}</h3>
-                  <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">{(selectedPunto.categoria ?? '').toUpperCase()}</p>
+                  <p className="text-sm font-semibold text-slate-500 dark:text-slate-300">{(selectedPunto.categoria ?? '').toUpperCase()}</p>
                 </div>
                 <span className={`px-2 py-1 rounded text-[10px] font-bold ${getDispBadge(selectedPunto.disponibilidad)}`}>
                   {getDispText(selectedPunto.disponibilidad)}
@@ -231,7 +232,7 @@ const Pernoctar = () => {
                   </div>
                 )
               })()}
-              <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">
+              <p className="text-xs text-slate-400 dark:text-slate-400 mt-2">
                 {formatUpdatedAt(selectedPunto.updatedAt)}
               </p>
             </div>
@@ -240,7 +241,7 @@ const Pernoctar = () => {
               {selectedPunto.telefono && (
                 <a
                   href={`tel:${selectedPunto.telefono}`}
-                  className="flex-1 flex items-center justify-center gap-1 bg-success/10 hover:bg-success/20 text-success py-2.5 rounded-xl font-bold text-sm transition-colors"
+                  className="flex-1 flex items-center justify-center gap-1 bg-success/15 dark:bg-success/25 hover:bg-success/25 dark:hover:bg-success/35 text-success font-bold py-2.5 rounded-xl text-sm transition-colors"
                 >
                   <Phone size={16} /> Llamar
                 </a>
@@ -248,7 +249,7 @@ const Pernoctar = () => {
 
               <button
                 onClick={() => handleMaps(selectedPunto.lat, selectedPunto.lng)}
-                className="flex-1 flex items-center justify-center gap-1 bg-primary/10 hover:bg-primary/20 text-primary py-2.5 rounded-xl font-bold text-sm transition-colors"
+                className="flex-1 flex items-center justify-center gap-1 bg-primary text-white hover:bg-primary/90 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-lg shadow-primary/25"
               >
                 <Map size={16} /> Ir ahora
               </button>

@@ -75,7 +75,7 @@ export const AdminMapSelector = ({ lat, lng, onChangeLocation }: AdminMapSelecto
 
   return (
     <div className="space-y-2">
-      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+      <p className="text-xs text-slate-500 dark:text-slate-300 font-medium">
         📍 Hacé click en cualquier lugar del mapa o arrastrá el marcador para fijar las coordenadas exactas:
       </p>
       

@@ -140,7 +140,7 @@ export const mapZonesToParadas = (zones: Zone[]): CorredorGastronomico[] => {
       distancia: z.distancia_min || 5,
       x: z.x || 50,
       y: z.y || 50,
-      referencia: z.referencia || '',
+      referencia: z.referencia || z.name || '',
       updatedAt: Date.now()
     }))
 }
@@ -155,7 +155,7 @@ export const mapZonesToServiciosMapa = (zones: Zone[]): PuntoServicioMapa[] => {
       x: z.x || 50,
       y: z.y || 50,
       distancia: z.distancia_min || 5,
-      referencia: z.referencia || '',
+      referencia: z.referencia || z.name || '',
       lat: z.lat || 0,
       lng: z.lng || 0,
       updatedAt: Date.now()
@@ -171,7 +171,7 @@ export const mapZonesToEstacionamiento = (zones: Zone[]): ZonaEstacionamiento[] 
       distancia_min: z.distancia_min || 5,
       disponibilidad: satToDisp[z.saturation] ?? 50,
       estado: z.saturation,
-      referencia: z.referencia || '',
+      referencia: z.referencia || z.name || '',
       lat: z.lat || 0,
       lng: z.lng || 0,
       updatedAt: Date.now()
@@ -190,7 +190,7 @@ export const mapZonesToSalidas = (zones: Zone[]): ZonaSalida[] => {
       distancia_min: z.distancia_min || 5,
       espera_min: z.espera_min || 5,
       disponibilidad: satToDisp[z.saturation] ?? 50,
-      referencia: z.referencia || '',
+      referencia: z.referencia || z.name || '',
       lat: z.lat || 0,
       lng: z.lng || 0,
       capacidad_estimada: z.capacidad_estimada,
@@ -238,7 +238,7 @@ export const mapZonesToComida = (zones: Zone[]): PuntoComida[] => {
         espera_min: z.espera_min || 5,
         estado: z.saturation,
         disponibilidad: satToDisp[z.saturation] ?? 50,
-        referencia: z.referencia || '',
+        referencia: z.referencia || z.name || '',
         lat,
         lng,
         geometryType: (z.geometry_type === 'line' ? 'line' : 'point') as 'point' | 'line',
@@ -257,7 +257,7 @@ export const mapZonesToServicios = (zones: Zone[]): PuntoServicio[] => {
       tipo: 'servicio' as const,
       subtipo: (z.subtipo || 'descanso') as PuntoServicio['subtipo'],
       distancia_min: z.distancia_min || 5,
-      referencia: z.referencia || '',
+      referencia: z.referencia || z.name || '',
       lat: z.lat || 0,
       lng: z.lng || 0,
       updatedAt: Date.now()
@@ -276,7 +276,7 @@ export const mapZonesToPernoctar = (zones: Zone[]): PuntoPernoctar[] => {
       disponibilidad: (z.saturation === 'bajo' ? 'disponible' : z.saturation === 'medio' ? 'consultar' : 'completo') as PuntoPernoctar['disponibilidad'],
       telefono: z.telefono || '',
       web: z.web || '',
-      referencia: z.referencia || '',
+      referencia: z.referencia || z.name || '',
       lat: z.lat || 0,
       lng: z.lng || 0,
       updatedAt: Date.now()
@@ -294,7 +294,7 @@ export const mapZonesToEmergencia = (zones: Zone[]): { puntoSeguro: PuntoSeguro;
       lat: first?.lat || 0,
       lng: first?.lng || 0,
       direccion: first?.direccion || '',
-      referencia: first?.referencia || '',
+      referencia: first?.referencia || first?.name || '',
       distancia_min: first?.distancia_min || 5,
       horario: first?.horario || '24hs',
       telefono: first?.telefono || '',
@@ -306,7 +306,7 @@ export const mapZonesToEmergencia = (zones: Zone[]): { puntoSeguro: PuntoSeguro;
       lat: first?.lat || 0,
       lng: first?.lng || 0,
       direccion: first?.direccion || '',
-      referencia: first?.referencia || '',
+      referencia: first?.referencia || first?.name || '',
       distancia_min: first?.distancia_min || 5,
       horario: first?.horario || '24hs',
       telefono: first?.telefono || '',

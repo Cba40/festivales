@@ -50,7 +50,7 @@ const Servicios = () => {
                   <p className="font-bold text-slate-800 dark:text-slate-100">
                     {item.label}
                   </p>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                  <p className="text-sm text-slate-500 dark:text-slate-300">
                     {item.description}
                   </p>
                 </div>

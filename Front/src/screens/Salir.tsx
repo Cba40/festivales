@@ -19,7 +19,6 @@ import {
   type ExitSessionState
 } from '@/utils/exitSessionController'
 import { getDistancias, haversine } from '@/utils/geo'
-import { useUserLocation } from '@/hooks/useUserLocation'
 
 type TipoTransporte = 'auto' | 'transporte' | 'peatonal'
 
@@ -29,7 +28,7 @@ const Salir = () => {
   const [tipo, setTipo] = useState<TipoTransporte>('auto')
   const [selectedZona, setSelectedZona] = useState<ZonaSalida | null>(null)
   const [showMap, setShowMap] = useState(false)
-  const userLocation = useUserLocation()
+  const userLocation = useAppStore(s => s.userLocation)
 
   const zonasMock = useMemo(() => mapZonesToSalidas(zones), [zones])
 
@@ -148,8 +147,8 @@ const Salir = () => {
       case 'bajo': return 'bg-success/20 text-success'
       case 'medio': return 'bg-warning/20 text-warning'
       case 'alto': return 'bg-danger/20 text-danger'
-      case 'colapsado': return 'bg-gray-500/20 text-gray-500'
-      default: return 'bg-gray-500/20 text-gray-500'
+      case 'colapsado': return 'bg-gray-500/20 text-gray-500 dark:text-gray-300'
+      default: return 'bg-gray-500/20 text-gray-500 dark:text-gray-300'
     }
   }
 
@@ -165,7 +164,7 @@ const Salir = () => {
 
   const salirDescription = (
     <div className="bg-white dark:bg-slate-800 px-4 py-3 shadow-sm z-10 relative">
-      <p className="text-sm text-slate-600 dark:text-slate-400 text-center font-medium">
+      <p className="text-sm text-slate-600 dark:text-slate-300 text-center font-medium">
         ℹ️ Te mostramos la forma más rápida de salir según el flujo actual
       </p>
     </div>
@@ -210,7 +209,7 @@ const Salir = () => {
 
           {/* Lista de salidas */}
           <div className="space-y-2 pb-16">
-            <p className="text-xs font-bold text-slate-600 dark:text-slate-400 px-1 flex justify-between">
+            <p className="text-xs font-bold text-slate-600 dark:text-slate-300 px-1 flex justify-between">
               <span>📍 {salidasModo.length} salidas disponibles ({tipo === 'auto' ? 'Auto' : tipo === 'transporte' ? 'Transporte' : 'Caminando'})</span>
               {userLocation && <span className="text-blue-500 text-[10px] font-semibold">📡 Ubicación GPS activa</span>}
             </p>
@@ -234,7 +233,7 @@ const Salir = () => {
                         {getEstadoLabel(zona.estado)}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 flex flex-wrap gap-x-2 gap-y-0.5 items-center">
+                    <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 flex flex-wrap gap-x-2 gap-y-0.5 items-center">
                       <span>🚶 {dist.walking}</span>
                       <span className="opacity-50">·</span>
                       <span>🚗 {dist.driving}</span>
@@ -298,10 +297,10 @@ const Salir = () => {
                     </>
                   )
                 })()}
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-slate-500 dark:text-slate-300">
                   {formatUpdatedAt(selectedZona.updatedAt)}
                 </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-slate-500 dark:text-slate-300">
                   {getConfianzaLabel(getConfianza(selectedZona.estado))}
                 </p>
               </div>
@@ -375,7 +374,7 @@ const Salir = () => {
                     </p>
                   )
                 })()}
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">{getEstadoLabel(principal.estado)}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-300 mt-2">{getEstadoLabel(principal.estado)}</p>
               </div>
             </button>
           )}
@@ -433,10 +432,10 @@ const Salir = () => {
                     </>
                   )
                 })()}
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-slate-500 dark:text-slate-300">
                   {formatUpdatedAt(selectedZona.updatedAt)}
                 </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-slate-500 dark:text-slate-300">
                   {getConfianzaLabel(getConfianza(selectedZona.estado))}
                 </p>
               </div>
@@ -541,7 +540,7 @@ const Salir = () => {
             </button>
           )}
 
-          <p className="text-xs text-slate-400 dark:text-slate-500 text-center">
+          <p className="text-xs text-slate-400 dark:text-slate-400 text-center">
             {getConfianzaLabel(getConfianza(principal?.estado || 'medio'))}
           </p>
 
@@ -583,8 +582,8 @@ const Salir = () => {
                   </>
                 )
               })()}
-              <p className="text-xs text-slate-500 dark:text-slate-400">{formatUpdatedAt(selectedZona.updatedAt)}</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">{getConfianzaLabel(getConfianza(selectedZona.estado))}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-300">{formatUpdatedAt(selectedZona.updatedAt)}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-300">{getConfianzaLabel(getConfianza(selectedZona.estado))}</p>
             </div>
             <button onClick={() => abrirMapa(selectedZona)} className="w-full bg-primary text-white py-3 rounded-xl font-bold mb-2 flex items-center justify-center gap-2"><Map size={20} /> Iniciar ruta</button>
             <button onClick={() => setSelectedZona(null)} className="w-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 py-3 rounded-xl font-bold flex items-center justify-center gap-2"><X size={16} /> Cerrar</button>
@@ -641,9 +640,9 @@ const Salir = () => {
                     </p>
                   )
                 })()}
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">Menor tiempo total de salida</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">{formatUpdatedAt(principal.updatedAt)}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{getConfianzaLabel(getConfianza(principal.estado))}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-300 mt-2">Menor tiempo total de salida</p>
+                <p className="text-xs text-slate-500 dark:text-slate-300 mt-2">{formatUpdatedAt(principal.updatedAt)}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-300 mt-1">{getConfianzaLabel(getConfianza(principal.estado))}</p>
               </div>
             </button>
           )}
@@ -703,8 +702,8 @@ const Salir = () => {
                   </>
                 )
               })()}
-              <p className="text-xs text-slate-500 dark:text-slate-400">{formatUpdatedAt(selectedZona.updatedAt)}</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">{getConfianzaLabel(getConfianza(selectedZona.estado))}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-300">{formatUpdatedAt(selectedZona.updatedAt)}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-300">{getConfianzaLabel(getConfianza(selectedZona.estado))}</p>
             </div>
             <button onClick={() => abrirMapa(selectedZona)} className="w-full bg-primary text-white py-3 rounded-xl font-bold mb-2 flex items-center justify-center gap-2"><Map size={20} /> Iniciar ruta</button>
             <button onClick={() => setSelectedZona(null)} className="w-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 py-3 rounded-xl font-bold flex items-center justify-center gap-2"><X size={16} /> Cerrar</button>
@@ -747,7 +746,7 @@ const Salir = () => {
           <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4">
             Salidas disponibles
           </h2>
-          <div className="text-xs text-gray-500 mt-2 mb-4">
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 mb-4">
             🟢 Bajo: rápido · 🟡 Medio: demora moderada · 🔴 Alto: mucha demora
           </div>
           <div className="space-y-3">
@@ -766,8 +765,8 @@ const Salir = () => {
                   <span>🚗 {dist.driving}</span>
                   {zona.espera_min > 0 && <span>⏱️ {zona.espera_min} min espera</span>}
                 </p>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{formatUpdatedAt(zona.updatedAt)}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{getConfianzaLabel(getConfianza(zona.estado))}</p>
+                <p className="text-xs text-gray-400 dark:text-gray-300 mt-1">{formatUpdatedAt(zona.updatedAt)}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-300 mt-1">{getConfianzaLabel(getConfianza(zona.estado))}</p>
               </button>
               )
             })}
@@ -809,8 +808,8 @@ const Salir = () => {
                   </>
                 )
               })()}
-              <p className="text-xs text-slate-500 dark:text-slate-400">{formatUpdatedAt(selectedZona.updatedAt)}</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">{getConfianzaLabel(getConfianza(selectedZona.estado))}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-300">{formatUpdatedAt(selectedZona.updatedAt)}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-300">{getConfianzaLabel(getConfianza(selectedZona.estado))}</p>
             </div>
             <button onClick={() => abrirMapa(selectedZona)} className="w-full bg-primary text-white py-3 rounded-xl font-bold mb-2 flex items-center justify-center gap-2"><Map size={20} /> Iniciar ruta</button>
             <button onClick={() => setSelectedZona(null)} className="w-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 py-3 rounded-xl font-bold flex items-center justify-center gap-2"><X size={16} /> Cerrar</button>

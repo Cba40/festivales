@@ -130,7 +130,7 @@ const ServiciosGenerales = () => {
 
         {/* Lista de referencia rápida para el usuario */}
         <div className="space-y-2 pb-6">
-          <p className="text-xs font-bold text-slate-600 dark:text-slate-400 px-1 flex justify-between">
+          <p className="text-xs font-bold text-slate-600 dark:text-slate-300 px-1 flex justify-between">
             <span>📍 {puntosOrdenados.length} puntos disponibles</span>
             {userLocation && <span className="text-blue-500 text-[10px] font-semibold">📡 Ubicación GPS activa</span>}
           </p>
@@ -147,7 +147,7 @@ const ServiciosGenerales = () => {
                   <p className="font-semibold text-sm text-slate-800 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400">
                     {punto.nombre}
                   </p>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 flex flex-wrap gap-x-2 gap-y-0.5 items-center">
+                  <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 flex flex-wrap gap-x-2 gap-y-0.5 items-center">
                     <span>🚶 {dist.walking}</span>
                     <span className="opacity-50">·</span>
                     <span>🚗 {dist.driving}</span>
@@ -160,7 +160,7 @@ const ServiciosGenerales = () => {
             )
           })}
           {puntosOrdenados.length === 0 && (
-            <p className="text-sm text-slate-500 italic text-center py-4">
+            <p className="text-sm text-slate-500 dark:text-slate-400 italic text-center py-4">
               No hay puntos cargados de este servicio actualmente.
             </p>
           )}
@@ -182,7 +182,7 @@ const ServiciosGenerales = () => {
                   <p>📍 {selected.referencia}</p>
                   <p className="flex items-center gap-1.5">🚶 <span>Tiempo caminando:</span> <span className="font-semibold text-slate-800 dark:text-slate-100">{dist.walking}</span></p>
                   <p className="flex items-center gap-1.5">🚗 <span>Tiempo en auto:</span> <span className="font-semibold text-slate-800 dark:text-slate-100">{dist.driving}</span></p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-100 dark:border-slate-700/50 mt-2">
+                  <p className="text-xs text-slate-500 dark:text-slate-300 pt-1 border-t border-slate-100 dark:border-slate-700/50 mt-2">
                     Actualizado: {formatUpdatedAt(selected.updatedAt)}
                   </p>
                 </div>

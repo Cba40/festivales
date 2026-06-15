@@ -43,7 +43,7 @@ const ResolverAhora = () => {
 
         <div className="flex-1 p-4 space-y-4">
           {/* 1. CONTEXTO (arriba, pequeño) */}
-          <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
+          <div className="flex justify-between text-xs text-slate-500 dark:text-slate-300">
             <span>📍 {inferencia.contexto.zona}</span>
             <span>🕒 {inferencia.contexto.hora}</span>
             <span className={saturacionColor}>
@@ -106,7 +106,7 @@ const ResolverAhora = () => {
           )}
 
           {/* 6. ESTADO / CONFIANZA */}
-          <p className="text-xs text-slate-400 dark:text-slate-500 text-center">
+          <p className="text-xs text-slate-400 dark:text-slate-400 text-center">
             {inferencia.confianza === 'alta' ? '✅' : '⚠️'} Estimación en tiempo real
           </p>
         </div>
@@ -153,7 +153,7 @@ const ResolverAhora = () => {
                   </p>
                 )}
                 {'timestamp' in selectedZona && (
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                  <p className="text-xs text-slate-500 dark:text-slate-300">
                     🕒 {selectedZona.timestamp}
                   </p>
                 )}
@@ -188,7 +188,7 @@ const ResolverAhora = () => {
 
       <div className="flex-1 p-4 space-y-4">
         {/* 1. CONTEXTO */}
-        <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
+        <div className="flex justify-between text-xs text-slate-500 dark:text-slate-300">
           <span>📍 {inferencia.contexto.zona}</span>
           <span>🕒 {inferencia.contexto.hora}</span>
           <span className={saturacionColor}>
@@ -201,7 +201,7 @@ const ResolverAhora = () => {
           <p className="text-slate-600 dark:text-slate-300 text-sm">
             No puedo determinar exactamente qué necesitás ahora
           </p>
-          <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">
+          <p className="text-slate-500 dark:text-slate-300 text-xs mt-1">
             Elegí una acción:
           </p>
         </div>

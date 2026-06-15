@@ -13,7 +13,6 @@ import { getConfianza, getConfianzaLabel } from '@/utils/confianza'
 import { formatUpdatedAt } from '@/utils/formatTime'
 import type { Zone } from '@/features/dashboard/types'
 import { getDistancias, haversine } from '@/utils/geo'
-import { useUserLocation } from '@/hooks/useUserLocation'
 
 const mapZoneToParada = (zones: Zone[]): ParadaTransporte[] =>
   zones
@@ -36,7 +35,7 @@ const ServiciosTransporte = () => {
   const zones = useAppStore((s) => s.zones)
   const [selectedParada, setSelectedParada] = useState<ParadaTransporte | null>(null)
   const [showMap, setShowMap] = useState(false)
-  const userLocation = useUserLocation()
+  const userLocation = useAppStore(s => s.userLocation)
 
   const paradasTransporte = useMemo(() => mapZoneToParada(zones), [zones])
   const paradasOrdenadas = useMemo(() => {
@@ -77,9 +76,9 @@ const ServiciosTransporte = () => {
       case 'alto':
         return 'bg-danger/20 text-danger'
       case 'colapsado':
-        return 'bg-gray-500/20 text-gray-500'
+        return 'bg-gray-500/20 text-gray-500 dark:text-gray-300'
       default:
-        return 'bg-gray-500/20 text-gray-500'
+        return 'bg-gray-500/20 text-gray-500 dark:text-gray-300'
     }
   }
 
@@ -117,7 +116,7 @@ const ServiciosTransporte = () => {
 
           {/* Lista de paradas de transporte */}
           <div className="space-y-2 pb-16">
-            <p className="text-xs font-bold text-slate-600 dark:text-slate-400 px-1 flex justify-between">
+            <p className="text-xs font-bold text-slate-600 dark:text-slate-300 px-1 flex justify-between">
               <span>📍 {paradasOrdenadas.length} paradas de transporte disponibles</span>
               {userLocation && <span className="text-blue-500 text-[10px] font-semibold">📡 Ubicación GPS activa</span>}
             </p>
@@ -139,7 +138,7 @@ const ServiciosTransporte = () => {
                         {getEstadoLabel(parada.estado)}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 flex flex-wrap gap-x-2 gap-y-0.5 items-center">
+                    <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 flex flex-wrap gap-x-2 gap-y-0.5 items-center">
                       <span>🚶 {dist.walking}</span>
                       <span className="opacity-50">·</span>
                       <span>🚗 {dist.driving}</span>
@@ -207,10 +206,10 @@ const ServiciosTransporte = () => {
                     🧭 {selectedParada.calle}
                   </p>
                 )}
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-slate-500 dark:text-slate-300">
                   {formatUpdatedAt(selectedParada.updatedAt)}
                 </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-slate-500 dark:text-slate-300">
                   {getConfianzaLabel(getConfianza(selectedParada.estado))}
                 </p>
               </div>
@@ -309,10 +308,10 @@ const ServiciosTransporte = () => {
                     🧭 {selectedParada.calle}
                   </p>
                 )}
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-slate-500 dark:text-slate-300">
                   {formatUpdatedAt(selectedParada.updatedAt)}
                 </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-slate-500 dark:text-slate-300">
                   {getConfianzaLabel(getConfianza(selectedParada.estado))}
                 </p>
               </div>
@@ -380,7 +379,7 @@ const ServiciosTransporte = () => {
           )}
 
           {principal && (
-            <p className="text-xs text-slate-500 dark:text-slate-400 -mt-2 text-center">
+            <p className="text-xs text-slate-500 dark:text-slate-300 -mt-2 text-center">
               {formatUpdatedAt(principal.updatedAt)}
             </p>
           )}
@@ -413,13 +412,13 @@ const ServiciosTransporte = () => {
           )}
 
           {!alternativa && (
-            <p className="text-sm text-slate-500 mt-2">
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
               ℹ️ Es la única opción disponible en este momento
             </p>
           )}
 
           {/* Confianza */}
-          <p className="text-xs text-slate-400 dark:text-slate-500 text-center">
+          <p className="text-xs text-slate-400 dark:text-slate-400 text-center">
             {getConfianzaLabel(getConfianza(principal?.estado || 'medio'))}
           </p>
 
@@ -482,10 +481,10 @@ const ServiciosTransporte = () => {
                   🧭 {selectedParada.calle}
                 </p>
               )}
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-xs text-slate-500 dark:text-slate-300">
                 {formatUpdatedAt(selectedParada.updatedAt)}
               </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-xs text-slate-500 dark:text-slate-300">
                 {getConfianzaLabel(getConfianza(selectedParada.estado))}
               </p>
             </div>
@@ -542,13 +541,13 @@ const ServiciosTransporte = () => {
                     </p>
                   )
                 })()}
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                <p className="text-xs text-slate-500 dark:text-slate-300 mt-2">
                   Menor espera + cercanía
                 </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                <p className="text-xs text-slate-500 dark:text-slate-300 mt-2">
                   {formatUpdatedAt(principal.updatedAt)}
                 </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                <p className="text-xs text-slate-500 dark:text-slate-300 mt-1">
                   {getConfianzaLabel(getConfianza(principal.estado))}
                 </p>
               </div>
@@ -578,7 +577,7 @@ const ServiciosTransporte = () => {
                     </p>
                   )
                 })()}
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                <p className="text-xs text-slate-500 dark:text-slate-300 mt-2">
                   {formatUpdatedAt(alternativa.updatedAt)}
                 </p>
               </div>
@@ -642,10 +641,10 @@ const ServiciosTransporte = () => {
               <p className="text-sm text-slate-600 dark:text-slate-300">
                 🧭 {selectedParada.calle}
               </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-xs text-slate-500 dark:text-slate-300">
                 {formatUpdatedAt(selectedParada.updatedAt)}
               </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-xs text-slate-500 dark:text-slate-300">
                 {getConfianzaLabel(getConfianza(selectedParada.estado))}
               </p>
             </div>
@@ -682,7 +681,7 @@ const ServiciosTransporte = () => {
           <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4">
             Paradas disponibles
           </h2>
-          <div className="text-xs text-gray-500 mt-2 mb-4">
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 mb-4">
             🟢 Bajo: rápido · 🟡 Medio: demora moderada · 🔴 Alto: mucha demora
           </div>
           <div className="space-y-3">
@@ -713,10 +712,10 @@ const ServiciosTransporte = () => {
                     <span>🚗 {dist.driving}</span>
                     <span>⏱️ {parada.espera_min} min espera</span>
                   </p>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                  <p className="text-xs text-gray-400 dark:text-gray-300 mt-1">
                     {formatUpdatedAt(parada.updatedAt)}
                   </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  <p className="text-xs text-slate-500 dark:text-slate-300 mt-1">
                     {getConfianzaLabel(getConfianza(parada.estado))}
                   </p>
                 </button>
@@ -782,10 +781,10 @@ const ServiciosTransporte = () => {
               <p className="text-sm text-slate-600 dark:text-slate-300">
                 🧭 {selectedParada.calle}
               </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-xs text-slate-500 dark:text-slate-300">
                 {formatUpdatedAt(selectedParada.updatedAt)}
               </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-xs text-slate-500 dark:text-slate-300">
                 {getConfianzaLabel(getConfianza(selectedParada.estado))}
               </p>
             </div>

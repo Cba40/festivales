@@ -18,7 +18,7 @@ const GastronomiaExpanded = () => {
       case 'baja': return 'bg-success/20 text-success'
       case 'media': return 'bg-warning/20 text-warning'
       case 'alta': return 'bg-danger/20 text-danger'
-      default: return 'bg-gray-500/20 text-gray-500'
+      default: return 'bg-gray-500/20 text-gray-500 dark:text-gray-300'
     }
   }
 
@@ -106,8 +106,8 @@ const GastronomiaExpanded = () => {
 
         {/* Leyenda */}
         <div className="bg-white dark:bg-slate-800 rounded-xl p-3 shadow-md">
-          <p className="text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">Leyenda:</p>
-          <div className="space-y-1 text-xs text-slate-600 dark:text-slate-400">
+          <p className="text-xs font-bold text-slate-600 dark:text-slate-300 mb-2">Leyenda:</p>
+          <div className="space-y-1 text-xs text-slate-600 dark:text-slate-300">
             <p className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-success" /> Baja saturación — Fácil encontrar lugar</p>
             <p className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-warning" /> Media saturación — Moderadamente disponible</p>
             <p className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-danger" /> Alta saturación — Muy concurrido</p>
@@ -116,7 +116,7 @@ const GastronomiaExpanded = () => {
 
         {/* Lista de corredores */}
         <div className="space-y-2">
-          <p className="text-xs font-bold text-slate-600 dark:text-slate-400 px-1">
+          <p className="text-xs font-bold text-slate-600 dark:text-slate-300 px-1">
             {corredores.length} zonas disponibles
           </p>
           {corredores.map(corredor => (
@@ -134,10 +134,10 @@ const GastronomiaExpanded = () => {
                   <p className="font-semibold text-sm text-slate-800 dark:text-slate-100 group-hover:text-primary dark:group-hover:text-primary">
                     {corredor.nombre}
                   </p>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 flex items-center gap-1">
+                  <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 flex items-center gap-1">
                     <UtensilsCrossed size={12} /> {getTipoLabel(corredor.tipo)}
                   </p>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 flex items-center gap-1">
+                  <p className="text-xs text-slate-600 dark:text-slate-300 flex items-center gap-1">
                     <Clock size={12} /> {corredor.distancia} min
                   </p>
                 </div>
@@ -180,7 +180,7 @@ const GastronomiaExpanded = () => {
               <div className={`text-sm font-semibold p-2 rounded ${getSaturacionColor(selectedCorredor.saturacion)}`}>
                 {getSaturacionLabel(selectedCorredor.saturacion)}
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+              <p className="text-xs text-slate-500 dark:text-slate-300 mt-2">
                 {formatUpdatedAt(selectedCorredor.updatedAt)}
               </p>
             </div>

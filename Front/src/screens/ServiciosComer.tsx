@@ -13,15 +13,14 @@ import { getConfianza, getConfianzaLabel } from '@/utils/confianza'
 import { formatUpdatedAt } from '@/utils/formatTime'
 import type { PuntoComida } from '@/data/mappers'
 import { getDistancias, haversine } from '@/utils/geo'
-import { useUserLocation } from '@/hooks/useUserLocation'
 
 const getEstadoStyles = (estado: string) => {
   switch (estado) {
     case 'bajo': return 'bg-success/20 text-success'
     case 'medio': return 'bg-warning/20 text-warning'
     case 'alto': return 'bg-danger/20 text-danger'
-    case 'colapsado': return 'bg-gray-500/20 text-gray-500'
-    default: return 'bg-gray-500/20 text-gray-500'
+    case 'colapsado': return 'bg-gray-500/20 text-gray-500 dark:text-gray-300'
+    default: return 'bg-gray-500/20 text-gray-500 dark:text-gray-300'
   }
 }
 
@@ -41,7 +40,7 @@ const ServiciosComer = () => {
   const [selectedPunto, setSelectedPunto] = useState<PuntoComida | null>(null)
   const [mostrarOpciones, setMostrarOpciones] = useState(false)
   const [showMap, setShowMap] = useState(false)
-  const userLocation = useUserLocation()
+  const userLocation = useAppStore(s => s.userLocation)
 
   const comidas = useMemo(() => mapZonesToComida(zones), [zones])
 
@@ -108,10 +107,10 @@ const ServiciosComer = () => {
           <p className="text-sm text-slate-600 dark:text-slate-300">
             ⏱️ Espera: {selectedPunto.espera_min} min
           </p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs text-slate-500 dark:text-slate-300">
             {formatUpdatedAt(selectedPunto.updatedAt)}
           </p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs text-slate-500 dark:text-slate-300">
             {getConfianzaLabel(getConfianza(selectedPunto.estado))}
           </p>
         </div>
@@ -171,7 +170,7 @@ const ServiciosComer = () => {
 
           {/* Lista debajo del mapa */}
           <div className="space-y-2 pb-20">
-            <p className="text-xs font-bold text-slate-600 dark:text-slate-400 px-1 flex justify-between">
+            <p className="text-xs font-bold text-slate-600 dark:text-slate-300 px-1 flex justify-between">
               <span>🍔 {comidasOrdenadas.length} zonas gastronómicas</span>
               {userLocation && <span className="text-blue-500 text-[10px] font-semibold">📡 Ubicación GPS activa</span>}
             </p>
@@ -193,7 +192,7 @@ const ServiciosComer = () => {
                         {getEstadoLabel(punto.estado)}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 flex flex-wrap gap-x-2 gap-y-0.5 items-center">
+                    <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 flex flex-wrap gap-x-2 gap-y-0.5 items-center">
                       <span>🚶 {dist.walking}</span>
                       <span className="opacity-50">·</span>
                       <span>🚗 {dist.driving}</span>
@@ -236,11 +235,11 @@ const ServiciosComer = () => {
           </div>
 
           <div className="mt-4 text-center space-y-2">
-            <p className="text-xs text-slate-400 dark:text-slate-500">
+            <p className="text-xs text-slate-400 dark:text-slate-400">
               No hay opciones recomendadas en este momento
             </p>
             <button
-              className="text-xs underline text-slate-500 dark:text-slate-400"
+              className="text-xs underline text-slate-500 dark:text-slate-300"
               onClick={() => setMostrarOpciones(true)}
             >
               Ver opciones igualmente
@@ -264,7 +263,7 @@ const ServiciosComer = () => {
                     <span className={`ml-2 px-2 py-1 rounded text-xs font-bold ${getEstadoStyles(punto.estado)}`}>
                       {getEstadoLabel(punto.estado)}
                     </span>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex flex-wrap gap-x-2">
+                    <p className="text-xs text-gray-500 dark:text-gray-300 mt-1 flex flex-wrap gap-x-2">
                       <span>🚶 {dist.walking}</span>
                       <span>🚗 {dist.driving}</span>
                       <span>⏱️ {punto.espera_min} min</span>
@@ -330,7 +329,7 @@ const ServiciosComer = () => {
             )
           })()}
 
-          <p className="text-xs text-slate-400 dark:text-slate-500 text-center">
+          <p className="text-xs text-slate-400 dark:text-slate-400 text-center">
             {getConfianzaLabel(getConfianza(principal?.estado || 'medio'))}
           </p>
 
@@ -370,8 +369,8 @@ const ServiciosComer = () => {
                     <span>🚗 {dist.driving}</span>
                     <span>⏱️ {principal.espera_min} min</span>
                   </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">{formatUpdatedAt(principal.updatedAt)}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{getConfianzaLabel(getConfianza(principal.estado))}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-300 mt-2">{formatUpdatedAt(principal.updatedAt)}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-300 mt-1">{getConfianzaLabel(getConfianza(principal.estado))}</p>
                 </div>
               </button>
             )
@@ -421,7 +420,7 @@ const ServiciosComer = () => {
           <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4">
             Zonas gastronómicas disponibles
           </h2>
-          <div className="text-xs text-gray-500 mt-2 mb-4">
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 mb-4">
             🟢 Bajo: rápido · 🟡 Medio: demora moderada · 🔴 Alto: mucha demora
           </div>
           {userLocation && (
@@ -448,8 +447,8 @@ const ServiciosComer = () => {
                     <span>🚗 {dist.driving}</span>
                     <span>⏱️ {punto.espera_min} min espera</span>
                   </p>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{formatUpdatedAt(punto.updatedAt)}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{getConfianzaLabel(getConfianza(punto.estado))}</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-300 mt-1">{formatUpdatedAt(punto.updatedAt)}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-300 mt-1">{getConfianzaLabel(getConfianza(punto.estado))}</p>
                 </button>
               )
             })}

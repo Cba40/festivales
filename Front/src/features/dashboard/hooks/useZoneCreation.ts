@@ -76,18 +76,6 @@ export function useZoneCreation(eventId: string = DEFAULT_EVENT_ID) {
         lat: res.data.latitude ?? undefined,
         lng: res.data.longitude ?? undefined,
       });
-      removeZone(optimisticZone.id);
-      addZone({
-        id: res.data.id,
-        name: res.data.name,
-        type: res.data.type,
-        saturation: res.data.saturation as Zone['saturation'],
-        status: res.data.status as Zone['status'],
-        capacity: res.data.capacity,
-        availableCapacity: res.data.available_capacity,
-        lat: res.data.latitude ?? undefined,
-        lng: res.data.longitude ?? undefined,
-      });
     } catch (err) {
       removeZone(optimisticZone.id);
       const msg =

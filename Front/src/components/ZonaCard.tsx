@@ -57,7 +57,7 @@ export const ZonaCard = ({
             {nombre}
           </h3>
           {ubicacion && (
-            <div className="flex items-center gap-1 text-xs text-slate-500 font-medium">
+            <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 font-medium">
               <MapPin size={12} />
               {ubicacion}
             </div>

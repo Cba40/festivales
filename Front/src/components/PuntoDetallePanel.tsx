@@ -64,10 +64,10 @@ const PuntoDetallePanel = ({ punto, onClose }: PuntoDetallePanelProps) => {
           <p className="text-sm text-slate-600 dark:text-slate-300">
             ⏱️ Espera: {punto.espera_min} min
           </p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs text-slate-500 dark:text-slate-300">
             {formatUpdatedAt(punto.updatedAt)}
           </p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs text-slate-500 dark:text-slate-300">
             {getConfianzaLabel(getConfianza(punto.estado))}
           </p>
         </div>
