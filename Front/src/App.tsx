@@ -44,10 +44,13 @@ function AppLayout() {
 
   useEffect(() => {
     if (!navigator.geolocation) return;
+    const onSuccess = (pos: GeolocationPosition) =>
+      setUserLocation([pos.coords.latitude, pos.coords.longitude]);
+    navigator.geolocation.getCurrentPosition(onSuccess, undefined, { timeout: 15000 });
     const id = navigator.geolocation.watchPosition(
-      (pos) => setUserLocation([pos.coords.latitude, pos.coords.longitude]),
+      onSuccess,
       (err) => console.warn('[GPS] Error:', err.message),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
+      { enableHighAccuracy: false, timeout: 30000, maximumAge: 15000 }
     );
     return () => navigator.geolocation.clearWatch(id);
   }, [setUserLocation]);

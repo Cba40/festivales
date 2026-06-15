@@ -1,8 +1,9 @@
 import 'leaflet/dist/leaflet.css'
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { MapContainer, TileLayer, CircleMarker, Polyline, useMap } from 'react-leaflet'
 import { X, Map } from 'lucide-react'
 import type { PuntoComida } from '@/data/mappers'
+import { useAppStore } from '@/core/state/store'
 
 const URBAN_FACTOR = 1.3
 
@@ -26,26 +27,17 @@ const calcWalkingDist = (lat1: number, lng1: number, lat2: number, lng2: number)
 
 const UserLocationMarker = () => {
   const map = useMap()
-  const [pos, setPos] = useState<[number, number] | null>(null)
+  const storeLocation = useAppStore(s => s.userLocation)
 
   useEffect(() => {
-    if (!navigator.geolocation) return
-    const id = navigator.geolocation.watchPosition(
-      (p) => {
-        const pt: [number, number] = [p.coords.latitude, p.coords.longitude]
-        setPos(pt)
-      },
-      () => {},
-      { enableHighAccuracy: true, timeout: 10000 }
-    )
-    return () => navigator.geolocation.clearWatch(id)
-  }, [map])
+    if (storeLocation) map.flyTo(storeLocation, map.getZoom())
+  }, [storeLocation, map])
 
-  if (!pos) return null
+  if (!storeLocation) return null
 
   return (
     <CircleMarker
-      center={pos}
+      center={storeLocation}
       radius={8}
       pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.8, weight: 3 }}
     />

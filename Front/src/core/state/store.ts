@@ -74,7 +74,11 @@ export const useAppStore = create<AppState>((set) => ({
   },
 
   // User location
-  userLocation: null,
+  userLocation: (() => {
+    const cached = localStorage.getItem('last_location');
+    if (cached) { try { return JSON.parse(cached) as [number, number]; } catch { /* ignore */ } }
+    return null;
+  })(),
 
   // Inicializar con un baño random por defecto para pruebas de mapa offline
   zones: [
@@ -123,7 +127,10 @@ export const useAppStore = create<AppState>((set) => ({
     })),
 
   // Location mutations
-  setUserLocation: (loc) => set({ userLocation: loc }),
+  setUserLocation: (loc) => {
+    if (loc) localStorage.setItem('last_location', JSON.stringify(loc));
+    set({ userLocation: loc });
+  },
 
   // Incident mutations
   setIncidents: (incidents) => set({ incidents }),

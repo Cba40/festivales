@@ -1,7 +1,8 @@
 import 'leaflet/dist/leaflet.css'
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet'
 import L from 'leaflet'
+import { useAppStore } from '@/core/state/store'
 
 // Icono para la ubicación del usuario en tiempo real
 const userIcon = L.divIcon({
@@ -18,27 +19,18 @@ const userIcon = L.divIcon({
 
 const UserLocationMarker = ({ onLocationUpdate }: { onLocationUpdate: (pos: [number, number]) => void }) => {
   const map = useMap()
-  const [pos, setPos] = useState<[number, number] | null>(null)
+  const storeLocation = useAppStore(s => s.userLocation)
 
   useEffect(() => {
-    if (!navigator.geolocation) return
-    const id = navigator.geolocation.watchPosition(
-      (p) => {
-        const pt: [number, number] = [p.coords.latitude, p.coords.longitude]
-        setPos(pt)
-        onLocationUpdate(pt)
-      },
-      (err) => {
-        console.warn('Error al obtener la ubicación en tiempo real:', err.message)
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    )
-    return () => navigator.geolocation.clearWatch(id)
-  }, [map, onLocationUpdate])
+    if (storeLocation) {
+      onLocationUpdate(storeLocation)
+      map.flyTo(storeLocation, map.getZoom())
+    }
+  }, [storeLocation, map, onLocationUpdate])
 
-  if (!pos) return null
+  if (!storeLocation) return null
 
-  return <Marker position={pos} icon={userIcon} />
+  return <Marker position={storeLocation} icon={userIcon} />
 }
 
 export interface InteractiveMapPoint {
