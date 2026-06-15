@@ -1,5 +1,5 @@
 import 'leaflet/dist/leaflet.css'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { MapContainer, TileLayer, CircleMarker, Polyline, useMap } from 'react-leaflet'
 import { X, Map } from 'lucide-react'
 import type { PuntoComida } from '@/data/mappers'
@@ -28,9 +28,13 @@ const calcWalkingDist = (lat1: number, lng1: number, lat2: number, lng2: number)
 const UserLocationMarker = () => {
   const map = useMap()
   const storeLocation = useAppStore(s => s.userLocation)
+  const hasFlown = useRef(false)
 
   useEffect(() => {
-    if (storeLocation) map.flyTo(storeLocation, map.getZoom())
+    if (storeLocation && !hasFlown.current) {
+      map.flyTo(storeLocation, map.getZoom())
+      hasFlown.current = true
+    }
   }, [storeLocation, map])
 
   if (!storeLocation) return null

@@ -1,5 +1,5 @@
 import 'leaflet/dist/leaflet.css'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import { useAppStore } from '@/core/state/store'
@@ -20,11 +20,15 @@ const userIcon = L.divIcon({
 const UserLocationMarker = ({ onLocationUpdate }: { onLocationUpdate: (pos: [number, number]) => void }) => {
   const map = useMap()
   const storeLocation = useAppStore(s => s.userLocation)
+  const hasFlown = useRef(false)
 
   useEffect(() => {
     if (storeLocation) {
       onLocationUpdate(storeLocation)
-      map.flyTo(storeLocation, map.getZoom())
+      if (!hasFlown.current) {
+        map.flyTo(storeLocation, map.getZoom())
+        hasFlown.current = true
+      }
     }
   }, [storeLocation, map, onLocationUpdate])
 
