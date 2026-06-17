@@ -26,6 +26,8 @@ function AppLayout() {
   const isDashboard = location.pathname.startsWith('/dashboard');
   const { refresh } = useDashboardSync();
   const setUserLocation = useAppStore(s => s.setUserLocation);
+  const setLocationPermissionDenied = useAppStore(s => s.setLocationPermissionDenied);
+  const requestLocation = useAppStore(s => s.requestLocation);
 
   useEffect(() => { refresh(); }, [refresh]);
 
@@ -42,18 +44,71 @@ function AppLayout() {
     };
   }, [refresh]);
 
+  // 1. Escuchar el estado de los permisos de geolocalización de manera reactiva
   useEffect(() => {
+    if (!navigator.permissions || !navigator.permissions.query) return;
+
+    let permissionStatus: PermissionStatus | null = null;
+
+    const handlePermissionChange = () => {
+      if (!permissionStatus) return;
+      if (permissionStatus.state === 'denied') {
+        setLocationPermissionDenied(true);
+      } else if (permissionStatus.state === 'granted') {
+        setLocationPermissionDenied(false);
+        requestLocation();
+      } else {
+        setLocationPermissionDenied(false);
+      }
+    };
+
+    navigator.permissions.query({ name: 'geolocation' as PermissionName })
+      .then((status) => {
+        permissionStatus = status;
+        if (status.state === 'denied') {
+          setLocationPermissionDenied(true);
+        } else {
+          setLocationPermissionDenied(false);
+        }
+        status.addEventListener('change', handlePermissionChange);
+      })
+      .catch((err) => {
+        console.warn('[Permissions API] Error:', err);
+      });
+
+    return () => {
+      if (permissionStatus) {
+        permissionStatus.removeEventListener('change', handlePermissionChange);
+      }
+    };
+  }, [setLocationPermissionDenied, requestLocation]);
+
+  // 2. Solicitar la ubicación inicial y mantener watchPosition
+  useEffect(() => {
+    requestLocation();
+
     if (!navigator.geolocation) return;
-    const onSuccess = (pos: GeolocationPosition) =>
+
+    const onSuccess = (pos: GeolocationPosition) => {
       setUserLocation([pos.coords.latitude, pos.coords.longitude]);
-    navigator.geolocation.getCurrentPosition(onSuccess, undefined, { timeout: 15000 });
+      setLocationPermissionDenied(false);
+    };
+
+    const onError = (err: GeolocationPositionError) => {
+      if (err.code === err.PERMISSION_DENIED) {
+        setLocationPermissionDenied(true);
+      }
+      console.warn('[GPS] Error:', err.message);
+    };
+
     const id = navigator.geolocation.watchPosition(
       onSuccess,
-      (err) => console.warn('[GPS] Error:', err.message),
+      onError,
       { enableHighAccuracy: false, timeout: 30000, maximumAge: 15000 }
     );
+
     return () => navigator.geolocation.clearWatch(id);
-  }, [setUserLocation]);
+  }, [setUserLocation, setLocationPermissionDenied, requestLocation]);
 
   if (isDashboard) {
     return (

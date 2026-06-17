@@ -35,6 +35,7 @@ interface AppState {
 
   // User location (GPS)
   userLocation: [number, number] | null;
+  locationPermissionDenied: boolean;
 
   // Actions — Auth
   login: (token: string) => void;
@@ -54,6 +55,8 @@ interface AppState {
 
   // Actions — Location
   setUserLocation: (loc: [number, number] | null) => void;
+  setLocationPermissionDenied: (denied: boolean) => void;
+  requestLocation: () => Promise<boolean>;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -79,6 +82,7 @@ export const useAppStore = create<AppState>((set) => ({
     if (cached) { try { return JSON.parse(cached) as [number, number]; } catch { /* ignore */ } }
     return null;
   })(),
+  locationPermissionDenied: false,
 
   // Inicializar con un baño random por defecto para pruebas de mapa offline
   zones: [
@@ -130,6 +134,31 @@ export const useAppStore = create<AppState>((set) => ({
   setUserLocation: (loc) => {
     if (loc) localStorage.setItem('last_location', JSON.stringify(loc));
     set({ userLocation: loc });
+  },
+
+  setLocationPermissionDenied: (denied) => {
+    set({ locationPermissionDenied: denied });
+  },
+
+  requestLocation: async () => {
+    if (!navigator.geolocation) return false;
+    return new Promise<boolean>((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const loc: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+          localStorage.setItem('last_location', JSON.stringify(loc));
+          set({ userLocation: loc, locationPermissionDenied: false });
+          resolve(true);
+        },
+        (err) => {
+          if (err.code === err.PERMISSION_DENIED) {
+            set({ locationPermissionDenied: true });
+          }
+          resolve(false);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    });
   },
 
   // Incident mutations

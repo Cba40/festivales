@@ -1,19 +1,62 @@
 // src/screens/Home.tsx
 
+import { useState } from 'react';
 import { Header } from '@/components/Header';
 import { StatusBanner } from '@/components/StatusBanner';
 import { QuickAction } from '@/components/ActionButton';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, Car, LogOut, Bus, UtensilsCrossed, Hotel, Info, MessageCircle } from 'lucide-react';
+import { AlertTriangle, Car, LogOut, Bus, UtensilsCrossed, Hotel, Info, MessageCircle, MapPinOff } from 'lucide-react';
+import { useAppStore } from '@/core/state/store';
+import { LocationPromptModal } from '@/components/LocationPromptModal';
 
 const Home = () => {
   const navigate = useNavigate();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const locationPermissionDenied = useAppStore(s => s.locationPermissionDenied);
+  const requestLocation = useAppStore(s => s.requestLocation);
+
+  const handleBannerClick = async () => {
+    if (navigator.permissions && navigator.permissions.query) {
+      try {
+        const res = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
+        if (res.state === 'denied') {
+          setIsModalOpen(true);
+          return;
+        }
+      } catch (err) {
+        console.warn('[Permissions API] Error en query:', err);
+      }
+    }
+
+    const success = await requestLocation();
+    if (!success) {
+      setIsModalOpen(true);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
       <Header title="Festival Jesús María" ubicacion="Zona Centro" />
 
       <StatusBanner estado="alerta" mensaje="Zona con alta demanda" />
+
+      {locationPermissionDenied && (
+        <button
+          onClick={handleBannerClick}
+          className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white px-4 py-3 flex items-center justify-between gap-3 shadow-md transition-all duration-300 hover:shadow-lg animate-pulse"
+        >
+          <div className="flex items-center gap-2.5">
+            <MapPinOff size={20} className="text-white flex-shrink-0" />
+            <div className="text-left">
+              <span className="font-bold text-sm leading-tight block">Ubicación desactivada</span>
+              <span className="text-xs opacity-90 leading-tight block">Actívala para ver estacionamientos y servicios cercanos.</span>
+            </div>
+          </div>
+          <span className="text-xs font-extrabold uppercase tracking-wide bg-white/20 px-2.5 py-1 rounded-full border border-white/10 hover:bg-white/30 transition-colors flex-shrink-0">
+            Activar
+          </span>
+        </button>
+      )}
 
       <div className="flex-1 p-4 space-y-6">
         <div>
@@ -93,6 +136,7 @@ const Home = () => {
           </button>
         </div>
       </div>
+      <LocationPromptModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </div>
   );
 };
