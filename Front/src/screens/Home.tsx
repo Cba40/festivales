@@ -120,12 +120,12 @@ const Home = () => {
         <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
           <button
             onClick={() => navigate('/asistente')}
-            className="w-full flex items-center gap-3 bg-primary/10 dark:bg-primary/20 hover:bg-primary/15 dark:hover:bg-primary/25 text-primary py-3 px-4 rounded-xl transition-colors text-left"
+            className="w-full flex items-center gap-3 bg-primary/10 dark:bg-blue-950/50 hover:bg-primary/15 dark:hover:bg-blue-900/40 text-primary dark:text-blue-400 py-3.5 px-4 rounded-xl transition-all duration-200 text-left border border-primary/5 dark:border-blue-900/30"
           >
-            <MessageCircle size={20} />
+            <MessageCircle size={20} className="text-primary dark:text-blue-400" />
             <div>
-              <p className="text-sm font-bold">Preguntá algo rápido</p>
-              <p className="text-xs opacity-75">La app te ayuda a decidir rápido</p>
+              <p className="text-sm font-bold text-primary dark:text-blue-400">Preguntá algo rápido</p>
+              <p className="text-xs text-primary/80 dark:text-blue-400/80">La app te ayuda a decidir rápido</p>
             </div>
           </button>
         </div>
