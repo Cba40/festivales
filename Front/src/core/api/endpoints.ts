@@ -16,4 +16,9 @@ export const endpoints = {
     list: (eventId: string) => `/events/${eventId}/incidents`,
     create: (eventId: string) => `/events/${eventId}/incidents`,
   },
+  eventDays: {
+    list: (eventId: string) => `/events/${eventId}/event-days`,
+    today: (eventId: string) => `/events/${eventId}/event-days/today`,
+    byId: (eventId: string, id: string) => `/events/${eventId}/event-days/${id}`,
+  },
 };

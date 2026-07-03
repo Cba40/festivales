@@ -15,9 +15,12 @@ import Pernoctar from './screens/Pernoctar';
 import AsistenteScreen from './screens/AsistenteScreen';
 import { DashboardScreen } from './features/dashboard/screens/DashboardScreen';
 import { useDashboardSync } from './features/dashboard/hooks/useDashboardSync';
+import { loadEventDayContext } from './utils/contextoEvento';
+import { recargarFases } from './config/eventoConfig';
 import { ZoneUpdateScreen } from './features/dashboard/screens/ZoneUpdateScreen';
 import { IncidentReportScreen } from './features/dashboard/screens/IncidentReportScreen';
 import { ZoneAdminScreen } from './features/dashboard/screens/ZoneAdminScreen';
+import { EventDayScreen } from './features/dashboard/screens/EventDayScreen';
 import LoginScreen from './features/auth/screens/LoginScreen';
 import ProtectedRoute from './shared/components/ProtectedRoute';
 
@@ -29,7 +32,11 @@ function AppLayout() {
   const setLocationPermissionDenied = useAppStore(s => s.setLocationPermissionDenied);
   const requestLocation = useAppStore(s => s.requestLocation);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    refresh();
+    const eventId = import.meta.env.VITE_EVENT_ID || 'default-event-id';
+    loadEventDayContext(eventId).then(() => recargarFases());
+  }, [refresh]);
 
   useEffect(() => {
     const id = setInterval(refresh, 30000);
@@ -122,6 +129,7 @@ function AppLayout() {
         <Route path="/dashboard/zones" element={<ZoneUpdateScreen />} />
         <Route path="/dashboard/report" element={<IncidentReportScreen />} />
         <Route path="/dashboard/admin-zones" element={<ZoneAdminScreen />} />
+        <Route path="/dashboard/event-days" element={<EventDayScreen />} />
       </Routes>
     );
   }

@@ -44,3 +44,45 @@ export interface Incident {
   createdAt: string;
   zoneId?: string;
 }
+
+export interface EventDaySummary {
+  id: string;
+  date: string;
+  day_of_week: string;
+  weather: string | null;
+  headliner_artist: string | null;
+  expected_attendance: number | null;
+  is_active: boolean;
+}
+
+export interface EventDay {
+  id: string;
+  event_id: string;
+  date: string;
+  day_of_week: string;
+  weather: string | null;
+  headliner_artist: string | null;
+  expected_attendance: number | null;
+  peak_hour_start: number | null;
+  peak_hour_end: number | null;
+  opening_time: number | null;
+  closing_time: number | null;
+  notes: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EventDayCreatePayload {
+  date: string;
+  day_of_week: string;
+  weather?: string | null;
+  headliner_artist?: string | null;
+  expected_attendance?: number | null;
+  peak_hour_start?: number | null;
+  peak_hour_end?: number | null;
+  opening_time?: number | null;
+  closing_time?: number | null;
+  notes?: string | null;
+  is_active?: boolean;
+}

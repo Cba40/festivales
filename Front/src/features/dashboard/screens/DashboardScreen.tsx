@@ -21,6 +21,12 @@ export function DashboardScreen() {
         <h1 className="text-xl font-bold text-slate-800">Operación Territorial</h1>
         <div className="flex gap-4">
           <button
+            onClick={() => navigate('/dashboard/event-days')}
+            className="text-sm bg-indigo-600 hover:bg-indigo-700 text-white py-1 px-3 rounded font-medium"
+          >
+            Días
+          </button>
+          <button
             onClick={() => navigate('/dashboard/admin-zones')}
             className="text-sm bg-emerald-600 hover:bg-emerald-700 text-white py-1 px-3 rounded font-medium"
           >

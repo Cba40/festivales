@@ -5,7 +5,7 @@ import { getSalidasOrdenadas } from './mockSalidas'
 import { getZonasOrdenadas } from './mockZones'
 import { getHoraEvento } from '@/utils/contextoEvento'
 import { getFaseActual } from '@/utils/fases'
-import { getEventoConfig, fases } from '@/config/eventoConfig'
+import { getEventoConfig, fases as getFases } from '@/config/eventoConfig'
 
 export type SaturacionTipo = 'baja' | 'media' | 'alta' | 'colapsada' | 'desconocida'
 
@@ -91,7 +91,7 @@ export const inferirNecesidad = (
   const config = getEventoConfig()
 
   // GUARDA DEFENSIVA: config.fases puede no existir
-  const fasesDisponibles = config.fases ?? fases
+  const fasesDisponibles = config.fases ?? getFases()
   if (!fasesDisponibles || fasesDisponibles.length === 0) {
     console.warn('Evento sin configuración de fases')
   }
