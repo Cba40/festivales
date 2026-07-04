@@ -4,6 +4,8 @@ import { EventDayForm } from '../components/EventDayForm';
 import { useEventDays } from '../hooks/useEventDays';
 import { useEventDayMutations } from '../hooks/useEventDayMutations';
 import type { EventDaySummary, EventDay, EventDayCreatePayload } from '../types';
+import { apiClient } from '@/core/api/client';
+import { endpoints } from '@/core/api/endpoints';
 
 const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 
@@ -24,8 +26,6 @@ export function EventDayScreen() {
   const handleEdit = useCallback(async (day: EventDaySummary) => {
     setFormError(null);
     try {
-      const { default: apiClient } = await import('@/core/api/client');
-      const { endpoints } = await import('@/core/api/endpoints');
       const { data } = await apiClient.get<EventDay>(
         endpoints.eventDays.byId(EVENT_ID, day.id)
       );
