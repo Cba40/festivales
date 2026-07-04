@@ -15,23 +15,23 @@ createRoot(document.getElementById('root')!).render(
 );
 
 // ============================================
-// SERVICE WORKER — solo en producción
+// SERVICE WORKER — DESACTIVADO temporalmente
+// Pantalla blanca por cache corrupto en Vercel
 // ============================================
 
-if ('serviceWorker' in navigator) {
-  if (import.meta.env.PROD) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js');
-    });
-  } else {
-    // Dev: desregistrar SWs existentes que pudieran interferir
-    window.addEventListener('load', async () => {
-      const registrations = await navigator.serviceWorker.getRegistrations();
-      for (const reg of registrations) {
-        await reg.unregister();
-      }
-      const keys = await caches.keys();
-      await Promise.all(keys.map((k) => caches.delete(k)));
-    });
-  }
-}
+// if ('serviceWorker' in navigator) {
+//   if (import.meta.env.PROD) {
+//     window.addEventListener('load', () => {
+//       navigator.serviceWorker.register('/sw.js');
+//     });
+//   } else {
+//     window.addEventListener('load', async () => {
+//       const registrations = await navigator.serviceWorker.getRegistrations();
+//       for (const reg of registrations) {
+//         await reg.unregister();
+//       }
+//       const keys = await caches.keys();
+//       await Promise.all(keys.map((k) => caches.delete(k)));
+//     });
+//   }
+// }
