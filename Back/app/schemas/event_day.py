@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_serializer, field_validator
 
 
 class EventDayCreate(BaseModel):
@@ -51,6 +51,17 @@ class EventDayResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+    @field_validator("date", mode="before")
+    @classmethod
+    def coerce_date(cls, value):
+        if isinstance(value, datetime):
+            return value.date()
+        return value
+
+    @field_serializer("date")
+    def serialize_date(self, value: date) -> str:
+        return value.isoformat()
+
 
 class EventDaySummary(BaseModel):
     id: str
@@ -60,3 +71,14 @@ class EventDaySummary(BaseModel):
     headliner_artist: Optional[str]
     expected_attendance: Optional[int]
     is_active: bool
+
+    @field_validator("date", mode="before")
+    @classmethod
+    def coerce_date(cls, value):
+        if isinstance(value, datetime):
+            return value.date()
+        return value
+
+    @field_serializer("date")
+    def serialize_date(self, value: date) -> str:
+        return value.isoformat()
