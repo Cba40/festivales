@@ -1,76 +1,43 @@
-const CACHE_NAME = 'festival-jm-v1';
-const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/icon-192.svg',
-  '/icon-512.svg',
-];
+const CACHE_VERSION = 'v1';
+const CACHE_NAME = 'festival-jm-' + CACHE_VERSION;
 
-// Install: cachear assets estáticos
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
-    })
-  );
   self.skipWaiting();
 });
 
-// Activate: limpiar caches viejas
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+        keys
+          .filter((key) => key !== CACHE_NAME)
+          .map((key) => caches.delete(key))
       );
     })
   );
   self.clients.claim();
 });
 
-// Fetch: estrategia cache-first para navegación y assets estáticos
 self.addEventListener('fetch', (event) => {
   const { request } = event;
+  if (request.method !== 'GET') return;
 
-  // Dev: pasar de largo, no interceptar nada
-  if (self.location.port === '5173') return;
+  const url = new URL(request.url);
 
-  // Navegación HTML: cache-first
-  if (request.mode === 'navigate') {
+  if (
+    url.pathname.startsWith('/assets/') &&
+    /\.(js|css|png|svg|woff2?)$/.test(url.pathname)
+  ) {
     event.respondWith(
       caches.match(request).then((cached) => {
-        return cached || fetch(request);
-      })
-    );
-    return;
-  }
-
-  // Assets estáticos (JS/CSS generados por Vite): cache-first
-  if (request.url.includes('/assets/') || request.url.endsWith('.js') || request.url.endsWith('.css')) {
-    event.respondWith(
-      caches.match(request).then((cached) => {
-        return cached || fetch(request);
-      })
-    );
-    return;
-  }
-
-  // API calls: network-first — solo cachear GET
-  if (request.url.includes('/api/')) {
-    if (request.method !== 'GET') return; // POST, PUT, DELETE pasan sin SW
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+        return cached || fetch(request).then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          }
           return response;
-        })
-        .catch(() => caches.match(request))
+        });
+      })
     );
-    return;
   }
-
-  // Default: network
-  event.respondWith(fetch(request));
 });
