@@ -60,7 +60,7 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
     e.preventDefault();
     if (!date || !dayOfWeek) return;
 
-    await onSave({
+    const payload: EventDayCreatePayload = {
       date,
       day_of_week: dayOfWeek,
       weather: weather || null,
@@ -72,7 +72,19 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
       closing_time: closingTime ? parseInt(closingTime, 10) : null,
       notes: notes || null,
       is_active: isActive,
-    });
+    };
+
+    if (isEditing && eventDay) {
+      const changed = Object.fromEntries(
+        Object.entries(payload).filter(
+          ([key, value]) => value !== (eventDay as any)[key]
+        )
+      );
+      if (Object.keys(changed).length === 0) return;
+      await onSave(changed as EventDayCreatePayload);
+    } else {
+      await onSave(payload);
+    }
   };
 
   return (
