@@ -1,10 +1,10 @@
 import json
-from typing import List
+from typing import List, Optional
 
 from pydantic_settings import BaseSettings
 
 
-def parse_cors_origins(raw: str | None) -> List[str]:
+def parse_cors_origins(raw: Optional[str]) -> List[str]:
     if not raw:
         return ["*"]
     stripped = raw.strip()

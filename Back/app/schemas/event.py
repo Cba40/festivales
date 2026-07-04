@@ -1,6 +1,7 @@
 # backend/app/schemas/event.py
 
 from datetime import datetime
+from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -8,10 +9,10 @@ from pydantic import BaseModel, ConfigDict
 class EventResponse(BaseModel):
     id: str
     name: str
-    description: str | None = None
-    location: str | None = None
-    start_date: datetime | None = None
-    end_date: datetime | None = None
+    description: Optional[str] = None
+    location: Optional[str] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 

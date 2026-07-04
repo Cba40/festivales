@@ -1,9 +1,10 @@
 import uuid
 from datetime import datetime
+from typing import Optional
 
-from sqlalchemy import String, Text, DateTime, ForeignKey, func
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 from geoalchemy2 import Geometry
+from sqlalchemy import DateTime, ForeignKey, String, Text, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
 
@@ -17,8 +18,8 @@ class Incident(Base):
     severity: Mapped[str] = mapped_column(String(20), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="abierto")
-    zone_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("zones.id"), nullable=True)
-    geometry: Mapped[str | None] = mapped_column(Geometry("POINT"), nullable=True)
+    zone_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("zones.id"), nullable=True)
+    geometry: Mapped[Optional[str]] = mapped_column(Geometry("POINT"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

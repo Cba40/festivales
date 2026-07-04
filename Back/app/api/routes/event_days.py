@@ -1,18 +1,19 @@
 from datetime import date
+from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from app.api.deps import verify_token
 from app.db.session import get_db
 from app.models.event import Event
 from app.models.event_day import EventDay
 from app.schemas.event_day import (
     EventDayCreate,
-    EventDayUpdate,
     EventDayResponse,
     EventDaySummary,
+    EventDayUpdate,
 )
-from app.api.deps import verify_token
 
 router = APIRouter(prefix="/api/events/{event_id}/event-days", tags=["event-days"])
 
@@ -20,7 +21,7 @@ router = APIRouter(prefix="/api/events/{event_id}/event-days", tags=["event-days
 @router.get("", response_model=list[EventDaySummary])
 def list_event_days(
     event_id: str,
-    active: bool | None = Query(None),
+    active: Optional[bool] = Query(None),
     db: Session = Depends(get_db),
     _=Depends(verify_token),
 ):
@@ -31,7 +32,7 @@ def list_event_days(
     return days
 
 
-@router.get("/today", response_model=EventDayResponse | None)
+@router.get("/today", response_model=Optional[EventDayResponse])
 def get_today_event_day(
     event_id: str,
     db: Session = Depends(get_db),

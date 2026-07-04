@@ -1,6 +1,7 @@
 # backend/app/schemas/incident.py
 
 from datetime import datetime
+from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -9,7 +10,7 @@ class IncidentCreate(BaseModel):
     type: str
     severity: str
     description: str
-    zone_id: str | None = None
+    zone_id: Optional[str] = None
 
 
 class IncidentResponse(BaseModel):
@@ -19,7 +20,7 @@ class IncidentResponse(BaseModel):
     severity: str
     description: str
     status: str
-    zone_id: str | None = None
+    zone_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

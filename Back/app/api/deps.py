@@ -1,5 +1,7 @@
 # backend/app/api/deps.py
 
+from typing import Optional
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
@@ -11,10 +13,10 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=Fals
 
 
 class TokenPayload(BaseModel):
-    sub: str | None = None
+    sub: Optional[str] = None
 
 
-def verify_token(token: str | None = Depends(oauth2_scheme)) -> TokenPayload:
+def verify_token(token: Optional[str] = Depends(oauth2_scheme)) -> TokenPayload:
     if token is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -23,7 +25,7 @@ def verify_token(token: str | None = Depends(oauth2_scheme)) -> TokenPayload:
         )
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        username: str | None = payload.get("sub")
+        username: Optional[str] = payload.get("sub")
         if username is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

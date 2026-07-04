@@ -15,22 +15,22 @@ class ZoneResponse(BaseModel):
     status: str
     capacity: int
     available_capacity: int
-    latitude: float | None = None
-    longitude: float | None = None
-    disponibilidad: int | None = None
-    espera_min: int | None = None
-    calle: str | None = None
-    subtipo: str | None = None
-    tipo_culinario: str | None = None
-    x: float | None = None
-    y: float | None = None
-    direccion: str | None = None
-    horario: str | None = None
-    telefono: str | None = None
-    servicios: str | None = None
-    transporte: str | None = None
-    capacidad_estimada: int | None = None
-    es_embudo: bool | None = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    disponibilidad: Optional[int] = None
+    espera_min: Optional[int] = None
+    calle: Optional[str] = None
+    subtipo: Optional[str] = None
+    tipo_culinario: Optional[str] = None
+    x: Optional[float] = None
+    y: Optional[float] = None
+    direccion: Optional[str] = None
+    horario: Optional[str] = None
+    telefono: Optional[str] = None
+    servicios: Optional[str] = None
+    transporte: Optional[str] = None
+    capacidad_estimada: Optional[int] = None
+    es_embudo: Optional[bool] = None
     created_at: datetime
     updated_at: datetime
 
@@ -41,49 +41,49 @@ class ZoneCreateRequest(BaseModel):
     name: str
     type: str
     capacity: int
-    latitude: float | None = None
-    longitude: float | None = None
-    disponibilidad: int | None = None
-    espera_min: int | None = None
-    calle: str | None = None
-    subtipo: str | None = None
-    tipo_culinario: str | None = None
-    x: float | None = None
-    y: float | None = None
-    direccion: str | None = None
-    horario: str | None = None
-    telefono: str | None = None
-    servicios: str | None = None
-    transporte: str | None = None
-    capacidad_estimada: int | None = None
-    es_embudo: bool | None = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    disponibilidad: Optional[int] = None
+    espera_min: Optional[int] = None
+    calle: Optional[str] = None
+    subtipo: Optional[str] = None
+    tipo_culinario: Optional[str] = None
+    x: Optional[float] = None
+    y: Optional[float] = None
+    direccion: Optional[str] = None
+    horario: Optional[str] = None
+    telefono: Optional[str] = None
+    servicios: Optional[str] = None
+    transporte: Optional[str] = None
+    capacidad_estimada: Optional[int] = None
+    es_embudo: Optional[bool] = None
 
 
 class ZoneUpdateRequest(BaseModel):
-    saturation: str | None = None
-    status: str | None = None
-    available_capacity: int | None = None
-    disponibilidad: int | None = None
-    espera_min: int | None = None
-    calle: str | None = None
-    subtipo: str | None = None
-    tipo_culinario: str | None = None
-    x: float | None = None
-    y: float | None = None
-    direccion: str | None = None
-    horario: str | None = None
-    telefono: str | None = None
-    servicios: str | None = None
-    transporte: str | None = None
-    capacidad_estimada: int | None = None
-    es_embudo: bool | None = None
+    saturation: Optional[str] = None
+    status: Optional[str] = None
+    available_capacity: Optional[int] = None
+    disponibilidad: Optional[int] = None
+    espera_min: Optional[int] = None
+    calle: Optional[str] = None
+    subtipo: Optional[str] = None
+    tipo_culinario: Optional[str] = None
+    x: Optional[float] = None
+    y: Optional[float] = None
+    direccion: Optional[str] = None
+    horario: Optional[str] = None
+    telefono: Optional[str] = None
+    servicios: Optional[str] = None
+    transporte: Optional[str] = None
+    capacidad_estimada: Optional[int] = None
+    es_embudo: Optional[bool] = None
 
 
 class ZoneConfigUpdateRequest(BaseModel):
-    name: str | None = None
-    type: str | None = None
-    capacity: int | None = None
-    available_capacity: int | None = None
-    saturation: str | None = None
-    latitude: float | None = None
-    longitude: float | None = None
+    name: Optional[str] = None
+    type: Optional[str] = None
+    capacity: Optional[int] = None
+    available_capacity: Optional[int] = None
+    saturation: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
