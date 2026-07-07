@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, time
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, field_serializer, field_validator
@@ -7,13 +7,16 @@ from pydantic import BaseModel, ConfigDict, field_serializer, field_validator
 class EventDayCreate(BaseModel):
     date: date
     day_of_week: str
+    entry_start_time: time
+    entry_peak_start_time: time
+    entry_peak_end_time: time
+    event_start_time: time
+    exit_peak_start_time: time
+    exit_peak_end_time: time
+    event_end_time: time
     weather: Optional[str] = None
     headliner_artist: Optional[str] = None
     expected_attendance: Optional[int] = None
-    peak_hour_start: Optional[int] = None
-    peak_hour_end: Optional[int] = None
-    opening_time: Optional[int] = None
-    closing_time: Optional[int] = None
     notes: Optional[str] = None
     is_active: bool = True
 
@@ -21,13 +24,16 @@ class EventDayCreate(BaseModel):
 class EventDayUpdate(BaseModel):
     date: Optional[date] = None
     day_of_week: Optional[str] = None
+    entry_start_time: Optional[time] = None
+    entry_peak_start_time: Optional[time] = None
+    entry_peak_end_time: Optional[time] = None
+    event_start_time: Optional[time] = None
+    exit_peak_start_time: Optional[time] = None
+    exit_peak_end_time: Optional[time] = None
+    event_end_time: Optional[time] = None
     weather: Optional[str] = None
     headliner_artist: Optional[str] = None
     expected_attendance: Optional[int] = None
-    peak_hour_start: Optional[int] = None
-    peak_hour_end: Optional[int] = None
-    opening_time: Optional[int] = None
-    closing_time: Optional[int] = None
     notes: Optional[str] = None
     is_active: Optional[bool] = None
 
@@ -37,13 +43,16 @@ class EventDayResponse(BaseModel):
     event_id: str
     date: date
     day_of_week: str
+    entry_start_time: time
+    entry_peak_start_time: time
+    entry_peak_end_time: time
+    event_start_time: time
+    exit_peak_start_time: time
+    exit_peak_end_time: time
+    event_end_time: time
     weather: Optional[str]
     headliner_artist: Optional[str]
     expected_attendance: Optional[int]
-    peak_hour_start: Optional[int]
-    peak_hour_end: Optional[int]
-    opening_time: Optional[int]
-    closing_time: Optional[int]
     notes: Optional[str]
     is_active: bool
     created_at: datetime
@@ -62,11 +71,22 @@ class EventDayResponse(BaseModel):
     def serialize_date(self, value: date) -> str:
         return value.isoformat()
 
+    @field_serializer("entry_start_time", "entry_peak_start_time", "entry_peak_end_time", "event_start_time", "exit_peak_start_time", "exit_peak_end_time", "event_end_time")
+    def serialize_time(self, value: time) -> str:
+        return value.strftime("%H:%M")
+
 
 class EventDaySummary(BaseModel):
     id: str
     date: date
     day_of_week: str
+    entry_start_time: time
+    entry_peak_start_time: time
+    entry_peak_end_time: time
+    event_start_time: time
+    exit_peak_start_time: time
+    exit_peak_end_time: time
+    event_end_time: time
     weather: Optional[str]
     headliner_artist: Optional[str]
     expected_attendance: Optional[int]
@@ -82,3 +102,7 @@ class EventDaySummary(BaseModel):
     @field_serializer("date")
     def serialize_date(self, value: date) -> str:
         return value.isoformat()
+
+    @field_serializer("entry_start_time", "entry_peak_start_time", "entry_peak_end_time", "event_start_time", "exit_peak_start_time", "exit_peak_end_time", "event_end_time")
+    def serialize_time(self, value: time) -> str:
+        return value.strftime("%H:%M")
