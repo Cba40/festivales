@@ -6,7 +6,6 @@ import { AlertTriangle, Car, LogOut, Bus, UtensilsCrossed, Hotel, Info, MessageC
 import { useAppStore } from '@/core/state/store';
 import { LocationPromptModal } from '@/components/LocationPromptModal';
 import { EventStatusBar } from '@/features/public/components/EventStatusBar';
-import { ZoneList } from '@/features/public/components/ZoneList';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -83,8 +82,6 @@ const Home = () => {
             />
           </div>
         </div>
-
-        <ZoneList />
 
         <div>
           <h2 className="text-sm font-bold text-gray-600 dark:text-gray-300 mb-3 uppercase tracking-wide">
