@@ -49,6 +49,13 @@ export interface EventDaySummary {
   id: string;
   date: string;
   day_of_week: string;
+  entry_start_time: string;
+  entry_peak_start_time: string;
+  entry_peak_end_time: string;
+  event_start_time: string;
+  exit_peak_start_time: string;
+  exit_peak_end_time: string;
+  event_end_time: string;
   weather: string | null;
   headliner_artist: string | null;
   expected_attendance: number | null;
@@ -60,13 +67,16 @@ export interface EventDay {
   event_id: string;
   date: string;
   day_of_week: string;
+  entry_start_time: string;
+  entry_peak_start_time: string;
+  entry_peak_end_time: string;
+  event_start_time: string;
+  exit_peak_start_time: string;
+  exit_peak_end_time: string;
+  event_end_time: string;
   weather: string | null;
   headliner_artist: string | null;
   expected_attendance: number | null;
-  peak_hour_start: number | null;
-  peak_hour_end: number | null;
-  opening_time: number | null;
-  closing_time: number | null;
   notes: string | null;
   is_active: boolean;
   created_at: string;
@@ -76,13 +86,16 @@ export interface EventDay {
 export interface EventDayCreatePayload {
   date: string;
   day_of_week: string;
+  entry_start_time: string;
+  entry_peak_start_time: string;
+  entry_peak_end_time: string;
+  event_start_time: string;
+  exit_peak_start_time: string;
+  exit_peak_end_time: string;
+  event_end_time: string;
   weather?: string | null;
   headliner_artist?: string | null;
   expected_attendance?: number | null;
-  peak_hour_start?: number | null;
-  peak_hour_end?: number | null;
-  opening_time?: number | null;
-  closing_time?: number | null;
   notes?: string | null;
   is_active?: boolean;
 }
