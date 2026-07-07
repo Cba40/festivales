@@ -1,13 +1,12 @@
-// src/screens/Home.tsx
-
 import { useState } from 'react';
 import { Header } from '@/components/Header';
-import { StatusBanner } from '@/components/StatusBanner';
 import { QuickAction } from '@/components/ActionButton';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Car, LogOut, Bus, UtensilsCrossed, Hotel, Info, MessageCircle, MapPinOff } from 'lucide-react';
 import { useAppStore } from '@/core/state/store';
 import { LocationPromptModal } from '@/components/LocationPromptModal';
+import { EventStatusBar } from '@/features/public/components/EventStatusBar';
+import { ZoneList } from '@/features/public/components/ZoneList';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -38,7 +37,7 @@ const Home = () => {
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
       <Header title="Festival Jesús María" ubicacion="Zona Centro" />
 
-      <StatusBanner estado="alerta" mensaje="Zona con alta demanda" />
+      <EventStatusBar />
 
       {locationPermissionDenied && (
         <button
@@ -84,6 +83,8 @@ const Home = () => {
             />
           </div>
         </div>
+
+        <ZoneList />
 
         <div>
           <h2 className="text-sm font-bold text-gray-600 dark:text-gray-300 mb-3 uppercase tracking-wide">
