@@ -1,4 +1,5 @@
 import logging
+import time as time_module
 from datetime import date, datetime, time, timezone
 from typing import Optional
 
@@ -39,16 +40,27 @@ class ContextEngineService:
 
     def compute_predictions(self, db: Session, event_id: str, datetime_actual: Optional[datetime] = None) -> dict:
         dt = datetime_actual if datetime_actual is not None else datetime.now(timezone.utc)
+        _t0 = time_module.time()
+
         event_day = self._get_active_event_day(db, event_id, dt.date())
+        t1 = time_module.time()
+        logger.info("context_engine.step_1_get_event_day completed in %.3fs", t1 - _t0)
         if not event_day:
+            logger.info("context_engine.completed no_event_day event_id=%s in %.3fs", event_id, time_module.time() - _t0)
             return self._baseline_response(event_id, db)
 
         current_state, override = self._resolve_state(db, event_id, event_day, dt)
+        t2 = time_module.time()
+        logger.info("context_engine.step_2_resolve_state completed in %.3fs", t2 - t1)
         if not current_state:
+            logger.info("context_engine.completed no_state event_id=%s in %.3fs", event_id, time_module.time() - _t0)
             return self._baseline_response(event_id, db)
 
         zones = self._get_event_zones(db, event_id)
+        t3 = time_module.time()
+        logger.info("context_engine.step_3_get_zones completed in %.3fs (%d zones)", t3 - t2, len(zones))
         if not zones:
+            logger.info("context_engine.completed no_zones event_id=%s in %.3fs", event_id, time_module.time() - _t0)
             return {
                 "estado_actual": current_state,
                 "override_activo": override,
@@ -56,12 +68,24 @@ class ContextEngineService:
             }
 
         factors = self._calculate_base_factors(db, event_day.id, current_state.id, current_state.slug, zones)
+        t4 = time_module.time()
+        logger.info("context_engine.step_4_base_factors completed in %.3fs (%d zones)", t4 - t3, len(factors))
+        logger.debug("context_engine.step_4_factors event_id=%s factors=%s", event_id, factors)
 
         factors = self._apply_incident_corrections(db, event_id, zones, factors)
+        t5 = time_module.time()
+        logger.info("context_engine.step_5_incident_corrections completed in %.3fs", t5 - t4)
 
         factors = self._apply_specific_overrides(db, event_day.id, dt, zones, factors)
+        t6 = time_module.time()
+        logger.info("context_engine.step_6_specific_overrides completed in %.3fs", t6 - t5)
 
         predictions = self._generate_predictions(zones, factors)
+        t7 = time_module.time()
+        logger.info(
+            "context_engine.completed event_id=%s state=%s zones=%d total=%.3fs",
+            event_id, current_state.slug, len(predictions), t7 - _t0,
+        )
 
         return {
             "estado_actual": current_state,
