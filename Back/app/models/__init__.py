@@ -8,6 +8,7 @@ from app.models.zone_type import ZoneType
 from app.models.event_day_zone_factor import EventDayZoneFactor
 from app.models.state_override import StateOverride
 from app.models.incident_impact import IncidentImpact
+from app.models.attendance_level import AttendanceLevel
 
 __all__ = [
     "Event",
@@ -20,4 +21,5 @@ __all__ = [
     "EventDayZoneFactor",
     "StateOverride",
     "IncidentImpact",
+    "AttendanceLevel",
 ]

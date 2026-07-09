@@ -11,6 +11,7 @@ from app.api.routes.points import router as points_router
 from app.api.routes.incidents import router as incidents_router
 from app.api.routes.event_days import router as event_days_router
 from app.api.routes.context_engine import router as context_engine_router
+from app.api.routes.attendance_levels import router as attendance_levels_router
 from app.api.routes.catalogs import router as catalogs_router
 from app.api.routes.health import router as health_router
 
@@ -33,6 +34,7 @@ app.include_router(points_router)
 app.include_router(incidents_router)
 app.include_router(event_days_router)
 app.include_router(context_engine_router)
+app.include_router(attendance_levels_router)
 app.include_router(catalogs_router)
 app.include_router(health_router)
 

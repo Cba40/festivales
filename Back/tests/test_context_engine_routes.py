@@ -30,7 +30,7 @@ class TestGetStateEndpoint:
         assert response.status_code == 200
         data = response.json()
         assert data["estado_actual"] is not None
-        assert data["estado_actual"]["slug"] == "temprano"
+        assert data["estado_actual"]["slug"] == "pico"
         assert data["override_activo"] is None
 
     def test_get_state_endpoint_sin_jornada(
@@ -67,7 +67,7 @@ class TestGetPredictionsEndpoint:
         assert response.status_code == 200
         data = response.json()
         assert data["estado_actual"] is not None
-        assert data["estado_actual"]["slug"] == "temprano"
+        assert data["estado_actual"]["slug"] == "pico"
         assert data["override_activo"] is None
         assert len(data["zonas"]) == 3
         for zona in data["zonas"]:
@@ -93,8 +93,8 @@ class TestCreateOverrideEndpoint:
             "event_day_id": sample_event_day.id,
             "event_state_id": state_pico.id,
             "zone_type_id": None,
-            "start_time": "2026-07-10T08:00:00Z",
-            "end_time": "2026-07-10T23:00:00Z",
+            "start_min": 0,
+            "end_min": 900,
             "reason": "Prueba de override",
             "created_by": "tester",
         }
@@ -127,8 +127,8 @@ class TestCancelOverrideEndpoint:
             event_day_id=sample_event_day.id,
             event_state_id=state_pico.id,
             zone_type_id=None,
-            start_time=datetime(2026, 7, 10, 8, 0, tzinfo=timezone.utc),
-            end_time=datetime(2026, 7, 10, 23, 0, tzinfo=timezone.utc),
+            start_min=0,
+            end_min=900,
             reason="To be cancelled",
             created_by="tester",
             is_active=True,
@@ -217,8 +217,8 @@ class TestEndpointsRequierenAuth:
         body = {
             "event_day_id": sample_event_day.id,
             "event_state_id": "any-id",
-            "start_time": "2026-07-10T08:00:00Z",
-            "end_time": "2026-07-10T23:00:00Z",
+            "start_min": 0,
+            "end_min": 900,
             "reason": "test",
             "created_by": "tester",
         }

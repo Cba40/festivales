@@ -1,8 +1,8 @@
 import uuid
-from datetime import date, datetime, time
+from datetime import date, datetime
 from typing import Optional
 
-from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, String, Text, Time, UniqueConstraint, func, text
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -15,16 +15,14 @@ class EventDay(Base):
     event_id: Mapped[str] = mapped_column(String(36), ForeignKey("events.id"), nullable=False)
     date: Mapped[date] = mapped_column(Date, nullable=False)
     day_of_week: Mapped[str] = mapped_column(String(10), nullable=False)
-    entry_start_time: Mapped[time] = mapped_column(Time, nullable=False)
-    entry_peak_start_time: Mapped[time] = mapped_column(Time, nullable=False)
-    entry_peak_end_time: Mapped[time] = mapped_column(Time, nullable=False)
-    event_start_time: Mapped[time] = mapped_column(Time, nullable=False)
-    exit_peak_start_time: Mapped[time] = mapped_column(Time, nullable=False)
-    exit_peak_end_time: Mapped[time] = mapped_column(Time, nullable=False)
-    event_end_time: Mapped[time] = mapped_column(Time, nullable=False)
+    entry_start_min: Mapped[int] = mapped_column(Integer, nullable=False)
+    activity_peak_start_min: Mapped[int] = mapped_column(Integer, nullable=False)
+    activity_peak_end_min: Mapped[int] = mapped_column(Integer, nullable=False)
+    exit_start_min: Mapped[int] = mapped_column(Integer, nullable=False)
+    event_end_min: Mapped[int] = mapped_column(Integer, nullable=False)
     weather: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     headliner_artist: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    expected_attendance: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    estimated_attendance: Mapped[int] = mapped_column(Integer, nullable=False)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -38,7 +36,10 @@ class EventDay(Base):
         UniqueConstraint("event_id", "date", name="uq_event_day_event_date"),
         Index("ix_event_day_event_active", "event_id", "is_active", postgresql_where=text("is_active = true")),
         CheckConstraint(
-            "check_event_day_time_order(entry_start_time, entry_peak_start_time, entry_peak_end_time, event_start_time, exit_peak_start_time, exit_peak_end_time, event_end_time)",
-            name="ck_event_day_temporal_order"
+            "entry_start_min < activity_peak_start_min AND "
+            "activity_peak_start_min < activity_peak_end_min AND "
+            "activity_peak_end_min < exit_start_min AND "
+            "exit_start_min < event_end_min",
+            name="ck_event_day_minute_order"
         ),
     )

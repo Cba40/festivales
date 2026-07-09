@@ -1,5 +1,5 @@
 import os
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 import pytest
@@ -96,7 +96,7 @@ EVENT_STATE_SEEDS = [
         "description": "Apertura de puertas.",
         "is_initial": True,
         "is_final": False,
-        "rules": {"tipo": "horario", "campo_inicio": None, "campo_fin": "entry_peak_start_time"},
+        "rules": {"tipo": "minutos", "campo_inicio": None, "campo_fin": "activity_peak_start_min"},
     },
     {
         "id": EVENT_STATE_IDS["temprano"],
@@ -108,7 +108,7 @@ EVENT_STATE_SEEDS = [
         "description": "Pico de ingreso.",
         "is_initial": False,
         "is_final": False,
-        "rules": {"tipo": "horario", "campo_inicio": "entry_peak_start_time", "campo_fin": "event_start_time"},
+        "rules": {"tipo": "minutos", "campo_inicio": "activity_peak_start_min", "campo_fin": "activity_peak_end_min"},
     },
     {
         "id": EVENT_STATE_IDS["pico"],
@@ -120,7 +120,7 @@ EVENT_STATE_SEEDS = [
         "description": "Show principal en curso.",
         "is_initial": False,
         "is_final": False,
-        "rules": {"tipo": "horario", "campo_inicio": "event_start_time", "campo_fin": "exit_peak_start_time"},
+        "rules": {"tipo": "minutos", "campo_inicio": "activity_peak_end_min", "campo_fin": "exit_start_min"},
     },
     {
         "id": EVENT_STATE_IDS["cierre"],
@@ -132,7 +132,7 @@ EVENT_STATE_SEEDS = [
         "description": "Pico de salida.",
         "is_initial": False,
         "is_final": False,
-        "rules": {"tipo": "horario", "campo_inicio": "exit_peak_start_time", "campo_fin": "event_end_time"},
+        "rules": {"tipo": "minutos", "campo_inicio": "exit_start_min", "campo_fin": "event_end_min"},
     },
     {
         "id": EVENT_STATE_IDS["post_evento"],
@@ -144,57 +144,9 @@ EVENT_STATE_SEEDS = [
         "description": "Jornada finalizada.",
         "is_initial": False,
         "is_final": True,
-        "rules": {"tipo": "horario", "campo_inicio": "event_end_time", "campo_fin": None},
+        "rules": {"tipo": "minutos", "campo_inicio": "event_end_min", "campo_fin": None},
     },
 ]
-
-
-def _create_check_function(engine):
-    with engine.connect() as conn:
-        conn.execute(text("""
-            CREATE OR REPLACE FUNCTION check_event_day_time_order(
-                p_t1 TIME, p_t2 TIME, p_t3 TIME, p_t4 TIME,
-                p_t5 TIME, p_t6 TIME, p_t7 TIME
-            ) RETURNS BOOLEAN
-            LANGUAGE plpgsql IMMUTABLE RETURNS NULL ON NULL INPUT
-            AS $$
-            DECLARE
-                v_t1 INTEGER; v_t2 INTEGER; v_t3 INTEGER; v_t4 INTEGER;
-                v_t5 INTEGER; v_t6 INTEGER; v_t7 INTEGER;
-            BEGIN
-                v_t1 := EXTRACT(EPOCH FROM p_t1)::INTEGER;
-                v_t2 := EXTRACT(EPOCH FROM p_t2)::INTEGER;
-                v_t3 := EXTRACT(EPOCH FROM p_t3)::INTEGER;
-                v_t4 := EXTRACT(EPOCH FROM p_t4)::INTEGER;
-                v_t5 := EXTRACT(EPOCH FROM p_t5)::INTEGER;
-                v_t6 := EXTRACT(EPOCH FROM p_t6)::INTEGER;
-                v_t7 := EXTRACT(EPOCH FROM p_t7)::INTEGER;
-
-                IF v_t2 < v_t1 THEN v_t2 := v_t2 + 86400; END IF;
-                IF v_t3 < v_t2 THEN v_t3 := v_t3 + 86400; END IF;
-                IF v_t4 < v_t3 THEN v_t4 := v_t4 + 86400; END IF;
-                IF v_t5 < v_t4 THEN v_t5 := v_t5 + 86400; END IF;
-                IF v_t6 < v_t5 THEN v_t6 := v_t6 + 86400; END IF;
-                IF v_t7 < v_t6 THEN v_t7 := v_t7 + 86400; END IF;
-
-                IF v_t1 >= v_t2 THEN RETURN FALSE; END IF;
-                IF v_t2 >= v_t3 THEN RETURN FALSE; END IF;
-                IF v_t3 >= v_t4 THEN RETURN FALSE; END IF;
-                IF v_t4 >= v_t5 THEN RETURN FALSE; END IF;
-                IF v_t5 >= v_t6 THEN RETURN FALSE; END IF;
-                IF v_t6 >= v_t7 THEN RETURN FALSE; END IF;
-
-                RETURN TRUE;
-            END;
-            $$;
-        """))
-        conn.commit()
-
-
-def _drop_check_function(engine):
-    with engine.connect() as conn:
-        conn.execute(text("DROP FUNCTION IF EXISTS check_event_day_time_order"))
-        conn.commit()
 
 
 def _seed_event_states(session: Session):
@@ -238,12 +190,10 @@ def _seed_zone_types(session: Session):
 @pytest.fixture(scope="session")
 def test_engine():
     engine = create_engine(TEST_DATABASE_URL, pool_pre_ping=True)
-    _create_check_function(engine)
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     yield engine
     Base.metadata.drop_all(bind=engine)
-    _drop_check_function(engine)
     engine.dispose()
 
 
@@ -280,13 +230,52 @@ def sample_event_day(db_session: Session, sample_event: Event) -> EventDay:
         event_id=sample_event.id,
         date=date(2026, 7, 10),
         day_of_week="viernes",
-        entry_start_time=time(8, 0),
-        entry_peak_start_time=time(10, 0),
-        entry_peak_end_time=time(11, 0),
-        event_start_time=time(13, 0),
-        exit_peak_start_time=time(20, 0),
-        exit_peak_end_time=time(21, 0),
-        event_end_time=time(23, 0),
+        entry_start_min=480,
+        activity_peak_start_min=600,
+        activity_peak_end_min=660,
+        exit_start_min=1200,
+        event_end_min=1380,
+        estimated_attendance=50000,
+        is_active=True,
+    )
+    db_session.add(day)
+    db_session.flush()
+    return day
+
+
+@pytest.fixture
+def sample_event_day_cross_midnight(db_session: Session, sample_event: Event) -> EventDay:
+    day = EventDay(
+        id="test-day-cross",
+        event_id=sample_event.id,
+        date=date(2026, 7, 10),
+        day_of_week="viernes",
+        entry_start_min=1320,
+        activity_peak_start_min=1380,
+        activity_peak_end_min=1440,
+        exit_start_min=1560,
+        event_end_min=1620,
+        estimated_attendance=30000,
+        is_active=True,
+    )
+    db_session.add(day)
+    db_session.flush()
+    return day
+
+
+@pytest.fixture
+def sample_event_day_next(db_session: Session, sample_event: Event) -> EventDay:
+    day = EventDay(
+        id="test-day-next",
+        event_id=sample_event.id,
+        date=date(2026, 7, 11),
+        day_of_week="sabado",
+        entry_start_min=480,
+        activity_peak_start_min=600,
+        activity_peak_end_min=660,
+        exit_start_min=1200,
+        event_end_min=1380,
+        estimated_attendance=60000,
         is_active=True,
     )
     db_session.add(day)
@@ -332,6 +321,22 @@ def sample_zones(db_session: Session, sample_event: Event) -> list[Zone]:
         db_session.add(z)
     db_session.flush()
     return zones
+
+
+@pytest.fixture
+def sample_attendance_levels(db_session: Session, sample_event: Event) -> list:
+    from app.models.attendance_level import AttendanceLevel
+    levels = [
+        AttendanceLevel(id="al-baja", event_id=sample_event.id, name="Baja", min_people=0, max_people=5000, global_multiplier=0.8),
+        AttendanceLevel(id="al-media", event_id=sample_event.id, name="Media", min_people=5001, max_people=15000, global_multiplier=1.0),
+        AttendanceLevel(id="al-alta", event_id=sample_event.id, name="Alta", min_people=15001, max_people=30000, global_multiplier=1.3),
+        AttendanceLevel(id="al-muy-alta", event_id=sample_event.id, name="Muy Alta", min_people=30001, max_people=60000, global_multiplier=1.6),
+        AttendanceLevel(id="al-masiva", event_id=sample_event.id, name="Masiva", min_people=60001, max_people=None, global_multiplier=2.0),
+    ]
+    for al in levels:
+        db_session.add(al)
+    db_session.flush()
+    return levels
 
 
 @pytest.fixture

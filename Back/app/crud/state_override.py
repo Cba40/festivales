@@ -1,4 +1,3 @@
-from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import and_, select
@@ -23,13 +22,13 @@ class StateOverrideCRUD:
         stmt = select(StateOverride).offset(skip).limit(limit)
         return list(db.execute(stmt).scalars().all())
 
-    def get_active_overrides(self, db: Session, event_day_id: str, current_datetime: datetime) -> list[StateOverride]:
+    def get_active_overrides(self, db: Session, event_day_id: str, current_min: int) -> list[StateOverride]:
         stmt = select(StateOverride).where(
             and_(
                 StateOverride.event_day_id == event_day_id,
                 StateOverride.is_active == True,
-                StateOverride.start_time <= current_datetime,
-                StateOverride.end_time >= current_datetime,
+                StateOverride.start_min <= current_min,
+                StateOverride.end_min > current_min,
             )
         )
         return list(db.execute(stmt).scalars().all())

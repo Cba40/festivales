@@ -1,4 +1,4 @@
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, timezone
 from typing import Optional
 
 import pytest
@@ -36,8 +36,8 @@ class TestGetCurrentState:
             event_day_id=sample_event_day.id,
             event_state_id=state_pico.id,
             zone_type_id=None,
-            start_time=datetime(2026, 7, 10, 0, 0, tzinfo=timezone.utc),
-            end_time=datetime(2026, 7, 10, 23, 59, tzinfo=timezone.utc),
+            start_min=0,
+            end_min=900,
             reason="Test global override",
             created_by="tester",
             is_active=True,
@@ -62,8 +62,8 @@ class TestGetCurrentState:
             event_day_id=sample_event_day.id,
             event_state_id=state_pico.id,
             zone_type_id=zt_puesto.id,
-            start_time=datetime(2026, 7, 10, 0, 0, tzinfo=timezone.utc),
-            end_time=datetime(2026, 7, 10, 23, 59, tzinfo=timezone.utc),
+            start_min=0,
+            end_min=900,
             reason="Test specific override",
             created_by="tester",
             is_active=True,
@@ -77,15 +77,14 @@ class TestGetCurrentState:
         assert state.slug == "pre_apertura"
         assert active_override is None
 
-    def test_get_current_state_regla_horario_pre_apertura(
+    def test_get_current_state_regla_minutos_pre_apertura(
         self, db_session: Session, sample_event, sample_event_day
     ):
         dt = datetime(2026, 7, 10, 7, 59, tzinfo=timezone.utc)
         state, _ = context_engine.get_current_state(db_session, sample_event.id, dt)
-        assert state is not None
-        assert state.slug == "pre_apertura"
+        assert state is None
 
-    def test_get_current_state_regla_horario_temprano(
+    def test_get_current_state_regla_minutos_temprano(
         self, db_session: Session, sample_event, sample_event_day
     ):
         dt = datetime(2026, 7, 10, 10, 0, tzinfo=timezone.utc)
@@ -93,7 +92,7 @@ class TestGetCurrentState:
         assert state is not None
         assert state.slug == "temprano"
 
-    def test_get_current_state_regla_horario_pico(
+    def test_get_current_state_regla_minutos_pico(
         self, db_session: Session, sample_event, sample_event_day
     ):
         dt = datetime(2026, 7, 10, 13, 0, tzinfo=timezone.utc)
@@ -101,7 +100,7 @@ class TestGetCurrentState:
         assert state is not None
         assert state.slug == "pico"
 
-    def test_get_current_state_regla_horario_cierre(
+    def test_get_current_state_regla_minutos_cierre(
         self, db_session: Session, sample_event, sample_event_day
     ):
         dt = datetime(2026, 7, 10, 20, 0, tzinfo=timezone.utc)
@@ -109,13 +108,49 @@ class TestGetCurrentState:
         assert state is not None
         assert state.slug == "cierre"
 
-    def test_get_current_state_regla_horario_post_evento(
+    def test_get_current_state_regla_minutos_post_evento(
         self, db_session: Session, sample_event, sample_event_day
     ):
         dt = datetime(2026, 7, 10, 23, 0, tzinfo=timezone.utc)
         state, _ = context_engine.get_current_state(db_session, sample_event.id, dt)
         assert state is not None
         assert state.slug == "post_evento"
+
+    def test_get_current_state_cruce_medianoche(
+        self, db_session: Session, sample_event, sample_event_day_cross_midnight
+    ):
+        dt = datetime(2026, 7, 11, 2, 0, tzinfo=timezone.utc)
+        state, _ = context_engine.get_current_state(db_session, sample_event.id, dt)
+        assert state is not None
+
+    def test_get_current_state_override_evaluado_con_minutos(
+        self, db_session: Session, sample_event, sample_event_day
+    ):
+        state_pico = db_session.get(EventState, EVENT_STATE_IDS["pico"])
+        override = StateOverride(
+            id="override-min-1",
+            event_day_id=sample_event_day.id,
+            event_state_id=state_pico.id,
+            zone_type_id=None,
+            start_min=120,
+            end_min=720,
+            reason="Override de 10:00 a 20:00",
+            created_by="tester",
+            is_active=True,
+        )
+        db_session.add(override)
+        db_session.flush()
+
+        dt = datetime(2026, 7, 10, 15, 0, tzinfo=timezone.utc)
+        state, active_override = context_engine.get_current_state(db_session, sample_event.id, dt)
+        assert state is not None
+        assert state.slug == "pico"
+        assert active_override is not None
+
+        dt = datetime(2026, 7, 10, 21, 0, tzinfo=timezone.utc)
+        state, _ = context_engine.get_current_state(db_session, sample_event.id, dt)
+        assert state is not None
+        assert state.slug == "cierre"
 
 
 class TestComputePredictions:
@@ -149,7 +184,7 @@ class TestComputePredictions:
         db_session.add(edzf)
         db_session.flush()
 
-        dt = datetime(2026, 7, 10, 11, 0, tzinfo=timezone.utc)
+        dt = datetime(2026, 7, 10, 10, 15, tzinfo=timezone.utc)
         result = context_engine.compute_predictions(db_session, sample_event.id, dt)
         assert result["estado_actual"] is not None
         assert result["estado_actual"].slug == "temprano"
@@ -163,7 +198,7 @@ class TestComputePredictions:
     def test_compute_predictions_fallback_default_factors(
         self, db_session: Session, sample_event, sample_event_day, sample_zones
     ):
-        dt = datetime(2026, 7, 10, 11, 0, tzinfo=timezone.utc)
+        dt = datetime(2026, 7, 10, 10, 0, tzinfo=timezone.utc)
         result = context_engine.compute_predictions(db_session, sample_event.id, dt)
 
         zona_bano = next(z for z in result["zonas"] if z["id"] == "zone-bano-1")
@@ -199,7 +234,7 @@ class TestComputePredictions:
         db_session.add(impact)
         db_session.flush()
 
-        dt = datetime(2026, 7, 10, 11, 0, tzinfo=timezone.utc)
+        dt = datetime(2026, 7, 10, 10, 0, tzinfo=timezone.utc)
         result = context_engine.compute_predictions(db_session, sample_event.id, dt)
 
         zona_bano_result = next(z for z in result["zonas"] if z["id"] == "zone-bano-1")
@@ -239,7 +274,7 @@ class TestComputePredictions:
         db_session.add(impact)
         db_session.flush()
 
-        dt = datetime(2026, 7, 10, 11, 0, tzinfo=timezone.utc)
+        dt = datetime(2026, 7, 10, 10, 0, tzinfo=timezone.utc)
         result = context_engine.compute_predictions(db_session, sample_event.id, dt)
 
         zona_bano = next(z for z in result["zonas"] if z["id"] == "zone-bano-1")
@@ -273,26 +308,71 @@ class TestComputePredictions:
         assert zona_comida["factores"]["attendance"] == 0.0
         assert zona_comida["factores"]["resource"] == 2.0
 
+    def test_compute_predictions_con_attendance_level(
+        self, db_session: Session, sample_event, sample_event_day, sample_zones, sample_attendance_levels
+    ):
+        dt = datetime(2026, 7, 10, 10, 0, tzinfo=timezone.utc)
+        result = context_engine.compute_predictions(db_session, sample_event.id, dt)
+
+        zona_comida = next(z for z in result["zonas"] if z["id"] == "zone-comida-1")
+        assert result["estado_actual"] is not None
+        assert result["estado_actual"].slug == "temprano"
+        assert abs(zona_comida["prediccion"]["attendance_predicha"] - 1.0 * 0.5 * 1.6) < 0.01
+
+    def test_compute_predictions_attendance_level_fallback(
+        self, db_session: Session, sample_event, sample_event_day, sample_zones
+    ):
+        dt = datetime(2026, 7, 10, 10, 0, tzinfo=timezone.utc)
+        result = context_engine.compute_predictions(db_session, sample_event.id, dt)
+
+        zona_comida = next(z for z in result["zonas"] if z["id"] == "zone-comida-1")
+        expected_attendance = 1.0 * 0.5 * 1.0
+        assert abs(zona_comida["prediccion"]["attendance_predicha"] - expected_attendance) < 0.01
+
+    def test_compute_predictions_attendance_level_limite_exacto(
+        self, db_session: Session, sample_event, sample_event_day, sample_zones, sample_attendance_levels
+    ):
+        sample_event_day.estimated_attendance = 15000
+        db_session.flush()
+
+        dt = datetime(2026, 7, 10, 10, 0, tzinfo=timezone.utc)
+        result = context_engine.compute_predictions(db_session, sample_event.id, dt)
+
+        zona_comida = next(z for z in result["zonas"] if z["id"] == "zone-comida-1")
+        assert abs(zona_comida["prediccion"]["attendance_predicha"] - 1.0 * 0.5 * 1.0) < 0.01
+
+    def test_compute_predictions_attendance_level_abierto(
+        self, db_session: Session, sample_event, sample_event_day, sample_zones, sample_attendance_levels
+    ):
+        sample_event_day.estimated_attendance = 100000
+        db_session.flush()
+
+        dt = datetime(2026, 7, 10, 10, 0, tzinfo=timezone.utc)
+        result = context_engine.compute_predictions(db_session, sample_event.id, dt)
+
+        zona_comida = next(z for z in result["zonas"] if z["id"] == "zone-comida-1")
+        assert abs(zona_comida["prediccion"]["attendance_predicha"] - 1.0 * 0.5 * 2.0) < 0.01
+
 
 class TestEvaluateCompuestoRule:
 
     def test_evaluate_compuesto_rule_and(
         self, db_session: Session, sample_event, sample_event_day
     ):
+        current_min = 180
         rule = {
             "tipo": "compuesto",
             "operador": "AND",
             "reglas": [
-                {"tipo": "horario", "campo_inicio": "entry_peak_start_time", "campo_fin": "event_start_time"},
-                {"tipo": "horario", "campo_inicio": "entry_start_time", "campo_fin": "event_end_time"},
+                {"tipo": "minutos", "campo_inicio": "activity_peak_start_min", "campo_fin": "exit_start_min"},
+                {"tipo": "minutos", "campo_inicio": "entry_start_min", "campo_fin": "event_end_min"},
             ],
         }
-        current_time = time(11, 0)
-        result = context_engine._evaluate_compuesto_rule(rule, sample_event_day, current_time)
+        result = context_engine._evaluate_compuesto_rule(rule, sample_event_day, current_min)
         assert result is True
 
-        current_time = time(7, 0)
-        result = context_engine._evaluate_compuesto_rule(rule, sample_event_day, current_time)
+        current_min = -1
+        result = context_engine._evaluate_compuesto_rule(rule, sample_event_day, current_min)
         assert result is False
 
     def test_evaluate_compuesto_rule_or(
@@ -302,14 +382,14 @@ class TestEvaluateCompuestoRule:
             "tipo": "compuesto",
             "operador": "OR",
             "reglas": [
-                {"tipo": "horario", "campo_inicio": "event_start_time", "campo_fin": "exit_peak_start_time"},
-                {"tipo": "horario", "campo_inicio": "entry_peak_start_time", "campo_fin": "event_start_time"},
+                {"tipo": "minutos", "campo_inicio": "activity_peak_end_min", "campo_fin": "exit_start_min"},
+                {"tipo": "minutos", "campo_inicio": "activity_peak_start_min", "campo_fin": "activity_peak_end_min"},
             ],
         }
-        current_time = time(14, 0)
-        result = context_engine._evaluate_compuesto_rule(rule, sample_event_day, current_time)
+        current_min = 700
+        result = context_engine._evaluate_compuesto_rule(rule, sample_event_day, current_min)
         assert result is True
 
-        current_time = time(7, 0)
-        result = context_engine._evaluate_compuesto_rule(rule, sample_event_day, current_time)
+        current_min = 0
+        result = context_engine._evaluate_compuesto_rule(rule, sample_event_day, current_min)
         assert result is False

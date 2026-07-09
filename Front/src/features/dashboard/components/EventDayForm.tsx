@@ -14,37 +14,44 @@ const DAYS_OF_WEEK = [
 
 const WEATHER_OPTIONS = [
   { value: '', label: 'Sin especificar' },
-  { value: 'soleado', label: '☀️ Soleado' },
-  { value: 'nublado', label: '☁️ Nublado' },
-  { value: 'lluvioso', label: '🌧️ Lluvioso' },
-  { value: 'tormenta', label: '⛈️ Tormenta' },
+  { value: 'soleado', label: 'Soleado' },
+  { value: 'nublado', label: 'Nublado' },
+  { value: 'lluvioso', label: 'Lluvioso' },
+  { value: 'tormenta', label: 'Tormenta' },
 ];
 
-const TIME_LABELS: { key: keyof EventDayCreatePayload; label: string; hint: string }[] = [
-  { key: 'entry_start_time', label: 'Apertura de puertas', hint: 'Comienza el ingreso del público' },
-  { key: 'entry_peak_start_time', label: 'Inicio pico de ingreso', hint: 'Mayor caudal de entrada' },
-  { key: 'entry_peak_end_time', label: 'Fin pico de ingreso', hint: 'Disminuye el caudal de entrada' },
-  { key: 'event_start_time', label: 'Inicio del show', hint: 'Comienza el evento principal' },
-  { key: 'exit_peak_start_time', label: 'Inicio pico de salida', hint: 'Comienza la salida masiva' },
-  { key: 'exit_peak_end_time', label: 'Fin pico de salida', hint: 'Disminuye la salida masiva' },
-  { key: 'event_end_time', label: 'Cierre total', hint: 'Finaliza la jornada' },
+const TIME_LABELS: { key: string; label: string; hint: string }[] = [
+  { key: 'entry_start_min', label: 'Apertura de puertas', hint: 'Comienza el ingreso del público' },
+  { key: 'activity_peak_start_min', label: 'Inicio pico de ingreso', hint: 'Mayor caudal de entrada' },
+  { key: 'activity_peak_end_min', label: 'Fin pico de ingreso', hint: 'Disminuye el caudal de entrada' },
+  { key: 'exit_start_min', label: 'Inicio pico de salida', hint: 'Comienza la salida masiva' },
+  { key: 'event_end_min', label: 'Cierre total', hint: 'Finaliza la jornada' },
 ];
 
-function isValidTimeOrder(times: Record<string, string>): { valid: boolean; error: string | null } {
-  const order: (keyof EventDayCreatePayload)[] = [
-    'entry_start_time',
-    'entry_peak_start_time',
-    'entry_peak_end_time',
-    'event_start_time',
-    'exit_peak_start_time',
-    'exit_peak_end_time',
-    'event_end_time',
+function minutesToTimeStr(min: number): string {
+  const h = Math.floor(min / 60).toString().padStart(2, '0');
+  const m = (min % 60).toString().padStart(2, '0');
+  return `${h}:${m}`;
+}
+
+function timeStrToMinutes(t: string): number {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function isValidTimeOrder(times: Record<string, number>): { valid: boolean; error: string | null } {
+  const order: string[] = [
+    'entry_start_min',
+    'activity_peak_start_min',
+    'activity_peak_end_min',
+    'exit_start_min',
+    'event_end_min',
   ];
 
   for (let i = 0; i < order.length - 1; i++) {
     const a = times[order[i]];
     const b = times[order[i + 1]];
-    if (!a || !b) {
+    if (a == null || b == null) {
       return { valid: false, error: 'Todos los horarios son obligatorios' };
     }
     if (a >= b) {
@@ -52,7 +59,7 @@ function isValidTimeOrder(times: Record<string, string>): { valid: boolean; erro
       const nextLabel = TIME_LABELS.find(t => t.key === order[i + 1])?.label ?? order[i + 1];
       return {
         valid: false,
-        error: `"${prevLabel}" (${a}) debe ser anterior a "${nextLabel}" (${b})`,
+        error: `"${prevLabel}" debe ser anterior a "${nextLabel}"`,
       };
     }
   }
@@ -67,18 +74,16 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
   const [dayOfWeek, setDayOfWeek] = useState('');
   const [weather, setWeather] = useState('');
   const [headlinerArtist, setHeadlinerArtist] = useState('');
-  const [expectedAttendance, setExpectedAttendance] = useState('');
+  const [estimatedAttendance, setEstimatedAttendance] = useState('');
   const [notes, setNotes] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  const [entryStartTime, setEntryStartTime] = useState('');
-  const [entryPeakStartTime, setEntryPeakStartTime] = useState('');
-  const [entryPeakEndTime, setEntryPeakEndTime] = useState('');
-  const [eventStartTime, setEventStartTime] = useState('');
-  const [exitPeakStartTime, setExitPeakStartTime] = useState('');
-  const [exitPeakEndTime, setExitPeakEndTime] = useState('');
-  const [eventEndTime, setEventEndTime] = useState('');
+  const [entryStartMin, setEntryStartMin] = useState('');
+  const [activityPeakStartMin, setActivityPeakStartMin] = useState('');
+  const [activityPeakEndMin, setActivityPeakEndMin] = useState('');
+  const [exitStartMin, setExitStartMin] = useState('');
+  const [eventEndMin, setEventEndMin] = useState('');
 
   useEffect(() => {
     if (eventDay) {
@@ -86,14 +91,12 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
       setDayOfWeek(eventDay.day_of_week);
       setWeather(eventDay.weather ?? '');
       setHeadlinerArtist(eventDay.headliner_artist ?? '');
-      setExpectedAttendance(eventDay.expected_attendance?.toString() ?? '');
-      setEntryStartTime(eventDay.entry_start_time ?? '');
-      setEntryPeakStartTime(eventDay.entry_peak_start_time ?? '');
-      setEntryPeakEndTime(eventDay.entry_peak_end_time ?? '');
-      setEventStartTime(eventDay.event_start_time ?? '');
-      setExitPeakStartTime(eventDay.exit_peak_start_time ?? '');
-      setExitPeakEndTime(eventDay.exit_peak_end_time ?? '');
-      setEventEndTime(eventDay.event_end_time ?? '');
+      setEstimatedAttendance(eventDay.estimated_attendance?.toString() ?? '');
+      setEntryStartMin(minutesToTimeStr(eventDay.entry_start_min));
+      setActivityPeakStartMin(minutesToTimeStr(eventDay.activity_peak_start_min));
+      setActivityPeakEndMin(minutesToTimeStr(eventDay.activity_peak_end_min));
+      setExitStartMin(minutesToTimeStr(eventDay.exit_start_min));
+      setEventEndMin(minutesToTimeStr(eventDay.event_end_min));
       setNotes(eventDay.notes ?? '');
       setIsActive(eventDay.is_active);
     }
@@ -104,17 +107,24 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
     setValidationError(null);
     if (!date || !dayOfWeek) return;
 
-    const times = {
-      entry_start_time: entryStartTime,
-      entry_peak_start_time: entryPeakStartTime,
-      entry_peak_end_time: entryPeakEndTime,
-      event_start_time: eventStartTime,
-      exit_peak_start_time: exitPeakStartTime,
-      exit_peak_end_time: exitPeakEndTime,
-      event_end_time: eventEndTime,
+    const timeValues = {
+      entry_start_min: entryStartMin,
+      activity_peak_start_min: activityPeakStartMin,
+      activity_peak_end_min: activityPeakEndMin,
+      exit_start_min: exitStartMin,
+      event_end_min: eventEndMin,
     };
 
-    const timeValidation = isValidTimeOrder(times);
+    const minuteValues: Record<string, number> = {};
+    for (const [key, val] of Object.entries(timeValues)) {
+      if (!val) {
+        setValidationError('Todos los horarios son obligatorios');
+        return;
+      }
+      minuteValues[key] = timeStrToMinutes(val);
+    }
+
+    const timeValidation = isValidTimeOrder(minuteValues);
     if (!timeValidation.valid) {
       setValidationError(timeValidation.error);
       return;
@@ -123,10 +133,10 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
     const payload: EventDayCreatePayload = {
       date,
       day_of_week: dayOfWeek,
-      ...times,
+      ...minuteValues,
       weather: weather || null,
       headliner_artist: headlinerArtist || null,
-      expected_attendance: expectedAttendance ? parseInt(expectedAttendance, 10) : null,
+      estimated_attendance: estimatedAttendance ? parseInt(estimatedAttendance, 10) : 0,
       notes: notes || null,
       is_active: isActive,
     };
@@ -145,23 +155,19 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
   };
 
   const timeSetters: Record<string, React.Dispatch<React.SetStateAction<string>>> = {
-    entry_start_time: setEntryStartTime,
-    entry_peak_start_time: setEntryPeakStartTime,
-    entry_peak_end_time: setEntryPeakEndTime,
-    event_start_time: setEventStartTime,
-    exit_peak_start_time: setExitPeakStartTime,
-    exit_peak_end_time: setExitPeakEndTime,
-    event_end_time: setEventEndTime,
+    entry_start_min: setEntryStartMin,
+    activity_peak_start_min: setActivityPeakStartMin,
+    activity_peak_end_min: setActivityPeakEndMin,
+    exit_start_min: setExitStartMin,
+    event_end_min: setEventEndMin,
   };
 
   const timeValues: Record<string, string> = {
-    entry_start_time: entryStartTime,
-    entry_peak_start_time: entryPeakStartTime,
-    entry_peak_end_time: entryPeakEndTime,
-    event_start_time: eventStartTime,
-    exit_peak_start_time: exitPeakStartTime,
-    exit_peak_end_time: exitPeakEndTime,
-    event_end_time: eventEndTime,
+    entry_start_min: entryStartMin,
+    activity_peak_start_min: activityPeakStartMin,
+    activity_peak_end_min: activityPeakEndMin,
+    exit_start_min: exitStartMin,
+    event_end_min: eventEndMin,
   };
 
   return (
@@ -222,8 +228,8 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
           <input
             type="number"
             min={0}
-            value={expectedAttendance}
-            onChange={(e) => setExpectedAttendance(e.target.value)}
+            value={estimatedAttendance}
+            onChange={(e) => setEstimatedAttendance(e.target.value)}
             placeholder="Ej: 50000"
             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />

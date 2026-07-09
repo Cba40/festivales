@@ -99,8 +99,8 @@ class TestSmokeE2E:
             "event_day_id": sample_event_day.id,
             "event_state_id": state_pico.id,
             "zone_type_id": None,
-            "start_time": "2026-07-10T08:00:00Z",
-            "end_time": "2026-07-10T23:00:00Z",
+            "start_min": 480,
+            "end_min": 1380,
             "reason": "Smoke test override",
             "created_by": "smoke_tester",
         }
