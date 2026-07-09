@@ -22,7 +22,7 @@ from app.schemas.state_override import (
     StateOverrideResponse,
 )
 from app.schemas.zone_prediction import ContextEngineResponse, CurrentStateResponse
-from app.services import context_engine
+from app.services import context_engine as context_engine_service
 
 router = APIRouter(prefix="/api/events/{event_id}/context-engine", tags=["context-engine"])
 
@@ -52,7 +52,7 @@ def get_current_state(
     _=Depends(verify_token),
 ):
     _get_event_or_404(db, event_id)
-    state, override = context_engine.get_current_state(db, event_id, datetime_actual)
+    state, override = context_engine_service.get_current_state(db, event_id, datetime_actual)
     return {"estado_actual": state, "override_activo": override}
 
 
@@ -64,7 +64,7 @@ def get_predictions(
     _=Depends(verify_token),
 ):
     _get_event_or_404(db, event_id)
-    result = context_engine.compute_predictions(db, event_id, datetime_actual)
+    result = context_engine_service.compute_predictions(db, event_id, datetime_actual)
     return result
 
 
