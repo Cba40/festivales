@@ -1,5 +1,12 @@
 {
+  "functions": {
+    "Back/app/main.py": {
+      "runtime": "@vercel/python@4.5.0",
+      "memory": 512,
+      "maxDuration": 30
+    }
+  },
   "rewrites": [
-    { "source": "/(.*)", "destination": "/app/main.py" }
+    { "source": "/(.*)", "destination": "/Back/app/main.py" }
   ]
 }
