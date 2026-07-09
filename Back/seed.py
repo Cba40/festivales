@@ -370,6 +370,12 @@ def main():
         session.commit()
 
         event = get_or_create_event(session)
+        # Asegurar que el evento esté persistido antes de crear entidades con FK
+        session.commit()
+
+        # Re-obtener el evento desde la base para garantizar consistencia del id
+        event = session.query(Event).filter(Event.id == event.id).first()
+
         seed_zones(session, event)
         session.commit()
         print(f"\n\U0001f4cb VITE_EVENT_ID={event.id}")
