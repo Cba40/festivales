@@ -18,6 +18,4 @@ class ZoneType(Base):
     default_factors: Mapped[dict] = mapped_column(JSON, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    event_day_zone_factors = relationship("EventDayZoneFactor", back_populates="zone_type")
-    state_overrides = relationship("StateOverride", back_populates="zone_type")
     incident_impacts = relationship("IncidentImpact", back_populates="zone_type")

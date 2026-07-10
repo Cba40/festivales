@@ -1,9 +1,15 @@
+import asyncio
 import os
+import sys
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 import pytest
 from fastapi.testclient import TestClient
+
+# Windows: psycopg async requires SelectorEventLoop, not ProactorEventLoop
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 from jose import jwt
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
@@ -13,23 +19,12 @@ from app.db.session import Base, get_db
 from app.main import app
 from app.models.event import Event
 from app.models.event_day import EventDay
-from app.models.event_day_zone_factor import EventDayZoneFactor
-from app.models.event_state import EventState
 from app.models.incident import Incident
 from app.models.incident_impact import IncidentImpact
-from app.models.state_override import StateOverride
 from app.models.zone import Zone
 from app.models.zone_type import ZoneType
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", settings.DATABASE_URL)
-
-EVENT_STATE_IDS = {
-    "pre_apertura": "a1111111-1111-1111-1111-111111111111",
-    "temprano": "a2222222-2222-2222-2222-222222222222",
-    "pico": "a3333333-3333-3333-3333-333333333333",
-    "cierre": "a4444444-4444-4444-4444-444444444444",
-    "post_evento": "a5555555-5555-5555-5555-555555555555",
-}
 
 ZONE_TYPE_IDS = {
     "puesto_comida": "b1111111-1111-1111-1111-111111111111",
@@ -85,76 +80,6 @@ ZONE_TYPE_DEFAULT_FACTORS = {
     },
 }
 
-EVENT_STATE_SEEDS = [
-    {
-        "id": EVENT_STATE_IDS["pre_apertura"],
-        "event_id": None,
-        "name": "Pre-apertura",
-        "slug": "pre_apertura",
-        "sort_order": 0,
-        "color": "#94a3b8",
-        "description": "Apertura de puertas.",
-        "is_initial": True,
-        "is_final": False,
-        "rules": {"tipo": "minutos", "campo_inicio": None, "campo_fin": "activity_peak_start_min"},
-    },
-    {
-        "id": EVENT_STATE_IDS["temprano"],
-        "event_id": None,
-        "name": "Temprano",
-        "slug": "temprano",
-        "sort_order": 1,
-        "color": "#3b82f6",
-        "description": "Pico de ingreso.",
-        "is_initial": False,
-        "is_final": False,
-        "rules": {"tipo": "minutos", "campo_inicio": "activity_peak_start_min", "campo_fin": "activity_peak_end_min"},
-    },
-    {
-        "id": EVENT_STATE_IDS["pico"],
-        "event_id": None,
-        "name": "Pico",
-        "slug": "pico",
-        "sort_order": 2,
-        "color": "#ef4444",
-        "description": "Show principal en curso.",
-        "is_initial": False,
-        "is_final": False,
-        "rules": {"tipo": "minutos", "campo_inicio": "activity_peak_end_min", "campo_fin": "exit_start_min"},
-    },
-    {
-        "id": EVENT_STATE_IDS["cierre"],
-        "event_id": None,
-        "name": "Cierre",
-        "slug": "cierre",
-        "sort_order": 3,
-        "color": "#f59e0b",
-        "description": "Pico de salida.",
-        "is_initial": False,
-        "is_final": False,
-        "rules": {"tipo": "minutos", "campo_inicio": "exit_start_min", "campo_fin": "event_end_min"},
-    },
-    {
-        "id": EVENT_STATE_IDS["post_evento"],
-        "event_id": None,
-        "name": "Post-evento",
-        "slug": "post_evento",
-        "sort_order": 4,
-        "color": "#6366f1",
-        "description": "Jornada finalizada.",
-        "is_initial": False,
-        "is_final": True,
-        "rules": {"tipo": "minutos", "campo_inicio": "event_end_min", "campo_fin": None},
-    },
-]
-
-
-def _seed_event_states(session: Session):
-    for data in EVENT_STATE_SEEDS:
-        exists = session.get(EventState, data["id"])
-        if not exists:
-            session.add(EventState(**data))
-
 
 def _seed_zone_types(session: Session):
     for slug, factors in ZONE_TYPE_DEFAULT_FACTORS.items():
@@ -204,7 +129,6 @@ def db_session(test_engine):
     session = Session(bind=connection)
     session.begin_nested()
 
-    _seed_event_states(session)
     _seed_zone_types(session)
     session.flush()
 

@@ -4,6 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+import logging
+
+logger = logging.getLogger(__name__)
 from app.models.event import Event
 from app.models.incident import Incident
 from app.models.zone import Zone
@@ -20,6 +23,7 @@ def list_incidents(
 ):
     event = db.query(Event).filter(Event.id == event_id).first()
     if not event:
+        logger.info("incidents.list_incidents: Event not found event_id=%s", event_id)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
     incidents = db.query(Incident).filter(Incident.event_id == event_id).order_by(Incident.created_at.desc()).all()
     return incidents
@@ -39,6 +43,7 @@ def create_incident(
     if body.zone_id:
         zone = db.query(Zone).filter(Zone.id == body.zone_id, Zone.event_id == event_id).first()
         if not zone:
+            logger.info("incidents.create_incident: Zone not found event_id=%s zone_id=%s", event_id, body.zone_id)
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Zone not found")
 
     incident = Incident(

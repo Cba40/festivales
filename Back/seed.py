@@ -2,14 +2,19 @@
 # Script idempotente: ejecutar múltiples veces sin duplicar datos.
 
 import sys
+from datetime import datetime, timezone, timedelta
 sys.path.insert(0, '.')
 
+from sqlalchemy import text
 from app.db.session import SessionLocal
 from app.models.event import Event
 from app.models.zone import Zone
 
+EVENT_ID = "663e6e32-9d4a-4f20-b992-3585b9310522"
+
 EVENT_SLUG = "festival-jesus-maria-2026"
 
+TZ = timezone(timedelta(hours=-3))
 EVENT_DATA = {
     "name": "Festival de Jesús María 2026",
     "description": (
@@ -18,8 +23,8 @@ EVENT_DATA = {
         "combinando destreza gaucha, música folklórica y tradición."
     ),
     "location": "Jesús María, Córdoba, Argentina",
-    "start_date": "2026-07-15T00:00:00-03:00",
-    "end_date": "2026-07-25T23:59:00-03:00",
+    "start_date": datetime(2026, 7, 15, 0, 0, tzinfo=TZ),
+    "end_date": datetime(2026, 7, 25, 23, 59, tzinfo=TZ),
 }
 
 ZONES_DATA = [
@@ -290,21 +295,26 @@ ZONES_DATA = [
 
 
 def get_or_create_event(session):
-    event = session.query(Event).filter(Event.name == EVENT_DATA["name"]).first()
+    event = session.query(Event).filter(Event.id == EVENT_ID).first()
     if event:
-        print(f"\u2139\ufe0f Evento ya existe: {event.name} (id={event.id})")
+        print(f"ℹ️ Evento ya existe: {event.name} (id={event.id})")
         return event
 
-    event = Event(
-        name=EVENT_DATA["name"],
-        description=EVENT_DATA["description"],
-        location=EVENT_DATA["location"],
-        start_date=EVENT_DATA["start_date"],
-        end_date=EVENT_DATA["end_date"],
-    )
-    session.add(event)
-    session.flush()
-    print(f"\u2705 Evento creado: {event.name} (id={event.id})")
+    session.execute(text("""
+        INSERT INTO events (id, name, description, location, start_date, end_date)
+        VALUES (:id, :name, :description, :location, :start_date, :end_date)
+    """), {
+        "id": EVENT_ID,
+        "name": EVENT_DATA["name"],
+        "description": EVENT_DATA["description"],
+        "location": EVENT_DATA["location"],
+        "start_date": EVENT_DATA["start_date"],
+        "end_date": EVENT_DATA["end_date"],
+    })
+    session.commit()
+
+    event = session.query(Event).filter(Event.id == EVENT_ID).first()
+    print(f"✅ Evento creado: {event.name} (id={event.id})")
     return event
 
 

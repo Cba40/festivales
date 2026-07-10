@@ -12,34 +12,21 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["health"])
 
-P2_TABLES = [
-    "event_states",
-    "zone_types",
-    "event_day_zone_factors",
-    "state_overrides",
-    "incident_impacts",
-]
-
-P2_TIME_COLUMNS = [
-    "entry_start_time",
-    "entry_peak_start_time",
-    "entry_peak_end_time",
-    "event_start_time",
-    "exit_peak_start_time",
-    "exit_peak_end_time",
-    "event_end_time",
+P3_TABLES = [
+    "operational_profiles",
+    "event_days",
 ]
 
 
-@router.get("/health/p2")
-def health_p2(
+@router.get("/health/p3")
+def health_p3(
     db: Session = Depends(get_db),
     _=Depends(verify_token),
 ):
     checks = {}
 
     table_ok = True
-    for table in P2_TABLES:
+    for table in P3_TABLES:
         result = db.execute(
             text("SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = :t"),
             {"t": table},
@@ -48,34 +35,17 @@ def health_p2(
         if not result:
             table_ok = False
 
-    columns_ok = True
-    column_check = True
-    for col in P2_TIME_COLUMNS:
-        result = db.execute(
-            text(
-                "SELECT 1 FROM information_schema.columns "
-                "WHERE table_schema = 'public' AND table_name = 'event_days' AND column_name = :c"
-            ),
-            {"c": col},
-        ).scalar()
-        if not result:
-            column_check = False
-            columns_ok = False
-    checks["columnas"] = column_check
+    profile_count = db.execute(text("SELECT COUNT(*) FROM operational_profiles")).scalar() or 0
+    event_day_count = db.execute(text("SELECT COUNT(*) FROM event_days")).scalar() or 0
+    checks["operational_profiles"] = profile_count
+    checks["event_days"] = event_day_count
 
-    state_count = db.execute(text("SELECT COUNT(*) FROM event_states")).scalar() or 0
-    zone_count = db.execute(text("SELECT COUNT(*) FROM zone_types")).scalar() or 0
-    checks["seed_states"] = state_count
-    checks["seed_zone_types"] = zone_count
-
-    seed_ok = state_count >= 5 and zone_count >= 6
-
-    status = "ok" if (table_ok and columns_ok and seed_ok) else "degraded"
+    status = "ok" if table_ok else "degraded"
 
     if status == "degraded":
         logger.warning(
-            "Health check P2 degraded: tables=%s cols=%s states=%s zone_types=%s",
-            table_ok, columns_ok, state_count, zone_count,
+            "Health check P3 degraded: tables=%s profiles=%s event_days=%s",
+            table_ok, profile_count, event_day_count,
         )
 
     return {

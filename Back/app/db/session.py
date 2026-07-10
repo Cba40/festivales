@@ -1,12 +1,17 @@
 # backend/app/db/session.py
 
 from sqlalchemy import create_engine
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 from app.core.config import settings
 
 engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+async_engine = create_async_engine(settings.DATABASE_URL, pool_pre_ping=True)
+AsyncSessionLocal = async_sessionmaker(autocommit=False, autoflush=False, bind=async_engine)
+
 Base = declarative_base()
 
 
@@ -16,6 +21,14 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+async def get_async_db():
+    async with AsyncSessionLocal() as db:
+        try:
+            yield db
+        finally:
+            await db.close()
 
 
 # NOTA: migraciones gestionadas por Alembic, no crear tablas aquí

@@ -1,37 +1,47 @@
 from datetime import date, datetime
 from typing import Optional
+from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, field_serializer, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator, model_validator
 
 
 class EventDayCreate(BaseModel):
     date: date
     day_of_week: str
-    entry_start_min: int
-    activity_peak_start_min: int
-    activity_peak_end_min: int
-    exit_start_min: int
-    event_end_min: int
     weather: Optional[str] = None
     headliner_artist: Optional[str] = None
     estimated_attendance: int = 0
     notes: Optional[str] = None
     is_active: bool = True
+    operational_profile_id: UUID
+    operational_start_min: int = Field(ge=0)
+    operational_end_min: int = Field(ge=0)
+
+    @model_validator(mode='after')
+    def check_operational_end(self) -> 'EventDayCreate':
+        if self.operational_end_min <= self.operational_start_min:
+            raise ValueError('operational_end_min must be greater than operational_start_min')
+        return self
 
 
 class EventDayUpdate(BaseModel):
     date: Optional[date] = None
     day_of_week: Optional[str] = None
-    entry_start_min: Optional[int] = None
-    activity_peak_start_min: Optional[int] = None
-    activity_peak_end_min: Optional[int] = None
-    exit_start_min: Optional[int] = None
-    event_end_min: Optional[int] = None
     weather: Optional[str] = None
     headliner_artist: Optional[str] = None
     estimated_attendance: Optional[int] = None
     notes: Optional[str] = None
     is_active: Optional[bool] = None
+    operational_profile_id: Optional[UUID] = None
+    operational_start_min: Optional[int] = Field(default=None, ge=0)
+    operational_end_min: Optional[int] = None
+
+    @model_validator(mode='after')
+    def check_operational_end(self) -> 'EventDayUpdate':
+        if self.operational_start_min is not None and self.operational_end_min is not None:
+            if self.operational_end_min <= self.operational_start_min:
+                raise ValueError('operational_end_min must be greater than operational_start_min')
+        return self
 
 
 class EventDayResponse(BaseModel):
@@ -39,16 +49,14 @@ class EventDayResponse(BaseModel):
     event_id: str
     date: date
     day_of_week: str
-    entry_start_min: int
-    activity_peak_start_min: int
-    activity_peak_end_min: int
-    exit_start_min: int
-    event_end_min: int
     weather: Optional[str]
     headliner_artist: Optional[str]
     estimated_attendance: int
     notes: Optional[str]
     is_active: bool
+    operational_profile_id: UUID
+    operational_start_min: int
+    operational_end_min: int
     created_at: datetime
     updated_at: datetime
 
@@ -70,15 +78,13 @@ class EventDaySummary(BaseModel):
     id: str
     date: date
     day_of_week: str
-    entry_start_min: int
-    activity_peak_start_min: int
-    activity_peak_end_min: int
-    exit_start_min: int
-    event_end_min: int
     weather: Optional[str]
     headliner_artist: Optional[str]
     estimated_attendance: int
     is_active: bool
+    operational_profile_id: UUID
+    operational_start_min: int
+    operational_end_min: int
 
     @field_validator("date", mode="before")
     @classmethod
