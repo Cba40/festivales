@@ -45,15 +45,28 @@ export interface Incident {
   zoneId?: string;
 }
 
+export interface OperationalPhaseDTO {
+  id: string;
+  operational_profile_id: string;
+  name: string;
+  start_min: number;
+  end_min: number;
+  sort_order: number;
+}
+
+export interface OperationalProfileDTO {
+  id: string;
+  name: string;
+  description: string;
+}
+
 export interface EventDaySummary {
   id: string;
   date: string;
   day_of_week: string;
-  entry_start_min: number;
-  activity_peak_start_min: number;
-  activity_peak_end_min: number;
-  exit_start_min: number;
-  event_end_min: number;
+  operational_profile_id: string;
+  operational_start_min: number;
+  operational_end_min: number;
   weather: string | null;
   headliner_artist: string | null;
   estimated_attendance: number | null;
@@ -65,11 +78,9 @@ export interface EventDay {
   event_id: string;
   date: string;
   day_of_week: string;
-  entry_start_min: number;
-  activity_peak_start_min: number;
-  activity_peak_end_min: number;
-  exit_start_min: number;
-  event_end_min: number;
+  operational_profile_id: string;
+  operational_start_min: number;
+  operational_end_min: number;
   weather: string | null;
   headliner_artist: string | null;
   estimated_attendance: number | null;
@@ -82,11 +93,9 @@ export interface EventDay {
 export interface EventDayCreatePayload {
   date: string;
   day_of_week: string;
-  entry_start_min: number;
-  activity_peak_start_min: number;
-  activity_peak_end_min: number;
-  exit_start_min: number;
-  event_end_min: number;
+  operational_profile_id: string;
+  operational_start_min: number;
+  operational_end_min: number;
   weather?: string | null;
   headliner_artist?: string | null;
   estimated_attendance?: number | null;

@@ -20,15 +20,15 @@ export const loadEventDayContext = async (eventId: string): Promise<EventDay | n
 };
 
 export const getHoraEvento = (): number => {
-  if (cachedEventDay?.peak_hour_start != null) {
-    return cachedEventDay.peak_hour_start;
+  if (cachedEventDay?.operational_start_min != null) {
+    return cachedEventDay.operational_start_min / 60;
   }
   return new Date().getHours();
 };
 
 export const getEventDayPeakRange = (): [number, number] | null => {
-  if (cachedEventDay?.peak_hour_start != null && cachedEventDay?.peak_hour_end != null) {
-    return [cachedEventDay.peak_hour_start, cachedEventDay.peak_hour_end];
+  if (cachedEventDay?.operational_start_min != null && cachedEventDay?.operational_end_min != null) {
+    return [cachedEventDay.operational_start_min / 60, cachedEventDay.operational_end_min / 60];
   }
   return null;
 };
@@ -36,12 +36,12 @@ export const getEventDayPeakRange = (): [number, number] | null => {
 export const getEventDaySchedule = () => {
   if (!cachedEventDay) return null;
   return {
-    openingTime: cachedEventDay.opening_time,
-    closingTime: cachedEventDay.closing_time,
-    peakStart: cachedEventDay.peak_hour_start,
-    peakEnd: cachedEventDay.peak_hour_end,
+    openingTime: cachedEventDay.operational_start_min,
+    closingTime: cachedEventDay.operational_end_min,
+    peakStart: cachedEventDay.operational_start_min / 60,
+    peakEnd: cachedEventDay.operational_end_min / 60,
     weather: cachedEventDay.weather,
     artist: cachedEventDay.headliner_artist,
-    attendance: cachedEventDay.expected_attendance,
+    attendance: cachedEventDay.estimated_attendance,
   };
 };

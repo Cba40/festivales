@@ -238,19 +238,16 @@ class TestOperationalEventModifierCRUD:
         """§13: Crear dos modificadores con mismo (event_type, zone_type_id) → ValueError."""
         zt_id = "zt-estacionamiento"
 
-        try:
-            await create_operational_event_modifier(
-                async_session,
-                OperationalEventModifierCreate(
-                    event_type="tormenta",
-                    zone_type_id=zt_id,
-                    saturation_multiplier=1.5,
-                    availability_multiplier=0.8,
-                    priority_modifier=0.3,
-                ),
-            )
-        except Exception as exc:
-            pytest.skip(f"OperationalEventModifier.create requiere id manual (bug conocido): {exc}")
+        await create_operational_event_modifier(
+            async_session,
+            OperationalEventModifierCreate(
+                event_type="tormenta",
+                zone_type_id=zt_id,
+                saturation_multiplier=1.5,
+                availability_multiplier=0.8,
+                priority_modifier=0.3,
+            ),
+        )
 
         with pytest.raises(ValueError) as exc_info:
             await create_operational_event_modifier(

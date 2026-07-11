@@ -1,12 +1,8 @@
 import { useState, useEffect } from 'react';
 import { RefreshCw, Activity, Users, Wrench } from 'lucide-react';
 import { EVENT_ID } from './constants';
-import { usePredictions, useEventStates, useAutoRefresh } from '../../hooks/useContextEngine';
-import type { ZonePredictionDTO, EventStateDTO, StateOverrideDTO } from '../../hooks/useContextEngine';
-
-function getStateColor(slug: string | undefined, states: EventStateDTO[]): string {
-  return states.find(s => s.slug === slug)?.color ?? '#94a3b8';
-}
+import { usePredictions, useAutoRefresh } from '../../hooks/useContextEngine';
+import type { ZonePredictionDTO } from '../../hooks/useContextEngine';
 
 function getSaturationColor(value: number): string {
   if (value < 0.3) return 'bg-emerald-500';
@@ -29,7 +25,6 @@ interface PredictionsDashboardProps {
 
 export function PredictionsDashboard({ eventId, autoRefreshMs = 15000 }: PredictionsDashboardProps) {
   const eid = eventId || EVENT_ID;
-  const { states: eventStates } = useEventStates(eid);
   const { data, loading, error, refresh } = usePredictions(eid);
   const [autoRefresh, setAutoRefresh] = useState(true);
 
@@ -39,8 +34,6 @@ export function PredictionsDashboard({ eventId, autoRefreshMs = 15000 }: Predict
 
   useAutoRefresh(refresh, autoRefreshMs, autoRefresh);
 
-  const estado: EventStateDTO | null = data?.estado_actual ?? null;
-  const override: StateOverrideDTO | null = data?.override_activo ?? null;
   const zonas: ZonePredictionDTO[] = data?.zonas ?? [];
 
   return (
@@ -74,21 +67,6 @@ export function PredictionsDashboard({ eventId, autoRefreshMs = 15000 }: Predict
 
       {!loading && !data && !error && (
         <div className="text-center py-8 text-slate-400 italic">Sin datos. Seleccioná una jornada activa.</div>
-      )}
-
-      {estado && (
-        <div className="flex items-center gap-3 p-4 bg-white border border-slate-200 rounded-xl shadow-sm">
-          <div className="w-4 h-4 rounded-full shrink-0" style={{ backgroundColor: getStateColor(estado.slug, eventStates) }} />
-          <div className="flex-1">
-            <div className="text-sm font-semibold text-slate-800">Estado actual: {estado.name}</div>
-            <div className="text-xs text-slate-500">Orden {estado.sort_order} · {estado.slug}</div>
-          </div>
-          {override && (
-            <div className="text-xs bg-amber-50 border border-amber-200 text-amber-700 px-2 py-1 rounded">
-              Override activo
-            </div>
-          )}
-        </div>
       )}
 
       {zonas.length > 0 && (

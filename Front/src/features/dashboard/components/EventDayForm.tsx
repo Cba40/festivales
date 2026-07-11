@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import type { EventDay, EventDayCreatePayload } from '../types';
+import { apiClient } from '@/core/api/client';
+import type { EventDay, EventDayCreatePayload, OperationalProfileDTO, OperationalPhaseDTO } from '../types';
 
 interface EventDayFormProps {
   eventDay?: EventDay | null;
@@ -20,14 +21,6 @@ const WEATHER_OPTIONS = [
   { value: 'tormenta', label: 'Tormenta' },
 ];
 
-const TIME_LABELS: { key: string; label: string; hint: string }[] = [
-  { key: 'entry_start_min', label: 'Apertura de puertas', hint: 'Comienza el ingreso del público' },
-  { key: 'activity_peak_start_min', label: 'Inicio pico de ingreso', hint: 'Mayor caudal de entrada' },
-  { key: 'activity_peak_end_min', label: 'Fin pico de ingreso', hint: 'Disminuye el caudal de entrada' },
-  { key: 'exit_start_min', label: 'Inicio pico de salida', hint: 'Comienza la salida masiva' },
-  { key: 'event_end_min', label: 'Cierre total', hint: 'Finaliza la jornada' },
-];
-
 function minutesToTimeStr(min: number): string {
   const h = Math.floor(min / 60).toString().padStart(2, '0');
   const m = (min % 60).toString().padStart(2, '0');
@@ -37,34 +30,6 @@ function minutesToTimeStr(min: number): string {
 function timeStrToMinutes(t: string): number {
   const [h, m] = t.split(':').map(Number);
   return h * 60 + m;
-}
-
-function isValidTimeOrder(times: Record<string, number>): { valid: boolean; error: string | null } {
-  const order: string[] = [
-    'entry_start_min',
-    'activity_peak_start_min',
-    'activity_peak_end_min',
-    'exit_start_min',
-    'event_end_min',
-  ];
-
-  for (let i = 0; i < order.length - 1; i++) {
-    const a = times[order[i]];
-    const b = times[order[i + 1]];
-    if (a == null || b == null) {
-      return { valid: false, error: 'Todos los horarios son obligatorios' };
-    }
-    if (a >= b) {
-      const prevLabel = TIME_LABELS.find(t => t.key === order[i])?.label ?? order[i];
-      const nextLabel = TIME_LABELS.find(t => t.key === order[i + 1])?.label ?? order[i + 1];
-      return {
-        valid: false,
-        error: `"${prevLabel}" debe ser anterior a "${nextLabel}"`,
-      };
-    }
-  }
-
-  return { valid: true, error: null };
 }
 
 export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFormProps) {
@@ -79,11 +44,22 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
   const [isActive, setIsActive] = useState(true);
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  const [entryStartMin, setEntryStartMin] = useState('');
-  const [activityPeakStartMin, setActivityPeakStartMin] = useState('');
-  const [activityPeakEndMin, setActivityPeakEndMin] = useState('');
-  const [exitStartMin, setExitStartMin] = useState('');
-  const [eventEndMin, setEventEndMin] = useState('');
+  const [profiles, setProfiles] = useState<OperationalProfileDTO[]>([]);
+  const [selectedProfileId, setSelectedProfileId] = useState('');
+  const [phases, setPhases] = useState<OperationalPhaseDTO[]>([]);
+  const [phasesLoading, setPhasesLoading] = useState(false);
+  const [profilesLoading, setProfilesLoading] = useState(false);
+
+  const [operationalStartStr, setOperationalStartStr] = useState('');
+  const [operationalEndStr, setOperationalEndStr] = useState('');
+
+  useEffect(() => {
+    setProfilesLoading(true);
+    apiClient.get<OperationalProfileDTO[]>('/operational-profiles/')
+      .then(({ data }) => setProfiles(data))
+      .catch(() => {})
+      .finally(() => setProfilesLoading(false));
+  }, []);
 
   useEffect(() => {
     if (eventDay) {
@@ -92,48 +68,50 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
       setWeather(eventDay.weather ?? '');
       setHeadlinerArtist(eventDay.headliner_artist ?? '');
       setEstimatedAttendance(eventDay.estimated_attendance?.toString() ?? '');
-      setEntryStartMin(minutesToTimeStr(eventDay.entry_start_min));
-      setActivityPeakStartMin(minutesToTimeStr(eventDay.activity_peak_start_min));
-      setActivityPeakEndMin(minutesToTimeStr(eventDay.activity_peak_end_min));
-      setExitStartMin(minutesToTimeStr(eventDay.exit_start_min));
-      setEventEndMin(minutesToTimeStr(eventDay.event_end_min));
+      setSelectedProfileId(eventDay.operational_profile_id);
+      setOperationalStartStr(minutesToTimeStr(eventDay.operational_start_min));
+      setOperationalEndStr(minutesToTimeStr(eventDay.operational_end_min));
       setNotes(eventDay.notes ?? '');
       setIsActive(eventDay.is_active);
     }
   }, [eventDay]);
 
+  useEffect(() => {
+    if (!selectedProfileId) {
+      setPhases([]);
+      return;
+    }
+    setPhasesLoading(true);
+    apiClient.get<OperationalPhaseDTO[]>(`/operational-phases/by-profile/${selectedProfileId}`)
+      .then(({ data }) => setPhases(data))
+      .catch(() => setPhases([]))
+      .finally(() => setPhasesLoading(false));
+  }, [selectedProfileId]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setValidationError(null);
-    if (!date || !dayOfWeek) return;
+    if (!date || !dayOfWeek || !selectedProfileId) return;
 
-    const timeValues = {
-      entry_start_min: entryStartMin,
-      activity_peak_start_min: activityPeakStartMin,
-      activity_peak_end_min: activityPeakEndMin,
-      exit_start_min: exitStartMin,
-      event_end_min: eventEndMin,
-    };
-
-    const minuteValues: Record<string, number> = {};
-    for (const [key, val] of Object.entries(timeValues)) {
-      if (!val) {
-        setValidationError('Todos los horarios son obligatorios');
-        return;
-      }
-      minuteValues[key] = timeStrToMinutes(val);
+    if (!operationalStartStr || !operationalEndStr) {
+      setValidationError('La ventana operativa es obligatoria');
+      return;
     }
 
-    const timeValidation = isValidTimeOrder(minuteValues);
-    if (!timeValidation.valid) {
-      setValidationError(timeValidation.error);
+    const startMin = timeStrToMinutes(operationalStartStr);
+    const endMin = timeStrToMinutes(operationalEndStr);
+
+    if (endMin <= startMin) {
+      setValidationError('El fin de jornada territorial debe ser posterior al inicio');
       return;
     }
 
     const payload: EventDayCreatePayload = {
       date,
       day_of_week: dayOfWeek,
-      ...minuteValues,
+      operational_profile_id: selectedProfileId,
+      operational_start_min: startMin,
+      operational_end_min: endMin,
       weather: weather || null,
       headliner_artist: headlinerArtist || null,
       estimated_attendance: estimatedAttendance ? parseInt(estimatedAttendance, 10) : 0,
@@ -152,22 +130,6 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
     } else {
       await onSave(payload);
     }
-  };
-
-  const timeSetters: Record<string, React.Dispatch<React.SetStateAction<string>>> = {
-    entry_start_min: setEntryStartMin,
-    activity_peak_start_min: setActivityPeakStartMin,
-    activity_peak_end_min: setActivityPeakEndMin,
-    exit_start_min: setExitStartMin,
-    event_end_min: setEventEndMin,
-  };
-
-  const timeValues: Record<string, string> = {
-    entry_start_min: entryStartMin,
-    activity_peak_start_min: activityPeakStartMin,
-    activity_peak_end_min: activityPeakEndMin,
-    exit_start_min: exitStartMin,
-    event_end_min: eventEndMin,
   };
 
   return (
@@ -197,6 +159,46 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
               <option key={d} value={d}>{d.charAt(0).toUpperCase() + d.slice(1)}</option>
             ))}
           </select>
+        </div>
+
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium text-slate-700 mb-1">Perfil operativo *</label>
+          <select
+            value={selectedProfileId}
+            onChange={(e) => setSelectedProfileId(e.target.value)}
+            required
+            disabled={profilesLoading}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+          >
+            <option value="">{profilesLoading ? 'Cargando perfiles...' : 'Seleccionar perfil...'}</option>
+            {profiles.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Inicio de jornada territorial *</label>
+          <input
+            type="time"
+            value={operationalStartStr}
+            onChange={(e) => setOperationalStartStr(e.target.value)}
+            required
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <p className="text-[10px] text-slate-400 mt-0.5">Ej: 08:00 = 480 min desde medianoche</p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Fin de jornada territorial *</label>
+          <input
+            type="time"
+            value={operationalEndStr}
+            onChange={(e) => setOperationalEndStr(e.target.value)}
+            required
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <p className="text-[10px] text-slate-400 mt-0.5">Ej: 06:00 (+1 día) = 1800 min (&gt;1440 cruza medianoche)</p>
         </div>
 
         <div>
@@ -255,27 +257,46 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
         </div>
       )}
 
-      <div className="border-t border-slate-200 pt-4">
-        <h3 className="text-sm font-semibold text-slate-700 mb-3">Línea de tiempo del evento</h3>
-        <p className="text-xs text-slate-500 mb-3">
-          Los horarios deben respetar el orden cronológico. Todos los campos son obligatorios.
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {TIME_LABELS.map(({ key, label, hint }) => (
-            <div key={key}>
-              <label className="block text-sm font-medium text-slate-700 mb-1">{label} *</label>
-              <input
-                type="time"
-                value={timeValues[key]}
-                onChange={(e) => timeSetters[key](e.target.value)}
-                required
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <p className="text-[10px] text-slate-400 mt-0.5">{hint}</p>
+      {selectedProfileId && (
+        <div className="border-t border-slate-200 pt-4">
+          <h3 className="text-sm font-semibold text-slate-700 mb-2">Fases del perfil operativo</h3>
+          <p className="text-xs text-slate-500 mb-3">
+            Las fases se gestionan en la configuración de perfiles operativos. Esta vista es informativa.
+          </p>
+          {phasesLoading ? (
+            <div className="text-xs text-slate-400">Cargando fases...</div>
+          ) : phases.length === 0 ? (
+            <div className="text-xs text-slate-400">Sin fases definidas para este perfil.</div>
+          ) : (
+            <div className="space-y-2">
+              {phases
+                .slice().sort((a, b) => a.sort_order - b.sort_order)
+                .map((phase) => (
+                  <div
+                    key={phase.id}
+                    className="flex items-center gap-3 p-2 bg-slate-50 rounded-lg border border-slate-100"
+                  >
+                    <span className="text-xs font-semibold text-slate-600 w-16 text-center">
+                      {minutesToTimeStr(phase.start_min)}
+                    </span>
+                    <div className="flex-1 h-1.5 bg-blue-100 rounded-full">
+                      <div
+                        className="h-1.5 bg-blue-500 rounded-full"
+                        style={{
+                          width: `${Math.min(100, ((phase.end_min - phase.start_min) / 120) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                    <span className="text-xs font-semibold text-slate-600 w-16 text-center">
+                      {minutesToTimeStr(phase.end_min)}
+                    </span>
+                    <span className="text-sm font-medium text-slate-700 min-w-[120px]">{phase.name}</span>
+                  </div>
+                ))}
             </div>
-          ))}
+          )}
         </div>
-      </div>
+      )}
 
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-1">Notas</label>
@@ -299,7 +320,7 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
         </button>
         <button
           type="submit"
-          disabled={saving || !date || !dayOfWeek}
+          disabled={saving || !date || !dayOfWeek || !selectedProfileId || !operationalStartStr || !operationalEndStr}
           className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
         >
           {saving ? 'Guardando...' : isEditing ? 'Actualizar' : 'Crear día'}

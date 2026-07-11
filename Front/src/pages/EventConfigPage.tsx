@@ -1,17 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Clock, Grid, ToggleLeft, BarChart3, ArrowLeft } from 'lucide-react';
+import { BarChart3, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { EVENT_ID } from '../components/context-engine/constants';
-import { EventDayTimelineEditor } from '../components/context-engine/EventDayTimelineEditor';
-import { ZoneFactorMatrix } from '../components/context-engine/ZoneFactorMatrix';
-import { OverrideManager } from '../components/context-engine/OverrideManager';
 import { PredictionsDashboard } from '../components/context-engine/PredictionsDashboard';
 import { apiClient } from '../core/api/client';
 
 const TABS = [
-  { id: 'timeline', label: 'Línea de tiempo', icon: Clock },
-  { id: 'factors', label: 'Factores por zona', icon: Grid },
-  { id: 'overrides', label: 'Overrides', icon: ToggleLeft },
   { id: 'predictions', label: 'Predicciones', icon: BarChart3 },
 ];
 
@@ -23,7 +17,7 @@ interface EventDaySummary {
 
 export function EventConfigPage() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('timeline');
+  const [activeTab, setActiveTab] = useState('predictions');
   const [eventDays, setEventDays] = useState<EventDaySummary[]>([]);
   const [selectedDayId, setSelectedDayId] = useState<string | null>(null);
   const [loadingDays, setLoadingDays] = useState(true);
@@ -102,32 +96,7 @@ export function EventConfigPage() {
       <main className="p-6 max-w-7xl mx-auto">
         {!selectedDayId && !loadingDays && (
           <div className="text-center py-12 text-slate-400 italic">
-            No hay jornadas disponibles. Creá una desde la solapa "Línea de tiempo".
-          </div>
-        )}
-
-        {activeTab === 'timeline' && (
-          <div className="bg-white border border-slate-200 rounded-xl p-6">
-            <EventDayTimelineEditor
-              eventDayId={selectedDayId}
-              eventId={EVENT_ID}
-              onSaved={() => loadDays()}
-            />
-          </div>
-        )}
-
-        {activeTab === 'factors' && selectedDayId && (
-          <div className="bg-white border border-slate-200 rounded-xl p-6">
-            <ZoneFactorMatrix eventDayId={selectedDayId} eventId={EVENT_ID} />
-          </div>
-        )}
-
-        {activeTab === 'overrides' && selectedDayId && (
-          <div className="bg-white border border-slate-200 rounded-xl p-6">
-            <OverrideManager
-              eventDayId={selectedDayId}
-              eventId={EVENT_ID}
-            />
+            No hay jornadas disponibles.
           </div>
         )}
 

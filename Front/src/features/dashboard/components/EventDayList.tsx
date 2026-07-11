@@ -46,8 +46,8 @@ export function EventDayList({ eventDays, onEdit, onDelete }: EventDayListProps)
               </td>
               <td className="py-3 text-slate-600">{day.headliner_artist || '—'}</td>
               <td className="py-3 text-slate-600">
-                {day.expected_attendance
-                  ? day.expected_attendance.toLocaleString()
+                {day.estimated_attendance
+                  ? day.estimated_attendance.toLocaleString()
                   : '—'}
               </td>
               <td className="py-3">
