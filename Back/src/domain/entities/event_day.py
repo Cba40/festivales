@@ -1,6 +1,8 @@
 from datetime import date
 from uuid import UUID, uuid4
 
+from src.domain.entities.event_day_phase import EventDayPhase
+
 
 class EventDay:
     def __init__(
@@ -10,6 +12,7 @@ class EventDay:
         attendance_level_id: UUID,
         operational_start_min: int,
         operational_end_min: int,
+        phases: tuple[EventDayPhase, ...],
         id: UUID | None = None,
     ) -> None:
         resolved_id = id if id is not None else uuid4()
@@ -20,6 +23,7 @@ class EventDay:
             attendance_level_id,
             operational_start_min,
             operational_end_min,
+            phases,
         )
         self._id = resolved_id
         self._event_date = event_date
@@ -27,6 +31,7 @@ class EventDay:
         self._attendance_level_id = attendance_level_id
         self._operational_start_min = operational_start_min
         self._operational_end_min = operational_end_min
+        self._phases = phases
 
     @property
     def id(self) -> UUID:
@@ -52,6 +57,10 @@ class EventDay:
     def operational_end_min(self) -> int:
         return self._operational_end_min
 
+    @property
+    def phases(self) -> tuple["EventDayPhase", ...]:
+        return self._phases
+
     @staticmethod
     def _validate(
         id: UUID,
@@ -60,6 +69,7 @@ class EventDay:
         attendance_level_id: UUID,
         operational_start_min: int,
         operational_end_min: int,
+        phases: tuple["EventDayPhase", ...],
     ) -> None:
         if not isinstance(id, UUID):
             raise TypeError("id must be a UUID")
@@ -77,6 +87,12 @@ class EventDay:
             raise TypeError("operational_end_min must be an integer")
         if operational_end_min <= operational_start_min:
             raise ValueError("operational_end_min must be greater than operational_start_min")
+        if not isinstance(phases, tuple):
+            raise TypeError("phases must be a tuple")
+        if len(phases) < 1:
+            raise ValueError("event_day must contain at least one phase")
+        if not all(isinstance(p, EventDayPhase) for p in phases):
+            raise TypeError("each phase must be an EventDayPhase instance")
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, EventDay):
@@ -92,5 +108,6 @@ class EventDay:
             f"operational_profile_id={self._operational_profile_id!r}, "
             f"attendance_level_id={self._attendance_level_id!r}, "
             f"operational_start_min={self._operational_start_min!r}, "
-            f"operational_end_min={self._operational_end_min!r})"
+            f"operational_end_min={self._operational_end_min!r}, "
+            f"phases_count={len(self._phases)})"
         )

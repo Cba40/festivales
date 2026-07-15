@@ -4,6 +4,19 @@ from uuid import UUID
 import pytest
 
 from src.domain.entities.event_day import EventDay
+from src.domain.entities.event_day_phase import EventDayPhase
+
+
+def _make_phase(
+    start_min: int = 480,
+    end_min: int = 1320,
+) -> EventDayPhase:
+    return EventDayPhase(
+        event_day_id=UUID("00000000-0000-0000-0000-000000000000"),
+        operational_phase_id=UUID("00000000-0000-0000-0000-000000000000"),
+        start_min=start_min,
+        end_min=end_min,
+    )
 
 
 class TestEventDayCreation:
@@ -17,6 +30,7 @@ class TestEventDayCreation:
             attendance_level_id=al_id,
             operational_start_min=480,
             operational_end_min=1320,
+            phases=(_make_phase(),),
         )
         assert isinstance(ed.id, UUID)
         assert ed.event_date == d
@@ -35,6 +49,7 @@ class TestEventDayCreation:
             attendance_level_id=al_id,
             operational_start_min=1200,
             operational_end_min=1740,
+            phases=(_make_phase(),),
         )
         assert ed.operational_end_min == 1740
 
@@ -50,6 +65,7 @@ class TestEventDayCreation:
             operational_start_min=480,
             operational_end_min=1320,
             id=custom_id,
+            phases=(_make_phase(),),
         )
         assert ed.id == custom_id
 
@@ -63,6 +79,7 @@ class TestEventDayCreation:
             attendance_level_id=al_id,
             operational_start_min=0,
             operational_end_min=100,
+            phases=(_make_phase(),),
         )
         assert ed.operational_start_min == 0
 
@@ -76,8 +93,32 @@ class TestEventDayCreation:
             attendance_level_id=al_id,
             operational_start_min=600,
             operational_end_min=1200,
+            phases=(_make_phase(),),
         )
         assert ed.operational_start_min == 600
+
+    def test_create_with_phases(self) -> None:
+        d = date(2026, 7, 15)
+        op_id = UUID("00000000-0000-0000-0000-000000000001")
+        al_id = UUID("00000000-0000-0000-0000-000000000002")
+        ed_id = UUID("00000000-0000-0000-0000-000000000010")
+        op_phase_id = UUID("00000000-0000-0000-0000-000000000020")
+        edp = EventDayPhase(
+            event_day_id=ed_id,
+            operational_phase_id=op_phase_id,
+            start_min=480,
+            end_min=720,
+        )
+        ed = EventDay(
+            event_date=d,
+            operational_profile_id=op_id,
+            attendance_level_id=al_id,
+            operational_start_min=480,
+            operational_end_min=1320,
+            phases=(edp,),
+        )
+        assert len(ed.phases) == 1
+        assert ed.phases[0] is edp
 
 
 class TestEventDayValidation:
@@ -93,6 +134,7 @@ class TestEventDayValidation:
                 operational_start_min=480,
                 operational_end_min=1320,
                 id="not-a-uuid",  # type: ignore[arg-type]
+                phases=(_make_phase(),),
             )
 
     def test_invalid_event_date_type_raises_error(self) -> None:
@@ -105,6 +147,7 @@ class TestEventDayValidation:
                 attendance_level_id=al_id,
                 operational_start_min=480,
                 operational_end_min=1320,
+                phases=(_make_phase(),),
             )
 
     def test_invalid_operational_profile_id_raises_error(self) -> None:
@@ -117,6 +160,7 @@ class TestEventDayValidation:
                 attendance_level_id=al_id,
                 operational_start_min=480,
                 operational_end_min=1320,
+                phases=(_make_phase(),),
             )
 
     def test_invalid_attendance_level_id_raises_error(self) -> None:
@@ -129,6 +173,7 @@ class TestEventDayValidation:
                 attendance_level_id="not-a-uuid",  # type: ignore[arg-type]
                 operational_start_min=480,
                 operational_end_min=1320,
+                phases=(_make_phase(),),
             )
 
     def test_negative_start_min_raises_error(self) -> None:
@@ -142,6 +187,7 @@ class TestEventDayValidation:
                 attendance_level_id=al_id,
                 operational_start_min=-1,
                 operational_end_min=100,
+                phases=(_make_phase(),),
             )
 
     def test_end_min_equal_to_start_min_raises_error(self) -> None:
@@ -155,6 +201,7 @@ class TestEventDayValidation:
                 attendance_level_id=al_id,
                 operational_start_min=480,
                 operational_end_min=480,
+                phases=(_make_phase(),),
             )
 
     def test_end_min_less_than_start_min_raises_error(self) -> None:
@@ -168,6 +215,7 @@ class TestEventDayValidation:
                 attendance_level_id=al_id,
                 operational_start_min=600,
                 operational_end_min=300,
+                phases=(_make_phase(),),
             )
 
     def test_start_min_as_bool_raises_error(self) -> None:
@@ -181,6 +229,7 @@ class TestEventDayValidation:
                 attendance_level_id=al_id,
                 operational_start_min=True,  # type: ignore[arg-type]
                 operational_end_min=100,
+                phases=(_make_phase(),),
             )
 
     def test_start_min_as_string_raises_error(self) -> None:
@@ -194,6 +243,7 @@ class TestEventDayValidation:
                 attendance_level_id=al_id,
                 operational_start_min="480",  # type: ignore[arg-type]
                 operational_end_min=100,
+                phases=(_make_phase(),),
             )
 
     def test_end_min_as_bool_raises_error(self) -> None:
@@ -207,6 +257,49 @@ class TestEventDayValidation:
                 attendance_level_id=al_id,
                 operational_start_min=0,
                 operational_end_min=True,  # type: ignore[arg-type]
+                phases=(_make_phase(),),
+            )
+
+    def test_empty_phases_raises_error(self) -> None:
+        d = date(2026, 7, 15)
+        op_id = UUID("00000000-0000-0000-0000-000000000001")
+        al_id = UUID("00000000-0000-0000-0000-000000000002")
+        with pytest.raises(ValueError, match="at least one phase"):
+            EventDay(
+                event_date=d,
+                operational_profile_id=op_id,
+                attendance_level_id=al_id,
+                operational_start_min=480,
+                operational_end_min=1320,
+                phases=(),
+            )
+
+    def test_phases_not_a_tuple_raises_error(self) -> None:
+        d = date(2026, 7, 15)
+        op_id = UUID("00000000-0000-0000-0000-000000000001")
+        al_id = UUID("00000000-0000-0000-0000-000000000002")
+        with pytest.raises(TypeError, match="must be a tuple"):
+            EventDay(
+                event_date=d,
+                operational_profile_id=op_id,
+                attendance_level_id=al_id,
+                operational_start_min=480,
+                operational_end_min=1320,
+                phases=[],  # type: ignore[arg-type]
+            )
+
+    def test_phases_with_wrong_element_type_raises_error(self) -> None:
+        d = date(2026, 7, 15)
+        op_id = UUID("00000000-0000-0000-0000-000000000001")
+        al_id = UUID("00000000-0000-0000-0000-000000000002")
+        with pytest.raises(TypeError, match="must be an EventDayPhase instance"):
+            EventDay(
+                event_date=d,
+                operational_profile_id=op_id,
+                attendance_level_id=al_id,
+                operational_start_min=480,
+                operational_end_min=1320,
+                phases=("not-a-phase",),  # type: ignore[arg-type]
             )
 
 
@@ -223,6 +316,7 @@ class TestEventDayEquality:
             operational_start_min=480,
             operational_end_min=1320,
             id=id,
+            phases=(_make_phase(),),
         )
         ed2 = EventDay(
             event_date=d,
@@ -231,6 +325,7 @@ class TestEventDayEquality:
             operational_start_min=480,
             operational_end_min=1320,
             id=id,
+            phases=(_make_phase(),),
         )
         assert ed1 == ed2
 
@@ -244,6 +339,7 @@ class TestEventDayEquality:
             attendance_level_id=al_id,
             operational_start_min=480,
             operational_end_min=1320,
+            phases=(_make_phase(),),
         )
         ed2 = EventDay(
             event_date=d,
@@ -251,6 +347,7 @@ class TestEventDayEquality:
             attendance_level_id=al_id,
             operational_start_min=480,
             operational_end_min=1320,
+            phases=(_make_phase(),),
         )
         assert ed1 != ed2
 
@@ -264,6 +361,7 @@ class TestEventDayEquality:
             attendance_level_id=al_id,
             operational_start_min=480,
             operational_end_min=1320,
+            phases=(_make_phase(),),
         )
         assert (ed == "not-an-event-day") is False
 
@@ -279,6 +377,7 @@ class TestEventDayEquality:
             operational_start_min=480,
             operational_end_min=1320,
             id=id,
+            phases=(_make_phase(),),
         )
         ed2 = EventDay(
             event_date=d,
@@ -287,6 +386,7 @@ class TestEventDayEquality:
             operational_start_min=480,
             operational_end_min=1320,
             id=id,
+            phases=(_make_phase(),),
         )
         assert hash(ed1) == hash(ed2)
 
@@ -302,6 +402,7 @@ class TestEventDayEquality:
             operational_start_min=480,
             operational_end_min=1320,
             id=id,
+            phases=(_make_phase(),),
         )
         s = {ed}
         expected = EventDay(
@@ -311,6 +412,7 @@ class TestEventDayEquality:
             operational_start_min=480,
             operational_end_min=1320,
             id=id,
+            phases=(_make_phase(),),
         )
         assert expected in s
 
@@ -326,6 +428,7 @@ class TestEventDayImmutability:
             attendance_level_id=al_id,
             operational_start_min=480,
             operational_end_min=1320,
+            phases=(_make_phase(),),
         )
         with pytest.raises(AttributeError):
             ed.id = UUID("00000000-0000-0000-0000-000000000000")  # type: ignore[misc]
@@ -340,6 +443,7 @@ class TestEventDayImmutability:
             attendance_level_id=al_id,
             operational_start_min=480,
             operational_end_min=1320,
+            phases=(_make_phase(),),
         )
         with pytest.raises(AttributeError):
             ed.event_date = date(2026, 7, 16)  # type: ignore[misc]
@@ -354,6 +458,7 @@ class TestEventDayImmutability:
             attendance_level_id=al_id,
             operational_start_min=480,
             operational_end_min=1320,
+            phases=(_make_phase(),),
         )
         with pytest.raises(AttributeError):
             ed.operational_profile_id = UUID("00000000-0000-0000-0000-000000000010")  # type: ignore[misc]
@@ -368,6 +473,7 @@ class TestEventDayImmutability:
             attendance_level_id=al_id,
             operational_start_min=480,
             operational_end_min=1320,
+            phases=(_make_phase(),),
         )
         with pytest.raises(AttributeError):
             ed.attendance_level_id = UUID("00000000-0000-0000-0000-000000000020")  # type: ignore[misc]
@@ -382,6 +488,7 @@ class TestEventDayImmutability:
             attendance_level_id=al_id,
             operational_start_min=480,
             operational_end_min=1320,
+            phases=(_make_phase(),),
         )
         with pytest.raises(AttributeError):
             ed.operational_start_min = 600  # type: ignore[misc]
@@ -396,9 +503,25 @@ class TestEventDayImmutability:
             attendance_level_id=al_id,
             operational_start_min=480,
             operational_end_min=1320,
+            phases=(_make_phase(),),
         )
         with pytest.raises(AttributeError):
             ed.operational_end_min = 1400  # type: ignore[misc]
+
+    def test_phases_is_readonly(self) -> None:
+        d = date(2026, 7, 15)
+        op_id = UUID("00000000-0000-0000-0000-000000000001")
+        al_id = UUID("00000000-0000-0000-0000-000000000002")
+        ed = EventDay(
+            event_date=d,
+            operational_profile_id=op_id,
+            attendance_level_id=al_id,
+            operational_start_min=480,
+            operational_end_min=1320,
+            phases=(_make_phase(),),
+        )
+        with pytest.raises(AttributeError):
+            ed.phases = ()  # type: ignore[misc]
 
 
 class TestEventDayRepresentation:
@@ -414,6 +537,7 @@ class TestEventDayRepresentation:
             operational_start_min=480,
             operational_end_min=1320,
             id=id,
+            phases=(_make_phase(),),
         )
         repr_str = repr(ed)
         assert "EventDay" in repr_str
@@ -421,3 +545,4 @@ class TestEventDayRepresentation:
         assert repr(d) in repr_str
         assert "480" in repr_str
         assert "1320" in repr_str
+        assert "phases_count=1" in repr_str
