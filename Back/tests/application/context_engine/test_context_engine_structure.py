@@ -11,7 +11,7 @@ from src.application.context_engine.exceptions import (
     InvalidPhaseContext,
     InvalidRuntimeContext,
 )
-from src.application.context_engine.interfaces import (
+from src.domain.ports import (
     EventDayRepository,
     ZoneBehaviorRepository,
 )
