@@ -71,8 +71,4 @@ class TestInterfaces:
         assert hasattr(ZoneBehaviorRepository, "find_by_zone_type_and_phase")
 
 
-class TestNoAlgorithmImplemented:
-    def test_predict_raises_not_implemented(self) -> None:
-        engine = ContextEngine()
-        with pytest.raises(NotImplementedError):
-            engine.predict()
+
