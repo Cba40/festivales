@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from uuid import UUID
 
-from sqlalchemy import ForeignKey, func
+from sqlalchemy import CheckConstraint, ForeignKey, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.infrastructure.db.base import Base
@@ -18,6 +18,11 @@ class EventDayModel(Base):
     attendance_level_id: Mapped[UUID] = mapped_column(ForeignKey("attendance_levels.id"), nullable=False)
     operational_start_min: Mapped[int] = mapped_column(nullable=False)
     operational_end_min: Mapped[int] = mapped_column(nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("operational_start_min >= 0", name="ck_event_days_operational_start_min_non_negative"),
+        CheckConstraint("operational_end_min > operational_start_min", name="ck_event_days_operational_end_min_gt_start"),
+    )
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 

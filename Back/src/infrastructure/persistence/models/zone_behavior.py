@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import ForeignKey, UniqueConstraint, func
+from sqlalchemy import CheckConstraint, ForeignKey, UniqueConstraint, func
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -24,6 +24,7 @@ class ZoneBehaviorModel(Base):
 
     __table_args__ = (
         UniqueConstraint("operational_phase_id", "zone_type_id"),
+        CheckConstraint("density_factor >= 0.0 AND density_factor <= 1.0", name="ck_zone_behaviors_density_factor_range"),
     )
 
     operational_phase: Mapped["OperationalPhaseModel"] = relationship(back_populates="zone_behaviors")
