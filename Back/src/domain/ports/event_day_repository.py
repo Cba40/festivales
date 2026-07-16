@@ -9,3 +9,6 @@ from src.domain.entities.event_day import EventDay
 class EventDayRepository(Protocol):
     async def find_by_date(self, target_date: date) -> EventDay | None:
         ...
+
+    async def save(self, event_day: EventDay) -> EventDay:
+        ...
