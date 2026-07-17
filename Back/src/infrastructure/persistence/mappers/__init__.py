@@ -24,6 +24,10 @@ from src.infrastructure.persistence.mappers.operational_profile_mapper import (
     operational_profile_to_domain,
     operational_profile_to_model,
 )
+from src.infrastructure.persistence.mappers.prediction_mapper import (
+    prediction_to_domain,
+    prediction_to_model,
+)
 from src.infrastructure.persistence.mappers.zone_behavior_mapper import (
     zone_behavior_to_domain,
     zone_behavior_to_model,
@@ -50,6 +54,8 @@ __all__ = [
     "operational_phase_to_model",
     "operational_profile_to_domain",
     "operational_profile_to_model",
+    "prediction_to_domain",
+    "prediction_to_model",
     "zone_behavior_to_domain",
     "zone_behavior_to_model",
     "zone_to_domain",

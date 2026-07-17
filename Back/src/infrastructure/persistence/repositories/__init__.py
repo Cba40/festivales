@@ -9,6 +9,9 @@ from src.infrastructure.persistence.repositories.operational_event_repository im
 from src.infrastructure.persistence.repositories.operational_profile_repository import (
     SQLOperationalProfileRepository,
 )
+from src.infrastructure.persistence.repositories.prediction_repository import (
+    SQLPredictionRepository,
+)
 from src.infrastructure.persistence.repositories.zone_behavior_repository import (
     SQLZoneBehaviorRepository,
 )
@@ -17,5 +20,6 @@ __all__ = [
     "SQLEventDayRepository",
     "SQLOperationalEventRepository",
     "SQLOperationalProfileRepository",
+    "SQLPredictionRepository",
     "SQLZoneBehaviorRepository",
 ]
