@@ -9,6 +9,7 @@ from src.domain.ports.operational_profile_repository import (
 )
 from src.domain.ports.prediction_repository import PredictionRepository
 from src.domain.ports.zone_behavior_repository import ZoneBehaviorRepository
+from src.domain.ports.zone_repository import ZoneRepository
 
 __all__ = [
     "EventDayRepository",
@@ -16,4 +17,5 @@ __all__ = [
     "OperationalProfileRepository",
     "PredictionRepository",
     "ZoneBehaviorRepository",
+    "ZoneRepository",
 ]

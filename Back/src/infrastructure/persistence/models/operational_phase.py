@@ -24,10 +24,6 @@ class OperationalPhaseModel(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 
-    __table_args__ = (
-        UniqueConstraint("operational_profile_id", "sequence_order"),
-    )
-
     profile: Mapped["OperationalProfileModel"] = relationship(back_populates="phases")
     zone_behaviors: Mapped[list["ZoneBehaviorModel"]] = relationship(back_populates="operational_phase")
     event_day_phases: Mapped[list["EventDayPhaseModel"]] = relationship(back_populates="operational_phase")

@@ -21,6 +21,7 @@ class OperationalEventModel(Base):
 
     __table_args__ = (
         CheckConstraint("impact_value >= -100 AND impact_value <= 100", name="ck_operational_events_impact_value_range"),
+        CheckConstraint("end_timestamp > start_timestamp", name="ck_operational_events_end_gt_start"),
     )
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())

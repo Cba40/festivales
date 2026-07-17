@@ -15,6 +15,9 @@ from src.infrastructure.persistence.repositories.prediction_repository import (
 from src.infrastructure.persistence.repositories.zone_behavior_repository import (
     SQLZoneBehaviorRepository,
 )
+from src.infrastructure.persistence.repositories.zone_repository import (
+    SQLZoneRepository,
+)
 
 __all__ = [
     "SQLEventDayRepository",
@@ -22,4 +25,5 @@ __all__ = [
     "SQLOperationalProfileRepository",
     "SQLPredictionRepository",
     "SQLZoneBehaviorRepository",
+    "SQLZoneRepository",
 ]

@@ -10,6 +10,7 @@ from src.domain.entities.event_day import EventDay
 from src.domain.entities.event_day_phase import EventDayPhase
 from src.domain.entities.operational_phase import OperationalPhase
 from src.domain.entities.operational_profile import OperationalProfile
+from src.domain.entities.zone import Zone
 from src.domain.entities.zone_behavior import FlowRestriction, ZoneBehavior
 from src.infrastructure.persistence.models import (
     EventDayModel,
@@ -17,11 +18,13 @@ from src.infrastructure.persistence.models import (
     OperationalPhaseModel,
     OperationalProfileModel,
     ZoneBehaviorModel,
+    ZoneModel,
 )
 from src.infrastructure.persistence.repositories import (
     SQLEventDayRepository,
     SQLOperationalProfileRepository,
     SQLZoneBehaviorRepository,
+    SQLZoneRepository,
 )
 
 A_UUID = UUID("11111111-1111-1111-1111-111111111111")
@@ -329,3 +332,97 @@ class TestSQLOperationalProfileRepository:
 
         assert isinstance(result, OperationalProfile)
         assert result.id == B_UUID
+
+
+# ---------------------------------------------------------------------------
+# SQLZoneRepository
+# ---------------------------------------------------------------------------
+
+
+class TestSQLZoneRepository:
+    async def test_find_by_id_returns_zone(self) -> None:
+        session = AsyncMock()
+        model = ZoneModel(id=A_UUID, name="Zona Test", zone_type_id=B_UUID, capacity=500)
+        session.execute = AsyncMock(return_value=_mock_scalar_result(model))
+        repo = SQLZoneRepository(session)
+
+        result = await repo.find_by_id(A_UUID)
+
+        assert result is not None
+        assert isinstance(result, Zone)
+        assert result.id == A_UUID
+        assert result.name == "Zona Test"
+        assert result.zone_type_id == B_UUID
+        assert result.capacity == 500
+
+    async def test_find_by_id_returns_none(self) -> None:
+        session = AsyncMock()
+        session.execute = AsyncMock(return_value=_mock_scalar_result(None))
+        repo = SQLZoneRepository(session)
+
+        result = await repo.find_by_id(A_UUID)
+
+        assert result is None
+
+    async def test_find_by_id_uses_correct_filter(self) -> None:
+        session = AsyncMock()
+        session.execute = AsyncMock(return_value=_mock_scalar_result(None))
+        repo = SQLZoneRepository(session)
+
+        await repo.find_by_id(A_UUID)
+
+        call_stmt = session.execute.call_args[0][0]
+        compiled = str(call_stmt.compile(compile_kwargs={"literal_binds": True}))
+        assert "zones" in compiled
+        assert A_UUID.hex in compiled
+
+    async def test_save_new_zone(self) -> None:
+        session = AsyncMock()
+        session.get = AsyncMock(return_value=None)
+        session.add = MagicMock()
+        session.flush = AsyncMock()
+        session.refresh = AsyncMock()
+
+        zone = Zone(id=A_UUID, name="Zona Nueva", zone_type_id=B_UUID, capacity=1000)
+        repo = SQLZoneRepository(session)
+
+        result = await repo.save(zone)
+
+        assert result.id == A_UUID
+        assert result.name == "Zona Nueva"
+        assert result.capacity == 1000
+        session.add.assert_called_once()
+        session.flush.assert_awaited_once()
+
+    async def test_save_existing_zone_updates_fields(self) -> None:
+        session = AsyncMock()
+        existing_model = ZoneModel(id=A_UUID, name="Zona Original", zone_type_id=B_UUID, capacity=500)
+        session.get = AsyncMock(return_value=existing_model)
+        session.flush = AsyncMock()
+        session.refresh = AsyncMock()
+
+        zone = Zone(id=A_UUID, name="Zona Actualizada", zone_type_id=B_UUID, capacity=800)
+        repo = SQLZoneRepository(session)
+
+        result = await repo.save(zone)
+
+        assert existing_model.name == "Zona Actualizada"
+        assert existing_model.capacity == 800
+        session.flush.assert_awaited_once()
+        session.refresh.assert_awaited_once()
+
+    async def test_save_reuses_mapper(self) -> None:
+        session = AsyncMock()
+        session.get = AsyncMock(return_value=None)
+        session.add = MagicMock()
+        session.flush = AsyncMock()
+        session.refresh = AsyncMock()
+
+        zone = Zone(id=A_UUID, name="Zona Mapper", zone_type_id=B_UUID, capacity=300)
+        repo = SQLZoneRepository(session)
+
+        result = await repo.save(zone)
+
+        assert isinstance(result, Zone)
+        assert result.id == A_UUID
+        assert result.name == "Zona Mapper"
