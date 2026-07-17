@@ -13,3 +13,6 @@ class OperationalEventRepository(Protocol):
         timestamp: datetime,
     ) -> Sequence[OperationalEvent]:
         ...
+
+    async def save(self, event: OperationalEvent) -> OperationalEvent:
+        ...

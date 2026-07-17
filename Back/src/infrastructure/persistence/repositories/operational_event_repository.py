@@ -12,6 +12,7 @@ from src.domain.ports.operational_event_repository import (
 )
 from src.infrastructure.persistence.mappers import (
     operational_event_to_domain,
+    operational_event_to_model,
 )
 from src.infrastructure.persistence.models import OperationalEventModel
 
@@ -34,3 +35,10 @@ class SQLOperationalEventRepository(OperationalEventRepository):
         result = await self._session.execute(stmt)
         models = result.scalars().all()
         return [operational_event_to_domain(m) for m in models]
+
+    async def save(self, event: OperationalEvent) -> OperationalEvent:
+        model = operational_event_to_model(event)
+        self._session.add(model)
+        await self._session.flush()
+        await self._session.refresh(model)
+        return operational_event_to_domain(model)
