@@ -19,6 +19,7 @@ from app.api.routes.zone_behaviors import router as zone_behaviors_router
 from app.api.routes.operational_events import router as operational_events_router
 from app.api.routes.operational_event_modifiers import router as operational_event_modifiers_router
 from app.api.routes.predictions import router as predictions_router
+from app.api.routes.recommendations import router as recommendations_router
 
 app = FastAPI(title="Territorial MVP", version="0.1.0")
 
@@ -47,6 +48,7 @@ app.include_router(zone_behaviors_router, prefix="/api")
 app.include_router(operational_events_router, prefix="/api")
 app.include_router(operational_event_modifiers_router, prefix="/api")
 app.include_router(predictions_router)
+app.include_router(recommendations_router)
 
 
 @app.get("/health")
