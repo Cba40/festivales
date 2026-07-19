@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { apiClient } from '../core/api/client';
+import { endpoints } from '../core/api/endpoints';
 
 const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 
@@ -33,6 +34,47 @@ export interface ContextEngineResponseDTO {
     is_active: boolean; created_at: string;
   } | null;
   zonas: ZonePredictionDTO[];
+}
+
+export interface ZoneStateItem {
+  zone_id: string;
+  operational_state: string;
+  availability: number;
+  saturation_level: number;
+  estimated_wait: number;
+  confidence: number;
+  reasoning_factors: string[];
+  active_restriction: string;
+}
+
+export interface TerritorialPredictionResponse {
+  timestamp: string;
+  active_phase_id: string;
+  active_event_day_phase_id: string;
+  zone_states: ZoneStateItem[];
+}
+
+export function useTerritorialPrediction(eventId: string = EVENT_ID) {
+  const [data, setData] = useState<TerritorialPredictionResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data: res } = await apiClient.get<TerritorialPredictionResponse>(
+        endpoints.predictions.get(eventId)
+      );
+      setData(res);
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || 'Error al obtener predicciones');
+    } finally {
+      setLoading(false);
+    }
+  }, [eventId]);
+
+  return { data, loading, error, refresh };
 }
 
 export function usePredictions(eventId: string = EVENT_ID) {

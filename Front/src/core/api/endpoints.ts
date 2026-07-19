@@ -21,6 +21,9 @@ export const endpoints = {
     today: (eventId: string) => `/events/${eventId}/event-days/today`,
     byId: (eventId: string, id: string) => `/events/${eventId}/event-days/${id}`,
   },
+  predictions: {
+    get: (eventId: string) => `/events/${eventId}/predictions`,
+  },
   recommendations: {
     list: (eventId: string) =>
       `/events/${eventId}/recommendations`,
