@@ -59,6 +59,15 @@ class WeightedScoringStrategy:
         mobility_context: MobilityContext,
         config: RecommendationConfig,
     ) -> bool:
+        # ── Zone-type filter (documented in FRONTEND_BACKEND_CONTRACT.md §4) ──
+        # Each ActionType maps to exactly one ZoneType via ZONE_TYPE_BY_ACTION.
+        # Runtime enforcement requires zone_type_id on ZoneState, which will be
+        # added when the Context Engine propagates it through the pipeline.
+        # Until then, the mapping is authoritative for Product Endpoints.
+        # _ = requested_action.zone_type  # reserved for future use
+
+        # ── Behavioural filters ──────────────────────────────────────────────
+
         if requested_action.action_type == ActionType.SEEK_EXIT:
             if zone.active_restriction == FlowRestriction.CLOSED:
                 return False

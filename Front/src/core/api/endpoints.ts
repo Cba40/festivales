@@ -28,4 +28,8 @@ export const endpoints = {
     list: (eventId: string) =>
       `/events/${eventId}/recommendations`,
   },
+  products: {
+    parking: (eventId: string) =>
+      `/events/${eventId}/products/parking`,
+  },
 };

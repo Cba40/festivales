@@ -10,7 +10,11 @@ from src.application.recommendation.config import (
 from src.application.recommendation.strategy import WeightedScoringStrategy
 from src.domain.entities.zone_behavior import FlowRestriction
 from src.domain.recommendation.mobility_context import MobilityContext
-from src.domain.recommendation.requested_action import ActionType, RequestedAction
+from src.domain.recommendation.requested_action import (
+    ActionType,
+    RequestedAction,
+    ZONE_TYPE_BY_ACTION,
+)
 from src.domain.recommendation.user_context import AccessLevel, UserContext
 from src.domain.recommendation.zone_recommendation import ZoneRecommendation
 from src.domain.value_objects.territorial_prediction import TerritorialPrediction
@@ -101,6 +105,48 @@ def action_exit() -> RequestedAction:
 @pytest.fixture
 def action_service() -> RequestedAction:
     return RequestedAction(action_type=ActionType.SEEK_SERVICE)
+
+
+# ── New ActionType fixtures ──────────────────────────────────────────────
+
+@pytest.fixture
+def action_parking() -> RequestedAction:
+    return RequestedAction(action_type=ActionType.SEEK_PARKING)
+
+
+@pytest.fixture
+def action_food() -> RequestedAction:
+    return RequestedAction(action_type=ActionType.SEEK_FOOD)
+
+
+@pytest.fixture
+def action_bathroom() -> RequestedAction:
+    return RequestedAction(action_type=ActionType.SEEK_BATHROOM)
+
+
+@pytest.fixture
+def action_transport() -> RequestedAction:
+    return RequestedAction(action_type=ActionType.SEEK_TRANSPORT)
+
+
+@pytest.fixture
+def action_accommodation() -> RequestedAction:
+    return RequestedAction(action_type=ActionType.SEEK_ACCOMMODATION)
+
+
+@pytest.fixture
+def action_rest() -> RequestedAction:
+    return RequestedAction(action_type=ActionType.SEEK_REST)
+
+
+@pytest.fixture
+def action_security() -> RequestedAction:
+    return RequestedAction(action_type=ActionType.SEEK_SECURITY)
+
+
+@pytest.fixture
+def action_information() -> RequestedAction:
+    return RequestedAction(action_type=ActionType.SEEK_INFORMATION)
 
 
 @staticmethod
@@ -699,6 +745,120 @@ class TestNoResults:
             config=RecommendationConfig(),
         )
         assert result == []
+
+
+class TestActionTypeCatalog:
+    """Verify the definitive ActionType → ZoneType mapping."""
+
+    @pytest.mark.parametrize(
+        "action_type, expected_zone_type",
+        [
+            (ActionType.SEEK_PARKING, "Parking"),
+            (ActionType.SEEK_FOOD, "Gastronomy"),
+            (ActionType.SEEK_BATHROOM, "Sanitary"),
+            (ActionType.SEEK_TRANSPORT, "Transport"),
+            (ActionType.SEEK_ACCOMMODATION, "Accommodation"),
+            (ActionType.SEEK_EXIT, "Transport"),
+            (ActionType.SEEK_REST, "RestArea"),
+            (ActionType.SEEK_SECURITY, "Security"),
+            (ActionType.SEEK_INFORMATION, "Information"),
+            (ActionType.SEEK_LOW_DENSITY, None),
+            (ActionType.SEEK_SERVICE, None),
+        ],
+    )
+    def test_zone_type_mapping(
+        self,
+        action_type: ActionType,
+        expected_zone_type: str | None,
+    ) -> None:
+        action = RequestedAction(action_type=action_type)
+        assert action.zone_type == expected_zone_type
+
+    def test_explicit_zone_type_overrides_default(
+        self,
+    ) -> None:
+        action = RequestedAction(
+            action_type=ActionType.SEEK_PARKING,
+            zone_type="CustomType",
+        )
+        assert action.zone_type == "CustomType"
+
+    def test_no_ambiguous_action_types(self) -> None:
+        """Every intention-oriented ActionType maps to exactly one ZoneType."""
+        intention_oriented = [
+            ActionType.SEEK_PARKING,
+            ActionType.SEEK_FOOD,
+            ActionType.SEEK_BATHROOM,
+            ActionType.SEEK_TRANSPORT,
+            ActionType.SEEK_ACCOMMODATION,
+            ActionType.SEEK_EXIT,
+            ActionType.SEEK_REST,
+            ActionType.SEEK_SECURITY,
+            ActionType.SEEK_INFORMATION,
+        ]
+        for at in intention_oriented:
+            assert at in ZONE_TYPE_BY_ACTION
+            assert ZONE_TYPE_BY_ACTION[at] is not None, (
+                f"{at} must map to a ZoneType"
+            )
+
+    def test_service_not_used_for_specific_intents(self) -> None:
+        """SEEK_SERVICE is not the documented ActionType for any screen."""
+        specific = {
+            ActionType.SEEK_PARKING,
+            ActionType.SEEK_FOOD,
+            ActionType.SEEK_BATHROOM,
+            ActionType.SEEK_TRANSPORT,
+            ActionType.SEEK_ACCOMMODATION,
+            ActionType.SEEK_EXIT,
+            ActionType.SEEK_REST,
+            ActionType.SEEK_SECURITY,
+            ActionType.SEEK_INFORMATION,
+        }
+        service = ActionType.SEEK_SERVICE
+        assert service not in specific
+
+
+class TestNewActionTypesNoRegression:
+    """New ActionTypes must not break existing filtering behaviour."""
+
+    @pytest.mark.parametrize(
+        "action_type",
+        [
+            ActionType.SEEK_PARKING,
+            ActionType.SEEK_FOOD,
+            ActionType.SEEK_BATHROOM,
+            ActionType.SEEK_TRANSPORT,
+            ActionType.SEEK_ACCOMMODATION,
+            ActionType.SEEK_REST,
+            ActionType.SEEK_SECURITY,
+            ActionType.SEEK_INFORMATION,
+        ],
+    )
+    def test_new_action_types_accept_all_zones_by_default(
+        self,
+        action_type: ActionType,
+        strategy: WeightedScoringStrategy,
+    ) -> None:
+        action = RequestedAction(action_type=action_type)
+        all_zones = [_zone_a(), _zone_b(), _zone_c()]
+        result = strategy.evaluate(
+            prediction=_prediction(zone_states=all_zones),
+            user_context=UserContext(
+                user_id=UUID("00000000-0000-0000-0000-000000000001"),
+                access_level=AccessLevel.STANDARD,
+            ),
+            mobility_context=MobilityContext(
+                current_zone_id=None,
+                speed=1.0,
+                accessibility_required=False,
+            ),
+            requested_action=action,
+            config=RecommendationConfig(),
+        )
+        assert len(result) == 3, (
+            f"{action_type} should not filter zones by default"
+        )
 
 
 class TestDeterminism:

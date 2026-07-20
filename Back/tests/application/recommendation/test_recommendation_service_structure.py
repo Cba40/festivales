@@ -185,8 +185,16 @@ class TestValueObjects:
         assert AccessLevel.STAFF.value == "STAFF"
 
     def test_action_type_enum_values(self) -> None:
-        assert ActionType.SEEK_LOW_DENSITY.value == "SEEK_LOW_DENSITY"
+        assert ActionType.SEEK_PARKING.value == "SEEK_PARKING"
+        assert ActionType.SEEK_FOOD.value == "SEEK_FOOD"
+        assert ActionType.SEEK_BATHROOM.value == "SEEK_BATHROOM"
+        assert ActionType.SEEK_TRANSPORT.value == "SEEK_TRANSPORT"
+        assert ActionType.SEEK_ACCOMMODATION.value == "SEEK_ACCOMMODATION"
         assert ActionType.SEEK_EXIT.value == "SEEK_EXIT"
+        assert ActionType.SEEK_REST.value == "SEEK_REST"
+        assert ActionType.SEEK_SECURITY.value == "SEEK_SECURITY"
+        assert ActionType.SEEK_INFORMATION.value == "SEEK_INFORMATION"
+        assert ActionType.SEEK_LOW_DENSITY.value == "SEEK_LOW_DENSITY"
         assert ActionType.SEEK_SERVICE.value == "SEEK_SERVICE"
 
 
