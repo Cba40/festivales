@@ -139,7 +139,7 @@ async def get_parking_product_adapter(
             zonas=[],
         )
 
-    requested_action = RequestedAction(action_type=ActionType.SEEK_SERVICE)
+    requested_action = RequestedAction(action_type=ActionType.SEEK_PARKING)
 
     recs, prediction = await get_recommendations_adapter(
         db=db,

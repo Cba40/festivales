@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/Header'
 import { Map, X, List, Info } from 'lucide-react'
@@ -6,7 +6,7 @@ import { InteractiveMap } from '@/components/InteractiveMap'
 import { useAppStore } from '@/core/state/store'
 import { useParkingRecommendations, type ZonaEstacionamientoItem } from '@/services/parkingProduct'
 import { formatUpdatedAt } from '@/utils/formatTime'
-import { getDistancias, haversine } from '@/utils/geo'
+import { getDistancias } from '@/utils/geo'
 
 const Estacionar = () => {
   const navigate = useNavigate()
@@ -22,22 +22,10 @@ const Estacionar = () => {
 
   const zonas = data?.zonas ?? []
 
-  const zonasOrdenadas = useMemo(() => {
-    if (!userLocation) return zonas
-    return [...zonas].sort((a, b) => {
-      if (a.lat && a.lng && b.lat && b.lng) {
-        const distA = haversine(userLocation[0], userLocation[1], a.lat, a.lng)
-        const distB = haversine(userLocation[0], userLocation[1], b.lat, b.lng)
-        return distA - distB
-      }
-      return 0
-    })
-  }, [zonas, userLocation])
-
   const modo = data?.mode ?? 'informar'
 
-  const principal = zonasOrdenadas[0]
-  const alternativa = zonasOrdenadas[1]
+  const principal = zonas[0]
+  const alternativa = zonas[1]
 
   const abrirMapa = (zona: ZonaEstacionamientoItem) => {
     if (zona.lat && zona.lng) {
@@ -179,7 +167,7 @@ const Estacionar = () => {
 
         <div className="flex-1 p-4 overflow-y-auto space-y-4">
           <InteractiveMap
-            puntos={zonasOrdenadas
+            puntos={zonas
               .filter(z => z.lat && z.lng)
               .map(z => ({
                 id: z.zone_id,
@@ -196,10 +184,10 @@ const Estacionar = () => {
 
           <div className="space-y-2 pb-16">
             <p className="text-xs font-bold text-slate-600 dark:text-slate-300 px-1 flex justify-between">
-              <span>📍 {zonasOrdenadas.length} zonas disponibles</span>
+              <span>📍 {zonas.length} zonas disponibles</span>
               {userLocation && <span className="text-blue-500 text-[10px] font-semibold">📡 Ubicación GPS activa</span>}
             </p>
-            {zonasOrdenadas.map(zona => {
+            {zonas.map(zona => {
               const dist = getDistancias(zona.lat ?? 0, zona.lng ?? 0, userLocation, zona.distancia_min ?? 5)
               return (
                 <button
@@ -284,7 +272,7 @@ const Estacionar = () => {
               <p className="text-xs text-red-500 text-center">
                 ⚠️ Disponibilidad muy baja — podés no encontrar lugar
               </p>
-              {zonasOrdenadas.slice(0, 2).map((zona) => {
+              {zonas.slice(0, 2).map((zona) => {
                 const dist = getDistancias(zona.lat ?? 0, zona.lng ?? 0, userLocation, zona.distancia_min ?? 5)
                 return (
                 <button
@@ -512,7 +500,7 @@ const Estacionar = () => {
             🟢 Bajo: rápido · 🟡 Medio: demora moderada · 🔴 Alto: mucha demora
           </div>
           <div className="space-y-3">
-            {zonasOrdenadas.slice(0, 3).map((zona) => {
+            {zonas.slice(0, 3).map((zona) => {
               const dist = getDistancias(zona.lat ?? 0, zona.lng ?? 0, userLocation, zona.distancia_min ?? 5)
               return (
               <button
