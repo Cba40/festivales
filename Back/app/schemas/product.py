@@ -56,8 +56,19 @@ class TransportRecommendationResponse(BaseModel):
     zonas: list[ZonaTransporteItem]
 
 
+class ZonaRestItem(ZonaItemBase):
+    pass
+
+
 class BathroomRecommendationResponse(BaseModel):
     event_id: str
     timestamp: str
     mode: str
     zonas: list[ZonaSanitaryItem]
+
+
+class RestRecommendationResponse(BaseModel):
+    event_id: str
+    timestamp: str
+    mode: str
+    zonas: list[ZonaRestItem]
