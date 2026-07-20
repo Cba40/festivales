@@ -22,6 +22,7 @@ from app.api.routes.predictions import router as predictions_router
 from app.api.routes.recommendations import router as recommendations_router
 from app.api.routes.parking import router as parking_router
 from app.api.routes.gastronomy import router as gastronomy_router
+from app.api.routes.transport import router as transport_router
 
 app = FastAPI(title="Territorial MVP", version="0.1.0")
 
@@ -53,6 +54,7 @@ app.include_router(predictions_router)
 app.include_router(recommendations_router)
 app.include_router(parking_router)
 app.include_router(gastronomy_router)
+app.include_router(transport_router)
 
 
 @app.get("/health")

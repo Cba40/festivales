@@ -34,8 +34,19 @@ class ZonaGastronomicaItem(ZonaItemBase):
     categoria: str = ""
 
 
+class ZonaTransporteItem(ZonaItemBase):
+    calle: str = ""
+
+
 class GastronomyRecommendationResponse(BaseModel):
     event_id: str
     timestamp: str
     mode: str
     zonas: list[ZonaGastronomicaItem]
+
+
+class TransportRecommendationResponse(BaseModel):
+    event_id: str
+    timestamp: str
+    mode: str
+    zonas: list[ZonaTransporteItem]

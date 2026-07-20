@@ -33,5 +33,7 @@ export const endpoints = {
       `/events/${eventId}/products/parking`,
     gastronomy: (eventId: string) =>
       `/events/${eventId}/products/gastronomy`,
+    transport: (eventId: string) =>
+      `/events/${eventId}/products/transport`,
   },
 };
