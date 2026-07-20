@@ -39,5 +39,7 @@ export const endpoints = {
       `/events/${eventId}/products/bathroom`,
     rest: (eventId: string) =>
       `/events/${eventId}/products/rest`,
+    health: (eventId: string) =>
+      `/events/${eventId}/products/health`,
   },
 };
