@@ -52,6 +52,7 @@ async def load_type_filtered_zone_ids(
     type_map: dict[str, UUID],
     zone_type_slug: str,
     orm_type_value: str,
+    subtype: str | None = None,
 ) -> set[UUID]:
     type_id = type_map.get(zone_type_slug)
     if type_id is None:
@@ -61,6 +62,8 @@ async def load_type_filtered_zone_ids(
         ZoneORM.event_id == event_id,
         ZoneORM.type == orm_type_value,
     )
+    if subtype is not None:
+        stmt = stmt.where(ZoneORM.subtipo == subtype)
     rows = (await db.execute(stmt)).scalars().all()
     return {UUID(r.id) for r in rows}
 
