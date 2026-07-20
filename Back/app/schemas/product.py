@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 
 
-class ZonaEstacionamientoItem(BaseModel):
+class ZonaItemBase(BaseModel):
     zone_id: str
     name: str
     score: float = Field(ge=0.0, le=1.0)
@@ -9,7 +9,6 @@ class ZonaEstacionamientoItem(BaseModel):
     saturation_level: float = Field(ge=0.0, le=1.0)
     estado: str
     availability: int
-    disponibilidad: int = Field(ge=0, le=100)
     estimated_wait: int
     confidence: float = Field(ge=0.0, le=1.0)
     active_restriction: str
@@ -20,8 +19,23 @@ class ZonaEstacionamientoItem(BaseModel):
     distancia_min: int | None = None
 
 
+class ZonaEstacionamientoItem(ZonaItemBase):
+    pass
+
+
 class ParkingRecommendationResponse(BaseModel):
     event_id: str
     timestamp: str
     mode: str
     zonas: list[ZonaEstacionamientoItem]
+
+
+class ZonaGastronomicaItem(ZonaItemBase):
+    categoria: str = ""
+
+
+class GastronomyRecommendationResponse(BaseModel):
+    event_id: str
+    timestamp: str
+    mode: str
+    zonas: list[ZonaGastronomicaItem]

@@ -5,7 +5,7 @@ import { useAppStore } from '@/core/state/store'
 
 const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id'
 
-export interface ZonaEstacionamientoItem {
+export interface ZonaGastronomicaItem {
   zone_id: string
   name: string
   score: number
@@ -17,21 +17,22 @@ export interface ZonaEstacionamientoItem {
   confidence: number
   active_restriction: string
   operational_state: string
+  categoria: string
   lat: number | null
   lng: number | null
   referencia: string
   distancia_min: number | null
 }
 
-export interface ParkingRecommendationResponse {
+export interface GastronomyRecommendationResponse {
   event_id: string
   timestamp: string
   mode: string
-  zonas: ZonaEstacionamientoItem[]
+  zonas: ZonaGastronomicaItem[]
 }
 
-export function useParkingRecommendations() {
-  const [data, setData] = useState<ParkingRecommendationResponse | null>(null)
+export function useGastronomyRecommendations() {
+  const [data, setData] = useState<GastronomyRecommendationResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -42,8 +43,8 @@ export function useParkingRecommendations() {
     setLoading(true)
     setError(null)
     try {
-      const { data: res } = await apiClient.get<ParkingRecommendationResponse>(
-        endpoints.products.parking(EVENT_ID),
+      const { data: res } = await apiClient.get<GastronomyRecommendationResponse>(
+        endpoints.products.gastronomy(EVENT_ID),
         {
           params: {
             speed: 1.5,
@@ -57,7 +58,7 @@ export function useParkingRecommendations() {
       )
       setData(res)
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Error al obtener recomendaciones de estacionamiento')
+      setError(err?.response?.data?.detail || 'Error al obtener recomendaciones de gastronomía')
     } finally {
       setLoading(false)
     }

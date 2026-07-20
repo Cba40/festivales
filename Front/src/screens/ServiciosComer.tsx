@@ -1,18 +1,12 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/Header'
 import { Map, List, X, Info } from 'lucide-react'
 import { InteractiveMap } from '@/components/InteractiveMap'
-import {
-  getComidaOrdenada,
-  getModoComer,
-} from '@/data/mockComer'
 import { useAppStore } from '@/core/state/store'
-import { mapZonesToComida } from '@/data/mappers'
-import { getConfianza, getConfianzaLabel } from '@/utils/confianza'
+import { useGastronomyRecommendations, type ZonaGastronomicaItem } from '@/services/gastronomyProduct'
 import { formatUpdatedAt } from '@/utils/formatTime'
-import type { PuntoComida } from '@/data/mappers'
-import { getDistancias, haversine } from '@/utils/geo'
+import { getDistancias } from '@/utils/geo'
 
 const getEstadoStyles = (estado: string) => {
   switch (estado) {
@@ -34,69 +28,63 @@ const getEstadoLabel = (estado: string) => {
   }
 }
 
+const getConfianzaLabel = (confidence: number): string => {
+  if (confidence >= 0.7) return '✅ Alta probabilidad'
+  if (confidence >= 0.4) return '⚠️ Últimos lugares'
+  return '❗ Disponibilidad incierta'
+}
+
 const ServiciosComer = () => {
   const navigate = useNavigate()
-  const zones = useAppStore(s => s.zones)
-  const [selectedPunto, setSelectedPunto] = useState<PuntoComida | null>(null)
+  const { data, loading, error, refresh } = useGastronomyRecommendations()
+  const [selectedZona, setSelectedZona] = useState<ZonaGastronomicaItem | null>(null)
   const [mostrarOpciones, setMostrarOpciones] = useState(false)
   const [showMap, setShowMap] = useState(false)
   const userLocation = useAppStore(s => s.userLocation)
 
-  const comidas = useMemo(() => mapZonesToComida(zones), [zones])
+  useEffect(() => {
+    refresh()
+  }, [refresh])
 
-  const comidasOrdenadas = useMemo(() => {
-    const ordenadas = getComidaOrdenada(comidas)
-    if (userLocation) {
-      return [...ordenadas].sort((a, b) => {
-        if (a.lat && a.lng && b.lat && b.lng) {
-          const distA = haversine(userLocation[0], userLocation[1], a.lat, a.lng)
-          const distB = haversine(userLocation[0], userLocation[1], b.lat, b.lng)
-          return distA - distB
-        }
-        return 0
-      })
-    }
-    return ordenadas
-  }, [comidas, userLocation])
+  const zonas = data?.zonas ?? []
 
-  const modo = useMemo(() => getModoComer(comidas), [comidas])
+  const modo = data?.mode ?? 'informar'
 
-  const principal = comidasOrdenadas[0]
-  const alternativa = comidasOrdenadas[1]
+  const principal = zonas[0]
+  const alternativa = zonas[1]
 
-  const abrirMapa = (punto: PuntoComida) => {
-    if (punto.lat && punto.lng) {
+  const abrirMapa = (zona: ZonaGastronomicaItem) => {
+    if (zona.lat && zona.lng) {
       window.open(
-        `https://www.google.com/maps/dir/?api=1&destination=${punto.lat},${punto.lng}`,
+        `https://www.google.com/maps/dir/?api=1&destination=${zona.lat},${zona.lng}`,
         '_blank'
       )
     }
-    setSelectedPunto(null)
+    setSelectedZona(null)
   }
 
-  // Bottom Sheet compartido
-  const renderBottomSheet = selectedPunto && (
+  const renderBottomSheet = selectedZona && (
     <>
       <div
         className="fixed inset-0 bg-black/50 z-[9999]"
-        onClick={() => setSelectedPunto(null)}
+        onClick={() => setSelectedZona(null)}
       />
       <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 rounded-t-2xl p-4 z-[10000] max-w-md mx-auto shadow-2xl">
         <div
           className="w-12 h-1 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto mb-4 cursor-pointer"
-          onClick={() => setSelectedPunto(null)}
+          onClick={() => setSelectedZona(null)}
         />
 
         <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2">
-          {selectedPunto.nombre}
+          {selectedZona.name}
         </h3>
 
         <div className="space-y-2 mb-4">
           <p className="text-sm text-slate-600 dark:text-slate-300">
-            📍 {selectedPunto.referencia}
+            📍 {selectedZona.referencia}
           </p>
           {(() => {
-            const dist = getDistancias(selectedPunto.lat ?? 0, selectedPunto.lng ?? 0, userLocation, selectedPunto.distancia_min)
+            const dist = getDistancias(selectedZona.lat ?? 0, selectedZona.lng ?? 0, userLocation, selectedZona.distancia_min ?? 5)
             return (
               <>
                 <p className="text-sm text-slate-600 dark:text-slate-300">🚶 Caminando: <span className="font-semibold text-slate-800 dark:text-slate-100">{dist.walking}</span></p>
@@ -105,18 +93,18 @@ const ServiciosComer = () => {
             )
           })()}
           <p className="text-sm text-slate-600 dark:text-slate-300">
-            ⏱️ Espera: {selectedPunto.espera_min} min
+            ⏱️ Espera: {selectedZona.estimated_wait} min
           </p>
           <p className="text-xs text-slate-500 dark:text-slate-300">
-            {formatUpdatedAt(selectedPunto.updatedAt)}
+            {formatUpdatedAt(Date.now())}
           </p>
           <p className="text-xs text-slate-500 dark:text-slate-300">
-            {getConfianzaLabel(getConfianza(selectedPunto.estado))}
+            {getConfianzaLabel(selectedZona.confidence)}
           </p>
         </div>
 
         <button
-          onClick={() => abrirMapa(selectedPunto)}
+          onClick={() => abrirMapa(selectedZona)}
           className="w-full bg-primary text-white py-3 rounded-xl font-bold mb-2 transition-transform active:scale-95 flex items-center justify-center gap-2"
         >
           <Map size={20} />
@@ -124,7 +112,7 @@ const ServiciosComer = () => {
         </button>
 
         <button
-          onClick={() => setSelectedPunto(null)}
+          onClick={() => setSelectedZona(null)}
           className="w-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 py-3 rounded-xl font-bold transition-transform active:scale-95 flex items-center justify-center gap-2"
         >
           <X size={16} />
@@ -134,7 +122,6 @@ const ServiciosComer = () => {
     </>
   )
 
-  // Botón flotante "Ver mapa completo" / "Ver lista"
   const botonMapa = (
     <button
       onClick={() => setShowMap(v => !v)}
@@ -145,7 +132,35 @@ const ServiciosComer = () => {
     </button>
   )
 
-  // Vista mapa completo (aplica en todos los modos)
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
+        <Header title="Comer" showBack onBack={() => navigate('/')} />
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-slate-500">Cargando recomendaciones...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
+        <Header title="Comer" showBack onBack={() => navigate('/')} />
+        <div className="flex-1 p-4 flex flex-col items-center justify-center space-y-4">
+          <p className="text-danger font-bold">Error al cargar</p>
+          <p className="text-sm text-slate-500 text-center">{error}</p>
+          <button
+            onClick={refresh}
+            className="bg-primary text-white px-6 py-2 rounded-lg font-bold"
+          >
+            Reintentar
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   if (showMap) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
@@ -153,43 +168,42 @@ const ServiciosComer = () => {
 
         <div className="flex-1 p-4 overflow-y-auto space-y-4">
           <InteractiveMap
-            puntos={comidasOrdenadas
-              .filter(p => p.lat && p.lng)
-              .map(p => ({
-                id: p.id,
-                nombre: p.nombre,
-                lat: p.lat!,
-                lng: p.lng!,
-                referencia: p.referencia,
+            puntos={zonas
+              .filter(z => z.lat && z.lng)
+              .map(z => ({
+                id: z.zone_id,
+                nombre: z.name,
+                lat: z.lat!,
+                lng: z.lng!,
+                referencia: z.referencia,
                 tipo: 'comer',
-                originalData: p
+                originalData: z
               }))}
-            onSelectPunto={(p) => setSelectedPunto(p as PuntoComida)}
+            onSelectPunto={(p) => setSelectedZona(p as ZonaGastronomicaItem)}
             onUserLocationUpdate={() => {}}
           />
 
-          {/* Lista debajo del mapa */}
           <div className="space-y-2 pb-20">
             <p className="text-xs font-bold text-slate-600 dark:text-slate-300 px-1 flex justify-between">
-              <span>🍔 {comidasOrdenadas.length} zonas gastronómicas</span>
+              <span>🍔 {zonas.length} zonas gastronómicas</span>
               {userLocation && <span className="text-blue-500 text-[10px] font-semibold">📡 Ubicación GPS activa</span>}
             </p>
-            {comidasOrdenadas.map(punto => {
-              const dist = getDistancias(punto.lat ?? 0, punto.lng ?? 0, userLocation, punto.distancia_min)
+            {zonas.map(zona => {
+              const dist = getDistancias(zona.lat ?? 0, zona.lng ?? 0, userLocation, zona.distancia_min ?? 5)
               return (
                 <button
-                  key={punto.id}
-                  onClick={() => setSelectedPunto(punto)}
+                  key={zona.zone_id}
+                  onClick={() => setSelectedZona(zona)}
                   className="w-full text-left bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-orange-400 dark:hover:border-orange-500 transition-colors group shadow-sm flex items-start gap-2"
                 >
                   <span className="text-lg mt-0.5">🍔</span>
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-center">
                       <p className="font-semibold text-sm text-slate-800 dark:text-slate-100 group-hover:text-orange-600 dark:group-hover:text-orange-400 truncate">
-                        {punto.nombre}
+                        {zona.name}
                       </p>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getEstadoStyles(punto.estado)}`}>
-                        {getEstadoLabel(punto.estado)}
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getEstadoStyles(zona.estado)}`}>
+                        {getEstadoLabel(zona.estado)}
                       </span>
                     </div>
                     <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 flex flex-wrap gap-x-2 gap-y-0.5 items-center">
@@ -197,7 +211,7 @@ const ServiciosComer = () => {
                       <span className="opacity-50">·</span>
                       <span>🚗 {dist.driving}</span>
                       <span className="opacity-50">·</span>
-                      <span>⏱️ {punto.espera_min} min espera</span>
+                      <span>⏱️ {zona.estimated_wait} min espera</span>
                     </p>
                   </div>
                   <Info size={16} className="text-slate-400 flex-shrink-0" />
@@ -213,7 +227,6 @@ const ServiciosComer = () => {
     )
   }
 
-  // SIN SOLUCIÓN
   if (modo === 'sin_solucion') {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
@@ -251,22 +264,22 @@ const ServiciosComer = () => {
               <p className="text-xs text-red-500 text-center">
                 ⚠️ Disponibilidad muy baja — podés no encontrar lugar
               </p>
-              {comidasOrdenadas.slice(0, 2).map((punto) => {
-                const dist = getDistancias(punto.lat ?? 0, punto.lng ?? 0, userLocation, punto.distancia_min)
+              {zonas.slice(0, 2).map((zona) => {
+                const dist = getDistancias(zona.lat ?? 0, zona.lng ?? 0, userLocation, zona.distancia_min ?? 5)
                 return (
                   <button
-                    key={punto.id}
-                    onClick={() => setSelectedPunto(punto)}
+                    key={zona.zone_id}
+                    onClick={() => setSelectedZona(zona)}
                     className="w-full p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-left"
                   >
-                    <span className="font-bold text-gray-900 dark:text-gray-100">{punto.nombre}</span>
-                    <span className={`ml-2 px-2 py-1 rounded text-xs font-bold ${getEstadoStyles(punto.estado)}`}>
-                      {getEstadoLabel(punto.estado)}
+                    <span className="font-bold text-gray-900 dark:text-gray-100">{zona.name}</span>
+                    <span className={`ml-2 px-2 py-1 rounded text-xs font-bold ${getEstadoStyles(zona.estado)}`}>
+                      {getEstadoLabel(zona.estado)}
                     </span>
                     <p className="text-xs text-gray-500 dark:text-gray-300 mt-1 flex flex-wrap gap-x-2">
                       <span>🚶 {dist.walking}</span>
                       <span>🚗 {dist.driving}</span>
-                      <span>⏱️ {punto.espera_min} min</span>
+                      <span>⏱️ {zona.estimated_wait} min</span>
                     </p>
                   </button>
                 )
@@ -281,7 +294,6 @@ const ServiciosComer = () => {
     )
   }
 
-  // GUIAR
   if (modo === 'guiar') {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
@@ -293,17 +305,17 @@ const ServiciosComer = () => {
 
         <div className="flex-1 p-4 space-y-4">
           {principal && (() => {
-            const dist = getDistancias(principal.lat ?? 0, principal.lng ?? 0, userLocation, principal.distancia_min)
+            const dist = getDistancias(principal.lat ?? 0, principal.lng ?? 0, userLocation, principal.distancia_min ?? 5)
             return (
-              <button onClick={() => setSelectedPunto(principal)} className="w-full">
+              <button onClick={() => setSelectedZona(principal)} className="w-full">
                 <div className="bg-primary text-white p-6 rounded-xl text-left shadow-lg">
-                  <p className="text-lg font-bold">👉 Dirigite ahora a {principal.nombre}</p>
+                  <p className="text-lg font-bold">👉 Dirigite ahora a {principal.name}</p>
                   <p className="text-sm opacity-90 mt-2">📍 {principal.referencia}</p>
                   <p className="text-sm opacity-90 flex gap-3">
                     <span>🚶 {dist.walking}</span>
                     <span>🚗 {dist.driving}</span>
                   </p>
-                  <p className="text-sm opacity-90">⏱️ Espera: {principal.espera_min} min</p>
+                  <p className="text-sm opacity-90">⏱️ Espera: {principal.estimated_wait} min</p>
                   {principal.estado === 'alto' && (
                     <p className="text-xs opacity-75 mt-2">⚠️ Últimos lugares</p>
                   )}
@@ -313,16 +325,16 @@ const ServiciosComer = () => {
           })()}
 
           {alternativa && principal?.estado !== 'colapsado' && (() => {
-            const dist = getDistancias(alternativa.lat ?? 0, alternativa.lng ?? 0, userLocation, alternativa.distancia_min)
+            const dist = getDistancias(alternativa.lat ?? 0, alternativa.lng ?? 0, userLocation, alternativa.distancia_min ?? 5)
             return (
-              <button onClick={() => setSelectedPunto(alternativa)} className="w-full">
+              <button onClick={() => setSelectedZona(alternativa)} className="w-full">
                 <div className="bg-slate-100 dark:bg-slate-700 border-2 border-slate-300 dark:border-slate-600 p-4 rounded-xl text-left">
-                  <p className="font-bold text-slate-800 dark:text-slate-100">👉 Si está lleno → {alternativa.nombre}</p>
+                  <p className="font-bold text-slate-800 dark:text-slate-100">👉 Si está lleno → {alternativa.name}</p>
                   <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">📍 {alternativa.referencia}</p>
                   <p className="text-sm text-slate-600 dark:text-slate-300 flex gap-3">
                     <span>🚶 {dist.walking}</span>
                     <span>🚗 {dist.driving}</span>
-                    <span>⏱️ {alternativa.espera_min} min</span>
+                    <span>⏱️ {alternativa.estimated_wait} min</span>
                   </p>
                 </div>
               </button>
@@ -330,7 +342,7 @@ const ServiciosComer = () => {
           })()}
 
           <p className="text-xs text-slate-400 dark:text-slate-400 text-center">
-            {getConfianzaLabel(getConfianza(principal?.estado || 'medio'))}
+            {getConfianzaLabel(principal?.confidence ?? 0.5)}
           </p>
 
           {principal && (
@@ -350,7 +362,6 @@ const ServiciosComer = () => {
     )
   }
 
-  // ASISTIR
   if (modo === 'asistir') {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
@@ -358,35 +369,35 @@ const ServiciosComer = () => {
 
         <div className="flex-1 p-4 space-y-4">
           {principal && (() => {
-            const dist = getDistancias(principal.lat ?? 0, principal.lng ?? 0, userLocation, principal.distancia_min)
+            const dist = getDistancias(principal.lat ?? 0, principal.lng ?? 0, userLocation, principal.distancia_min ?? 5)
             return (
-              <button onClick={() => setSelectedPunto(principal)} className="w-full">
+              <button onClick={() => setSelectedZona(principal)} className="w-full">
                 <div className="bg-white dark:bg-slate-800 border-l-4 border-primary p-4 rounded-xl text-left shadow-md">
-                  <p className="font-bold text-slate-800 dark:text-slate-100 text-lg">👉 Mejor opción ahora: {principal.nombre}</p>
+                  <p className="font-bold text-slate-800 dark:text-slate-100 text-lg">👉 Mejor opción ahora: {principal.name}</p>
                   <p className="text-sm text-slate-600 dark:text-slate-300 mt-2">📍 {principal.referencia}</p>
                   <p className="text-sm text-slate-600 dark:text-slate-300 flex gap-3">
                     <span>🚶 {dist.walking}</span>
                     <span>🚗 {dist.driving}</span>
-                    <span>⏱️ {principal.espera_min} min</span>
+                    <span>⏱️ {principal.estimated_wait} min</span>
                   </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-300 mt-2">{formatUpdatedAt(principal.updatedAt)}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-300 mt-1">{getConfianzaLabel(getConfianza(principal.estado))}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-300 mt-2">{formatUpdatedAt(Date.now())}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-300 mt-1">{getConfianzaLabel(principal.confidence)}</p>
                 </div>
               </button>
             )
           })()}
 
           {alternativa && (() => {
-            const dist = getDistancias(alternativa.lat ?? 0, alternativa.lng ?? 0, userLocation, alternativa.distancia_min)
+            const dist = getDistancias(alternativa.lat ?? 0, alternativa.lng ?? 0, userLocation, alternativa.distancia_min ?? 5)
             return (
-              <button onClick={() => setSelectedPunto(alternativa)} className="w-full">
+              <button onClick={() => setSelectedZona(alternativa)} className="w-full">
                 <div className="bg-slate-100 dark:bg-slate-700 border-2 border-slate-300 dark:border-slate-600 p-4 rounded-xl text-left">
-                  <p className="font-bold text-slate-800 dark:text-slate-100">Alternativa: {alternativa.nombre}</p>
+                  <p className="font-bold text-slate-800 dark:text-slate-100">Alternativa: {alternativa.name}</p>
                   <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">📍 {alternativa.referencia}</p>
                   <p className="text-sm text-slate-600 dark:text-slate-300 flex gap-3">
                     <span>🚶 {dist.walking}</span>
                     <span>🚗 {dist.driving}</span>
-                    <span>⏱️ {alternativa.espera_min} min</span>
+                    <span>⏱️ {alternativa.estimated_wait} min</span>
                   </p>
                 </div>
               </button>
@@ -410,7 +421,6 @@ const ServiciosComer = () => {
     )
   }
 
-  // INFORMAR (default)
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
       <Header title="Comer" showBack onBack={() => navigate('/')} />
@@ -424,31 +434,31 @@ const ServiciosComer = () => {
             🟢 Bajo: rápido · 🟡 Medio: demora moderada · 🔴 Alto: mucha demora
           </div>
           {userLocation && (
-            <p className="text-[10px] text-blue-500 font-semibold mb-3">📡 Ubicación GPS activa — lista ordenada por cercanía</p>
+            <p className="text-[10px] text-blue-500 font-semibold mb-3">📡 Ubicación GPS activa</p>
           )}
           <div className="space-y-3">
-            {comidasOrdenadas.slice(0, 3).map((punto) => {
-              const dist = getDistancias(punto.lat ?? 0, punto.lng ?? 0, userLocation, punto.distancia_min)
+            {zonas.slice(0, 3).map((zona) => {
+              const dist = getDistancias(zona.lat ?? 0, zona.lng ?? 0, userLocation, zona.distancia_min ?? 5)
               return (
                 <button
-                  key={punto.id}
-                  onClick={() => setSelectedPunto(punto)}
+                  key={zona.zone_id}
+                  onClick={() => setSelectedZona(zona)}
                   className="w-full p-4 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-left hover:border-primary dark:hover:border-primary/70 transition-colors"
                 >
                   <div className="flex justify-between items-center">
-                    <span className="font-bold mr-2 text-gray-900 dark:text-gray-100">{punto.nombre}</span>
-                    <span className={`px-2 py-1 rounded text-xs font-bold whitespace-nowrap shrink-0 ${getEstadoStyles(punto.estado)}`}>
-                      {getEstadoLabel(punto.estado)}
+                    <span className="font-bold mr-2 text-gray-900 dark:text-gray-100">{zona.name}</span>
+                    <span className={`px-2 py-1 rounded text-xs font-bold whitespace-nowrap shrink-0 ${getEstadoStyles(zona.estado)}`}>
+                      {getEstadoLabel(zona.estado)}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">📍 {punto.referencia}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">📍 {zona.referencia}</p>
                   <p className="text-sm text-gray-600 dark:text-gray-300 flex flex-wrap gap-x-3 gap-y-0.5">
                     <span>🚶 {dist.walking}</span>
                     <span>🚗 {dist.driving}</span>
-                    <span>⏱️ {punto.espera_min} min espera</span>
+                    <span>⏱️ {zona.estimated_wait} min espera</span>
                   </p>
-                  <p className="text-xs text-gray-400 dark:text-gray-300 mt-1">{formatUpdatedAt(punto.updatedAt)}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-300 mt-1">{getConfianzaLabel(getConfianza(punto.estado))}</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-300 mt-1">{formatUpdatedAt(Date.now())}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-300 mt-1">{getConfianzaLabel(zona.confidence)}</p>
                 </button>
               )
             })}

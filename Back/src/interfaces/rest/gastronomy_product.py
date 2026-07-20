@@ -1,9 +1,3 @@
-"""REST adapter: composes the enriched Parking Product response.
-
-Reuses get_recommendations_adapter (which delegates to RecommendationModule
-→ GetRecommendations) and enriches with ZoneState data and zone metadata.
-Composition happens exclusively in this adapter — no domain changes.
-"""
 from __future__ import annotations
 
 from datetime import datetime
@@ -12,8 +6,8 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.product import (
-    ParkingRecommendationResponse,
-    ZonaEstacionamientoItem,
+    GastronomyRecommendationResponse,
+    ZonaGastronomicaItem,
 )
 from src.domain.recommendation.requested_action import (
     ActionType,
@@ -30,29 +24,36 @@ from src.interfaces.rest.product_helpers import (
 from src.interfaces.rest.recommendations import get_recommendations_adapter
 
 
-async def get_parking_product_adapter(
+def _extra_gastronomy_fields(row) -> dict:
+    categoria = ""
+    if row.subtipo in ("rapido", "comida", "bebida"):
+        categoria = row.subtipo
+    return {"categoria": categoria}
+
+
+async def get_gastronomy_product_adapter(
     db: AsyncSession,
     *,
     timestamp: datetime,
     event_id: str,
-    user_context: UserContext,
-    mobility_context: MobilityContext,
+    user_context,
+    mobility_context,
     limit: int = 5,
-) -> ParkingRecommendationResponse:
+) -> GastronomyRecommendationResponse:
     zone_type_map = await load_zone_type_map(db)
-    parking_zone_ids = await load_type_filtered_zone_ids(
-        db, event_id, zone_type_map, "parking", "parking"
+    gastronomy_zone_ids = await load_type_filtered_zone_ids(
+        db, event_id, zone_type_map, "gastronomy", "comida"
     )
 
-    if not parking_zone_ids:
-        return ParkingRecommendationResponse(
+    if not gastronomy_zone_ids:
+        return GastronomyRecommendationResponse(
             event_id=event_id,
             timestamp=timestamp.isoformat(),
             mode="sin_solucion",
             zonas=[],
         )
 
-    requested_action = RequestedAction(action_type=ActionType.SEEK_PARKING)
+    requested_action = RequestedAction(action_type=ActionType.SEEK_FOOD)
 
     recs, prediction = await get_recommendations_adapter(
         db=db,
@@ -64,25 +65,29 @@ async def get_parking_product_adapter(
         limit=limit,
     )
 
-    parking_recs = [r for r in recs if r.zone_id in parking_zone_ids]
-    parking_recs = parking_recs[:limit]
+    gastronomy_recs = [r for r in recs if r.zone_id in gastronomy_zone_ids]
+    gastronomy_recs = gastronomy_recs[:limit]
 
-    zone_meta = await load_zone_metadata(db, [r.zone_id for r in parking_recs])
+    zone_meta = await load_zone_metadata(
+        db, [r.zone_id for r in gastronomy_recs],
+        extra_fields_fn=_extra_gastronomy_fields,
+    )
 
     zone_states_by_id: dict[UUID, ZoneState] = {}
     if prediction is not None:
         for zs in prediction.zone_states:
             zone_states_by_id[zs.zone_id] = zs
 
-    enriched: list[ZonaEstacionamientoItem] = []
-    for rec in parking_recs:
+    enriched: list[ZonaGastronomicaItem] = []
+    for rec in gastronomy_recs:
         state = zone_states_by_id.get(rec.zone_id)
         meta = zone_meta.get(rec.zone_id)
-        enriched.append(enrich_zone(rec, state, meta, ZonaEstacionamientoItem))
+        extra = {"categoria": meta.get("categoria", "")} if meta else {}
+        enriched.append(enrich_zone(rec, state, meta, ZonaGastronomicaItem, extra))
 
     mode = compute_mode([z.estado for z in enriched])
 
-    return ParkingRecommendationResponse(
+    return GastronomyRecommendationResponse(
         event_id=event_id,
         timestamp=prediction.timestamp.isoformat()
         if prediction is not None

@@ -1,4 +1,4 @@
-"""Tests for the GET /api/events/{event_id}/products/parking endpoint.
+"""Tests for the GET /api/events/{event_id}/products/gastronomy endpoint.
 
 All DB access is mocked — only the route's HTTP contract is tested.
 """
@@ -15,7 +15,7 @@ from jose import jwt
 from app.core.config import settings
 from app.db.session import get_async_db
 from app.main import app
-from app.schemas.product import ParkingRecommendationResponse, ZonaEstacionamientoItem
+from app.schemas.product import GastronomyRecommendationResponse, ZonaGastronomicaItem
 from src.domain.entities.zone_behavior import FlowRestriction
 from src.domain.recommendation.zone_recommendation import ZoneRecommendation
 from src.domain.value_objects.territorial_prediction import TerritorialPrediction
@@ -96,39 +96,22 @@ def sample_prediction() -> TerritorialPrediction:
     )
 
 
-@pytest.fixture
-def sample_recommendations() -> list[ZoneRecommendation]:
-    return [
-        ZoneRecommendation(
-            zone_id=ZONE_A,
-            score=0.85,
-            reasoning=["Baja densidad proyectada"],
-        ),
-        ZoneRecommendation(
-            zone_id=ZONE_B,
-            score=0.62,
-            reasoning=["Acceso regulado"],
-        ),
-    ]
-
-
 @pytest.fixture(autouse=True)
 def _mock_adapter(
-    sample_recommendations: list[ZoneRecommendation],
     sample_prediction: TerritorialPrediction,
 ):
     with patch(
-        "app.api.routes.parking.get_parking_product_adapter",
+        "app.api.routes.gastronomy.get_gastronomy_product_adapter",
         new_callable=AsyncMock,
     ) as mock:
-        mock.return_value = ParkingRecommendationResponse(
+        mock.return_value = GastronomyRecommendationResponse(
             event_id=EVENT_ID,
             timestamp=sample_prediction.timestamp.isoformat(),
             mode="informar",
             zonas=[
-                ZonaEstacionamientoItem(
+                ZonaGastronomicaItem(
                     zone_id=str(ZONE_A),
-                    name="Zona A",
+                    name="Puesto Norte",
                     score=0.85,
                     reasoning=["Baja densidad proyectada"],
                     saturation_level=0.15,
@@ -138,14 +121,15 @@ def _mock_adapter(
                     confidence=0.95,
                     active_restriction="OPEN",
                     operational_state="LOW_DEMAND",
+                    categoria="rapido",
                     lat=-30.97,
                     lng=-64.08,
-                    referencia="Calle Principal",
+                    referencia="Frente a la plaza secundaria",
                     distancia_min=5,
                 ),
-                ZonaEstacionamientoItem(
+                ZonaGastronomicaItem(
                     zone_id=str(ZONE_B),
-                    name="Zona B",
+                    name="Zona Gastronómica Central",
                     score=0.62,
                     reasoning=["Acceso regulado"],
                     saturation_level=0.60,
@@ -155,9 +139,10 @@ def _mock_adapter(
                     confidence=0.85,
                     active_restriction="REGULATED",
                     operational_state="MODERATE_DEMAND",
+                    categoria="comida",
                     lat=-30.98,
                     lng=-64.09,
-                    referencia="Calle Secundaria",
+                    referencia="Predio principal",
                     distancia_min=8,
                 ),
             ],
@@ -165,14 +150,14 @@ def _mock_adapter(
         yield mock
 
 
-class TestParkingProductEndpoint:
+class TestGastronomyProductEndpoint:
     def test_200_ok(
         self,
         client: TestClient,
         auth_headers: dict[str, str],
     ):
         resp = client.get(
-            f"{BASE_URL}/products/parking",
+            f"{BASE_URL}/products/gastronomy",
             params={
                 "speed": 1.5,
                 "accessibility_required": False,
@@ -190,14 +175,17 @@ class TestParkingProductEndpoint:
 
         first = body["zonas"][0]
         assert first["zone_id"] == str(ZONE_A)
+        assert first["name"] == "Puesto Norte"
         assert first["score"] == 0.85
         assert first["saturation_level"] == 0.15
         assert first["estado"] == "bajo"
+        assert first["estimated_wait"] == 0
         assert first["confidence"] == 0.95
         assert first["active_restriction"] == "OPEN"
+        assert first["categoria"] == "rapido"
         assert first["lat"] == -30.97
         assert first["lng"] == -64.08
-        assert first["referencia"] == "Calle Principal"
+        assert first["referencia"] == "Frente a la plaza secundaria"
         assert first["distancia_min"] == 5
 
     def test_422_missing_required_params(
@@ -206,7 +194,7 @@ class TestParkingProductEndpoint:
         auth_headers: dict[str, str],
     ):
         resp = client.get(
-            f"{BASE_URL}/products/parking",
+            f"{BASE_URL}/products/gastronomy",
             params={"speed": 1.5},
             headers=auth_headers,
         )
@@ -217,7 +205,7 @@ class TestParkingProductEndpoint:
         client: TestClient,
     ):
         resp = client.get(
-            f"{BASE_URL}/products/parking",
+            f"{BASE_URL}/products/gastronomy",
             params={
                 "speed": 1.5,
                 "accessibility_required": False,
@@ -232,7 +220,7 @@ class TestParkingProductEndpoint:
         auth_headers: dict[str, str],
     ):
         resp = client.get(
-            f"{BASE_URL}/products/parking",
+            f"{BASE_URL}/products/gastronomy",
             params={
                 "speed": -1.0,
                 "accessibility_required": False,
@@ -248,7 +236,7 @@ class TestParkingProductEndpoint:
         auth_headers: dict[str, str],
         _mock_adapter: AsyncMock,
     ):
-        _mock_adapter.return_value = ParkingRecommendationResponse(
+        _mock_adapter.return_value = GastronomyRecommendationResponse(
             event_id=EVENT_ID,
             timestamp=datetime.now(timezone.utc).isoformat(),
             mode="sin_solucion",
@@ -256,7 +244,7 @@ class TestParkingProductEndpoint:
         )
 
         resp = client.get(
-            f"{BASE_URL}/products/parking",
+            f"{BASE_URL}/products/gastronomy",
             params={
                 "speed": 1.5,
                 "accessibility_required": False,
@@ -277,7 +265,7 @@ class TestParkingProductEndpoint:
         _mock_adapter: AsyncMock,
     ):
         client.get(
-            f"{BASE_URL}/products/parking",
+            f"{BASE_URL}/products/gastronomy",
             params={
                 "speed": 1.5,
                 "accessibility_required": False,
@@ -304,13 +292,13 @@ class TestParkingProductEndpoint:
         assert mob_ctx.accessibility_required is False
         assert str(mob_ctx.current_zone_id) == str(ZONE_A)
 
-    def test_zone_structure(
+    def test_response_structure(
         self,
         client: TestClient,
         auth_headers: dict[str, str],
     ):
         resp = client.get(
-            f"{BASE_URL}/products/parking",
+            f"{BASE_URL}/products/gastronomy",
             params={
                 "speed": 1.5,
                 "accessibility_required": False,
@@ -326,6 +314,6 @@ class TestParkingProductEndpoint:
             "zone_id", "name", "score", "reasoning",
             "saturation_level", "estado", "availability",
             "estimated_wait", "confidence", "active_restriction",
-            "operational_state", "lat", "lng", "referencia", "distancia_min",
+            "operational_state", "categoria", "lat", "lng", "referencia", "distancia_min",
         }
         assert set(zona.keys()) == expected_fields

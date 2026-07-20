@@ -131,7 +131,7 @@ const Estacionar = () => {
             )
           })()}
           <p className="text-sm text-slate-600 dark:text-slate-300">
-            📊 Disponibilidad: {zona.disponibilidad}%
+            📊 Disponibilidad: {Math.round((1 - zona.saturation_level) * 100)}%
           </p>
           <p className="text-xs text-slate-500 dark:text-slate-300">
             {formatUpdatedAt(Date.now())}
@@ -210,7 +210,7 @@ const Estacionar = () => {
                       <span className="opacity-50">·</span>
                       <span>🚗 {dist.driving}</span>
                       <span className="opacity-50">·</span>
-                      <span>📊 {zona.disponibilidad}% disp.</span>
+                      <span>📊 {Math.round((1 - zona.saturation_level) * 100)}% disp.</span>
                       <span className="opacity-50">·</span>
                       <span className="truncate">{zona.referencia}</span>
                     </p>
@@ -287,7 +287,7 @@ const Estacionar = () => {
                   <p className="text-xs text-gray-500 dark:text-gray-300 mt-1 flex flex-wrap gap-x-2">
                     <span>🚶 {dist.walking}</span>
                     <span>🚗 {dist.driving}</span>
-                    <span>📊 {zona.disponibilidad}%</span>
+                    <span>📊 {Math.round((1 - zona.saturation_level) * 100)}%</span>
                   </p>
                 </button>
                 )
@@ -338,7 +338,7 @@ const Estacionar = () => {
                     </p>
                   )
                 })()}
-                {principal.disponibilidad < 20 && (
+                {Math.round((1 - principal.saturation_level) * 100) < 20 && (
                   <p className="text-xs opacity-75 mt-2">⚠️ Disponibilidad limitada</p>
                 )}
               </div>
@@ -363,7 +363,7 @@ const Estacionar = () => {
                     <p className="text-sm text-slate-600 dark:text-slate-300 flex gap-3">
                       <span>🚶 {dist.walking}</span>
                       <span>🚗 {dist.driving}</span>
-                      <span>📊 {alternativa.disponibilidad}% disp.</span>
+                      <span>📊 {Math.round((1 - alternativa.saturation_level) * 100)}% disp.</span>
                     </p>
                   )
                 })()}
@@ -423,7 +423,7 @@ const Estacionar = () => {
                     <p className="text-sm text-slate-600 dark:text-slate-300 flex gap-3">
                       <span>🚶 {dist.walking}</span>
                       <span>🚗 {dist.driving}</span>
-                      <span>📊 {principal.disponibilidad}% disp.</span>
+                      <span>📊 {Math.round((1 - principal.saturation_level) * 100)}% disp.</span>
                     </p>
                   )
                 })()}
@@ -455,7 +455,7 @@ const Estacionar = () => {
                     <p className="text-sm text-slate-600 dark:text-slate-300 flex gap-3">
                       <span>🚶 {dist.walking}</span>
                       <span>🚗 {dist.driving}</span>
-                      <span>📊 {alternativa.disponibilidad}% disp.</span>
+                      <span>📊 {Math.round((1 - alternativa.saturation_level) * 100)}% disp.</span>
                     </p>
                   )
                 })()}
@@ -524,7 +524,7 @@ const Estacionar = () => {
                 <p className="text-sm text-gray-600 dark:text-gray-300 flex flex-wrap gap-x-3 gap-y-0.5">
                   <span>🚶 {dist.walking}</span>
                   <span>🚗 {dist.driving}</span>
-                  <span>📊 {zona.disponibilidad}% disp.</span>
+                  <span>📊 {Math.round((1 - zona.saturation_level) * 100)}% disp.</span>
                 </p>
                 <p className="text-xs text-gray-400 dark:text-gray-300 mt-1">
                   {formatUpdatedAt(Date.now())}
