@@ -15,6 +15,7 @@ class ActionType(Enum):
     SEEK_INFORMATION = "SEEK_INFORMATION"
     SEEK_LOW_DENSITY = "SEEK_LOW_DENSITY"
     SEEK_SERVICE = "SEEK_SERVICE"
+    SEEK_HYDRATION = "SEEK_HYDRATION"
 
 
 ZONE_TYPE_BY_ACTION: dict[ActionType, str | None] = {
@@ -29,6 +30,7 @@ ZONE_TYPE_BY_ACTION: dict[ActionType, str | None] = {
     ActionType.SEEK_INFORMATION: "Information",
     ActionType.SEEK_LOW_DENSITY: None,
     ActionType.SEEK_SERVICE: None,
+    ActionType.SEEK_HYDRATION: None,
 }
 
 

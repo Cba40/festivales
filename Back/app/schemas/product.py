@@ -78,8 +78,19 @@ class RestRecommendationResponse(BaseModel):
     zonas: list[ZonaRestItem]
 
 
+class ZonaHidratacionItem(ZonaItemBase):
+    pass
+
+
 class HealthRecommendationResponse(BaseModel):
     event_id: str
     timestamp: str
     mode: str
     zonas: list[ZonaSaludItem]
+
+
+class HydrationRecommendationResponse(BaseModel):
+    event_id: str
+    timestamp: str
+    mode: str
+    zonas: list[ZonaHidratacionItem]

@@ -764,6 +764,7 @@ class TestActionTypeCatalog:
             (ActionType.SEEK_INFORMATION, "Information"),
             (ActionType.SEEK_LOW_DENSITY, None),
             (ActionType.SEEK_SERVICE, None),
+            (ActionType.SEEK_HYDRATION, None),
         ],
     )
     def test_zone_type_mapping(
@@ -814,6 +815,7 @@ class TestActionTypeCatalog:
             ActionType.SEEK_REST,
             ActionType.SEEK_SECURITY,
             ActionType.SEEK_INFORMATION,
+            ActionType.SEEK_HYDRATION,
         }
         service = ActionType.SEEK_SERVICE
         assert service not in specific

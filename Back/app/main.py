@@ -26,6 +26,7 @@ from app.api.routes.transport import router as transport_router
 from app.api.routes.bathroom import router as bathroom_router
 from app.api.routes.rest import router as rest_router
 from app.api.routes.health_product import router as health_product_router
+from app.api.routes.hydration import router as hydration_router
 
 app = FastAPI(title="Territorial MVP", version="0.1.0")
 
@@ -61,6 +62,7 @@ app.include_router(transport_router)
 app.include_router(bathroom_router)
 app.include_router(rest_router)
 app.include_router(health_product_router)
+app.include_router(hydration_router)
 
 
 @app.get("/health")

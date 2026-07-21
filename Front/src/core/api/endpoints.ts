@@ -41,5 +41,7 @@ export const endpoints = {
       `/events/${eventId}/products/rest`,
     health: (eventId: string) =>
       `/events/${eventId}/products/health`,
+    hydration: (eventId: string) =>
+      `/events/${eventId}/products/hydration`,
   },
 };

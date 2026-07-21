@@ -196,6 +196,7 @@ class TestValueObjects:
         assert ActionType.SEEK_INFORMATION.value == "SEEK_INFORMATION"
         assert ActionType.SEEK_LOW_DENSITY.value == "SEEK_LOW_DENSITY"
         assert ActionType.SEEK_SERVICE.value == "SEEK_SERVICE"
+        assert ActionType.SEEK_HYDRATION.value == "SEEK_HYDRATION"
 
 
 class TestDelegation:
