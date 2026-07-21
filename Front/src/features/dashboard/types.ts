@@ -57,7 +57,9 @@ export interface OperationalPhaseDTO {
 export interface OperationalProfileDTO {
   id: string;
   name: string;
-  description: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface EventDaySummary {

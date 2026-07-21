@@ -21,6 +21,7 @@ import { ZoneUpdateScreen } from './features/dashboard/screens/ZoneUpdateScreen'
 import { IncidentReportScreen } from './features/dashboard/screens/IncidentReportScreen';
 import { ZoneAdminScreen } from './features/dashboard/screens/ZoneAdminScreen';
 import { EventDayScreen } from './features/dashboard/screens/EventDayScreen';
+import { OperationalProfileScreen } from './features/dashboard/screens/OperationalProfileScreen';
 import { EventConfigPage } from './pages/EventConfigPage';
 import LoginScreen from './features/auth/screens/LoginScreen';
 import ProtectedRoute from './shared/components/ProtectedRoute';
@@ -131,6 +132,7 @@ function AppLayout() {
         <Route path="/dashboard/report" element={<IncidentReportScreen />} />
         <Route path="/dashboard/admin-zones" element={<ZoneAdminScreen />} />
         <Route path="/dashboard/event-days" element={<EventDayScreen />} />
+        <Route path="/dashboard/profiles" element={<OperationalProfileScreen />} />
         <Route path="/dashboard/context-engine" element={
           <ProtectedRoute>
             <EventConfigPage />
