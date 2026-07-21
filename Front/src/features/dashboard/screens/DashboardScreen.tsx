@@ -39,6 +39,12 @@ export function DashboardScreen() {
             Fases
           </button>
           <button
+            onClick={() => navigate('/dashboard/attendance')}
+            className="text-sm bg-orange-600 hover:bg-orange-700 text-white py-1 px-3 rounded font-medium"
+          >
+            Asistencia
+          </button>
+          <button
             onClick={() => navigate('/dashboard/context-engine')}
             className="text-sm bg-purple-600 hover:bg-purple-700 text-white py-1 px-3 rounded font-medium"
           >

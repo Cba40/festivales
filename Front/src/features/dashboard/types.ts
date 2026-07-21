@@ -45,6 +45,15 @@ export interface Incident {
   zoneId?: string;
 }
 
+export interface AttendanceLevelDTO {
+  id: string;
+  event_id: string;
+  name: string;
+  min_people: number;
+  max_people: number | null;
+  global_multiplier: number;
+}
+
 export interface OperationalPhaseDTO {
   id: string;
   operational_profile_id: string;
