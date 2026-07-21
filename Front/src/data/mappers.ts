@@ -13,19 +13,6 @@ export interface CorredorGastronomico {
   updatedAt: number
 }
 
-export interface PuntoServicioMapa {
-  id: string
-  tipo: 'banos' | 'hidratacion' | 'descanso' | 'salud'
-  nombre: string
-  x: number
-  y: number
-  distancia: number
-  referencia: string
-  lat: number
-  lng: number
-  updatedAt: number
-}
-
 export interface ZonaEstacionamiento {
   id: string
   nombre: string
@@ -99,18 +86,6 @@ export interface PuntoComida {
   updatedAt: number
 }
 
-export interface PuntoServicio {
-  id: string
-  nombre: string
-  tipo: 'servicio'
-  subtipo: 'banos' | 'hidratacion' | 'descanso' | 'salud'
-  distancia_min: number
-  referencia: string
-  lat: number
-  lng: number
-  updatedAt: number
-}
-
 export interface PuntoPernoctar {
   id: string
   nombre: string
@@ -141,23 +116,6 @@ export const mapZonesToParadas = (zones: Zone[]): CorredorGastronomico[] => {
       x: z.x || 50,
       y: z.y || 50,
       referencia: z.referencia || z.name || '',
-      updatedAt: Date.now()
-    }))
-}
-
-export const mapZonesToServiciosMapa = (zones: Zone[]): PuntoServicioMapa[] => {
-  return zones
-    .filter(z => z.type === 'servicios')
-    .map(z => ({
-      id: z.id,
-      tipo: (z.subtipo || 'descanso') as PuntoServicioMapa['tipo'],
-      nombre: z.name,
-      x: z.x || 50,
-      y: z.y || 50,
-      distancia: z.distancia_min || 5,
-      referencia: z.referencia || z.name || '',
-      lat: z.lat || 0,
-      lng: z.lng || 0,
       updatedAt: Date.now()
     }))
 }
@@ -246,22 +204,6 @@ export const mapZonesToComida = (zones: Zone[]): PuntoComida[] => {
         updatedAt: Date.now()
       }
     })
-}
-
-export const mapZonesToServicios = (zones: Zone[]): PuntoServicio[] => {
-  return zones
-    .filter(z => z.type === 'servicios')
-    .map(z => ({
-      id: z.id,
-      nombre: z.name,
-      tipo: 'servicio' as const,
-      subtipo: (z.subtipo || 'descanso') as PuntoServicio['subtipo'],
-      distancia_min: z.distancia_min || 5,
-      referencia: z.referencia || z.name || '',
-      lat: z.lat || 0,
-      lng: z.lng || 0,
-      updatedAt: Date.now()
-    }))
 }
 
 export const mapZonesToPernoctar = (zones: Zone[]): PuntoPernoctar[] => {

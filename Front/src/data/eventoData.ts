@@ -42,11 +42,6 @@ export interface ZonaSalida extends PuntoBase {
   es_embudo?: boolean
 }
 
-export interface PuntoServicio extends PuntoBase {
-  tipo: 'servicio'
-  subtipo: 'banos' | 'hidratacion' | 'descanso' | 'salud'
-}
-
 export interface PuntoPernoctar extends PuntoBase {
   tipo: 'pernoctar'
   categoria: 'hotel' | 'hostel' | 'camping' | 'hospedaje'
@@ -333,104 +328,6 @@ export const eventoData = {
       updatedAt: now - 4 * 60000
     }
   ] as ZonaSalida[],
-
-  // ============================================
-  // 🚻 SERVICIOS GENERALES (2 por subtipo)
-  // ============================================
-  servicios: [
-    // Baños
-    {
-      id: 'svc-b1',
-      nombre: 'Baños Norte',
-      tipo: 'servicio' as const,
-      subtipo: 'banos' as const,
-      lat: -30.973313,
-      lng: -64.088529,
-      referencia: 'Junto a entrada principal',
-      distancia_min: 2,
-      updatedAt: now - 5 * 60000
-    },
-    {
-      id: 'svc-b2',
-      nombre: 'Baños Sur',
-      tipo: 'servicio' as const,
-      subtipo: 'banos' as const,
-      lat: -30.985337,
-      lng: -64.094209,
-      referencia: 'Cerca de escenario',
-      distancia_min: 5,
-      updatedAt: now - 3 * 60000
-    },
-    // Hidratación
-    {
-      id: 'svc-h1',
-      nombre: 'Punto de Agua Central',
-      tipo: 'servicio' as const,
-      subtipo: 'hidratacion' as const,
-      lat: -30.973313,
-      lng: -64.088529,
-      referencia: 'Plaza principal',
-      distancia_min: 1,
-      updatedAt: now - 2 * 60000
-    },
-    {
-      id: 'svc-h2',
-      nombre: 'Fuente Lateral',
-      tipo: 'servicio' as const,
-      subtipo: 'hidratacion' as const,
-      lat: -30.978107,
-      lng: -64.094779,
-      referencia: 'Zona gastronómica',
-      distancia_min: 3,
-      updatedAt: now - 4 * 60000
-    },
-    // Descanso
-    {
-      id: 'svc-d1',
-      nombre: 'Zona Sombría',
-      tipo: 'servicio' as const,
-      subtipo: 'descanso' as const,
-      lat: -30.981249,
-      lng: -64.099398,
-      referencia: 'Área verde con bancos',
-      distancia_min: 4,
-      updatedAt: now - 6 * 60000
-    },
-    {
-      id: 'svc-d2',
-      nombre: 'Plaza de Descanso',
-      tipo: 'servicio' as const,
-      subtipo: 'descanso' as const,
-      lat: -30.975000,
-      lng: -64.090000,
-      referencia: 'Con sombra y mesas',
-      distancia_min: 6,
-      updatedAt: now - 8 * 60000
-    },
-    // Salud
-    {
-      id: 'svc-s1',
-      nombre: 'Primeros Auxilios',
-      tipo: 'servicio' as const,
-      subtipo: 'salud' as const,
-      lat: -30.978107,
-      lng: -64.094779,
-      referencia: 'Módulo médico',
-      distancia_min: 3,
-      updatedAt: now - 1 * 60000
-    },
-    {
-      id: 'svc-s2',
-      nombre: 'Punto de Ayuda',
-      tipo: 'servicio' as const,
-      subtipo: 'salud' as const,
-      lat: -30.985337,
-      lng: -64.094209,
-      referencia: 'Asistencia básica',
-      distancia_min: 7,
-      updatedAt: now - 2 * 60000
-    }
-  ] as PuntoServicio[],
 
   // ============================================
   // 🛏 DORMIR (4 alojamientos variados)
