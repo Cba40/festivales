@@ -33,6 +33,12 @@ export function DashboardScreen() {
             Perfiles
           </button>
           <button
+            onClick={() => navigate('/dashboard/phases')}
+            className="text-sm bg-cyan-600 hover:bg-cyan-700 text-white py-1 px-3 rounded font-medium"
+          >
+            Fases
+          </button>
+          <button
             onClick={() => navigate('/dashboard/context-engine')}
             className="text-sm bg-purple-600 hover:bg-purple-700 text-white py-1 px-3 rounded font-medium"
           >
