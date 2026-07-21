@@ -49,7 +49,4 @@ async def parking_recommendations(
         limit=limit,
     )
 
-    if not result.zonas and result.mode == "sin_solucion":
-        pass
-
     return result
