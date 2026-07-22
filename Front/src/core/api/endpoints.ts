@@ -20,6 +20,11 @@ export const endpoints = {
     list: (eventId: string) => `/events/${eventId}/event-days`,
     today: (eventId: string) => `/events/${eventId}/event-days/today`,
     byId: (eventId: string, id: string) => `/events/${eventId}/event-days/${id}`,
+    phases: {
+      list: (eventId: string, dayId: string) => `/events/${eventId}/event-days/${dayId}/phases`,
+      byId: (eventId: string, dayId: string, phaseId: string) =>
+        `/events/${eventId}/event-days/${dayId}/phases/${phaseId}`,
+    },
   },
   predictions: {
     get: (eventId: string) => `/events/${eventId}/predictions`,

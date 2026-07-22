@@ -48,12 +48,9 @@ export function EventDayScreen() {
   const handleSave = useCallback(
     async (payload: EventDayCreatePayload) => {
       setFormError(null);
-      let result: EventDay | null;
-      if (editingDay) {
-        result = await update(editingDay.id, payload);
-      } else {
-        result = await create(payload);
-      }
+      const result = editingDay
+        ? await update(editingDay.id, payload)
+        : await create(payload);
       if (result) {
         setShowForm(false);
         setEditingDay(null);

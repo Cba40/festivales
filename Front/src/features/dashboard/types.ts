@@ -73,11 +73,34 @@ export interface OperationalProfileDTO {
   updated_at: string;
 }
 
+export interface EventDayPhaseDTO {
+  id: string;
+  event_day_id: string;
+  operational_phase_id: string;
+  start_min: number;
+  end_min: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EventDayPhaseCreatePayload {
+  operational_phase_id: string;
+  start_min: number;
+  end_min: number;
+}
+
+export interface EventDayPhaseUpdatePayload {
+  operational_phase_id?: string;
+  start_min?: number;
+  end_min?: number;
+}
+
 export interface EventDaySummary {
   id: string;
   date: string;
   day_of_week: string;
   operational_profile_id: string;
+  attendance_level_id: string;
   operational_start_min: number;
   operational_end_min: number;
   weather: string | null;
@@ -92,6 +115,7 @@ export interface EventDay {
   date: string;
   day_of_week: string;
   operational_profile_id: string;
+  attendance_level_id: string;
   operational_start_min: number;
   operational_end_min: number;
   weather: string | null;
@@ -99,6 +123,7 @@ export interface EventDay {
   estimated_attendance: number | null;
   notes: string | null;
   is_active: boolean;
+  phases: EventDayPhaseDTO[];
   created_at: string;
   updated_at: string;
 }
@@ -107,8 +132,10 @@ export interface EventDayCreatePayload {
   date: string;
   day_of_week: string;
   operational_profile_id: string;
+  attendance_level_id: string;
   operational_start_min: number;
   operational_end_min: number;
+  phases?: EventDayPhaseCreatePayload[];
   weather?: string | null;
   headliner_artist?: string | null;
   estimated_attendance?: number | null;

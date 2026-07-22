@@ -1,6 +1,11 @@
-import { useState, useEffect } from 'react';
-import { apiClient } from '@/core/api/client';
-import type { EventDay, EventDayCreatePayload, OperationalProfileDTO, OperationalPhaseDTO } from '../types';
+import { useState, useEffect, useMemo } from 'react';
+import { EventDayPhaseEditor, validatePhases } from './EventDayPhaseEditor';
+import { useOperationalProfiles } from '../hooks/useOperationalProfiles';
+import { useAttendanceLevels } from '../hooks/useAttendanceLevels';
+import { useOperationalPhases } from '../hooks/useOperationalPhases';
+import type {
+  EventDay, EventDayCreatePayload, EventDayPhaseCreatePayload,
+} from '../types';
 
 interface EventDayFormProps {
   eventDay?: EventDay | null;
@@ -39,27 +44,21 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
   const [dayOfWeek, setDayOfWeek] = useState('');
   const [weather, setWeather] = useState('');
   const [headlinerArtist, setHeadlinerArtist] = useState('');
-  const [estimatedAttendance, setEstimatedAttendance] = useState('');
   const [notes, setNotes] = useState('');
   const [isActive, setIsActive] = useState(true);
-  const [validationError, setValidationError] = useState<string | null>(null);
 
-  const [profiles, setProfiles] = useState<OperationalProfileDTO[]>([]);
+  const { profiles, loading: profilesLoading } = useOperationalProfiles();
+  const { levels, loading: levelsLoading } = useAttendanceLevels();
+  const { phases: operationalPhases, loading: operationalPhasesLoading } = useOperationalPhases(selectedProfileId);
+
   const [selectedProfileId, setSelectedProfileId] = useState('');
-  const [phases, setPhases] = useState<OperationalPhaseDTO[]>([]);
-  const [phasesLoading, setPhasesLoading] = useState(false);
-  const [profilesLoading, setProfilesLoading] = useState(false);
+  const [selectedLevelId, setSelectedLevelId] = useState('');
 
   const [operationalStartStr, setOperationalStartStr] = useState('');
   const [operationalEndStr, setOperationalEndStr] = useState('');
 
-  useEffect(() => {
-    setProfilesLoading(true);
-    apiClient.get<OperationalProfileDTO[]>('/operational-profiles/')
-      .then(({ data }) => setProfiles(data))
-      .catch(() => {})
-      .finally(() => setProfilesLoading(false));
-  }, []);
+  const [eventDayPhases, setEventDayPhases] = useState<EventDayPhaseCreatePayload[]>([]);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
     if (eventDay) {
@@ -67,42 +66,62 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
       setDayOfWeek(eventDay.day_of_week);
       setWeather(eventDay.weather ?? '');
       setHeadlinerArtist(eventDay.headliner_artist ?? '');
-      setEstimatedAttendance(eventDay.estimated_attendance?.toString() ?? '');
       setSelectedProfileId(eventDay.operational_profile_id);
+      setSelectedLevelId(eventDay.attendance_level_id);
       setOperationalStartStr(minutesToTimeStr(eventDay.operational_start_min));
       setOperationalEndStr(minutesToTimeStr(eventDay.operational_end_min));
       setNotes(eventDay.notes ?? '');
       setIsActive(eventDay.is_active);
+      if (eventDay.phases && eventDay.phases.length > 0) {
+        setEventDayPhases(
+          eventDay.phases.map((p) => ({
+            operational_phase_id: p.operational_phase_id,
+            start_min: p.start_min,
+            end_min: p.end_min,
+          })),
+        );
+      }
     }
   }, [eventDay]);
 
-  useEffect(() => {
-    if (!selectedProfileId) {
-      setPhases([]);
-      return;
-    }
-    setPhasesLoading(true);
-    apiClient.get<OperationalPhaseDTO[]>(`/operational-phases/by-profile/${selectedProfileId}`)
-      .then(({ data }) => setPhases(data))
-      .catch(() => setPhases([]))
-      .finally(() => setPhasesLoading(false));
-  }, [selectedProfileId]);
+  const operationalStartMin = useMemo(
+    () => (operationalStartStr ? timeStrToMinutes(operationalStartStr) : 0),
+    [operationalStartStr],
+  );
+  const operationalEndMin = useMemo(
+    () => (operationalEndStr ? timeStrToMinutes(operationalEndStr) : 0),
+    [operationalEndStr],
+  );
+
+  const currentPhaseErrors = useMemo(
+    () => validatePhases(eventDayPhases, operationalStartMin, operationalEndMin),
+    [eventDayPhases, operationalStartMin, operationalEndMin],
+  );
+
+  const selectedLevel = levels.find((l) => l.id === selectedLevelId);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setValidationError(null);
-    if (!date || !dayOfWeek || !selectedProfileId) return;
 
+    if (!date || !dayOfWeek || !selectedProfileId || !selectedLevelId) {
+      setValidationError('Completá todos los campos obligatorios');
+      return;
+    }
     if (!operationalStartStr || !operationalEndStr) {
       setValidationError('La ventana operativa es obligatoria');
       return;
     }
-
-    const startMin = timeStrToMinutes(operationalStartStr);
-    const endMin = timeStrToMinutes(operationalEndStr);
-
-    if (endMin <= startMin) {
-      setValidationError('El fin de jornada territorial debe ser posterior al inicio');
+    if (operationalEndMin <= operationalStartMin) {
+      setValidationError('El fin de jornada debe ser posterior al inicio');
+      return;
+    }
+    if (eventDayPhases.length === 0) {
+      setValidationError('Debe haber al menos una fase en la jornada');
+      return;
+    }
+    if (currentPhaseErrors.length > 0) {
+      setValidationError('Corregí los errores en las fases antes de guardar');
       return;
     }
 
@@ -110,26 +129,17 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
       date,
       day_of_week: dayOfWeek,
       operational_profile_id: selectedProfileId,
-      operational_start_min: startMin,
-      operational_end_min: endMin,
+      attendance_level_id: selectedLevelId,
+      operational_start_min: operationalStartMin,
+      operational_end_min: operationalEndMin,
+      phases: eventDayPhases,
       weather: weather || null,
       headliner_artist: headlinerArtist || null,
-      estimated_attendance: estimatedAttendance ? parseInt(estimatedAttendance, 10) : 0,
       notes: notes || null,
       is_active: isActive,
     };
 
-    if (isEditing && eventDay) {
-      const changed = Object.fromEntries(
-        Object.entries(payload).filter(
-          ([key, value]) => value !== (eventDay as any)[key]
-        )
-      );
-      if (Object.keys(changed).length === 0) return;
-      await onSave(changed as EventDayCreatePayload);
-    } else {
-      await onSave(payload);
-    }
+    await onSave(payload);
   };
 
   return (
@@ -165,7 +175,7 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
           <label className="block text-sm font-medium text-slate-700 mb-1">Perfil operativo *</label>
           <select
             value={selectedProfileId}
-            onChange={(e) => setSelectedProfileId(e.target.value)}
+            onChange={(e) => { setSelectedProfileId(e.target.value); setEventDayPhases([]); }}
             required
             disabled={profilesLoading}
             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
@@ -175,6 +185,30 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>
+        </div>
+
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium text-slate-700 mb-1">Nivel de asistencia *</label>
+          <select
+            value={selectedLevelId}
+            onChange={(e) => setSelectedLevelId(e.target.value)}
+            required
+            disabled={levelsLoading}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+          >
+            <option value="">{levelsLoading ? 'Cargando niveles...' : 'Seleccionar nivel...'}</option>
+            {levels.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.name} ({l.min_people.toLocaleString()}—{l.max_people ? l.max_people.toLocaleString() : '∞'}) ×{l.global_multiplier}
+              </option>
+            ))}
+          </select>
+          {selectedLevel && (
+            <p className="text-[10px] text-slate-400 mt-0.5">
+              Multiplicador global: {selectedLevel.global_multiplier} — rango: {selectedLevel.min_people.toLocaleString()} a{' '}
+              {selectedLevel.max_people ? selectedLevel.max_people.toLocaleString() : 'sin límite'} personas
+            </p>
+          )}
         </div>
 
         <div>
@@ -200,103 +234,66 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
           />
           <p className="text-[10px] text-slate-400 mt-0.5">Ej: 06:00 (+1 día) = 1800 min (&gt;1440 cruza medianoche)</p>
         </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Clima</label>
-          <select
-            value={weather}
-            onChange={(e) => setWeather(e.target.value)}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            {WEATHER_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Artista principal</label>
-          <input
-            type="text"
-            value={headlinerArtist}
-            onChange={(e) => setHeadlinerArtist(e.target.value)}
-            placeholder="Ej: Los Auténticos Decadentes"
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Convocatoria estimada</label>
-          <input
-            type="number"
-            min={0}
-            value={estimatedAttendance}
-            onChange={(e) => setEstimatedAttendance(e.target.value)}
-            placeholder="Ej: 50000"
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        <div className="flex items-center gap-3 pt-6">
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={isActive}
-              onChange={(e) => setIsActive(e.target.checked)}
-              className="sr-only peer"
-            />
-            <div className="w-9 h-5 bg-slate-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600" />
-          </label>
-          <span className="text-sm font-medium text-slate-700">Día activo</span>
-        </div>
       </div>
-
-      {validationError && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-          {validationError}
-        </div>
-      )}
 
       {selectedProfileId && (
         <div className="border-t border-slate-200 pt-4">
-          <h3 className="text-sm font-semibold text-slate-700 mb-2">Fases del perfil operativo</h3>
-          <p className="text-xs text-slate-500 mb-3">
-            Las fases se gestionan en la configuración de perfiles operativos. Esta vista es informativa.
-          </p>
-          {phasesLoading ? (
-            <div className="text-xs text-slate-400">Cargando fases...</div>
-          ) : phases.length === 0 ? (
-            <div className="text-xs text-slate-400">Sin fases definidas para este perfil.</div>
+          {operationalPhasesLoading ? (
+            <div className="text-xs text-slate-400">Cargando fases del perfil...</div>
           ) : (
-            <div className="space-y-2">
-              {phases
-                .slice().sort((a, b) => a.sort_order - b.sort_order)
-                .map((phase) => (
-                  <div
-                    key={phase.id}
-                    className="flex items-center gap-3 p-2 bg-slate-50 rounded-lg border border-slate-100"
-                  >
-                    <span className="text-xs font-semibold text-slate-600 w-16 text-center">
-                      {minutesToTimeStr(phase.start_min)}
-                    </span>
-                    <div className="flex-1 h-1.5 bg-blue-100 rounded-full">
-                      <div
-                        className="h-1.5 bg-blue-500 rounded-full"
-                        style={{
-                          width: `${Math.min(100, ((phase.end_min - phase.start_min) / 120) * 100)}%`,
-                        }}
-                      />
-                    </div>
-                    <span className="text-xs font-semibold text-slate-600 w-16 text-center">
-                      {minutesToTimeStr(phase.end_min)}
-                    </span>
-                    <span className="text-sm font-medium text-slate-700 min-w-[120px]">{phase.name}</span>
-                  </div>
-                ))}
-            </div>
+            <EventDayPhaseEditor
+              phases={eventDayPhases}
+              operationalPhases={operationalPhases}
+              operationalStartMin={operationalStartMin}
+              operationalEndMin={operationalEndMin}
+              onChange={setEventDayPhases}
+              errors={[]}
+            />
           )}
         </div>
       )}
+
+      <div className="border-t border-slate-200 pt-4">
+        <h3 className="text-sm font-semibold text-slate-700 mb-3">Información adicional</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Clima</label>
+            <select
+              value={weather}
+              onChange={(e) => setWeather(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {WEATHER_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Artista principal</label>
+            <input
+              type="text"
+              value={headlinerArtist}
+              onChange={(e) => setHeadlinerArtist(e.target.value)}
+              placeholder="Ej: Los Auténticos Decadentes"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div className="flex items-center gap-3 pt-6">
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isActive}
+                onChange={(e) => setIsActive(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-9 h-5 bg-slate-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600" />
+            </label>
+            <span className="text-sm font-medium text-slate-700">Día activo</span>
+          </div>
+        </div>
+      </div>
 
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-1">Notas</label>
@@ -309,6 +306,12 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
         />
       </div>
 
+      {validationError && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          {validationError}
+        </div>
+      )}
+
       <div className="flex justify-end gap-3 pt-2">
         <button
           type="button"
@@ -320,7 +323,7 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
         </button>
         <button
           type="submit"
-          disabled={saving || !date || !dayOfWeek || !selectedProfileId || !operationalStartStr || !operationalEndStr}
+          disabled={saving || !date || !dayOfWeek || !selectedProfileId || !selectedLevelId || !operationalStartStr || !operationalEndStr}
           className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
         >
           {saving ? 'Guardando...' : isEditing ? 'Actualizar' : 'Crear día'}
