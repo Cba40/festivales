@@ -152,6 +152,44 @@ export interface ZoneBehaviorDTO {
   updated_at: string;
 }
 
+export type OperationalEventType =
+  | 'accidente' | 'corte_calle' | 'tormenta' | 'evacuacion'
+  | 'incendio' | 'congestion_extraordinaria' | 'escenario_finalizado'
+  | 'apertura_extraordinaria' | 'incidente_operativo' | 'fin_espectaculo'
+  | 'corte_energia';
+
+export interface OperationalEventDTO {
+  id: string;
+  event_day_id: string;
+  event_type: OperationalEventType;
+  description: string;
+  zone_id: string | null;
+  start_min: number;
+  end_min: number | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OperationalEventCreatePayload {
+  event_day_id: string;
+  event_type: OperationalEventType;
+  description: string;
+  zone_id?: string | null;
+  start_min: number;
+  end_min?: number | null;
+  is_active?: boolean;
+}
+
+export interface OperationalEventUpdatePayload {
+  event_type?: OperationalEventType;
+  description?: string;
+  zone_id?: string | null;
+  start_min?: number;
+  end_min?: number | null;
+  is_active?: boolean;
+}
+
 export interface EventDayCreatePayload {
   date: string;
   day_of_week: string;

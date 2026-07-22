@@ -33,6 +33,11 @@ export const endpoints = {
     list: (eventId: string) =>
       `/events/${eventId}/recommendations`,
   },
+  operationalEvents: {
+    list: (eventDayId: string) => `/operational-events/by-event-day/${eventDayId}`,
+    byId: (id: string) => `/operational-events/${id}`,
+    create: `/operational-events/`,
+  },
   products: {
     parking: (eventId: string) =>
       `/events/${eventId}/products/parking`,

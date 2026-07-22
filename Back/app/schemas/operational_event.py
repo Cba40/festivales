@@ -6,11 +6,17 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 EVENT_TYPE_LITERAL = Literal[
-    "fin_espectaculo",
+    "accidente",
+    "corte_calle",
     "tormenta",
     "evacuacion",
-    "corte_energia",
+    "incendio",
+    "congestion_extraordinaria",
+    "escenario_finalizado",
+    "apertura_extraordinaria",
     "incidente_operativo",
+    "fin_espectaculo",
+    "corte_energia",
 ]
 
 
@@ -18,6 +24,8 @@ class OperationalEventCreate(BaseModel):
     """Schema para crear un nuevo evento operativo."""
     event_day_id: str = Field(max_length=36)
     event_type: EVENT_TYPE_LITERAL
+    description: str = Field(min_length=1, max_length=1000)
+    zone_id: str | None = Field(default=None, max_length=36)
     start_min: int = Field(ge=0)
     end_min: int | None = Field(default=None)
     is_active: bool = True
@@ -32,6 +40,8 @@ class OperationalEventCreate(BaseModel):
 class OperationalEventUpdate(BaseModel):
     """Schema para actualizar un evento operativo existente."""
     event_type: EVENT_TYPE_LITERAL | None = Field(default=None)
+    description: str | None = Field(default=None, min_length=1, max_length=1000)
+    zone_id: str | None = Field(default=None, max_length=36)
     start_min: int | None = Field(default=None, ge=0)
     end_min: int | None = Field(default=None)
     is_active: bool | None = Field(default=None)
@@ -51,6 +61,8 @@ class OperationalEventResponse(BaseModel):
     id: UUID
     event_day_id: str
     event_type: str
+    description: str
+    zone_id: str | None
     start_min: int
     end_min: int | None
     is_active: bool

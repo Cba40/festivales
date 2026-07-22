@@ -25,6 +25,7 @@ import { OperationalProfileScreen } from './features/dashboard/screens/Operation
 import { OperationalPhaseScreen } from './features/dashboard/screens/OperationalPhaseScreen';
 import { ZoneBehaviorScreen } from './features/dashboard/screens/ZoneBehaviorScreen';
 import { AttendanceLevelScreen } from './features/dashboard/screens/AttendanceLevelScreen';
+import { OperationalEventScreen } from './features/dashboard/screens/OperationalEventScreen';
 import { EventConfigPage } from './pages/EventConfigPage';
 import LoginScreen from './features/auth/screens/LoginScreen';
 import ProtectedRoute from './shared/components/ProtectedRoute';
@@ -139,6 +140,7 @@ function AppLayout() {
         <Route path="/dashboard/phases" element={<OperationalPhaseScreen />} />
         <Route path="/dashboard/zone-behaviors" element={<ZoneBehaviorScreen />} />
         <Route path="/dashboard/attendance" element={<AttendanceLevelScreen />} />
+        <Route path="/dashboard/operational-events" element={<OperationalEventScreen />} />
         <Route path="/dashboard/context-engine" element={
           <ProtectedRoute>
             <EventConfigPage />

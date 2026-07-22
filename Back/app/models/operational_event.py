@@ -2,7 +2,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, String, func, text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -21,6 +21,10 @@ class OperationalEvent(Base):
         String(36), ForeignKey("event_days.id", ondelete="CASCADE"), nullable=False,
     )
     event_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    zone_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("zones.id", ondelete="SET NULL"), nullable=True,
+    )
     start_min: Mapped[int] = mapped_column(Integer, nullable=False)
     end_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
@@ -28,6 +32,7 @@ class OperationalEvent(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
 
     event_day: Mapped["EventDay"] = relationship(back_populates="operational_events")
+    zone: Mapped["Zone | None"] = relationship()
 
     __table_args__ = (
         Index("ix_oe_event_day_active", "event_day_id", "is_active", postgresql_where=text("is_active = true")),

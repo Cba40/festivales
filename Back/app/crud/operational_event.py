@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.event_day import EventDay
 from app.models.operational_event import OperationalEvent
+from app.models.zone import Zone
 from app.schemas.operational_event import OperationalEventCreate, OperationalEventUpdate
 
 
@@ -16,6 +17,11 @@ async def create(db: AsyncSession, obj_in: OperationalEventCreate) -> Operationa
 
     if obj_in.end_min is not None and obj_in.end_min <= obj_in.start_min:
         raise ValueError("end_min must be greater than start_min")
+
+    if obj_in.zone_id is not None:
+        zone = await db.get(Zone, obj_in.zone_id)
+        if not zone:
+            raise ValueError(f"Zone with id '{obj_in.zone_id}' not found")
 
     db_obj = OperationalEvent(**obj_in.model_dump())
     db.add(db_obj)
@@ -64,6 +70,11 @@ async def update(
         new_end = update_data.get("end_min", db_obj.end_min)
         if new_end is not None and new_end <= new_start:
             raise ValueError("end_min must be greater than start_min")
+
+    if "zone_id" in update_data and update_data["zone_id"] is not None:
+        zone = await db.get(Zone, update_data["zone_id"])
+        if not zone:
+            raise ValueError(f"Zone with id '{update_data['zone_id']}' not found")
 
     for field, value in update_data.items():
         setattr(db_obj, field, value)

@@ -69,6 +69,7 @@ def test_operational_event_literal_rejects_invalid():
         OperationalEventCreate(
             event_day_id=str(uuid.uuid4()),
             event_type="tipo_invalido",
+            description="test",
             start_min=0,
         )
     assert "event_type" in str(exc_info.value)
@@ -80,6 +81,7 @@ def test_operational_event_end_min_gt_start_min():
         OperationalEventCreate(
             event_day_id=str(uuid.uuid4()),
             event_type="tormenta",
+            description="test",
             start_min=100,
             end_min=50,
         )

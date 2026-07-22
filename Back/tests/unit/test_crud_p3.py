@@ -311,6 +311,7 @@ class TestOperationalEventCRUD:
             OperationalEventCreate(
                 event_day_id="test-ed-active-filter",
                 event_type="tormenta",
+                description="Tormenta eléctrica",
                 start_min=0,
                 end_min=1000,
                 is_active=True,
@@ -322,6 +323,7 @@ class TestOperationalEventCRUD:
             OperationalEventCreate(
                 event_day_id="test-ed-active-filter",
                 event_type="fin_espectaculo",
+                description="Fin del show principal",
                 start_min=0,
                 end_min=200,
                 is_active=True,
@@ -333,6 +335,7 @@ class TestOperationalEventCRUD:
             OperationalEventCreate(
                 event_day_id="test-ed-active-filter",
                 event_type="corte_energia",
+                description="Corte programado",
                 start_min=0,
                 end_min=1000,
                 is_active=False,
