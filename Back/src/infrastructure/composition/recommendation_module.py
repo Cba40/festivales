@@ -97,13 +97,13 @@ async def _load_zone_behaviors(
     for row in rows:
         zt_id = UUID(str(row.zone_type_id))
         op_id = UUID(str(row.operational_phase_id))
-        density = min(max(float(row.saturation_factor), 0.0), 1.0)
+        density = min(max(float(row.density_factor), 0.0), 1.0)
         result[(zt_id, op_id)] = ZoneBehavior(
             id=UUID(str(row.id)),
             zone_type_id=zt_id,
             operational_phase_id=op_id,
             density_factor=density,
-            flow_restriction=FlowRestriction.OPEN,
+            flow_restriction=FlowRestriction(row.flow_restriction),
         )
     return result
 

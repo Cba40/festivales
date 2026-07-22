@@ -136,7 +136,7 @@ async def seed_p3_data(async_session: AsyncSession):
         async_session.add(ZoneBehavior(
             operational_phase_id=phase_active.id,
             zone_type_id=zt_id,
-            saturation_factor=sat,
+            density_factor=sat,
             availability_factor=avail,
             resource_factor=res,
             priority_weight=prio,
@@ -147,7 +147,7 @@ async def seed_p3_data(async_session: AsyncSession):
         async_session.add(ZoneBehavior(
             operational_phase_id=phase_prep.id,
             zone_type_id=zt_id,
-            saturation_factor=1.0,
+            density_factor=1.0,
             availability_factor=1.0,
             resource_factor=1.0,
             priority_weight=1.0,

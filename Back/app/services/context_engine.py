@@ -116,10 +116,11 @@ class ContextEngineService:
         zb_by_zone_type: dict[str, dict] = {}
         for zb in behavior_list:
             zb_by_zone_type[zb.zone_type_id] = {
-                "saturation": float(zb.saturation_factor),
+                "saturation": float(zb.density_factor),
                 "attendance": float(zb.availability_factor),
                 "resource": float(zb.resource_factor),
                 "priority_weight": float(zb.priority_weight),
+                "flow_restriction": zb.flow_restriction,
             }
 
         # ═══════════════════════════════════════════
