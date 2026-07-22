@@ -3,7 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Numeric, String, UniqueConstraint, func, text
+from sqlalchemy import CheckConstraint, DateTime, Float, ForeignKey, Numeric, String, UniqueConstraint, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -13,7 +13,7 @@ class ZoneBehavior(Base):
     """Representa el comportamiento esperado de un ZoneType durante una OperationalPhase.
 
     Definido por la combinacion de OperationalPhase y ZoneType.
-    Contiene unicamente factores de comportamiento. No representa una respuesta puntual.
+    Contiene factores de comportamiento y configuracion territorial.
     """
     __tablename__ = "zone_behaviors"
 
@@ -28,6 +28,8 @@ class ZoneBehavior(Base):
     availability_factor: Mapped[Decimal] = mapped_column(Numeric(6, 2), nullable=False, server_default=text("1.0"))
     resource_factor: Mapped[Decimal] = mapped_column(Numeric(6, 2), nullable=False, server_default=text("1.0"))
     priority_weight: Mapped[Decimal] = mapped_column(Numeric(6, 2), nullable=False, server_default=text("1.0"))
+    density_factor: Mapped[float] = mapped_column(Float, nullable=False, server_default=text("0.5"))
+    flow_restriction: Mapped[str] = mapped_column(String(20), nullable=False, server_default=text("'OPEN'"))
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
 
@@ -40,4 +42,6 @@ class ZoneBehavior(Base):
         CheckConstraint("availability_factor > 0", name="ck_zb_availability_gt_0"),
         CheckConstraint("resource_factor > 0", name="ck_zb_resource_gt_0"),
         CheckConstraint("priority_weight > 0", name="ck_zb_priority_gt_0"),
+        CheckConstraint("density_factor >= 0.0 AND density_factor <= 1.0", name="ck_zb_density_factor_range"),
+        CheckConstraint("flow_restriction IN ('OPEN', 'REGULATED', 'CLOSED')", name="ck_zb_flow_restriction"),
     )

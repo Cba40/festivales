@@ -23,6 +23,7 @@ import { ZoneAdminScreen } from './features/dashboard/screens/ZoneAdminScreen';
 import { EventDayScreen } from './features/dashboard/screens/EventDayScreen';
 import { OperationalProfileScreen } from './features/dashboard/screens/OperationalProfileScreen';
 import { OperationalPhaseScreen } from './features/dashboard/screens/OperationalPhaseScreen';
+import { ZoneBehaviorScreen } from './features/dashboard/screens/ZoneBehaviorScreen';
 import { AttendanceLevelScreen } from './features/dashboard/screens/AttendanceLevelScreen';
 import { EventConfigPage } from './pages/EventConfigPage';
 import LoginScreen from './features/auth/screens/LoginScreen';
@@ -136,6 +137,7 @@ function AppLayout() {
         <Route path="/dashboard/event-days" element={<EventDayScreen />} />
         <Route path="/dashboard/profiles" element={<OperationalProfileScreen />} />
         <Route path="/dashboard/phases" element={<OperationalPhaseScreen />} />
+        <Route path="/dashboard/zone-behaviors" element={<ZoneBehaviorScreen />} />
         <Route path="/dashboard/attendance" element={<AttendanceLevelScreen />} />
         <Route path="/dashboard/context-engine" element={
           <ProtectedRoute>

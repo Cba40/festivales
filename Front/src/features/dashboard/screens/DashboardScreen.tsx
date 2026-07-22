@@ -45,6 +45,12 @@ export function DashboardScreen() {
             Asistencia
           </button>
           <button
+            onClick={() => navigate('/dashboard/zone-behaviors')}
+            className="text-sm bg-teal-600 hover:bg-teal-700 text-white py-1 px-3 rounded font-medium"
+          >
+            Comportamiento
+          </button>
+          <button
             onClick={() => navigate('/dashboard/context-engine')}
             className="text-sm bg-purple-600 hover:bg-purple-700 text-white py-1 px-3 rounded font-medium"
           >

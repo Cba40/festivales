@@ -128,6 +128,30 @@ export interface EventDay {
   updated_at: string;
 }
 
+export interface ZoneTypeDTO {
+  id: string;
+  name: string;
+  slug: string;
+  icon: string;
+  description: string;
+  default_factors: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface ZoneBehaviorDTO {
+  id: string;
+  operational_phase_id: string;
+  zone_type_id: string;
+  saturation_factor: number;
+  availability_factor: number;
+  resource_factor: number;
+  priority_weight: number;
+  density_factor: number;
+  flow_restriction: 'OPEN' | 'REGULATED' | 'CLOSED';
+  created_at: string;
+  updated_at: string;
+}
+
 export interface EventDayCreatePayload {
   date: string;
   day_of_week: string;
