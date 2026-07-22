@@ -190,6 +190,46 @@ export interface OperationalEventUpdatePayload {
   is_active?: boolean;
 }
 
+export interface RecommendationConfigDTO {
+  low_density_saturation_threshold: number;
+  low_density_reasoning_threshold: number;
+  regulated_penalty: number;
+  vip_bonus: number;
+  staff_bonus: number;
+  mobility_penalty: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RecommendationConfigUpdatePayload {
+  low_density_saturation_threshold?: number;
+  low_density_reasoning_threshold?: number;
+  regulated_penalty?: number;
+  vip_bonus?: number;
+  staff_bonus?: number;
+  mobility_penalty?: number;
+}
+
+export interface Stage4ConfigDTO {
+  saturation_high_threshold: number;
+  saturation_moderate_threshold: number;
+  confidence_no_events: number;
+  confidence_planned_events: number;
+  confidence_incident: number;
+  wait_time_mapping: number[][];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Stage4ConfigUpdatePayload {
+  saturation_high_threshold?: number;
+  saturation_moderate_threshold?: number;
+  confidence_no_events?: number;
+  confidence_planned_events?: number;
+  confidence_incident?: number;
+  wait_time_mapping?: number[][];
+}
+
 export interface EventDayCreatePayload {
   date: string;
   day_of_week: string;

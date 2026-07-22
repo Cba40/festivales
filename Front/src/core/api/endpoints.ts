@@ -33,6 +33,10 @@ export const endpoints = {
     list: (eventId: string) =>
       `/events/${eventId}/recommendations`,
   },
+  motorConfig: {
+    recommendationConfig: '/recommendation-config',
+    stage4Config: '/stage4-config',
+  },
   operationalEvents: {
     list: (eventDayId: string) => `/operational-events/by-event-day/${eventDayId}`,
     byId: (id: string) => `/operational-events/${id}`,

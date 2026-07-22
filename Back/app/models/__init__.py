@@ -12,6 +12,7 @@ from app.models.operational_phase import OperationalPhase
 from app.models.zone_behavior import ZoneBehavior
 from app.models.operational_event import OperationalEvent
 from app.models.operational_event_modifier import OperationalEventModifier
+from app.models.motor_config import RecommendationConfigModel, Stage4ConfigModel
 
 __all__ = [
     "Event",
@@ -27,4 +28,6 @@ __all__ = [
     "ZoneBehavior",
     "OperationalEvent",
     "OperationalEventModifier",
+    "RecommendationConfigModel",
+    "Stage4ConfigModel",
 ]
