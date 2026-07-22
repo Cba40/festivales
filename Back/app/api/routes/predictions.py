@@ -21,6 +21,7 @@ async def predict(
     db: AsyncSession = Depends(get_async_db),
     _=Depends(verify_token),
 ):
+    """Endpoint protegido para Dashboard (operador)."""
     datetime_actual = datetime.now(timezone.utc)
     return await engine_service.predict(db, event_id, datetime_actual)
 
@@ -29,8 +30,8 @@ async def predict(
 async def get_predictions(
     event_id: str,
     db: AsyncSession = Depends(get_async_db),
-    _=Depends(verify_token),
 ):
+    """Endpoint público para Visitor App. No requiere autenticación."""
     timestamp = datetime.now(timezone.utc)
     prediction = await get_territorial_prediction_adapter(
         db,
