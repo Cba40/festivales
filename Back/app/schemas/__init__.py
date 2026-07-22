@@ -1,5 +1,6 @@
 from app.schemas.event import EventResponse
 from app.schemas.event_day import EventDayCreate, EventDayUpdate, EventDayResponse, EventDaySummary
+from app.schemas.event_day_phase import EventDayPhaseCreate, EventDayPhaseUpdate, EventDayPhaseResponse
 from app.schemas.zone_type import ZoneTypeCreate, ZoneTypeUpdate, ZoneTypeResponse
 from app.schemas.attendance_level import AttendanceLevelCreate, AttendanceLevelUpdate, AttendanceLevelResponse
 from app.schemas.incident_impact import IncidentImpactCreate, IncidentImpactUpdate, IncidentImpactResponse
@@ -17,6 +18,7 @@ from app.schemas.territorial_prediction import ZonePrediction, TerritorialPredic
 __all__ = [
     "EventResponse",
     "EventDayCreate", "EventDayUpdate", "EventDayResponse", "EventDaySummary",
+    "EventDayPhaseCreate", "EventDayPhaseUpdate", "EventDayPhaseResponse",
     "ZoneTypeCreate", "ZoneTypeUpdate", "ZoneTypeResponse",
     "AttendanceLevelCreate", "AttendanceLevelUpdate", "AttendanceLevelResponse",
     "IncidentImpactCreate", "IncidentImpactUpdate", "IncidentImpactResponse",

@@ -13,8 +13,9 @@ from app.db.session import Base
 class EventDay(Base):
     """Representa una jornada operativa territorial.
 
-    Posee exactamente un OperationalProfile. Pertenece a cero o muchos OperationalEvent.
-    No representa la linea temporal del espectaculo.
+    Aggregate Root administrativo del Contexto Operacional.
+    Posee EventDayPhase (composicion interna), referencia OperationalProfile,
+    AttendanceLevel y Event. Pertenece a cero o muchos OperationalEvent.
     """
     __tablename__ = "event_days"
 
@@ -30,6 +31,9 @@ class EventDay(Base):
     operational_profile_id: Mapped[UUID] = mapped_column(
         ForeignKey("operational_profiles.id"), nullable=False,
     )
+    attendance_level_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("attendance_levels.id"), nullable=False,
+    )
     operational_start_min: Mapped[int] = mapped_column(Integer, nullable=False)
     operational_end_min: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -37,6 +41,10 @@ class EventDay(Base):
 
     event = relationship("Event", back_populates="event_days")
     operational_profile: Mapped["OperationalProfile"] = relationship()
+    attendance_level: Mapped["AttendanceLevel"] = relationship()
+    phases: Mapped[list["EventDayPhase"]] = relationship(
+        back_populates="event_day", cascade="all, delete-orphan",
+    )
     operational_events: Mapped[list["OperationalEvent"]] = relationship(
         back_populates="event_day", cascade="all, delete-orphan",
     )

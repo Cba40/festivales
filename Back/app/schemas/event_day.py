@@ -4,6 +4,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator, model_validator
 
+from app.schemas.event_day_phase import EventDayPhaseCreate, EventDayPhaseResponse
+
 
 class EventDayCreate(BaseModel):
     date: date
@@ -14,8 +16,10 @@ class EventDayCreate(BaseModel):
     notes: Optional[str] = None
     is_active: bool = True
     operational_profile_id: UUID
+    attendance_level_id: str
     operational_start_min: int = Field(ge=0)
     operational_end_min: int = Field(ge=0)
+    phases: list[EventDayPhaseCreate] = []
 
     @model_validator(mode='after')
     def check_operational_end(self) -> 'EventDayCreate':
@@ -33,8 +37,10 @@ class EventDayUpdate(BaseModel):
     notes: Optional[str] = None
     is_active: Optional[bool] = None
     operational_profile_id: Optional[UUID] = None
+    attendance_level_id: Optional[str] = None
     operational_start_min: Optional[int] = Field(default=None, ge=0)
     operational_end_min: Optional[int] = None
+    phases: Optional[list[EventDayPhaseCreate]] = None
 
     @model_validator(mode='after')
     def check_operational_end(self) -> 'EventDayUpdate':
@@ -55,8 +61,10 @@ class EventDayResponse(BaseModel):
     notes: Optional[str]
     is_active: bool
     operational_profile_id: UUID
+    attendance_level_id: str
     operational_start_min: int
     operational_end_min: int
+    phases: list[EventDayPhaseResponse] = []
     created_at: datetime
     updated_at: datetime
 
@@ -83,6 +91,7 @@ class EventDaySummary(BaseModel):
     estimated_attendance: int
     is_active: bool
     operational_profile_id: UUID
+    attendance_level_id: str
     operational_start_min: int
     operational_end_min: int
 

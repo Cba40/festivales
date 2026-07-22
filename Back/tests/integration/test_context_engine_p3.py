@@ -105,20 +105,6 @@ async def seed_p3_data(async_session: AsyncSession):
     async_session.add_all([phase_prep, phase_active, phase_disp])
     await async_session.flush()
 
-    # ── EventDay ───────────────────────────────────────────
-    event_day = EventDay(
-        id="test-ed-engine",
-        event_id=event.id,
-        date=date.today(),
-        day_of_week="jueves",
-        operational_profile_id=profile.id,
-        operational_start_min=480,
-        operational_end_min=1800,
-        estimated_attendance=50000,
-        is_active=True,
-    )
-    async_session.add(event_day)
-
     # ── ZoneTypes ──────────────────────────────────────────
     zt_types = {
         "zt-estacionamiento": "estacionamiento",
@@ -194,6 +180,22 @@ async def seed_p3_data(async_session: AsyncSession):
     for al in levels:
         async_session.add(al)
 
+    await async_session.flush()
+
+    # ── EventDay ───────────────────────────────────────────
+    event_day = EventDay(
+        id="test-ed-engine",
+        event_id=event.id,
+        date=date.today(),
+        day_of_week="jueves",
+        operational_profile_id=profile.id,
+        operational_start_min=480,
+        operational_end_min=1800,
+        estimated_attendance=50000,
+        attendance_level_id="al-engine-3",
+        is_active=True,
+    )
+    async_session.add(event_day)
     await async_session.flush()
 
     return {

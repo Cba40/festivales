@@ -41,6 +41,13 @@ from app.crud.event_day import (
     update as update_event_day,
     delete as delete_event_day,
 )
+from app.crud.event_day_phase import (
+    create as create_event_day_phase,
+    get_by_id as get_event_day_phase,
+    list_by_event_day as list_phases_by_event_day,
+    update as update_event_day_phase,
+    delete as delete_event_day_phase,
+)
 
 __all__ = [
     "create_operational_profile",
@@ -74,4 +81,9 @@ __all__ = [
     "list_by_event",
     "update_event_day",
     "delete_event_day",
+    "create_event_day_phase",
+    "get_event_day_phase",
+    "list_phases_by_event_day",
+    "update_event_day_phase",
+    "delete_event_day_phase",
 ]

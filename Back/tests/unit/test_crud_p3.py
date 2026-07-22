@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.core.config import settings
 from app.crud import (
     create_event_day,
+    create_event_day_phase,
     create_operational_event,
     create_operational_event_modifier,
     create_operational_phase,
@@ -21,11 +22,13 @@ from app.crud import (
     list_active_by_event_day,
     list_events_by_event_day,
     list_phases_by_profile,
+    update_event_day_phase,
     update_operational_profile,
     update_operational_phase,
 )
 from app.db.session import Base
 from app.schemas.event_day import EventDayCreate
+from app.schemas.event_day_phase import EventDayPhaseUpdate
 from app.schemas.operational_event import OperationalEventCreate
 from app.schemas.operational_event_modifier import OperationalEventModifierCreate
 from app.schemas.operational_phase import OperationalPhaseCreate
@@ -270,11 +273,17 @@ class TestOperationalEventCRUD:
         self, async_session: AsyncSession, clean_tables,
     ):
         """§13: Solo retorna eventos activos y vigentes para current_min."""
+        from app.models.attendance_level import AttendanceLevel
         from app.models.event import Event
         from app.models.event_day import EventDay
 
         event = Event(id="test-event-crud-filter", name="Filter Test", description="")
         async_session.add(event)
+        await async_session.flush()
+
+        al = AttendanceLevel(id="al-filter-test", event_id=event.id, name="TestAL",
+                             min_people=0, max_people=100000, global_multiplier=1.0)
+        async_session.add(al)
         await async_session.flush()
 
         from app.models.operational_profile import OperationalProfile
@@ -291,6 +300,7 @@ class TestOperationalEventCRUD:
             operational_start_min=480,
             operational_end_min=1800,
             estimated_attendance=10000,
+            attendance_level_id=al.id,
             is_active=True,
         )
         async_session.add(day)
@@ -341,6 +351,16 @@ class TestEventDayCRUD:
         self, async_session: AsyncSession, clean_tables,
     ):
         """§13: Crear EventDay con operational_profile_id inexistente → ValueError."""
+        from app.models.attendance_level import AttendanceLevel
+        from app.models.event import Event
+
+        event = Event(id="test-event-crud-al", name="AL Test", description="")
+        async_session.add(event)
+        al = AttendanceLevel(id="al-crud-test", event_id=event.id, name="TestAL",
+                             min_people=0, max_people=100000, global_multiplier=1.0)
+        async_session.add(al)
+        await async_session.flush()
+
         fake_profile_id = uuid.uuid4()
         with pytest.raises(ValueError) as exc_info:
             await create_event_day(
@@ -352,7 +372,99 @@ class TestEventDayCRUD:
                     operational_start_min=480,
                     operational_end_min=1800,
                     estimated_attendance=1000,
+                    attendance_level_id=al.id,
                 ),
-                event_id="test-event-crud",
+                event_id="test-event-crud-al",
+            )
+        assert "not found" in str(exc_info.value).lower()
+
+
+@pytest.mark.asyncio
+class TestEventDayPhaseCRUD:
+
+    async def _setup_phase(self, async_session: AsyncSession):
+        from app.models.attendance_level import AttendanceLevel
+        from app.models.event import Event
+        from app.models.event_day import EventDay
+        from app.models.operational_profile import OperationalProfile
+        from app.schemas.event_day_phase import EventDayPhaseCreate
+
+        event = Event(id="test-edp-event", name="EDP Test", description="")
+        async_session.add(event)
+        prof = OperationalProfile(name="EDPProfile", description="")
+        async_session.add(prof)
+        al = AttendanceLevel(id="al-edp-test", event_id=event.id, name="EDPAL",
+                             min_people=0, max_people=100000, global_multiplier=1.0)
+        async_session.add(al)
+        await async_session.flush()
+
+        day = EventDay(
+            id="test-edp-day",
+            event_id=event.id,
+            date="2026-08-01",
+            day_of_week="sabado",
+            operational_profile_id=prof.id,
+            operational_start_min=480,
+            operational_end_min=1800,
+            estimated_attendance=10000,
+            attendance_level_id=al.id,
+            is_active=True,
+        )
+        async_session.add(day)
+        await async_session.flush()
+
+        p1 = await create_operational_phase(
+            async_session,
+            OperationalPhaseCreate(
+                operational_profile_id=prof.id,
+                name="EDP Fase1",
+                start_min=0,
+                end_min=600,
+                sort_order=1,
+            ),
+        )
+        p2 = await create_operational_phase(
+            async_session,
+            OperationalPhaseCreate(
+                operational_profile_id=prof.id,
+                name="EDP Fase2",
+                start_min=600,
+                end_min=1200,
+                sort_order=2,
+            ),
+        )
+
+        edp = await create_event_day_phase(
+            async_session,
+            day.id,
+            EventDayPhaseCreate(
+                operational_phase_id=p1.id,
+                start_min=480,
+                end_min=600,
+            ),
+        )
+        return edp, p2.id
+
+    async def test_update_with_valid_operational_phase(
+        self, async_session: AsyncSession, clean_tables,
+    ):
+        """§13: Actualizar operational_phase_id con fase existente → OK."""
+        edp, p2_id = await self._setup_phase(async_session)
+        updated = await update_event_day_phase(
+            async_session, edp,
+            EventDayPhaseUpdate(operational_phase_id=p2_id),
+        )
+        assert updated.operational_phase_id == p2_id
+
+    async def test_update_with_invalid_operational_phase(
+        self, async_session: AsyncSession, clean_tables,
+    ):
+        """§13: Actualizar operational_phase_id con fase inexistente → ValueError."""
+        edp, _ = await self._setup_phase(async_session)
+        fake_id = uuid.uuid4()
+        with pytest.raises(ValueError) as exc_info:
+            await update_event_day_phase(
+                async_session, edp,
+                EventDayPhaseUpdate(operational_phase_id=fake_id),
             )
         assert "not found" in str(exc_info.value).lower()
