@@ -345,7 +345,7 @@ const Estacionar = () => {
             </button>
           )}
 
-          {alternativa && principal?.estado ?? 'colapsado' !== 'colapsado' && (
+          {alternativa && (principal?.estado ?? 'colapsado') !== 'colapsado' && (
             <button
               onClick={() => setSelectedZona(alternativa)}
               className="w-full"
