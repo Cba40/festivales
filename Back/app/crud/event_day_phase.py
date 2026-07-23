@@ -29,6 +29,7 @@ async def create(
     )
     db.add(db_obj)
     await db.flush()
+    await db.commit()
     await db.refresh(db_obj)
     return db_obj
 
@@ -70,6 +71,7 @@ async def update(
         setattr(db_obj, field, value)
 
     await db.flush()
+    await db.commit()
     await db.refresh(db_obj)
     return db_obj
 
@@ -80,4 +82,5 @@ async def delete(db: AsyncSession, id: UUID) -> bool:
         return False
     await db.delete(db_obj)
     await db.flush()
+    await db.commit()
     return True

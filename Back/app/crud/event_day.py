@@ -54,6 +54,7 @@ async def create(db: AsyncSession, obj_in: EventDayCreate, event_id: str) -> Eve
         db.add(ed_phase)
 
     await db.flush()
+    await db.commit()
     await db.refresh(db_obj)
     return db_obj
 
@@ -128,6 +129,7 @@ async def update(
             db.add(ed_phase)
 
     await db.flush()
+    await db.commit()
     await db.refresh(db_obj)
     return db_obj
 
@@ -138,4 +140,5 @@ async def delete(db: AsyncSession, id: str) -> bool:
         return False
     await db.delete(db_obj)
     await db.flush()
+    await db.commit()
     return True

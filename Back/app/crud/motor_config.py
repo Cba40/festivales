@@ -27,6 +27,7 @@ async def get_recommendation_config(
         config = RecommendationConfigModel(id=1)
         db.add(config)
         await db.flush()
+        await db.commit()
         await db.refresh(config)
     return config
 
@@ -40,6 +41,7 @@ async def update_recommendation_config(
     for field, value in update_data.items():
         setattr(config, field, value)
     await db.flush()
+    await db.commit()
     await db.refresh(config)
 
     motor_cfg = RecommendationConfig(
@@ -61,6 +63,7 @@ async def get_stage4_config(db: AsyncSession) -> Stage4ConfigModel:
         config = Stage4ConfigModel(id=1)
         db.add(config)
         await db.flush()
+        await db.commit()
         await db.refresh(config)
     return config
 
@@ -74,6 +77,7 @@ async def update_stage4_config(
     for field, value in update_data.items():
         setattr(config, field, value)
     await db.flush()
+    await db.commit()
     await db.refresh(config)
 
     raw_mapping = config.wait_time_mapping or _default_wait_mapping()
