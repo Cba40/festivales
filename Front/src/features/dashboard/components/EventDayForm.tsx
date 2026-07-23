@@ -47,12 +47,12 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
   const [notes, setNotes] = useState('');
   const [isActive, setIsActive] = useState(true);
 
+  const [selectedProfileId, setSelectedProfileId] = useState('');
+  const [selectedLevelId, setSelectedLevelId] = useState('');
+
   const { profiles, loading: profilesLoading } = useOperationalProfiles();
   const { levels, loading: levelsLoading } = useAttendanceLevels();
   const { phases: operationalPhases, loading: operationalPhasesLoading } = useOperationalPhases(selectedProfileId);
-
-  const [selectedProfileId, setSelectedProfileId] = useState('');
-  const [selectedLevelId, setSelectedLevelId] = useState('');
 
   const [operationalStartStr, setOperationalStartStr] = useState('');
   const [operationalEndStr, setOperationalEndStr] = useState('');
