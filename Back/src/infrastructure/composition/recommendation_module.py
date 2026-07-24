@@ -232,7 +232,9 @@ class RecommendationModule:
 
         ed_row = (
             await self._db.execute(
-                select(EventDayORM).where(EventDayORM.date == timestamp.date()),
+                select(EventDayORM)
+                .where(EventDayORM.date == timestamp.date())
+                .options(selectinload(EventDayORM.phases))
             )
         ).scalar_one_or_none()
         if ed_row is None:
@@ -257,11 +259,11 @@ class RecommendationModule:
                 EventDayPhase(
                     id=UUID(str(p.id)),
                     event_day_id=eid,
-                    operational_phase_id=p.id,
+                    operational_phase_id=UUID(str(p.operational_phase_id)),
                     start_min=p.start_min,
                     end_min=p.end_min,
                 )
-                for p in operational_profile.phases
+                for p in ed_row.phases
             ),
         )
 

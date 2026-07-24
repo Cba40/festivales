@@ -112,8 +112,6 @@ async def seed_profile_and_phase(async_session: AsyncSession, seed_profile):
             OperationalPhaseCreate(
                 operational_profile_id=profile_id,
                 name="FaseTest",
-                start_min=0,
-                end_min=600,
                 sort_order=1,
             ),
         )
@@ -156,8 +154,6 @@ class TestOperationalPhaseCRUD:
             OperationalPhaseCreate(
                 operational_profile_id=profile_id,
                 name="Fase1",
-                start_min=0,
-                end_min=300,
                 sort_order=1,
             ),
         )
@@ -167,8 +163,6 @@ class TestOperationalPhaseCRUD:
                 OperationalPhaseCreate(
                     operational_profile_id=profile_id,
                     name="Fase2",
-                    start_min=300,
-                    end_min=600,
                     sort_order=1,
                 ),
             )
@@ -421,8 +415,6 @@ class TestEventDayPhaseCRUD:
             OperationalPhaseCreate(
                 operational_profile_id=prof.id,
                 name="EDP Fase1",
-                start_min=0,
-                end_min=600,
                 sort_order=1,
             ),
         )
@@ -431,8 +423,6 @@ class TestEventDayPhaseCRUD:
             OperationalPhaseCreate(
                 operational_profile_id=prof.id,
                 name="EDP Fase2",
-                start_min=600,
-                end_min=1200,
                 sort_order=2,
             ),
         )

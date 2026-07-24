@@ -20,57 +20,57 @@ from sqlalchemy.ext.asyncio import create_async_engine
 # §11 de P3.0_EXECUTION_SPEC.md especifica solo ActividadExtendida.
 # Los demás perfiles se derivan coherentemente según su nombre y patrón operativo.
 # ───────────────────────────────────────────────────────────
-# Cada tupla:  (name, start_min, end_min, sort_order)
+# Cada tupla:  (name, sort_order)
 # ───────────────────────────────────────────────────────────
 
-PHASES_BY_PROFILE: dict[str, list[tuple[str, int, int, int]]] = {
+PHASES_BY_PROFILE: dict[str, list[tuple[str, int]]] = {
     "ActividadExtendida": [
-        ("Preparación", 0, 120, 1),
-        ("ActividadComercial", 120, 600, 2),
-        ("LlegadaVisitantes", 600, 780, 3),
-        ("AltaActividad", 780, 1080, 4),
-        ("EspectáculoEnDesarrollo", 1080, 1320, 5),
-        ("Dispersión", 1320, 1500, 6),
-        ("CierreTerritorial", 1500, 1680, 7),
+        ("Preparación", 1),
+        ("ActividadComercial", 2),
+        ("LlegadaVisitantes", 3),
+        ("AltaActividad", 4),
+        ("EspectáculoEnDesarrollo", 5),
+        ("Dispersión", 6),
+        ("CierreTerritorial", 7),
     ],
     "AfluenciaTemprana": [
-        ("Preparación", 0, 60, 1),
-        ("Apertura", 60, 180, 2),
-        ("PicoMatutino", 180, 480, 3),
-        ("ActividadContinua", 480, 780, 4),
-        ("Dispersión", 780, 1080, 5),
-        ("CierreTerritorial", 1080, 1320, 6),
+        ("Preparación", 1),
+        ("Apertura", 2),
+        ("PicoMatutino", 3),
+        ("ActividadContinua", 4),
+        ("Dispersión", 5),
+        ("CierreTerritorial", 6),
     ],
     "AfluenciaTardía": [
-        ("Preparación", 0, 120, 1),
-        ("ActividadPrevia", 120, 480, 2),
-        ("LlegadaVisitantes", 480, 780, 3),
-        ("AltaActividad", 780, 1140, 4),
-        ("Dispersión", 1140, 1380, 5),
-        ("CierreTerritorial", 1380, 1560, 6),
+        ("Preparación", 1),
+        ("ActividadPrevia", 2),
+        ("LlegadaVisitantes", 3),
+        ("AltaActividad", 4),
+        ("Dispersión", 5),
+        ("CierreTerritorial", 6),
     ],
     "DoblePico": [
-        ("Preparación", 0, 120, 1),
-        ("PrimerPico", 120, 480, 2),
-        ("ActividadMedia", 480, 780, 3),
-        ("SegundoPico", 780, 1080, 4),
-        ("Dispersión", 1080, 1320, 5),
-        ("CierreTerritorial", 1320, 1500, 6),
+        ("Preparación", 1),
+        ("PrimerPico", 2),
+        ("ActividadMedia", 3),
+        ("SegundoPico", 4),
+        ("Dispersión", 5),
+        ("CierreTerritorial", 6),
     ],
     "PicoNocturno": [
-        ("Preparación", 0, 180, 1),
-        ("ActividadVespertina", 180, 480, 2),
-        ("PicoNocturno", 480, 840, 3),
-        ("AltaActividadNocturna", 840, 1080, 4),
-        ("Dispersión", 1080, 1260, 5),
-        ("CierreTerritorial", 1260, 1440, 6),
+        ("Preparación", 1),
+        ("ActividadVespertina", 2),
+        ("PicoNocturno", 3),
+        ("AltaActividadNocturna", 4),
+        ("Dispersión", 5),
+        ("CierreTerritorial", 6),
     ],
     "BajaActividadContinua": [
-        ("Preparación", 0, 120, 1),
-        ("ActividadContinua", 120, 720, 2),
-        ("ActividadTranquila", 720, 1080, 3),
-        ("Dispersión", 1080, 1260, 4),
-        ("CierreTerritorial", 1260, 1440, 5),
+        ("Preparación", 1),
+        ("ActividadContinua", 2),
+        ("ActividadTranquila", 3),
+        ("Dispersión", 4),
+        ("CierreTerritorial", 5),
     ],
 }
 
@@ -146,14 +146,14 @@ async def main() -> None:
         for profile_name, phases in PHASES_BY_PROFILE.items():
             profile_id = profiles[profile_name]
 
-            for name, start_min, end_min, sort_order in phases:
+            for name, sort_order in phases:
                 result = await conn.execute(
                     text("""
                         INSERT INTO operational_phases
-                            (id, operational_profile_id, name, start_min, end_min,
+                            (id, operational_profile_id, name,
                              sort_order, created_at, updated_at)
                         SELECT
-                            gen_random_uuid(), :profile_id, :name, :start_min, :end_min,
+                            gen_random_uuid(), :profile_id, :name,
                             :sort_order, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
                         WHERE NOT EXISTS (
                             SELECT 1 FROM operational_phases
@@ -164,8 +164,6 @@ async def main() -> None:
                     {
                         "profile_id": profile_id,
                         "name": name,
-                        "start_min": start_min,
-                        "end_min": end_min,
                         "sort_order": sort_order,
                     },
                 )
@@ -197,7 +195,7 @@ async def main() -> None:
 
             profile_phases = PHASES_BY_PROFILE.get(profile_name, [])
             phase_def = next(
-                (p for p in profile_phases if p[3] == phase_sort_order), None
+                (p for p in profile_phases if p[1] == phase_sort_order), None
             )
             phase_name = phase_def[0] if phase_def else ""
 

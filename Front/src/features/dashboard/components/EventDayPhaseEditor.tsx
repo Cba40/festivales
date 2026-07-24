@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import type { OperationalPhaseDTO, EventDayPhaseDTO, EventDayPhaseCreatePayload } from '../types';
+import { useState } from 'react';
+import type { OperationalPhaseDTO, EventDayPhaseCreatePayload } from '../types';
 
 interface EventDayPhaseEditorProps {
   phases: EventDayPhaseCreatePayload[];
@@ -25,37 +25,18 @@ export function EventDayPhaseEditor({
   phases, operationalPhases, operationalStartMin, operationalEndMin, onChange, errors,
 }: EventDayPhaseEditorProps) {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [dirtySet, setDirtySet] = useState<Set<number>>(new Set());
-
-  useEffect(() => {
-    let changed = false;
-    const fixed = phases.map((p) => {
-      if (p.end_min > 1439) {
-        const raw = p.end_min % 1440;
-        if (raw >= p.start_min) {
-          changed = true;
-          return { ...p, end_min: raw };
-        }
-      }
-      return p;
-    });
-    if (changed) {
-      onChange(fixed);
-    }
-  }, [phases]);
 
   const phaseOptions = operationalPhases.filter(
     (op) => !phases.some((p) => p.operational_phase_id === op.id),
   );
 
   const addNew = () => {
-    const template = operationalPhases.length > 0 ? operationalPhases[0] : null;
     onChange([
       ...phases,
       {
-        operational_phase_id: template ? template.id : '',
-        start_min: template ? template.start_min : operationalStartMin,
-        end_min: template ? template.end_min : operationalEndMin,
+        operational_phase_id: '',
+        start_min: operationalStartMin,
+        end_min: operationalEndMin,
       },
     ]);
     setEditingIndex(phases.length);
@@ -67,38 +48,18 @@ export function EventDayPhaseEditor({
   };
 
   const handlePhaseSelect = (index: number, phaseId: string) => {
-    const updated = phases.map((p, i) => {
-      if (i !== index) return p;
-      const next = { ...p, operational_phase_id: phaseId };
-      if (!dirtySet.has(index)) {
-        const op = operationalPhases.find(o => o.id === phaseId);
-        if (op) {
-          next.start_min = op.start_min;
-          next.end_min = op.end_min;
-        }
-      }
-      return next;
-    });
+    const updated = phases.map((p, i) =>
+      i === index ? { ...p, operational_phase_id: phaseId } : p
+    );
     onChange(updated);
   };
 
   const handleTimeEdit = (index: number, field: 'start_min' | 'end_min', value: number) => {
-    if (!dirtySet.has(index)) {
-      setDirtySet(prev => new Set(prev).add(index));
-    }
     updatePhase(index, field, value);
   };
 
   const removePhase = (index: number) => {
     onChange(phases.filter((_, i) => i !== index));
-    setDirtySet(prev => {
-      const next = new Set<number>();
-      for (const idx of prev) {
-        if (idx < index) next.add(idx);
-        else if (idx > index) next.add(idx - 1);
-      }
-      return next;
-    });
     if (editingIndex === index) setEditingIndex(null);
   };
 
@@ -167,26 +128,12 @@ export function EventDayPhaseEditor({
                     <label className="text-[10px] text-slate-400 block mb-0.5">Fin</label>
                     <input
                       type="time"
-                      value={minutesToTimeStr(phase.end_min > 1439 ? phase.end_min % 1440 : phase.end_min)}
+                      value={minutesToTimeStr(phase.end_min)}
                       onChange={(e) => {
-                        const raw = timeStrToMinutes(e.target.value);
-                        handleTimeEdit(index, 'end_min', raw + (phase.end_min > 1439 ? 1440 : 0));
+                        handleTimeEdit(index, 'end_min', timeStrToMinutes(e.target.value));
                       }}
                       className="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
-                    <label className="flex items-center gap-1.5 mt-1 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={phase.end_min > 1439}
-                      onChange={() => {
-                        const raw = phase.end_min > 1439 ? phase.end_min % 1440 : phase.end_min;
-                        handleTimeEdit(index, 'end_min', phase.end_min > 1439 ? raw : raw + 1440);
-                      }}
-                        disabled={phase.end_min > 1439 ? (phase.end_min % 1440) >= phase.start_min : (phase.end_min) >= phase.start_min}
-                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                      />
-                      <span className="text-[10px] text-slate-500">Finaliza al día siguiente</span>
-                    </label>
                   </div>
                   <div className="flex items-end gap-1">
                     <button
@@ -208,8 +155,7 @@ export function EventDayPhaseEditor({
               </div>
               {op && (
                 <div className="mt-1.5 text-[10px] text-slate-400">
-                  {op.name}: {minutesToTimeStr(phase.start_min)} — {minutesToTimeStr(phase.end_min > 1439 ? phase.end_min % 1440 : phase.end_min)}
-                  {op.sort_order !== undefined && ` (orden ${op.sort_order})`}
+                  {op.name}: {minutesToTimeStr(phase.start_min)} — {minutesToTimeStr(phase.end_min)}
                 </div>
               )}
             </div>
@@ -230,7 +176,7 @@ export function EventDayPhaseEditor({
                 key={index}
                 className={`absolute top-0 h-full ${colors[index % colors.length]} opacity-60`}
                 style={{ left: `${Math.max(0, left)}%`, width: `${Math.max(0, width)}%` }}
-                title={op ? `${op.name}: ${minutesToTimeStr(phase.start_min)}-${minutesToTimeStr(phase.end_min > 1439 ? phase.end_min % 1440 : phase.end_min)}` : ''}
+                title={op ? `${op.name}: ${minutesToTimeStr(phase.start_min)}-${minutesToTimeStr(phase.end_min)}` : ''}
               />
             );
           })}

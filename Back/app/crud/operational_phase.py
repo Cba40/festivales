@@ -14,9 +14,6 @@ async def create(db: AsyncSession, obj_in: OperationalPhaseCreate) -> Operationa
     if not profile:
         raise ValueError(f"OperationalProfile with id '{obj_in.operational_profile_id}' not found")
 
-    if obj_in.end_min <= obj_in.start_min:
-        raise ValueError("end_min must be greater than start_min")
-
     result = await db.execute(
         select(OperationalPhase).where(
             OperationalPhase.operational_profile_id == obj_in.operational_profile_id,
@@ -56,12 +53,6 @@ async def update(
     db: AsyncSession, db_obj: OperationalPhase, obj_in: OperationalPhaseUpdate,
 ) -> OperationalPhase:
     update_data = obj_in.model_dump(exclude_unset=True)
-
-    if "start_min" in update_data or "end_min" in update_data:
-        new_start = update_data.get("start_min", db_obj.start_min)
-        new_end = update_data.get("end_min", db_obj.end_min)
-        if new_end <= new_start:
-            raise ValueError("end_min must be greater than start_min")
 
     if "sort_order" in update_data and update_data["sort_order"] != db_obj.sort_order:
         result = await db.execute(

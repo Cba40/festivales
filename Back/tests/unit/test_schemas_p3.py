@@ -11,39 +11,8 @@ from pydantic import ValidationError
 from app.schemas.event_day import EventDayCreate, EventDayUpdate
 from app.schemas.operational_event import OperationalEventCreate
 from app.schemas.operational_event_modifier import EVENT_TYPE_LITERAL
-from app.schemas.operational_phase import OperationalPhaseCreate, OperationalPhaseUpdate
 from app.schemas.territorial_prediction import TerritorialPrediction, ZonePrediction
 from app.schemas.zone_behavior import ZoneBehaviorCreate
-
-
-def test_operational_phase_create_end_min_gt_start_min():
-    """§13: OperationalPhaseCreate rechaza end_min <= start_min."""
-    with pytest.raises(ValidationError) as exc_info:
-        OperationalPhaseCreate(
-            operational_profile_id=uuid.uuid4(),
-            name="Test",
-            start_min=100,
-            end_min=50,
-            sort_order=1,
-        )
-    assert "end_min must be greater than start_min" in str(exc_info.value)
-
-
-def test_operational_phase_update_partial_validation():
-    """§13: OperationalPhaseUpdate permite solo start_min, pero rechaza end <= start cuando ambos se envían."""
-    # Solo start_min — debe ser válido
-    u = OperationalPhaseUpdate(start_min=100)
-    assert u.start_min == 100
-    assert u.end_min is None
-
-    # Solo end_min — debe ser válido
-    u = OperationalPhaseUpdate(end_min=200)
-    assert u.end_min == 200
-
-    # Ambos con end <= start — debe rechazar
-    with pytest.raises(ValidationError) as exc_info:
-        OperationalPhaseUpdate(start_min=200, end_min=100)
-    assert "end_min must be greater than start_min" in str(exc_info.value)
 
 
 def test_zone_behavior_factors_gt_zero():
