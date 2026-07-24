@@ -43,7 +43,11 @@ export function OperationalPhaseList({ phases, profiles, onEdit, onDelete }: Ope
                 <td className="py-3 text-slate-600">{profile?.name || '—'}</td>
                 <td className="py-3 text-slate-800 font-medium">{phase.name}</td>
                 <td className="py-3 text-slate-600">{minutesToTimeStr(phase.start_min)}</td>
-                <td className="py-3 text-slate-600">{minutesToTimeStr(phase.end_min)}</td>
+                <td className="py-3 text-slate-600">
+                    {phase.end_min > 1439
+                      ? `${minutesToTimeStr(phase.end_min % 1440)} (+1)`
+                      : minutesToTimeStr(phase.end_min)}
+                  </td>
                 <td className="py-3 text-slate-600">{phase.sort_order}</td>
                 <td className="py-3 text-right">
                   <button
