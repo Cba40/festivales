@@ -5,15 +5,11 @@ import type { OperationalPhaseDTO } from '../types';
 export interface PhaseCreatePayload {
   operational_profile_id: string;
   name: string;
-  start_min: number;
-  end_min: number;
   sort_order: number;
 }
 
 export interface PhaseUpdatePayload {
   name?: string;
-  start_min?: number;
-  end_min?: number;
   sort_order?: number;
 }
 

@@ -1,6 +1,6 @@
 """p51: Remove start_min and end_min from operational_phases
 
-Revision ID: 3c4d5e6f7a8b
+Revision ID: 3007545e07f8
 Revises: 2b3c4d5e6f7a
 Create Date: 2026-07-24
 
@@ -11,7 +11,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = '3c4d5e6f7a8b'
+revision: str = '3007545e07f8'
 down_revision: Union[str, Sequence[str], None] = '2b3c4d5e6f7a'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

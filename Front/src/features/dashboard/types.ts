@@ -58,8 +58,6 @@ export interface OperationalPhaseDTO {
   id: string;
   operational_profile_id: string;
   name: string;
-  start_min: number;
-  end_min: number;
   sort_order: number;
   created_at: string;
   updated_at: string;
