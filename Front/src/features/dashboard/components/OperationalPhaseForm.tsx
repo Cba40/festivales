@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { OperationalProfileDTO } from '../types';
 
 interface OperationalPhaseFormProps {
@@ -47,13 +47,16 @@ export function OperationalPhaseForm({
   const [endStr, setEndStr] = useState('');
   const [sortOrder, setSortOrder] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [extendsNextDay, setExtendsNextDay] = useState(false);
 
   useEffect(() => {
     if (initial) {
       setProfileId(initial.operational_profile_id);
       setName(initial.name);
       setStartStr(minutesToTimeStr(initial.start_min));
-      setEndStr(minutesToTimeStr(initial.end_min));
+      const rawEnd = initial.end_min;
+      setExtendsNextDay(rawEnd > 1439);
+      setEndStr(minutesToTimeStr(rawEnd > 1439 ? rawEnd % 1440 : rawEnd));
       setSortOrder(initial.sort_order.toString());
     } else {
       setProfileId(selectedProfileId);
@@ -63,6 +66,17 @@ export function OperationalPhaseForm({
       setSortOrder('');
     }
   }, [initial, selectedProfileId]);
+
+  const rawStartMin = useMemo(() => (startStr ? timeStrToMinutes(startStr) : 0), [startStr]);
+  const rawEndMin = useMemo(() => (endStr ? timeStrToMinutes(endStr) : 0), [endStr]);
+  const adjustedEndMin = useMemo(() => rawEndMin + (extendsNextDay ? 1440 : 0), [rawEndMin, extendsNextDay]);
+  const canExtend = rawEndMin < rawStartMin;
+
+  useEffect(() => {
+    if (!canExtend) {
+      setExtendsNextDay(false);
+    }
+  }, [canExtend]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,8 +100,8 @@ export function OperationalPhaseForm({
       return;
     }
 
-    const startMin = timeStrToMinutes(startStr);
-    const endMin = timeStrToMinutes(endStr);
+    const startMin = rawStartMin;
+    const endMin = adjustedEndMin;
 
     if (endMin <= startMin) {
       setValidationError('El minuto de fin debe ser mayor al minuto de inicio');
@@ -161,7 +175,27 @@ export function OperationalPhaseForm({
             required
             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          <p className="text-[10px] text-slate-400 mt-0.5">Ej: 12:00 = 720 min</p>
+          <label className="flex items-center gap-2 mt-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={extendsNextDay}
+              onChange={(e) => setExtendsNextDay(e.target.checked)}
+              disabled={!canExtend}
+              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            />
+            <span className="text-xs text-slate-600">Finaliza al día siguiente</span>
+          </label>
+          <div className="mt-2 text-[10px] text-slate-400 leading-relaxed">
+            Marque esta opción cuando la fase continúe después de la medianoche.
+            <br />
+            Ejemplo:
+            <br />
+            Inicio: 20:00
+            <br />
+            Fin: 02:00
+            <br />
+            → el sistema interpretará automáticamente 02:00 como las 02:00 del día siguiente (1560 minutos operacionales).
+          </div>
         </div>
       </div>
 

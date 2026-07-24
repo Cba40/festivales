@@ -58,6 +58,7 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
   const [operationalEndStr, setOperationalEndStr] = useState('');
 
   const [eventDayPhases, setEventDayPhases] = useState<EventDayPhaseCreatePayload[]>([]);
+  const [extendsNextDay, setExtendsNextDay] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -69,7 +70,9 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
       setSelectedProfileId(eventDay.operational_profile_id);
       setSelectedLevelId(eventDay.attendance_level_id);
       setOperationalStartStr(minutesToTimeStr(eventDay.operational_start_min));
-      setOperationalEndStr(minutesToTimeStr(eventDay.operational_end_min));
+      const rawEnd = eventDay.operational_end_min;
+      setExtendsNextDay(rawEnd > 1439);
+      setOperationalEndStr(minutesToTimeStr(rawEnd > 1439 ? rawEnd % 1440 : rawEnd));
       setNotes(eventDay.notes ?? '');
       setIsActive(eventDay.is_active);
       if (eventDay.phases && eventDay.phases.length > 0) {
@@ -88,10 +91,21 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
     () => (operationalStartStr ? timeStrToMinutes(operationalStartStr) : 0),
     [operationalStartStr],
   );
-  const operationalEndMin = useMemo(
+  const rawEndMin = useMemo(
     () => (operationalEndStr ? timeStrToMinutes(operationalEndStr) : 0),
     [operationalEndStr],
   );
+  const operationalEndMin = useMemo(
+    () => rawEndMin + (extendsNextDay ? 1440 : 0),
+    [rawEndMin, extendsNextDay],
+  );
+  const canExtend = rawEndMin < operationalStartMin;
+
+  useEffect(() => {
+    if (!canExtend) {
+      setExtendsNextDay(false);
+    }
+  }, [canExtend]);
 
   const currentPhaseErrors = useMemo(
     () => validatePhases(eventDayPhases, operationalStartMin, operationalEndMin),
@@ -232,7 +246,27 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
             required
             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          <p className="text-[10px] text-slate-400 mt-0.5">Ej: 06:00 (+1 día) = 1800 min (&gt;1440 cruza medianoche)</p>
+          <label className="flex items-center gap-2 mt-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={extendsNextDay}
+              onChange={(e) => setExtendsNextDay(e.target.checked)}
+              disabled={!canExtend}
+              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            />
+            <span className="text-xs text-slate-600">Finaliza al día siguiente</span>
+          </label>
+          <div className="mt-2 text-[10px] text-slate-400 leading-relaxed">
+            Marque esta opción cuando la jornada continúe después de la medianoche.
+            <br />
+            Ejemplo:
+            <br />
+            Inicio: 08:00
+            <br />
+            Fin: 06:00
+            <br />
+            → el sistema interpretará automáticamente 06:00 como las 06:00 del día siguiente (1800 minutos operacionales).
+          </div>
         </div>
       </div>
 
