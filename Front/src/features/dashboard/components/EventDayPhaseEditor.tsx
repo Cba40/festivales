@@ -25,6 +25,7 @@ export function EventDayPhaseEditor({
   phases, operationalPhases, operationalStartMin, operationalEndMin, onChange, errors,
 }: EventDayPhaseEditorProps) {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [dirtySet, setDirtySet] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     let changed = false;
@@ -53,8 +54,8 @@ export function EventDayPhaseEditor({
       ...phases,
       {
         operational_phase_id: template ? template.id : '',
-        start_min: operationalStartMin,
-        end_min: operationalEndMin,
+        start_min: template ? template.start_min : operationalStartMin,
+        end_min: template ? template.end_min : operationalEndMin,
       },
     ]);
     setEditingIndex(phases.length);
@@ -65,8 +66,39 @@ export function EventDayPhaseEditor({
     onChange(updated);
   };
 
+  const handlePhaseSelect = (index: number, phaseId: string) => {
+    const updated = phases.map((p, i) => {
+      if (i !== index) return p;
+      const next = { ...p, operational_phase_id: phaseId };
+      if (!dirtySet.has(index)) {
+        const op = operationalPhases.find(o => o.id === phaseId);
+        if (op) {
+          next.start_min = op.start_min;
+          next.end_min = op.end_min;
+        }
+      }
+      return next;
+    });
+    onChange(updated);
+  };
+
+  const handleTimeEdit = (index: number, field: 'start_min' | 'end_min', value: number) => {
+    if (!dirtySet.has(index)) {
+      setDirtySet(prev => new Set(prev).add(index));
+    }
+    updatePhase(index, field, value);
+  };
+
   const removePhase = (index: number) => {
     onChange(phases.filter((_, i) => i !== index));
+    setDirtySet(prev => {
+      const next = new Set<number>();
+      for (const idx of prev) {
+        if (idx < index) next.add(idx);
+        else if (idx > index) next.add(idx - 1);
+      }
+      return next;
+    });
     if (editingIndex === index) setEditingIndex(null);
   };
 
@@ -113,7 +145,7 @@ export function EventDayPhaseEditor({
                     <label className="text-[10px] text-slate-400 block mb-0.5">Fase operativa</label>
                     <select
                       value={phase.operational_phase_id}
-                      onChange={(e) => updatePhase(index, 'operational_phase_id', e.target.value)}
+                      onChange={(e) => handlePhaseSelect(index, e.target.value)}
                       className="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">Seleccionar...</option>
@@ -127,7 +159,7 @@ export function EventDayPhaseEditor({
                     <input
                       type="time"
                       value={minutesToTimeStr(phase.start_min)}
-                      onChange={(e) => updatePhase(index, 'start_min', timeStrToMinutes(e.target.value))}
+                      onChange={(e) => handleTimeEdit(index, 'start_min', timeStrToMinutes(e.target.value))}
                       className="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
@@ -138,7 +170,7 @@ export function EventDayPhaseEditor({
                       value={minutesToTimeStr(phase.end_min > 1439 ? phase.end_min % 1440 : phase.end_min)}
                       onChange={(e) => {
                         const raw = timeStrToMinutes(e.target.value);
-                        updatePhase(index, 'end_min', raw + (phase.end_min > 1439 ? 1440 : 0));
+                        handleTimeEdit(index, 'end_min', raw + (phase.end_min > 1439 ? 1440 : 0));
                       }}
                       className="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
@@ -146,10 +178,10 @@ export function EventDayPhaseEditor({
                       <input
                         type="checkbox"
                         checked={phase.end_min > 1439}
-                        onChange={() => {
-                          const raw = phase.end_min > 1439 ? phase.end_min % 1440 : phase.end_min;
-                          updatePhase(index, 'end_min', phase.end_min > 1439 ? raw : raw + 1440);
-                        }}
+                      onChange={() => {
+                        const raw = phase.end_min > 1439 ? phase.end_min % 1440 : phase.end_min;
+                        handleTimeEdit(index, 'end_min', phase.end_min > 1439 ? raw : raw + 1440);
+                      }}
                         disabled={phase.end_min > 1439 ? (phase.end_min % 1440) >= phase.start_min : (phase.end_min) >= phase.start_min}
                         className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                       />
