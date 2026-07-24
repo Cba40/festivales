@@ -83,8 +83,8 @@ export interface EventDayPhaseDTO {
 
 export interface EventDayPhaseCreatePayload {
   operational_phase_id: string;
-  start_min: number;
-  end_min: number;
+  start_min: number | null;
+  end_min: number | null;
 }
 
 export interface EventDayPhaseUpdatePayload {

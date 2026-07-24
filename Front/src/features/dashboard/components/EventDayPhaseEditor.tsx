@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo } from 'react';
 import type { OperationalPhaseDTO, EventDayPhaseCreatePayload } from '../types';
 
 interface EventDayPhaseEditorProps {
@@ -24,58 +24,25 @@ function timeStrToMinutes(t: string): number {
 export function EventDayPhaseEditor({
   phases, operationalPhases, operationalStartMin, operationalEndMin, onChange, errors,
 }: EventDayPhaseEditorProps) {
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
-
-  const phaseOptions = operationalPhases.filter(
-    (op) => !phases.some((p) => p.operational_phase_id === op.id),
+  const sortedPhases = useMemo(
+    () => [...phases].sort((a, b) => {
+      const aOp = operationalPhases.find((p) => p.id === a.operational_phase_id);
+      const bOp = operationalPhases.find((p) => p.id === b.operational_phase_id);
+      return (aOp?.sort_order ?? 0) - (bOp?.sort_order ?? 0);
+    }),
+    [phases, operationalPhases],
   );
 
-  const addNew = () => {
-    onChange([
-      ...phases,
-      {
-        operational_phase_id: '',
-        start_min: operationalStartMin,
-        end_min: operationalEndMin,
-      },
-    ]);
-    setEditingIndex(phases.length);
-  };
-
-  const updatePhase = (index: number, field: keyof EventDayPhaseCreatePayload, value: unknown) => {
-    const updated = phases.map((p, i) => (i === index ? { ...p, [field]: value } : p));
+  const setTime = (index: number, field: 'start_min' | 'end_min', value: number | null) => {
+    const originalIndex = phases.indexOf(sortedPhases[index]);
+    if (originalIndex === -1) return;
+    const updated = phases.map((p, i) => (i === originalIndex ? { ...p, [field]: value } : p));
     onChange(updated);
-  };
-
-  const handlePhaseSelect = (index: number, phaseId: string) => {
-    const updated = phases.map((p, i) =>
-      i === index ? { ...p, operational_phase_id: phaseId } : p
-    );
-    onChange(updated);
-  };
-
-  const handleTimeEdit = (index: number, field: 'start_min' | 'end_min', value: number) => {
-    updatePhase(index, field, value);
-  };
-
-  const removePhase = (index: number) => {
-    onChange(phases.filter((_, i) => i !== index));
-    if (editingIndex === index) setEditingIndex(null);
   };
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-700">Fases de la jornada</h3>
-        <button
-          type="button"
-          onClick={addNew}
-          disabled={phaseOptions.length === 0}
-          className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-        >
-          + Agregar fase
-        </button>
-      </div>
+      <h3 className="text-sm font-semibold text-slate-700">Fases de la jornada</h3>
 
       {errors.length > 0 && (
         <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 space-y-1">
@@ -83,89 +50,56 @@ export function EventDayPhaseEditor({
         </div>
       )}
 
-      {phases.length === 0 && !editingIndex && (
-        <div className="text-xs text-slate-400 py-4 text-center border border-dashed border-slate-300 rounded-lg">
-          No hay fases definidas. Agregá al menos una fase para la jornada.
-        </div>
-      )}
-
-      <div className="space-y-2">
-        {phases.map((phase, index) => {
-          const op = operationalPhases.find((p) => p.id === phase.operational_phase_id);
-          const isEditing = editingIndex === index;
-          return (
-            <div
-              key={index}
-              className={`p-3 rounded-lg border transition-colors ${
-                isEditing ? 'border-blue-300 bg-blue-50' : 'border-slate-200 bg-white'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex-1 grid grid-cols-1 sm:grid-cols-4 gap-2">
-                  <div>
-                    <label className="text-[10px] text-slate-400 block mb-0.5">Fase operativa</label>
-                    <select
-                      value={phase.operational_phase_id}
-                      onChange={(e) => handlePhaseSelect(index, e.target.value)}
-                      className="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Seleccionar...</option>
-                      {operationalPhases.map((op2) => (
-                        <option key={op2.id} value={op2.id}>{op2.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-400 block mb-0.5">Inicio</label>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-slate-200">
+              <th className="text-left py-2 pr-2 text-slate-500 font-medium">Nombre</th>
+              <th className="text-left py-2 px-2 text-slate-500 font-medium">Orden</th>
+              <th className="text-left py-2 px-2 text-slate-500 font-medium">Inicio</th>
+              <th className="text-left py-2 pl-2 text-slate-500 font-medium">Fin</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedPhases.map((phase, index) => {
+              const op = operationalPhases.find((p) => p.id === phase.operational_phase_id);
+              return (
+                <tr key={phase.operational_phase_id} className="border-b border-slate-100">
+                  <td className="py-2 pr-2 text-slate-800 font-medium">{op?.name ?? '—'}</td>
+                  <td className="py-2 px-2 text-slate-500">{op?.sort_order ?? '—'}</td>
+                  <td className="py-2 px-2">
                     <input
                       type="time"
-                      value={minutesToTimeStr(phase.start_min)}
-                      onChange={(e) => handleTimeEdit(index, 'start_min', timeStrToMinutes(e.target.value))}
-                      className="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-400 block mb-0.5">Fin</label>
-                    <input
-                      type="time"
-                      value={minutesToTimeStr(phase.end_min)}
+                      value={phase.start_min !== null ? minutesToTimeStr(phase.start_min) : ''}
                       onChange={(e) => {
-                        handleTimeEdit(index, 'end_min', timeStrToMinutes(e.target.value));
+                        const val = e.target.value;
+                        setTime(index, 'start_min', val ? timeStrToMinutes(val) : null);
                       }}
-                      className="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-28 px-2 py-1 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
-                  </div>
-                  <div className="flex items-end gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setEditingIndex(isEditing ? null : index)}
-                      className="px-2 py-1.5 text-xs text-blue-600 hover:text-blue-800 border border-blue-200 rounded-md hover:bg-blue-50 transition-colors"
-                    >
-                      {isEditing ? 'OK' : 'Editar'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => removePhase(index)}
-                      className="px-2 py-1.5 text-xs text-red-600 hover:text-red-800 border border-red-200 rounded-md hover:bg-red-50 transition-colors"
-                    >
-                      Eliminar
-                    </button>
-                  </div>
-                </div>
-              </div>
-              {op && (
-                <div className="mt-1.5 text-[10px] text-slate-400">
-                  {op.name}: {minutesToTimeStr(phase.start_min)} — {minutesToTimeStr(phase.end_min)}
-                </div>
-              )}
-            </div>
-          );
-        })}
+                  </td>
+                  <td className="py-2 pl-2">
+                    <input
+                      type="time"
+                      value={phase.end_min !== null ? minutesToTimeStr(phase.end_min) : ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setTime(index, 'end_min', val ? timeStrToMinutes(val) : null);
+                      }}
+                      className="w-28 px-2 py-1 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
 
       {phases.length > 0 && operationalEndMin > operationalStartMin && (
         <div className="relative h-8 bg-slate-100 rounded-full overflow-hidden">
-          {phases.map((phase, index) => {
+          {sortedPhases.map((phase, index) => {
+            if (phase.start_min === null || phase.end_min === null) return null;
             const range = operationalEndMin - operationalStartMin;
             const left = ((phase.start_min - operationalStartMin) / range) * 100;
             const width = ((phase.end_min - phase.start_min) / range) * 100;
@@ -173,7 +107,7 @@ export function EventDayPhaseEditor({
             const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-teal-500'];
             return (
               <div
-                key={index}
+                key={phase.operational_phase_id}
                 className={`absolute top-0 h-full ${colors[index % colors.length]} opacity-60`}
                 style={{ left: `${Math.max(0, left)}%`, width: `${Math.max(0, width)}%` }}
                 title={op ? `${op.name}: ${minutesToTimeStr(phase.start_min)}-${minutesToTimeStr(phase.end_min)}` : ''}
@@ -198,35 +132,39 @@ export function validatePhases(
   }
   for (let i = 0; i < phases.length; i++) {
     const p = phases[i];
-    if (!p.operational_phase_id) {
-      errors.push(`Fase #${i + 1}: debe seleccionar una fase operativa`);
+    if (p.start_min === null || p.end_min === null) {
+      errors.push(`Fase #${i + 1}: debe completar inicio y fin`);
       continue;
     }
     if (p.start_min < operationalStartMin) {
-      errors.push(`Fase #${i + 1}: el inicio (${p.start_min}) es anterior al inicio de la jornada (${operationalStartMin})`);
+      errors.push(`Fase #${i + 1}: el inicio (${minutesToTimeStr(p.start_min)}) es anterior al inicio de la jornada (${minutesToTimeStr(operationalStartMin)})`);
     }
     if (p.end_min > operationalEndMin) {
-      errors.push(`Fase #${i + 1}: el fin (${p.end_min}) supera el fin de la jornada (${operationalEndMin})`);
+      errors.push(`Fase #${i + 1}: el fin (${minutesToTimeStr(p.end_min)}) supera el fin de la jornada (${minutesToTimeStr(operationalEndMin)})`);
     }
     if (p.end_min <= p.start_min) {
       errors.push(`Fase #${i + 1}: el fin debe ser posterior al inicio`);
     }
     for (let j = i + 1; j < phases.length; j++) {
       const q = phases[j];
+      if (q.start_min === null || q.end_min === null) continue;
       if (p.start_min < q.end_min && q.start_min < p.end_min) {
         errors.push(`Las fases #${i + 1} y #${j + 1} se superponen`);
       }
     }
   }
-  const allStart = phases.map((p) => p.start_min);
-  const allEnd = phases.map((p) => p.end_min);
-  const minStart = Math.min(...allStart);
-  const maxEnd = Math.max(...allEnd);
-  if (minStart > operationalStartMin) {
-    errors.push('Las fases no cubren el inicio de la jornada operativa');
-  }
-  if (maxEnd < operationalEndMin) {
-    errors.push('Las fases no cubren el fin de la jornada operativa');
+  const nonNull = phases.filter((p) => p.start_min !== null && p.end_min !== null);
+  if (nonNull.length > 0) {
+    const allStart = nonNull.map((p) => p.start_min as number);
+    const allEnd = nonNull.map((p) => p.end_min as number);
+    const minStart = Math.min(...allStart);
+    const maxEnd = Math.max(...allEnd);
+    if (minStart > operationalStartMin) {
+      errors.push('Las fases no cubren el inicio de la jornada operativa');
+    }
+    if (maxEnd < operationalEndMin) {
+      errors.push('Las fases no cubren el fin de la jornada operativa');
+    }
   }
   return errors;
 }

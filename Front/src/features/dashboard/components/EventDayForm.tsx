@@ -84,6 +84,24 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
     }
   }, [eventDay]);
 
+  useEffect(() => {
+    if (!isEditing) {
+      setEventDayPhases([]);
+    }
+  }, [selectedProfileId, isEditing]);
+
+  useEffect(() => {
+    if (!isEditing && operationalPhases.length > 0 && eventDayPhases.length === 0 && selectedProfileId) {
+      const sorted = [...operationalPhases].sort((a, b) => a.sort_order - b.sort_order);
+      const autoPhases: EventDayPhaseCreatePayload[] = sorted.map((op) => ({
+        operational_phase_id: op.id,
+        start_min: null,
+        end_min: null,
+      }));
+      setEventDayPhases(autoPhases);
+    }
+  }, [operationalPhases, selectedProfileId, isEditing, eventDayPhases.length]);
+
   const operationalStartMin = useMemo(
     () => (operationalStartStr ? timeStrToMinutes(operationalStartStr) : 0),
     [operationalStartStr],
@@ -96,6 +114,11 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
   const currentPhaseErrors = useMemo(
     () => validatePhases(eventDayPhases, operationalStartMin, operationalEndMin),
     [eventDayPhases, operationalStartMin, operationalEndMin],
+  );
+
+  const sortedOperationalPhases = useMemo(
+    () => [...operationalPhases].sort((a, b) => a.sort_order - b.sort_order),
+    [operationalPhases],
   );
 
   const selectedLevel = levels.find((l) => l.id === selectedLevelId);
@@ -116,10 +139,6 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
       setValidationError('El fin de jornada debe ser posterior al inicio');
       return;
     }
-    if (eventDayPhases.length === 0) {
-      setValidationError('Debe haber al menos una fase en la jornada');
-      return;
-    }
     if (currentPhaseErrors.length > 0) {
       setValidationError('Corregí los errores en las fases antes de guardar');
       return;
@@ -132,7 +151,11 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
       attendance_level_id: selectedLevelId,
       operational_start_min: operationalStartMin,
       operational_end_min: operationalEndMin,
-      phases: eventDayPhases,
+      phases: eventDayPhases.map((p) => ({
+        operational_phase_id: p.operational_phase_id,
+        start_min: p.start_min!,
+        end_min: p.end_min!,
+      })),
       weather: weather || null,
       headliner_artist: headlinerArtist || null,
       notes: notes || null,
@@ -175,7 +198,7 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
           <label className="block text-sm font-medium text-slate-700 mb-1">Perfil operativo *</label>
           <select
             value={selectedProfileId}
-            onChange={(e) => { setSelectedProfileId(e.target.value); setEventDayPhases([]); }}
+            onChange={(e) => { setSelectedProfileId(e.target.value); }}
             required
             disabled={profilesLoading}
             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
@@ -243,11 +266,11 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
           ) : (
             <EventDayPhaseEditor
               phases={eventDayPhases}
-              operationalPhases={operationalPhases}
+              operationalPhases={sortedOperationalPhases}
               operationalStartMin={operationalStartMin}
               operationalEndMin={operationalEndMin}
               onChange={setEventDayPhases}
-              errors={[]}
+              errors={currentPhaseErrors}
             />
           )}
         </div>
