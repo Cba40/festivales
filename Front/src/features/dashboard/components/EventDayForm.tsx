@@ -3,6 +3,8 @@ import { EventDayPhaseEditor, validatePhases } from './EventDayPhaseEditor';
 import { useOperationalProfiles } from '../hooks/useOperationalProfiles';
 import { useAttendanceLevels } from '../hooks/useAttendanceLevels';
 import { useOperationalPhases } from '../hooks/useOperationalPhases';
+import type { NormalizedPhase } from '../utils/operationalMinutes';
+import { minutesToTimeStr, timeStrToMinutes, resolveOperationalMinutes, resolveOperationalWindow } from '../utils/operationalMinutes';
 import type {
   EventDay, EventDayCreatePayload, EventDayPhaseCreatePayload,
 } from '../types';
@@ -26,15 +28,45 @@ const WEATHER_OPTIONS = [
   { value: 'tormenta', label: 'Tormenta' },
 ];
 
-function minutesToTimeStr(min: number): string {
-  const h = Math.floor(min / 60).toString().padStart(2, '0');
-  const m = (min % 60).toString().padStart(2, '0');
-  return `${h}:${m}`;
-}
+const TIMELINE_COLORS = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-teal-500'];
 
-function timeStrToMinutes(t: string): number {
-  const [h, m] = t.split(':').map(Number);
-  return h * 60 + m;
+function PhaseTimelineBar({
+  phases, operationalStartMin, operationalEndMin, operationalPhases,
+}: {
+  phases: NormalizedPhase[];
+  operationalStartMin: number;
+  operationalEndMin: number;
+  operationalPhases: { id: string; name: string; sort_order: number }[];
+}) {
+  const opWindow = resolveOperationalWindow(operationalStartMin, operationalEndMin);
+  const range = opWindow.end - opWindow.start;
+  if (range <= 0) return null;
+
+  const sortedPhases = [...phases].sort((a, b) => {
+    const aOp = operationalPhases.find((p) => p.id === a.operational_phase_id);
+    const bOp = operationalPhases.find((p) => p.id === b.operational_phase_id);
+    return (aOp?.sort_order ?? 0) - (bOp?.sort_order ?? 0);
+  });
+
+  const visiblePhases = sortedPhases.filter((p) => p.start_min !== null && p.end_min !== null);
+
+  return (
+    <div className="relative h-8 bg-slate-100 rounded-full overflow-hidden">
+      {visiblePhases.map((phase, index) => {
+        const left = ((phase.start_min - opWindow.start) / range) * 100;
+        const width = ((phase.end_min - phase.start_min) / range) * 100;
+        const op = operationalPhases.find((p) => p.id === phase.operational_phase_id);
+        return (
+          <div
+            key={phase.operational_phase_id}
+            className={`absolute top-0 h-full ${TIMELINE_COLORS[index % TIMELINE_COLORS.length]} opacity-60`}
+            style={{ left: `${Math.max(0, left)}%`, width: `${Math.max(0, width)}%` }}
+            title={op ? `${op.name}: ${minutesToTimeStr(phase.start_min)}-${minutesToTimeStr(phase.end_min)}` : ''}
+          />
+        );
+      })}
+    </div>
+  );
 }
 
 export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFormProps) {
@@ -111,9 +143,19 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
     [operationalEndStr],
   );
 
+  const resolvedPhases = useMemo(
+    () => resolveOperationalMinutes(eventDayPhases, operationalStartMin, operationalEndMin, operationalPhases),
+    [eventDayPhases, operationalStartMin, operationalEndMin, operationalPhases],
+  );
+
+  const resolvedOpEnd = useMemo(
+    () => resolveOperationalWindow(operationalStartMin, operationalEndMin).end,
+    [operationalStartMin, operationalEndMin],
+  );
+
   const currentPhaseErrors = useMemo(
-    () => validatePhases(eventDayPhases, operationalStartMin, operationalEndMin),
-    [eventDayPhases, operationalStartMin, operationalEndMin],
+    () => validatePhases(resolvedPhases, operationalStartMin, resolvedOpEnd),
+    [resolvedPhases, operationalStartMin, resolvedOpEnd],
   );
 
   const sortedOperationalPhases = useMemo(
@@ -135,10 +177,6 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
       setValidationError('La ventana operativa es obligatoria');
       return;
     }
-    if (operationalEndMin <= operationalStartMin) {
-      setValidationError('El fin de jornada debe ser posterior al inicio');
-      return;
-    }
     if (currentPhaseErrors.length > 0) {
       setValidationError('Corregí los errores en las fases antes de guardar');
       return;
@@ -150,11 +188,11 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
       operational_profile_id: selectedProfileId,
       attendance_level_id: selectedLevelId,
       operational_start_min: operationalStartMin,
-      operational_end_min: operationalEndMin,
-      phases: eventDayPhases.map((p) => ({
+      operational_end_min: resolvedOpEnd,
+      phases: resolvedPhases.map((p) => ({
         operational_phase_id: p.operational_phase_id,
-        start_min: p.start_min!,
-        end_min: p.end_min!,
+        start_min: p.start_min,
+        end_min: p.end_min,
       })),
       weather: weather || null,
       headliner_artist: headlinerArtist || null,
@@ -164,6 +202,9 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
 
     await onSave(payload);
   };
+
+  const hasPhases = selectedProfileId && eventDayPhases.length > 0;
+  const hasAnyFilledPhase = resolvedPhases.some((p) => p.start_min !== null && p.end_min !== null);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -255,7 +296,6 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
             required
             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-
         </div>
       </div>
 
@@ -264,14 +304,24 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
           {operationalPhasesLoading ? (
             <div className="text-xs text-slate-400">Cargando fases del perfil...</div>
           ) : (
-            <EventDayPhaseEditor
-              phases={eventDayPhases}
-              operationalPhases={sortedOperationalPhases}
-              operationalStartMin={operationalStartMin}
-              operationalEndMin={operationalEndMin}
-              onChange={setEventDayPhases}
-              errors={currentPhaseErrors}
-            />
+            <>
+              <EventDayPhaseEditor
+                phases={eventDayPhases}
+                operationalPhases={sortedOperationalPhases}
+                onChange={setEventDayPhases}
+                errors={currentPhaseErrors}
+              />
+              {hasPhases && hasAnyFilledPhase && (
+                <div className="mt-3">
+                  <PhaseTimelineBar
+                    phases={resolvedPhases}
+                    operationalStartMin={operationalStartMin}
+                    operationalEndMin={operationalEndMin}
+                    operationalPhases={sortedOperationalPhases}
+                  />
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
