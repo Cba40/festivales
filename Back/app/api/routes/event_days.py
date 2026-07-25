@@ -1,6 +1,8 @@
 from datetime import date, datetime, timezone
 from typing import Optional
 from uuid import UUID
+import traceback
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,6 +34,8 @@ from app.schemas.event_day_phase import (
     EventDayPhaseResponse,
     EventDayPhaseUpdate,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/events/{event_id}/event-days", tags=["event-days"])
 
@@ -88,7 +92,7 @@ async def get_event_day(
 
 
 @router.post("", response_model=EventDayResponse, status_code=status.HTTP_201_CREATED)
-async def create_event_day(
+async def create_event_day_endpoint(
     event_id: str,
     body: EventDayCreate,
     db: AsyncSession = Depends(get_async_db),
@@ -98,6 +102,12 @@ async def create_event_day(
         return await create_event_day(db, body, event_id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+    except Exception as e:
+        logger.error(f"CREATE EVENT_DAY FAILED: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal error: {str(e)}"
+        )
 
 
 @router.put("/{day_id}", response_model=EventDayResponse)
