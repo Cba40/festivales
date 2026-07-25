@@ -1,5 +1,4 @@
 import { useState, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useOperationalEvents } from '../hooks/useOperationalEvents';
 import { useOperationalEventMutations } from '../hooks/useOperationalEventMutations';
 import { useEventDays } from '../hooks/useEventDays';
@@ -267,7 +266,6 @@ function EventFormModal({
 }
 
 export function OperationalEventScreen() {
-  const navigate = useNavigate();
   const { eventDays, loading: loadingDays } = useEventDays(DEFAULT_EVENT_ID);
   const [selectedDayId, setSelectedDayId] = useState<string | null>(null);
   const { events, loading, error, refresh } = useOperationalEvents(selectedDayId);
@@ -289,6 +287,7 @@ export function OperationalEventScreen() {
     async (payload: OperationalEventCreatePayload | OperationalEventUpdatePayload) => {
       let result;
       if (editingEvent) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { event_day_id, ...rest } = payload as OperationalEventCreatePayload;
         result = await update(editingEvent.id, rest);
       } else {

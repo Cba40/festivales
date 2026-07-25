@@ -112,6 +112,7 @@ export function MotorConfigScreen() {
 
   useEffect(() => {
     if (recConfig && !draftRec) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { created_at, updated_at, ...fields } = recConfig;
       setDraftRec(fields as Record<string, number>);
     }
@@ -119,6 +120,7 @@ export function MotorConfigScreen() {
 
   useEffect(() => {
     if (stgConfig && !draftStg) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { created_at, updated_at, ...fields } = stgConfig;
       setDraftStg(fields as unknown as Record<string, number | number[][]>);
     }

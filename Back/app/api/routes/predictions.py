@@ -6,33 +6,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import verify_token
 from app.db.session import get_async_db
-from app.schemas.territorial_prediction import TerritorialPrediction as LegacyTerritorialPrediction
-from app.services.context_engine import ContextEngineService
 from src.interfaces.rest.predictions import get_territorial_prediction_adapter
 
 router = APIRouter(prefix="/api/events/{event_id}", tags=["Predictions"])
 
-engine_service = ContextEngineService()
 
-
-@router.get("/prediction", response_model=LegacyTerritorialPrediction)
-async def predict(
+async def _build_prediction_response(
+    db: AsyncSession,
     event_id: str,
-    db: AsyncSession = Depends(get_async_db),
-    _=Depends(verify_token),
-):
-    """Endpoint protegido para Dashboard (operador)."""
-    datetime_actual = datetime.now(timezone.utc)
-    return await engine_service.predict(db, event_id, datetime_actual)
-
-
-@router.get("/predictions")
-async def get_predictions(
-    event_id: str,
-    db: AsyncSession = Depends(get_async_db),
-):
-    """Endpoint público para Visitor App. No requiere autenticación."""
-    timestamp = datetime.now(timezone.utc)
+    timestamp: datetime,
+) -> dict:
     prediction = await get_territorial_prediction_adapter(
         db,
         timestamp=timestamp,
@@ -61,3 +44,24 @@ async def get_predictions(
             for zs in prediction.zone_states
         ],
     }
+
+
+@router.get("/prediction")
+async def predict(
+    event_id: str,
+    db: AsyncSession = Depends(get_async_db),
+    _=Depends(verify_token),
+):
+    """Endpoint protegido para Dashboard (operador)."""
+    timestamp = datetime.now(timezone.utc)
+    return await _build_prediction_response(db, event_id, timestamp)
+
+
+@router.get("/predictions")
+async def get_predictions(
+    event_id: str,
+    db: AsyncSession = Depends(get_async_db),
+):
+    """Endpoint público para Visitor App. No requiere autenticación."""
+    timestamp = datetime.now(timezone.utc)
+    return await _build_prediction_response(db, event_id, timestamp)
