@@ -79,7 +79,7 @@ async def get_today_event_day(
 
 
 @router.get("/{day_id}", response_model=EventDayResponse)
-async def get_event_day(
+async def get_event_day_endpoint(
     event_id: str,
     day_id: str,
     db: AsyncSession = Depends(get_async_db),
@@ -111,7 +111,7 @@ async def create_event_day_endpoint(
 
 
 @router.put("/{day_id}", response_model=EventDayResponse)
-async def update_event_day(
+async def update_event_day_endpoint(
     event_id: str,
     day_id: str,
     body: EventDayUpdate,
@@ -128,7 +128,7 @@ async def update_event_day(
 
 
 @router.delete("/{day_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_event_day(
+async def delete_event_day_endpoint(
     event_id: str,
     day_id: str,
     db: AsyncSession = Depends(get_async_db),
