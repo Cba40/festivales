@@ -1,4 +1,5 @@
 """CRUD operations for EventDay."""
+import logging
 from uuid import UUID
 
 from sqlalchemy import select
@@ -10,6 +11,8 @@ from app.models.event_day_phase import EventDayPhase
 from app.models.operational_phase import OperationalPhase
 from app.models.operational_profile import OperationalProfile
 from app.schemas.event_day import EventDayCreate, EventDayUpdate
+
+logger = logging.getLogger(__name__)
 
 
 async def create(db: AsyncSession, obj_in: EventDayCreate, event_id: str) -> EventDay:
@@ -80,9 +83,19 @@ async def update(
 ) -> EventDay:
     update_data = obj_in.model_dump(exclude_unset=True)
 
+    # DEBUG 422 BEGIN
+    logger.info("CRUD update - Ingreso al CRUD")
+    logger.info("CRUD update - update_data=%s", update_data)
+    logger.info("CRUD update - claves presentes=%s", list(update_data.keys()))
+    logger.info("CRUD update - cantidad de fases recibidas=%s", len(update_data.get("phases", [])))
+    # DEBUG 422 END
+
     if "operational_profile_id" in update_data:
         profile = await db.get(OperationalProfile, update_data["operational_profile_id"])
         if not profile:
+            # DEBUG 422 BEGIN
+            logger.info("CRUD update - OperationalProfile inexistente - UUID=%s", update_data["operational_profile_id"])
+            # DEBUG 422 END
             raise ValueError(
                 f"OperationalProfile with id '{update_data['operational_profile_id']}' not found"
             )
@@ -90,6 +103,9 @@ async def update(
     if "attendance_level_id" in update_data:
         al = await db.get(AttendanceLevel, update_data["attendance_level_id"])
         if not al:
+            # DEBUG 422 BEGIN
+            logger.info("CRUD update - AttendanceLevel inexistente - UUID=%s", update_data["attendance_level_id"])
+            # DEBUG 422 END
             raise ValueError(
                 f"AttendanceLevel with id '{update_data['attendance_level_id']}' not found"
             )
@@ -98,6 +114,9 @@ async def update(
         new_start = update_data.get("operational_start_min", db_obj.operational_start_min)
         new_end = update_data.get("operational_end_min", db_obj.operational_end_min)
         if new_end <= new_start:
+            # DEBUG 422 BEGIN
+            logger.info("CRUD update - Ventana operacional inválida - new_start=%s new_end=%s", new_start, new_end)
+            # DEBUG 422 END
             raise ValueError(
                 "operational_end_min must be greater than operational_start_min"
             )
@@ -114,9 +133,12 @@ async def update(
         for old_phase in existing.scalars().all():
             await db.delete(old_phase)
 
-        for phase_in in phases_data:
+        for idx, phase_in in enumerate(phases_data):
             op_phase = await db.get(OperationalPhase, phase_in.operational_phase_id)
             if not op_phase:
+                # DEBUG 422 BEGIN
+                logger.info("CRUD update - OperationalPhase inexistente - UUID=%s índice=%s", phase_in.operational_phase_id, idx)
+                # DEBUG 422 END
                 raise ValueError(
                     f"OperationalPhase with id '{phase_in.operational_phase_id}' not found"
                 )

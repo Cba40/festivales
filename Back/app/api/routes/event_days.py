@@ -118,13 +118,31 @@ async def update_event_day_endpoint(
     db: AsyncSession = Depends(get_async_db),
     _=Depends(verify_token),
 ):
+    # DEBUG 422 BEGIN
+    logger.info("PUT EventDay - event_id=%s day_id=%s body=%s", event_id, day_id, body.model_dump(exclude_unset=True))
+    # DEBUG 422 END
+
     day = await get_event_day(db, day_id)
     if not day or day.event_id != event_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event day not found")
+
+    # DEBUG 422 BEGIN
+    logger.info("PUT EventDay - EventDay encontrado")
+    logger.info("PUT EventDay - Invocando CRUD update()")
+    # DEBUG 422 END
+
     try:
-        return await update_event_day(db, day, body)
+        result = await update_event_day(db, day, body)
+        # DEBUG 422 BEGIN
+        logger.info("PUT EventDay - CRUD update() finalizado correctamente")
+        # DEBUG 422 END
+        return result
     except ValueError as e:
+        logger.exception("PUT EventDay - ValueError")
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+    except Exception:
+        logger.exception("PUT EventDay - Unexpected exception")
+        raise
 
 
 @router.delete("/{day_id}", status_code=status.HTTP_204_NO_CONTENT)
