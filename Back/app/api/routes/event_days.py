@@ -99,7 +99,8 @@ async def create_event_day_endpoint(
     _=Depends(verify_token),
 ):
     try:
-        return await create_event_day(db, body, event_id)
+        result = await create_event_day(db, body, event_id)
+        return await _load_with_phases(db, result.id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
     except Exception as e:
