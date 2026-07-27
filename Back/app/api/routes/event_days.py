@@ -136,7 +136,7 @@ async def update_event_day_endpoint(
         # DEBUG 422 BEGIN
         logger.info("PUT EventDay - CRUD update() finalizado correctamente")
         # DEBUG 422 END
-        return result
+        return await _load_with_phases(db, result.id)
     except ValueError as e:
         logger.exception("PUT EventDay - ValueError")
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
