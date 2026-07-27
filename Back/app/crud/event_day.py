@@ -134,19 +134,19 @@ async def update(
             await db.delete(old_phase)
 
         for idx, phase_in in enumerate(phases_data):
-            op_phase = await db.get(OperationalPhase, phase_in.operational_phase_id)
+            op_phase = await db.get(OperationalPhase, phase_in["operational_phase_id"])
             if not op_phase:
                 # DEBUG 422 BEGIN
-                logger.info("CRUD update - OperationalPhase inexistente - UUID=%s índice=%s", phase_in.operational_phase_id, idx)
+                logger.info("CRUD update - OperationalPhase inexistente - UUID=%s índice=%s", phase_in["operational_phase_id"], idx)
                 # DEBUG 422 END
                 raise ValueError(
-                    f"OperationalPhase with id '{phase_in.operational_phase_id}' not found"
+                    f"OperationalPhase with id '{phase_in['operational_phase_id']}' not found"
                 )
             ed_phase = EventDayPhase(
                 event_day_id=db_obj.id,
-                operational_phase_id=phase_in.operational_phase_id,
-                start_min=phase_in.start_min,
-                end_min=phase_in.end_min,
+                operational_phase_id=phase_in["operational_phase_id"],
+                start_min=phase_in["start_min"],
+                end_min=phase_in["end_min"],
             )
             db.add(ed_phase)
 
