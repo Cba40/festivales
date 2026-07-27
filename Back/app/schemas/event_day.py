@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, date as Date, datetime
 from typing import Optional
 from uuid import UUID
 
@@ -29,7 +29,7 @@ class EventDayCreate(BaseModel):
 
 
 class EventDayUpdate(BaseModel):
-    date: Optional[date] = None
+    date: Optional[Date] = None
     day_of_week: Optional[str] = None
     weather: Optional[str] = None
     headliner_artist: Optional[str] = None
