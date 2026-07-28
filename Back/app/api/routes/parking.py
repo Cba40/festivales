@@ -6,7 +6,6 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import verify_token
 from app.db.session import get_async_db
 from app.schemas.product import ParkingRecommendationResponse
 from src.domain.recommendation.mobility_context import MobilityContext
@@ -26,7 +25,6 @@ async def parking_recommendations(
     user_id: str = Query(...),
     access_level: AccessLevel = Query(default=AccessLevel.STANDARD),
     db: AsyncSession = Depends(get_async_db),
-    _=Depends(verify_token),
 ):
     now = datetime.now(timezone.utc)
 
