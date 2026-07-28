@@ -110,10 +110,10 @@ async def _load_zone_behaviors(
 
 async def _load_attendance_level(
     db: AsyncSession,
-    event_id: str,
+    attendance_level_id: str,
 ) -> AttendanceLevel | None:
     stmt = select(AttendanceLevelORM).where(
-        AttendanceLevelORM.event_id == event_id,
+        AttendanceLevelORM.id == attendance_level_id,
     )
     row = (await db.execute(stmt)).scalar_one_or_none()
     if row is None:
@@ -226,10 +226,6 @@ class RecommendationModule:
         zones = await _load_zones(self._db, event_id, type_map)
         zone_behaviors = await _load_zone_behaviors(self._db, event_id)
 
-        attendance_level = await _load_attendance_level(self._db, event_id)
-        if attendance_level is None:
-            return [], None
-
         ed_row = (
             await self._db.execute(
                 select(EventDayORM)
@@ -238,6 +234,10 @@ class RecommendationModule:
             )
         ).scalar_one_or_none()
         if ed_row is None:
+            return [], None
+
+        attendance_level = await _load_attendance_level(self._db, ed_row.attendance_level_id)
+        if attendance_level is None:
             return [], None
 
         operational_profile = await _load_operational_profile(
