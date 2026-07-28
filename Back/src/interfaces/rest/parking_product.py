@@ -41,7 +41,7 @@ async def get_parking_product_adapter(
 ) -> ParkingRecommendationResponse:
     zone_type_map = await load_zone_type_map(db)
     parking_zone_ids = await load_type_filtered_zone_ids(
-        db, event_id, zone_type_map, "parking", "parking"
+        db, event_id, zone_type_map, "parking", "estacionamiento"
     )
 
     if not parking_zone_ids:
