@@ -1,4 +1,5 @@
 """Endpoint for TerritorialPrediction — invoca el Context Engine."""
+import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -7,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import verify_token
 from app.db.session import get_async_db
 from src.interfaces.rest.predictions import get_territorial_prediction_adapter
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/events/{event_id}", tags=["Predictions"])
 
@@ -64,4 +67,11 @@ async def get_predictions(
 ):
     """Endpoint público para Visitor App. No requiere autenticación."""
     timestamp = datetime.now(timezone.utc)
-    return await _build_prediction_response(db, event_id, timestamp)
+    try:
+        return await _build_prediction_response(db, event_id, timestamp)
+    except Exception:
+        logger.exception(
+            "Prediction endpoint failed | event_id=%s",
+            event_id,
+        )
+        raise
