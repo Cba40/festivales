@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.api.deps import verify_token
-from app.crud import zone_type as zone_type_crud
+from app.crud.zone_type import zone_type as zone_type_crud
 from app.db.session import get_db
 from app.schemas.zone_type import ZoneTypeResponse
 
