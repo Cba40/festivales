@@ -3,16 +3,20 @@ from __future__ import annotations
 from collections.abc import Mapping
 from datetime import date, datetime
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from src.application.context_engine.exceptions import InvalidPhaseContext
 from src.domain.entities.event_day import EventDay
 from src.domain.entities.event_day_phase import EventDayPhase
 from src.domain.entities.operational_phase import OperationalPhase
 
+LOCAL_TZ = ZoneInfo("America/Argentina/Buenos_Aires")
+
 
 def _to_current_min(event_date: date, timestamp: datetime) -> int:
-    days_diff = (timestamp.date() - event_date).days
-    return days_diff * 1440 + timestamp.hour * 60 + timestamp.minute
+    local_ts = timestamp.astimezone(LOCAL_TZ)
+    days_diff = (local_ts.date() - event_date).days
+    return days_diff * 1440 + local_ts.hour * 60 + local_ts.minute
 
 
 def resolve_contextual_phase(
