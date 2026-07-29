@@ -46,7 +46,7 @@ async def get_parking_product_adapter(
     logger.info("[PARKING-DEBUG] event=%s zone_type_map_slugs=%s keys=%s", event_id, len(zone_type_map), sorted(zone_type_map.keys()))
 
     parking_zone_ids = await load_type_filtered_zone_ids(
-        db, event_id, zone_type_map, "parking", "estacionamiento"
+        db, event_id, zone_type_map, "estacionamiento", "estacionamiento"
     )
     logger.info("[PARKING-DEBUG] event=%s parking_zone_ids=%s uuids=%s", event_id, len(parking_zone_ids), [str(u) for u in sorted(parking_zone_ids)])
 
