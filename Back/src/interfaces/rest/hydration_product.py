@@ -35,7 +35,7 @@ async def get_hydration_product_adapter(
 ) -> HydrationRecommendationResponse:
     zone_type_map = await load_zone_type_map(db)
     hydration_zone_ids = await load_type_filtered_zone_ids(
-        db, event_id, zone_type_map, "Information", "servicios", subtype="hidratacion"
+        db, event_id, zone_type_map, "hidratacion", "servicios", subtype="hidratacion"
     )
 
     if not hydration_zone_ids:

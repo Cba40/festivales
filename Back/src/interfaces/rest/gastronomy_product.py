@@ -42,7 +42,7 @@ async def get_gastronomy_product_adapter(
 ) -> GastronomyRecommendationResponse:
     zone_type_map = await load_zone_type_map(db)
     gastronomy_zone_ids = await load_type_filtered_zone_ids(
-        db, event_id, zone_type_map, "gastronomy", "comida"
+        db, event_id, zone_type_map, "comida", "comida"
     )
 
     if not gastronomy_zone_ids:

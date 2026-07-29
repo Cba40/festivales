@@ -39,7 +39,7 @@ async def get_transport_product_adapter(
 ) -> TransportRecommendationResponse:
     zone_type_map = await load_zone_type_map(db)
     transport_zone_ids = await load_type_filtered_zone_ids(
-        db, event_id, zone_type_map, "transport", "transporte"
+        db, event_id, zone_type_map, "transporte", "transporte"
     )
 
     if not transport_zone_ids:

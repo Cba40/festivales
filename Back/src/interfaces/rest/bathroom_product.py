@@ -35,7 +35,7 @@ async def get_bathroom_product_adapter(
 ) -> BathroomRecommendationResponse:
     zone_type_map = await load_zone_type_map(db)
     bathroom_zone_ids = await load_type_filtered_zone_ids(
-        db, event_id, zone_type_map, "Sanitary", "servicios", subtype="banos"
+        db, event_id, zone_type_map, "bano", "servicios", subtype="banos"
     )
 
     if not bathroom_zone_ids:

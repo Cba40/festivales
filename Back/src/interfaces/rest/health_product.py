@@ -45,7 +45,7 @@ async def get_health_product_adapter(
 ) -> HealthRecommendationResponse:
     zone_type_map = await load_zone_type_map(db)
     health_zone_ids = await load_type_filtered_zone_ids(
-        db, event_id, zone_type_map, "Security", "servicios", subtype="salud"
+        db, event_id, zone_type_map, "servicios", "servicios", subtype="salud"
     )
 
     if not health_zone_ids:

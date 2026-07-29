@@ -35,7 +35,7 @@ async def get_rest_product_adapter(
 ) -> RestRecommendationResponse:
     zone_type_map = await load_zone_type_map(db)
     rest_zone_ids = await load_type_filtered_zone_ids(
-        db, event_id, zone_type_map, "RestArea", "servicios", subtype="descanso"
+        db, event_id, zone_type_map, "servicios", "servicios", subtype="descanso"
     )
 
     if not rest_zone_ids:
