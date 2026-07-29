@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 from app.models.zone import Zone as ZoneORM
 from app.models.zone_type import ZoneType as ZoneTypeORM
@@ -54,7 +57,19 @@ async def load_type_filtered_zone_ids(
     orm_type_value: str,
     subtype: str | None = None,
 ) -> set[UUID]:
+    logger.info("[PARKING-DEBUG] params event_id=%s zone_type_slug=%s orm_type_value=%s subtype=%s",
+                event_id, zone_type_slug, orm_type_value, subtype)
     type_id = type_map.get(zone_type_slug)
+    logger.info("[PARKING-DEBUG] type_map_get slug=%s result=%s", zone_type_slug, str(type_id) if type_id is not None else "None")
+
+    all_stmt = select(ZoneORM).where(ZoneORM.event_id == event_id)
+    all_rows = (await db.execute(all_stmt)).scalars().all()
+    distinct_types = sorted({r.type for r in all_rows})
+    distinct_subtipos = sorted({r.subtipo for r in all_rows if r.subtipo})
+    logger.info("[PARKING-DEBUG] unfiltered event=%s total=%s names=%s types=%s subtipos=%s",
+                event_id, len(all_rows), [r.name for r in all_rows],
+                distinct_types, distinct_subtipos)
+
     if type_id is None:
         return set()
 
@@ -65,6 +80,8 @@ async def load_type_filtered_zone_ids(
     if subtype is not None:
         stmt = stmt.where(ZoneORM.subtipo == subtype)
     rows = (await db.execute(stmt)).scalars().all()
+    logger.info("[PARKING-DEBUG] filtered event=%s orm_type_value=%s subtype=%s total=%s names=%s",
+                event_id, orm_type_value, subtype, len(rows), [r.name for r in rows])
     return {UUID(r.id) for r in rows}
 
 
