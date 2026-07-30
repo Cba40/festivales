@@ -17,7 +17,6 @@ import { DashboardScreen } from './features/dashboard/screens/DashboardScreen';
 import { useDashboardSync } from './features/dashboard/hooks/useDashboardSync';
 import { loadEventDayContext } from './utils/contextoEvento';
 import { recargarFases } from './config/eventoConfig';
-import { ZoneUpdateScreen } from './features/dashboard/screens/ZoneUpdateScreen';
 import { IncidentReportScreen } from './features/dashboard/screens/IncidentReportScreen';
 import { ZoneAdminScreen } from './features/dashboard/screens/ZoneAdminScreen';
 import { EventDayScreen } from './features/dashboard/screens/EventDayScreen';
@@ -133,7 +132,6 @@ function AppLayout() {
             <DashboardScreen />
           </ProtectedRoute>
         } />
-        <Route path="/dashboard/zones" element={<ZoneUpdateScreen />} />
         <Route path="/dashboard/report" element={<IncidentReportScreen />} />
         <Route path="/dashboard/admin-zones" element={<ZoneAdminScreen />} />
         <Route path="/dashboard/event-days" element={<EventDayScreen />} />

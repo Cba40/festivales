@@ -70,12 +70,6 @@ export function DashboardScreen() {
             Admin. Zonas
           </button>
           <button 
-            onClick={() => navigate('/dashboard/zones')}
-            className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-          >
-            Ver Zonas
-          </button>
-          <button 
             onClick={() => refresh()}
             disabled={loading}
             className="text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-1 px-3 rounded"
