@@ -17,9 +17,7 @@ from src.domain.value_objects.zone_state import ZoneState
 from src.interfaces.rest.product_helpers import (
     compute_mode,
     enrich_zone,
-    load_type_filtered_zone_ids,
     load_zone_metadata,
-    load_zone_type_map,
 )
 from src.interfaces.rest.recommendations import get_recommendations_adapter
 
@@ -40,19 +38,6 @@ async def get_gastronomy_product_adapter(
     mobility_context,
     limit: int = 5,
 ) -> GastronomyRecommendationResponse:
-    zone_type_map = await load_zone_type_map(db)
-    gastronomy_zone_ids = await load_type_filtered_zone_ids(
-        db, event_id, zone_type_map, "comida", "comida"
-    )
-
-    if not gastronomy_zone_ids:
-        return GastronomyRecommendationResponse(
-            event_id=event_id,
-            timestamp=timestamp.isoformat(),
-            mode="sin_solucion",
-            zonas=[],
-        )
-
     requested_action = RequestedAction(action_type=ActionType.SEEK_FOOD)
 
     recs, prediction = await get_recommendations_adapter(
@@ -65,11 +50,8 @@ async def get_gastronomy_product_adapter(
         limit=limit,
     )
 
-    gastronomy_recs = [r for r in recs if r.zone_id in gastronomy_zone_ids]
-    gastronomy_recs = gastronomy_recs[:limit]
-
     zone_meta = await load_zone_metadata(
-        db, [r.zone_id for r in gastronomy_recs],
+        db, [r.zone_id for r in recs],
         extra_fields_fn=_extra_gastronomy_fields,
     )
 
@@ -79,7 +61,7 @@ async def get_gastronomy_product_adapter(
             zone_states_by_id[zs.zone_id] = zs
 
     enriched: list[ZonaGastronomicaItem] = []
-    for rec in gastronomy_recs:
+    for rec in recs:
         state = zone_states_by_id.get(rec.zone_id)
         meta = zone_meta.get(rec.zone_id)
         extra = {"categoria": meta.get("categoria", "")} if meta else {}
