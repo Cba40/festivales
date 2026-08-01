@@ -15,7 +15,9 @@ from src.domain.recommendation.mobility_context import MobilityContext
 from src.domain.recommendation.requested_action import ActionType, RequestedAction
 from src.domain.recommendation.user_context import AccessLevel, UserContext
 from src.domain.recommendation.zone_recommendation import ZoneRecommendation
+from src.domain.entities.zone_behavior import FlowRestriction
 from src.domain.value_objects.territorial_prediction import TerritorialPrediction
+from src.domain.value_objects.zone_state import ZoneState
 
 
 @pytest.fixture
@@ -75,7 +77,20 @@ def requested_action() -> RequestedAction:
 def prediction(timestamp: datetime) -> TerritorialPrediction:
     return TerritorialPrediction(
         timestamp=timestamp,
-        zone_states=[],
+        zone_states=[
+            ZoneState(
+                zone_id=UUID("a0000000-0000-0000-0000-000000000001"),
+                operational_state="NORMAL",
+                availability=80,
+                saturation_level=0.2,
+                estimated_wait=0,
+                confidence=1.0,
+                reasoning_factors=["Demanda histórica baja"],
+                active_restriction=FlowRestriction.OPEN,
+                type="comida",
+                subtipo=None,
+            ),
+        ],
         active_phase_id=UUID("10000000-0000-0000-0000-000000000001"),
         active_event_day_phase_id=UUID("30000000-0000-0000-0000-000000000001"),
     )
@@ -199,6 +214,36 @@ class TestGetRecommendations:
             requested_action=requested_action,
             limit=5,
         )
+
+    async def test_recommendation_service_receives_same_contract(
+        self,
+        use_case: GetRecommendations,
+        recommendation_service: MagicMock,
+        timestamp: datetime,
+        zones: list[Zone],
+        zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
+        attendance_level: AttendanceLevel,
+        user_context: UserContext,
+        mobility_context: MobilityContext,
+        requested_action: RequestedAction,
+        prediction: TerritorialPrediction,
+    ) -> None:
+        await use_case.execute(
+            timestamp=timestamp,
+            zones=zones,
+            zone_behaviors=zone_behaviors,
+            attendance_level=attendance_level,
+            user_context=user_context,
+            mobility_context=mobility_context,
+            requested_action=requested_action,
+        )
+
+        received = recommendation_service.recommend.call_args.kwargs["prediction"]
+        assert received is prediction
+        assert len(received.zone_states) == 1
+        zone_state = received.zone_states[0]
+        assert zone_state.type == "comida"
+        assert zone_state.subtipo is None
 
     async def test_returns_recommendations_from_service(
         self,

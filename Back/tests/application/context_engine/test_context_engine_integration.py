@@ -100,6 +100,7 @@ def zone_a(parking_type: UUID) -> Zone:
         name="Parking Norte",
         zone_type_id=parking_type,
         capacity=500,
+        type="estacionamiento",
     )
 
 
@@ -110,6 +111,8 @@ def zone_b(gastronomy_type: UUID) -> Zone:
         name="Sector Gastronomico",
         zone_type_id=gastronomy_type,
         capacity=2000,
+        type="comida",
+        subtipo=None,
     )
 
 
@@ -278,6 +281,34 @@ class TestFullPipeline:
         assert zone_b_state.saturation_level == pytest.approx(1200 / 2000.0)
         assert zone_b_state.availability == 800
         assert zone_b_state.operational_state == "MODERATE"
+
+    def test_pipeline_propagates_operational_classification(
+        self,
+        engine: ContextEngine,
+        timestamp: datetime,
+        zones: list[Zone],
+        zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
+        operational_phases: dict[UUID, OperationalPhase],
+        normal_attendance: AttendanceLevel,
+        event_day: EventDay,
+    ) -> None:
+        result = engine.predict(
+            timestamp=timestamp,
+            zones=zones,
+            zone_behaviors=zone_behaviors,
+            operational_phases=operational_phases,
+            attendance_level=normal_attendance,
+            event_day=event_day,
+            events=[],
+        )
+        zone_a_state = next(s for s in result.zone_states if str(s.zone_id).endswith("0001"))
+        zone_b_state = next(s for s in result.zone_states if str(s.zone_id).endswith("0002"))
+
+        assert zone_a_state.type == "estacionamiento"
+        assert zone_a_state.subtipo is None
+
+        assert zone_b_state.type == "comida"
+        assert zone_b_state.subtipo is None
 
     def test_deterministic_output(
         self,

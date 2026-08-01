@@ -73,6 +73,8 @@ def sample_prediction() -> TerritorialPrediction:
                 confidence=0.9,
                 reasoning_factors=["Demanda histórica baja"],
                 active_restriction=FlowRestriction.OPEN,
+                type="estacionamiento",
+                subtipo=None,
             ),
             ZoneState(
                 zone_id=UUID("a0000000-0000-0000-0000-000000000002"),
@@ -83,6 +85,8 @@ def sample_prediction() -> TerritorialPrediction:
                 confidence=0.75,
                 reasoning_factors=["Alta concentración", "Evento activo"],
                 active_restriction=FlowRestriction.REGULATED,
+                type="servicios",
+                subtipo="banos",
             ),
         ],
         active_phase_id=UUID("10000000-0000-0000-0000-000000000001"),
@@ -138,6 +142,23 @@ class TestPredictionsEndpoint:
         assert zs["confidence"] == 0.9
         assert zs["reasoning_factors"] == ["Demanda histórica baja"]
         assert zs["active_restriction"] == "OPEN"
+        assert zs["type"] == "estacionamiento"
+        assert zs["subtipo"] is None
+
+    def test_200_operational_classification_fields(
+        self,
+        client: TestClient,
+        auth_headers: dict[str, str],
+    ):
+        resp = client.get(
+            f"{BASE_URL}/predictions",
+            headers=auth_headers,
+        )
+
+        body = resp.json()
+        zs = body["zone_states"][1]
+        assert zs["type"] == "servicios"
+        assert zs["subtipo"] == "banos"
 
     def test_200_second_zone_restriction(
         self,

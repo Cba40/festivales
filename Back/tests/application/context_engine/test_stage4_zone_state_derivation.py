@@ -743,3 +743,84 @@ class TestOutputType:
             stage3_result, [zone_a], [], evaluation_result, default_config
         )
         assert isinstance(states[0], ZoneState)
+
+
+class TestOperationalClassificationPropagation:
+    """El contrato operativo `type`/`subtipo` se propaga de Zone a ZoneState."""
+
+    def test_type_propagated_from_zone(
+        self,
+        peak_phase: OperationalPhase,
+        active_day_phase: EventDayPhase,
+        timestamp: datetime,
+        zone_a: Zone,
+        default_config: Stage4Config,
+    ) -> None:
+        classified = Zone(
+            id=zone_a.id,
+            name=zone_a.name,
+            zone_type_id=zone_a.zone_type_id,
+            capacity=zone_a.capacity,
+            type="estacionamiento",
+        )
+        stage3_result = _build_stage3_result(
+            peak_phase, active_day_phase, timestamp,
+            {classified.id: (250, FlowRestriction.OPEN)},
+        )
+        evaluation_result = _make_evaluation_result(
+            peak_phase, active_day_phase, timestamp
+        )
+        states = derive_zone_states(
+            stage3_result, [classified], [], evaluation_result, default_config
+        )
+        assert states[0].type == "estacionamiento"
+
+    def test_subtipo_propagated_from_zone(
+        self,
+        peak_phase: OperationalPhase,
+        active_day_phase: EventDayPhase,
+        timestamp: datetime,
+        zone_a: Zone,
+        default_config: Stage4Config,
+    ) -> None:
+        classified = Zone(
+            id=zone_a.id,
+            name=zone_a.name,
+            zone_type_id=zone_a.zone_type_id,
+            capacity=zone_a.capacity,
+            type="servicios",
+            subtipo="banos",
+        )
+        stage3_result = _build_stage3_result(
+            peak_phase, active_day_phase, timestamp,
+            {classified.id: (250, FlowRestriction.OPEN)},
+        )
+        evaluation_result = _make_evaluation_result(
+            peak_phase, active_day_phase, timestamp
+        )
+        states = derive_zone_states(
+            stage3_result, [classified], [], evaluation_result, default_config
+        )
+        assert states[0].type == "servicios"
+        assert states[0].subtipo == "banos"
+
+    def test_no_classification_defaults_to_empty(
+        self,
+        peak_phase: OperationalPhase,
+        active_day_phase: EventDayPhase,
+        timestamp: datetime,
+        zone_a: Zone,
+        default_config: Stage4Config,
+    ) -> None:
+        stage3_result = _build_stage3_result(
+            peak_phase, active_day_phase, timestamp,
+            {zone_a.id: (250, FlowRestriction.OPEN)},
+        )
+        evaluation_result = _make_evaluation_result(
+            peak_phase, active_day_phase, timestamp
+        )
+        states = derive_zone_states(
+            stage3_result, [zone_a], [], evaluation_result, default_config
+        )
+        assert states[0].type == ""
+        assert states[0].subtipo is None
