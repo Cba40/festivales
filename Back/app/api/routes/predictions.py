@@ -43,6 +43,8 @@ async def _build_prediction_response(
                 "confidence": zs.confidence,
                 "reasoning_factors": list(zs.reasoning_factors),
                 "active_restriction": zs.active_restriction.value,
+                "type": zs.type,
+                "subtipo": zs.subtipo,
             }
             for zs in prediction.zone_states
         ],
