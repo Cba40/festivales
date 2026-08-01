@@ -12,8 +12,8 @@ from src.domain.entities.zone_behavior import FlowRestriction
 from src.domain.recommendation.mobility_context import MobilityContext
 from src.domain.recommendation.requested_action import (
     ActionType,
+    OPERATIONAL_CLASSIFICATION_BY_ACTION,
     RequestedAction,
-    ZONE_TYPE_BY_ACTION,
 )
 from src.domain.recommendation.user_context import AccessLevel, UserContext
 from src.domain.recommendation.zone_recommendation import ZoneRecommendation
@@ -391,8 +391,30 @@ class TestFiltering:
         self,
         strategy: WeightedScoringStrategy,
     ) -> None:
+        zone_open = ZoneState(
+            zone_id=UUID("a0000000-0000-0000-0000-000000000001"),
+            operational_state="LOW_DEMAND",
+            availability=400,
+            saturation_level=0.2,
+            estimated_wait=0,
+            confidence=1.0,
+            reasoning_factors=[],
+            active_restriction=FlowRestriction.OPEN,
+            type="salida",
+        )
+        zone_closed = ZoneState(
+            zone_id=UUID("c0000000-0000-0000-0000-000000000003"),
+            operational_state="CLOSED",
+            availability=0,
+            saturation_level=0.9,
+            estimated_wait=0,
+            confidence=0.5,
+            reasoning_factors=["Incidente activo en zona", "Zona cerrada"],
+            active_restriction=FlowRestriction.CLOSED,
+            type="salida",
+        )
         result = strategy.evaluate(
-            prediction=_prediction(zone_states=[_zone_a(), _zone_c()]),
+            prediction=_prediction(zone_states=[zone_open, zone_closed]),
             user_context=UserContext(
                 user_id=UUID("00000000-0000-0000-0000-000000000001"),
                 access_level=AccessLevel.STANDARD,
@@ -406,7 +428,7 @@ class TestFiltering:
             config=RecommendationConfig(),
         )
         assert len(result) == 1
-        assert result[0].zone_id == _zone_a().zone_id
+        assert result[0].zone_id == zone_open.zone_id
 
     def test_seek_low_density_filters_high_saturation(
         self,
@@ -710,8 +732,19 @@ class TestNoResults:
         self,
         strategy: WeightedScoringStrategy,
     ) -> None:
+        zone_closed = ZoneState(
+            zone_id=UUID("c0000000-0000-0000-0000-000000000003"),
+            operational_state="CLOSED",
+            availability=0,
+            saturation_level=0.9,
+            estimated_wait=0,
+            confidence=0.5,
+            reasoning_factors=["Incidente activo en zona", "Zona cerrada"],
+            active_restriction=FlowRestriction.CLOSED,
+            type="salida",
+        )
         result = strategy.evaluate(
-            prediction=_prediction(zone_states=[_zone_c()]),
+            prediction=_prediction(zone_states=[zone_closed]),
             user_context=UserContext(
                 user_id=UUID("00000000-0000-0000-0000-000000000001"),
                 access_level=AccessLevel.STANDARD,
@@ -748,44 +781,42 @@ class TestNoResults:
 
 
 class TestActionTypeCatalog:
-    """Verify the definitive ActionType → ZoneType mapping."""
+    """Verify the definitive ActionType → (type, subtipo) operational mapping."""
 
     @pytest.mark.parametrize(
-        "action_type, expected_zone_type",
+        "action_type, expected_type, expected_subtipo",
         [
-            (ActionType.SEEK_PARKING, "Parking"),
-            (ActionType.SEEK_FOOD, "Gastronomy"),
-            (ActionType.SEEK_BATHROOM, "Sanitary"),
-            (ActionType.SEEK_TRANSPORT, "Transport"),
-            (ActionType.SEEK_ACCOMMODATION, "Accommodation"),
-            (ActionType.SEEK_EXIT, "Transport"),
-            (ActionType.SEEK_REST, "RestArea"),
-            (ActionType.SEEK_SECURITY, "Security"),
-            (ActionType.SEEK_INFORMATION, "Information"),
-            (ActionType.SEEK_LOW_DENSITY, None),
-            (ActionType.SEEK_SERVICE, None),
-            (ActionType.SEEK_HYDRATION, None),
+            (ActionType.SEEK_PARKING, "estacionamiento", None),
+            (ActionType.SEEK_FOOD, "comida", None),
+            (ActionType.SEEK_TRANSPORT, "transporte", None),
+            (ActionType.SEEK_ACCOMMODATION, "hospedaje", None),
+            (ActionType.SEEK_EXIT, "salida", None),
+            (ActionType.SEEK_SECURITY, "emergencia", None),
+            (ActionType.SEEK_BATHROOM, "servicios", "banos"),
+            (ActionType.SEEK_HYDRATION, "servicios", "hidratacion"),
+            (ActionType.SEEK_REST, "servicios", "descanso"),
+            (ActionType.SEEK_HEALTH, "servicios", "salud"),
+            (ActionType.SEEK_INFORMATION, None, None),
+            (ActionType.SEEK_LOW_DENSITY, None, None),
+            (ActionType.SEEK_SERVICE, None, None),
         ],
     )
-    def test_zone_type_mapping(
+    def test_operational_classification_mapping(
         self,
         action_type: ActionType,
-        expected_zone_type: str | None,
+        expected_type: str | None,
+        expected_subtipo: str | None,
     ) -> None:
         action = RequestedAction(action_type=action_type)
-        assert action.zone_type == expected_zone_type
+        assert action.type == expected_type
+        assert action.subtipo == expected_subtipo
 
-    def test_explicit_zone_type_overrides_default(
-        self,
-    ) -> None:
-        action = RequestedAction(
-            action_type=ActionType.SEEK_PARKING,
-            zone_type="CustomType",
-        )
-        assert action.zone_type == "CustomType"
+    def test_zone_type_compat_exposes_operational_type(self) -> None:
+        action = RequestedAction(action_type=ActionType.SEEK_PARKING)
+        assert action.zone_type == "estacionamiento"
 
     def test_no_ambiguous_action_types(self) -> None:
-        """Every intention-oriented ActionType maps to exactly one ZoneType."""
+        """Every intention-oriented ActionType maps to exactly one operational type."""
         intention_oriented = [
             ActionType.SEEK_PARKING,
             ActionType.SEEK_FOOD,
@@ -795,13 +826,24 @@ class TestActionTypeCatalog:
             ActionType.SEEK_EXIT,
             ActionType.SEEK_REST,
             ActionType.SEEK_SECURITY,
-            ActionType.SEEK_INFORMATION,
+            ActionType.SEEK_HEALTH,
         ]
         for at in intention_oriented:
-            assert at in ZONE_TYPE_BY_ACTION
-            assert ZONE_TYPE_BY_ACTION[at] is not None, (
-                f"{at} must map to a ZoneType"
+            assert at in OPERATIONAL_CLASSIFICATION_BY_ACTION
+            assert OPERATIONAL_CLASSIFICATION_BY_ACTION[at][0] is not None, (
+                f"{at} must map to an operational type"
             )
+
+    def test_unclassified_actions_have_no_type(self) -> None:
+        """SEEK_INFORMATION and legacy actions carry no operational classification."""
+        for at in (
+            ActionType.SEEK_INFORMATION,
+            ActionType.SEEK_LOW_DENSITY,
+            ActionType.SEEK_SERVICE,
+        ):
+            action = RequestedAction(action_type=at)
+            assert action.type is None
+            assert action.subtipo is None
 
     def test_service_not_used_for_specific_intents(self) -> None:
         """SEEK_SERVICE is not the documented ActionType for any screen."""
@@ -816,36 +858,70 @@ class TestActionTypeCatalog:
             ActionType.SEEK_SECURITY,
             ActionType.SEEK_INFORMATION,
             ActionType.SEEK_HYDRATION,
+            ActionType.SEEK_HEALTH,
         }
         service = ActionType.SEEK_SERVICE
         assert service not in specific
 
 
 class TestNewActionTypesNoRegression:
-    """New ActionTypes must not break existing filtering behaviour."""
+    """New ActionTypes must filter by operational classification (type/subtipo)."""
+
+    @staticmethod
+    def _typed_zone(
+        *,
+        zone_id: str,
+        zone_type: str,
+        subtipo: str | None = None,
+        saturation_level: float = 0.2,
+        active_restriction: FlowRestriction = FlowRestriction.OPEN,
+    ) -> ZoneState:
+        return ZoneState(
+            zone_id=UUID(zone_id),
+            operational_state="LOW_DEMAND",
+            availability=400,
+            saturation_level=saturation_level,
+            estimated_wait=0,
+            confidence=1.0,
+            reasoning_factors=[],
+            active_restriction=active_restriction,
+            type=zone_type,
+            subtipo=subtipo,
+        )
 
     @pytest.mark.parametrize(
-        "action_type",
+        "action_type, zone_type, subtipo",
         [
-            ActionType.SEEK_PARKING,
-            ActionType.SEEK_FOOD,
-            ActionType.SEEK_BATHROOM,
-            ActionType.SEEK_TRANSPORT,
-            ActionType.SEEK_ACCOMMODATION,
-            ActionType.SEEK_REST,
-            ActionType.SEEK_SECURITY,
-            ActionType.SEEK_INFORMATION,
+            (ActionType.SEEK_PARKING, "estacionamiento", None),
+            (ActionType.SEEK_FOOD, "comida", None),
+            (ActionType.SEEK_BATHROOM, "servicios", "banos"),
+            (ActionType.SEEK_TRANSPORT, "transporte", None),
+            (ActionType.SEEK_ACCOMMODATION, "hospedaje", None),
+            (ActionType.SEEK_REST, "servicios", "descanso"),
+            (ActionType.SEEK_SECURITY, "emergencia", None),
+            (ActionType.SEEK_HYDRATION, "servicios", "hidratacion"),
+            (ActionType.SEEK_HEALTH, "servicios", "salud"),
         ],
     )
-    def test_new_action_types_accept_all_zones_by_default(
+    def test_new_action_types_filter_by_classification(
         self,
         action_type: ActionType,
+        zone_type: str,
+        subtipo: str | None,
         strategy: WeightedScoringStrategy,
     ) -> None:
-        action = RequestedAction(action_type=action_type)
-        all_zones = [_zone_a(), _zone_b(), _zone_c()]
+        matching = self._typed_zone(
+            zone_id="a0000000-0000-0000-0000-000000000001",
+            zone_type=zone_type,
+            subtipo=subtipo,
+        )
+        different = self._typed_zone(
+            zone_id="c0000000-0000-0000-0000-000000000003",
+            zone_type="salida",
+            subtipo=None,
+        )
         result = strategy.evaluate(
-            prediction=_prediction(zone_states=all_zones),
+            prediction=_prediction(zone_states=[matching, different]),
             user_context=UserContext(
                 user_id=UUID("00000000-0000-0000-0000-000000000001"),
                 access_level=AccessLevel.STANDARD,
@@ -855,12 +931,133 @@ class TestNewActionTypesNoRegression:
                 speed=1.0,
                 accessibility_required=False,
             ),
-            requested_action=action,
+            requested_action=RequestedAction(action_type=action_type),
             config=RecommendationConfig(),
         )
-        assert len(result) == 3, (
-            f"{action_type} should not filter zones by default"
+        assert len(result) == 1, (
+            f"{action_type} should only keep zones of type={zone_type} "
+            f"subtipo={subtipo}"
         )
+        assert result[0].zone_id == matching.zone_id
+
+    def test_subtipo_is_enforced_when_present(
+        self,
+        strategy: WeightedScoringStrategy,
+    ) -> None:
+        banos = self._typed_zone(
+            zone_id="a0000000-0000-0000-0000-000000000001",
+            zone_type="servicios",
+            subtipo="banos",
+        )
+        descanso = self._typed_zone(
+            zone_id="b0000000-0000-0000-0000-000000000002",
+            zone_type="servicios",
+            subtipo="descanso",
+        )
+        result = strategy.evaluate(
+            prediction=_prediction(zone_states=[banos, descanso]),
+            user_context=UserContext(
+                user_id=UUID("00000000-0000-0000-0000-000000000001"),
+                access_level=AccessLevel.STANDARD,
+            ),
+            mobility_context=MobilityContext(
+                current_zone_id=None,
+                speed=1.0,
+                accessibility_required=False,
+            ),
+            requested_action=RequestedAction(action_type=ActionType.SEEK_BATHROOM),
+            config=RecommendationConfig(),
+        )
+        assert len(result) == 1
+        assert result[0].zone_id == banos.zone_id
+
+    def test_no_subtipo_matches_any_subtipo_of_the_type(
+        self,
+        strategy: WeightedScoringStrategy,
+    ) -> None:
+        parking_plain = self._typed_zone(
+            zone_id="a0000000-0000-0000-0000-000000000001",
+            zone_type="estacionamiento",
+            subtipo=None,
+        )
+        parking_extra = self._typed_zone(
+            zone_id="b0000000-0000-0000-0000-000000000002",
+            zone_type="estacionamiento",
+            subtipo="premium",
+        )
+        result = strategy.evaluate(
+            prediction=_prediction(zone_states=[parking_plain, parking_extra]),
+            user_context=UserContext(
+                user_id=UUID("00000000-0000-0000-0000-000000000001"),
+                access_level=AccessLevel.STANDARD,
+            ),
+            mobility_context=MobilityContext(
+                current_zone_id=None,
+                speed=1.0,
+                accessibility_required=False,
+            ),
+            requested_action=RequestedAction(action_type=ActionType.SEEK_PARKING),
+            config=RecommendationConfig(),
+        )
+        assert len(result) == 2
+
+    def test_type_none_applies_no_classification_filter(
+        self,
+        strategy: WeightedScoringStrategy,
+    ) -> None:
+        zones = [
+            self._typed_zone(
+                zone_id="a0000000-0000-0000-0000-000000000001",
+                zone_type="comida",
+            ),
+            self._typed_zone(
+                zone_id="b0000000-0000-0000-0000-000000000002",
+                zone_type="servicios",
+                subtipo="banos",
+            ),
+        ]
+        result = strategy.evaluate(
+            prediction=_prediction(zone_states=zones),
+            user_context=UserContext(
+                user_id=UUID("00000000-0000-0000-0000-000000000001"),
+                access_level=AccessLevel.STANDARD,
+            ),
+            mobility_context=MobilityContext(
+                current_zone_id=None,
+                speed=1.0,
+                accessibility_required=False,
+            ),
+            requested_action=RequestedAction(action_type=ActionType.SEEK_INFORMATION),
+            config=RecommendationConfig(),
+        )
+        assert len(result) == 2
+
+    def test_all_filtered_when_no_zone_matches_classification(
+        self,
+        strategy: WeightedScoringStrategy,
+    ) -> None:
+        result = strategy.evaluate(
+            prediction=_prediction(
+                zone_states=[
+                    self._typed_zone(
+                        zone_id="a0000000-0000-0000-0000-000000000001",
+                        zone_type="comida",
+                    ),
+                ]
+            ),
+            user_context=UserContext(
+                user_id=UUID("00000000-0000-0000-0000-000000000001"),
+                access_level=AccessLevel.STANDARD,
+            ),
+            mobility_context=MobilityContext(
+                current_zone_id=None,
+                speed=1.0,
+                accessibility_required=False,
+            ),
+            requested_action=RequestedAction(action_type=ActionType.SEEK_PARKING),
+            config=RecommendationConfig(),
+        )
+        assert result == []
 
 
 class TestDeterminism:

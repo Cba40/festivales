@@ -59,12 +59,16 @@ class WeightedScoringStrategy:
         mobility_context: MobilityContext,
         config: RecommendationConfig,
     ) -> bool:
-        # ── Zone-type filter (documented in FRONTEND_BACKEND_CONTRACT.md §4) ──
-        # Each ActionType maps to exactly one ZoneType via ZONE_TYPE_BY_ACTION.
-        # Runtime enforcement requires zone_type_id on ZoneState, which will be
-        # added when the Context Engine propagates it through the pipeline.
-        # Until then, the mapping is authoritative for Product Endpoints.
-        # _ = requested_action.zone_type  # reserved for future use
+        # ── Operational classification filter (P3.0 §11.5, RFC-005 §7 Etapa 1) ──
+        # Zones of a different operational classification must never compete for
+        # the same recommendation. Filtering happens BEFORE the RecommendationScore.
+        requested_type = requested_action.type
+        if requested_type is not None:
+            if zone.type != requested_type:
+                return False
+            requested_subtipo = requested_action.subtipo
+            if requested_subtipo is not None and zone.subtipo != requested_subtipo:
+                return False
 
         # ── Behavioural filters ──────────────────────────────────────────────
 
