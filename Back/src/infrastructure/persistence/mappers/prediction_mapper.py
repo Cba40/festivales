@@ -18,6 +18,8 @@ def _zone_state_to_dict(state: ZoneState) -> dict:
         "confidence": state.confidence,
         "reasoning_factors": list(state.reasoning_factors),
         "active_restriction": state.active_restriction.value,
+        "type": state.type,
+        "subtipo": state.subtipo,
     }
 
 
@@ -31,6 +33,8 @@ def _zone_state_from_dict(data: dict) -> ZoneState:
         confidence=data["confidence"],
         reasoning_factors=list(data["reasoning_factors"]),
         active_restriction=FlowRestriction(data["active_restriction"]),
+        type=data.get("type", ""),
+        subtipo=data.get("subtipo"),
     )
 
 

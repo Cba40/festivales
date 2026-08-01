@@ -16,6 +16,8 @@ class ZoneState:
         confidence: float,
         reasoning_factors: list[str],
         active_restriction: FlowRestriction,
+        type: str = "",
+        subtipo: str | None = None,
     ) -> None:
         self._zone_id = zone_id
         self._operational_state = operational_state
@@ -25,6 +27,8 @@ class ZoneState:
         self._confidence = confidence
         self._reasoning_factors = list(reasoning_factors)
         self._active_restriction = active_restriction
+        self._type = type
+        self._subtipo = subtipo
 
     @property
     def zone_id(self) -> UUID:
@@ -58,6 +62,14 @@ class ZoneState:
     def active_restriction(self) -> FlowRestriction:
         return self._active_restriction
 
+    @property
+    def type(self) -> str:
+        return self._type
+
+    @property
+    def subtipo(self) -> str | None:
+        return self._subtipo
+
     def __repr__(self) -> str:
         return (
             f"ZoneState("
@@ -68,5 +80,6 @@ class ZoneState:
             f"estimated_wait={self._estimated_wait!r}, "
             f"confidence={self._confidence!r}, "
             f"reasoning_factors={self._reasoning_factors!r}, "
-            f"active_restriction={self._active_restriction!r})"
+            f"active_restriction={self._active_restriction!r}, "
+            f"type={self._type!r}, subtipo={self._subtipo!r})"
         )

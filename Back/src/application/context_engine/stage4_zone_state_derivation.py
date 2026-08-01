@@ -37,6 +37,8 @@ def derive_zone_states(
     for zone_id, zone_app in zone_behavior_result.zone_applications.items():
         zone = zones_by_id.get(zone_id)
         capacity = zone.capacity if zone is not None else 0
+        zone_type = zone.type if zone is not None else ""
+        zone_subtipo = zone.subtipo if zone is not None else None
 
         projected_density = zone_app.projected_density
         active_restriction = zone_app.active_restriction
@@ -65,6 +67,8 @@ def derive_zone_states(
                 confidence=confidence,
                 reasoning_factors=reasoning_factors,
                 active_restriction=active_restriction,
+                type=zone_type,
+                subtipo=zone_subtipo,
             )
         )
 

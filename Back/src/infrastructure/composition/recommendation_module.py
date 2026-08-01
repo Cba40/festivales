@@ -71,6 +71,8 @@ async def _load_zones(
             name=r.name,
             zone_type_id=zt_id,
             capacity=r.capacity,
+            type=r.type,
+            subtipo=r.subtipo,
         ))
     return zones
 
