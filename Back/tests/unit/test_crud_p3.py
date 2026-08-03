@@ -23,13 +23,15 @@ from app.crud import (
     list_active_by_event_day,
     list_events_by_event_day,
     list_phases_by_profile,
+    list_phases_by_event_day,
+    update_event_day,
     update_event_day_phase,
     update_operational_profile,
     update_operational_phase,
 )
 from app.crud.zone_type import zone_type as zone_type_crud
 from app.db.session import Base
-from app.schemas.event_day import EventDayCreate
+from app.schemas.event_day import EventDayCreate, EventDayUpdate
 from app.services.zone_behavior_sync import sync_zone_behaviors
 from app.schemas.event_day_phase import EventDayPhaseUpdate
 from app.schemas.operational_event import OperationalEventCreate
@@ -725,3 +727,235 @@ class TestZoneBehaviorSyncP31B:
         assert combos_second == combos_first
         assert len(combos_second) == total_first
         assert total_first == 2 * len(types)
+
+
+@pytest.mark.asyncio
+class TestEventDayProfileIntegrityP31C:
+    """P3.1C — Todas las EventDayPhase de un EventDay deben pertenecer al mismo
+    OperationalProfile que el EventDay."""
+
+    async def _setup(self, async_session: AsyncSession):
+        from app.models.attendance_level import AttendanceLevel
+        from app.models.event import Event
+
+        event = Event(id="test-p31c-event", name="P31C Event", description="")
+        async_session.add(event)
+        al = AttendanceLevel(
+            id="al-p31c", event_id=event.id, name="P31C AL",
+            min_people=0, max_people=100000, global_multiplier=1.0,
+        )
+        async_session.add(al)
+        await async_session.flush()
+
+        profile_a = await create_operational_profile(
+            async_session, OperationalProfileCreate(name="P31C-ProfA", description=""),
+        )
+        profile_b = await create_operational_profile(
+            async_session, OperationalProfileCreate(name="P31C-ProfB", description=""),
+        )
+        phase_a = await create_operational_phase(
+            async_session,
+            OperationalPhaseCreate(
+                operational_profile_id=profile_a.id, name="P31C A1", sort_order=1,
+            ),
+        )
+        phase_b = await create_operational_phase(
+            async_session,
+            OperationalPhaseCreate(
+                operational_profile_id=profile_b.id, name="P31C B1", sort_order=1,
+            ),
+        )
+        return event.id, al.id, profile_a.id, profile_b.id, phase_a.id, phase_b.id
+
+    async def _make_day(
+        self, async_session: AsyncSession, event_id, al_id, profile_id, phase_ids,
+    ):
+        from app.schemas.event_day_phase import EventDayPhaseCreate
+
+        return await create_event_day(
+            async_session,
+            EventDayCreate(
+                date="2026-09-01",
+                day_of_week="martes",
+                operational_profile_id=profile_id,
+                operational_start_min=0,
+                operational_end_min=600,
+                estimated_attendance=1000,
+                attendance_level_id=al_id,
+                phases=[
+                    EventDayPhaseCreate(
+                        operational_phase_id=ph, start_min=0, end_min=300,
+                    )
+                    for ph in phase_ids
+                ],
+            ),
+            event_id=event_id,
+        )
+
+    async def test_create_rejects_phase_from_other_profile(
+        self, async_session: AsyncSession, clean_tables,
+    ):
+        """Crear un EventDay con una fase de otro perfil → ValueError."""
+        from app.schemas.event_day_phase import EventDayPhaseCreate
+
+        e, al, pa, _pb, _pha, phb = await self._setup(async_session)
+        with pytest.raises(ValueError) as exc_info:
+            await create_event_day(
+                async_session,
+                EventDayCreate(
+                    date="2026-06-02",
+                    day_of_week="miercoles",
+                    operational_profile_id=pa,
+                    operational_start_min=0,
+                    operational_end_min=600,
+                    estimated_attendance=500,
+                    attendance_level_id=al,
+                    phases=[
+                        EventDayPhaseCreate(
+                            operational_phase_id=phb, start_min=0, end_min=300,
+                        )
+                    ],
+                ),
+                event_id=e,
+            )
+        assert "does not belong" in str(exc_info.value)
+
+    async def test_update_rejects_mixed_phases(
+        self, async_session: AsyncSession, clean_tables,
+    ):
+        """Cambiar perfil y enviar fases del perfil anterior → ValueError."""
+        from app.schemas.event_day_phase import EventDayPhaseCreate
+
+        e, al, pa, pb, pha, _phb = await self._setup(async_session)
+        day = await self._make_day(async_session, e, al, pa, [pha])
+
+        with pytest.raises(ValueError) as exc_info:
+            await update_event_day(
+                async_session, day,
+                EventDayUpdate(
+                    operational_profile_id=pb,
+                    phases=[
+                        EventDayPhaseCreate(
+                            operational_phase_id=pha, start_min=0, end_min=300,
+                        )
+                    ],
+                ),
+            )
+        assert "does not belong" in str(exc_info.value)
+
+    async def test_update_rejects_profile_change_without_phases(
+        self, async_session: AsyncSession, clean_tables,
+    ):
+        """Cambiar perfil sin enviar fases nuevas cuando el día ya tiene fases → ValueError."""
+        e, al, pa, pb, pha, _phb = await self._setup(async_session)
+        day = await self._make_day(async_session, e, al, pa, [pha])
+
+        with pytest.raises(ValueError):
+            await update_event_day(
+                async_session, day,
+                EventDayUpdate(operational_profile_id=pb),
+            )
+
+    async def test_update_phases_only_must_match_current_profile(
+        self, async_session: AsyncSession, clean_tables,
+    ):
+        """Enviar solo fases que no pertenecen al perfil actual → ValueError."""
+        from app.schemas.event_day_phase import EventDayPhaseCreate
+
+        e, al, pa, _pb, pha, phb = await self._setup(async_session)
+        day = await self._make_day(async_session, e, al, pa, [pha])
+
+        with pytest.raises(ValueError) as exc_info:
+            await update_event_day(
+                async_session, day,
+                EventDayUpdate(
+                    phases=[
+                        EventDayPhaseCreate(
+                            operational_phase_id=phb, start_min=0, end_min=300,
+                        )
+                    ],
+                ),
+            )
+        assert "does not belong" in str(exc_info.value)
+
+    async def test_create_phase_from_other_profile_rejected(
+        self, async_session: AsyncSession, clean_tables,
+    ):
+        """Agregar una EventDayPhase de otro perfil → ValueError."""
+        from app.schemas.event_day_phase import EventDayPhaseCreate
+
+        e, al, pa, _pb, pha, phb = await self._setup(async_session)
+        day = await self._make_day(async_session, e, al, pa, [pha])
+
+        with pytest.raises(ValueError) as exc_info:
+            await create_event_day_phase(
+                async_session, day.id,
+                EventDayPhaseCreate(
+                    operational_phase_id=phb, start_min=0, end_min=400,
+                ),
+            )
+        assert "does not belong" in str(exc_info.value)
+
+    async def test_update_phase_to_other_profile_rejected(
+        self, async_session: AsyncSession, clean_tables,
+    ):
+        """Reasignar una EventDayPhase a una fase de otro perfil → ValueError."""
+        from app.schemas.event_day_phase import EventDayPhaseCreate
+
+        e, al, pa, _pb, pha, phb = await self._setup(async_session)
+        day = await self._make_day(async_session, e, al, pa, [pha])
+        phase = await create_event_day_phase(
+            async_session, day.id,
+            EventDayPhaseCreate(
+                operational_phase_id=pha, start_min=0, end_min=300,
+            ),
+        )
+
+        with pytest.raises(ValueError) as exc_info:
+            await update_event_day_phase(
+                async_session, phase,
+                EventDayPhaseUpdate(operational_phase_id=phb),
+            )
+        assert "does not belong" in str(exc_info.value)
+
+    async def test_valid_profile_change_replaces_all_phases(
+        self, async_session: AsyncSession, clean_tables,
+    ):
+        """Caso válido: cambiar perfil + fases completas del nuevo perfil → OK."""
+        from app.schemas.event_day_phase import EventDayPhaseCreate
+
+        e, al, pa, pb, pha, phb = await self._setup(async_session)
+        day = await self._make_day(async_session, e, al, pa, [pha])
+
+        updated = await update_event_day(
+            async_session, day,
+            EventDayUpdate(
+                operational_profile_id=pb,
+                phases=[
+                    EventDayPhaseCreate(
+                        operational_phase_id=phb, start_min=0, end_min=300,
+                    )
+                ],
+            ),
+        )
+        assert updated.operational_profile_id == pb
+        phases = await list_phases_by_event_day(async_session, day.id)
+        assert len(phases) == 1
+        assert phases[0].operational_phase_id == phb
+
+    async def test_valid_add_phase_same_profile(
+        self, async_session: AsyncSession, clean_tables,
+    ):
+        """Caso válido: agregar una fase del perfil del día → OK."""
+        from app.schemas.event_day_phase import EventDayPhaseCreate
+
+        e, al, pa, _pb, pha, _phb = await self._setup(async_session)
+        day = await self._make_day(async_session, e, al, pa, [pha])
+
+        added = await create_event_day_phase(
+            async_session, day.id,
+            EventDayPhaseCreate(
+                operational_phase_id=pha, start_min=0, end_min=300,
+            ),
+        )
+        assert added.operational_phase_id == pha

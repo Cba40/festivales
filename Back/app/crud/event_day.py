@@ -43,6 +43,12 @@ async def create(db: AsyncSession, obj_in: EventDayCreate, event_id: str) -> Eve
             raise ValueError(
                 f"OperationalPhase with id '{phase_in.operational_phase_id}' not found"
             )
+        if op_phase.operational_profile_id != obj_in.operational_profile_id:
+            raise ValueError(
+                f"OperationalPhase with id '{phase_in.operational_phase_id}' "
+                f"does not belong to OperationalProfile "
+                f"'{obj_in.operational_profile_id}'"
+            )
 
     db.add(db_obj)
     await db.flush()
@@ -122,6 +128,35 @@ async def update(
             )
 
     phases_data = update_data.pop("phases", None)
+
+    target_profile_id = update_data.get(
+        "operational_profile_id", db_obj.operational_profile_id,
+    )
+
+    if phases_data is not None:
+        for phase_in in phases_data:
+            op_phase = await db.get(OperationalPhase, phase_in["operational_phase_id"])
+            if not op_phase:
+                raise ValueError(
+                    f"OperationalPhase with id "
+                    f"'{phase_in['operational_phase_id']}' not found"
+                )
+            if op_phase.operational_profile_id != target_profile_id:
+                raise ValueError(
+                    f"OperationalPhase with id "
+                    f"'{phase_in['operational_phase_id']}' "
+                    f"does not belong to OperationalProfile "
+                    f"'{target_profile_id}'"
+                )
+    else:
+        if target_profile_id != db_obj.operational_profile_id:
+            existing = await db.execute(
+                select(EventDayPhase).where(EventDayPhase.event_day_id == db_obj.id)
+            )
+            if existing.scalars().first() is not None:
+                raise ValueError(
+                    "operational_profile_id cannot change without providing new 'phases'"
+                )
 
     for field, value in update_data.items():
         setattr(db_obj, field, value)

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { EventDayPhaseEditor, validatePhases } from './EventDayPhaseEditor';
 import { useOperationalProfiles } from '../hooks/useOperationalProfiles';
 import { useAttendanceLevels } from '../hooks/useAttendanceLevels';
@@ -92,8 +92,11 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
   const [eventDayPhases, setEventDayPhases] = useState<EventDayPhaseCreatePayload[]>([]);
   const [validationError, setValidationError] = useState<string | null>(null);
 
+  const skipNextClearRef = useRef(false);
+
   useEffect(() => {
     if (eventDay) {
+      skipNextClearRef.current = true;
       setDate(eventDay.date);
       setDayOfWeek(eventDay.day_of_week);
       setWeather(eventDay.weather ?? '');
@@ -117,22 +120,31 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
   }, [eventDay]);
 
   useEffect(() => {
-    if (!isEditing) {
-      setEventDayPhases([]);
+    if (!selectedProfileId) return;
+    if (skipNextClearRef.current) {
+      skipNextClearRef.current = false;
+      return;
     }
-  }, [selectedProfileId, isEditing]);
+    setEventDayPhases([]);
+  }, [selectedProfileId]);
+
+  const profileOperationalPhases = useMemo(
+    () => operationalPhases.filter((op) => op.operational_profile_id === selectedProfileId),
+    [operationalPhases, selectedProfileId],
+  );
 
   useEffect(() => {
-    if (!isEditing && operationalPhases.length > 0 && eventDayPhases.length === 0 && selectedProfileId) {
-      const sorted = [...operationalPhases].sort((a, b) => a.sort_order - b.sort_order);
-      const autoPhases: EventDayPhaseCreatePayload[] = sorted.map((op) => ({
-        operational_phase_id: op.id,
-        start_min: null,
-        end_min: null,
-      }));
-      setEventDayPhases(autoPhases);
-    }
-  }, [operationalPhases, selectedProfileId, isEditing, eventDayPhases.length]);
+    if (!selectedProfileId) return;
+    if (profileOperationalPhases.length === 0) return;
+    if (eventDayPhases.length > 0) return;
+    const sorted = [...profileOperationalPhases].sort((a, b) => a.sort_order - b.sort_order);
+    const autoPhases: EventDayPhaseCreatePayload[] = sorted.map((op) => ({
+      operational_phase_id: op.id,
+      start_min: null,
+      end_min: null,
+    }));
+    setEventDayPhases(autoPhases);
+  }, [profileOperationalPhases, selectedProfileId, eventDayPhases.length]);
 
   const operationalStartMin = useMemo(
     () => (operationalStartStr ? timeStrToMinutes(operationalStartStr) : 0),
@@ -159,8 +171,8 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
   );
 
   const sortedOperationalPhases = useMemo(
-    () => [...operationalPhases].sort((a, b) => a.sort_order - b.sort_order),
-    [operationalPhases],
+    () => [...profileOperationalPhases].sort((a, b) => a.sort_order - b.sort_order),
+    [profileOperationalPhases],
   );
 
   const selectedLevel = levels.find((l) => l.id === selectedLevelId);

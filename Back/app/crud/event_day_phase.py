@@ -4,6 +4,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.event_day import EventDay
 from app.models.event_day_phase import EventDayPhase
 from app.models.operational_phase import OperationalPhase
 from app.schemas.event_day_phase import EventDayPhaseCreate, EventDayPhaseUpdate
@@ -16,6 +17,16 @@ async def create(
     if not op_phase:
         raise ValueError(
             f"OperationalPhase with id '{obj_in.operational_phase_id}' not found"
+        )
+
+    event_day = await db.get(EventDay, event_day_id)
+    if not event_day:
+        raise ValueError(f"EventDay with id '{event_day_id}' not found")
+    if op_phase.operational_profile_id != event_day.operational_profile_id:
+        raise ValueError(
+            f"OperationalPhase with id '{obj_in.operational_phase_id}' "
+            f"does not belong to OperationalProfile "
+            f"'{event_day.operational_profile_id}'"
         )
 
     if obj_in.end_min <= obj_in.start_min:
@@ -59,6 +70,18 @@ async def update(
         if not op_phase:
             raise ValueError(
                 f"OperationalPhase with id '{update_data['operational_phase_id']}' not found"
+            )
+        event_day = await db.get(EventDay, db_obj.event_day_id)
+        if not event_day:
+            raise ValueError(
+                f"EventDay with id '{db_obj.event_day_id}' not found"
+            )
+        if op_phase.operational_profile_id != event_day.operational_profile_id:
+            raise ValueError(
+                f"OperationalPhase with id "
+                f"'{update_data['operational_phase_id']}' "
+                f"does not belong to OperationalProfile "
+                f"'{event_day.operational_profile_id}'"
             )
 
     if "start_min" in update_data or "end_min" in update_data:
