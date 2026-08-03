@@ -30,6 +30,7 @@ from app.crud import (
 from app.crud.zone_type import zone_type as zone_type_crud
 from app.db.session import Base
 from app.schemas.event_day import EventDayCreate
+from app.services.zone_behavior_sync import sync_zone_behaviors
 from app.schemas.event_day_phase import EventDayPhaseUpdate
 from app.schemas.operational_event import OperationalEventCreate
 from app.schemas.operational_event_modifier import OperationalEventModifierCreate
@@ -571,7 +572,7 @@ class TestIntegrityP31A:
         )
 
         with patch(
-            "app.crud.operational_phase.default_behavior",
+            "app.services.zone_behavior_sync.default_behavior",
             side_effect=RuntimeError("boom"),
         ):
             with pytest.raises(RuntimeError):
@@ -588,3 +589,139 @@ class TestIntegrityP31A:
             select(OperationalPhase).where(OperationalPhase.name == "FaseRollback")
         )
         assert result.scalar_one_or_none() is None
+
+
+class TestZoneBehaviorSyncP31B:
+    """P3.1B — Sincronización automática e idempotente de ZoneBehavior."""
+
+    def _add_zone_types(self, session: Session, slugs: list[str]):
+        from app.models.zone_type import ZoneType
+
+        types = []
+        for slug in slugs:
+            zt = ZoneType(
+                id=f"zt-p31b-{slug}",
+                name=slug,
+                slug=slug,
+                icon="x",
+                description="test",
+                default_factors={},
+            )
+            session.add(zt)
+            types.append(zt)
+        session.flush()
+        return types
+
+    def _add_phase(self, session: Session, profile_id, name: str, sort_order: int):
+        from app.models.operational_phase import OperationalPhase
+
+        phase = OperationalPhase(
+            operational_profile_id=profile_id, name=name, sort_order=sort_order,
+        )
+        session.add(phase)
+        session.flush()
+        return phase
+
+    def _combos(self, session: Session) -> set:
+        from app.models.zone_behavior import ZoneBehavior
+
+        rows = session.execute(
+            select(ZoneBehavior.operational_phase_id, ZoneBehavior.zone_type_id)
+        ).all()
+        return {(r[0], r[1]) for r in rows}
+
+    def test_old_phase_without_behaviors_gets_missing(self, sync_session: Session):
+        """Fase antigua sin ZoneBehavior recibe automáticamente los faltantes."""
+        from app.models.operational_profile import OperationalProfile
+        from app.models.zone_behavior import ZoneBehavior
+
+        types = self._add_zone_types(sync_session, ["a", "b"])
+        profile = OperationalProfile(name="P31B-FaseAntigua", description="")
+        sync_session.add(profile)
+        sync_session.flush()
+        phase = self._add_phase(sync_session, profile.id, "FaseAntigua", 1)
+
+        created = sync_zone_behaviors(sync_session, phase_ids=[phase.id])
+        assert created == len(types)
+
+        behaviors = sync_session.execute(
+            select(ZoneBehavior).where(ZoneBehavior.operational_phase_id == phase.id)
+        ).scalars().all()
+        assert len(behaviors) == len(types)
+        for behavior in behaviors:
+            assert float(behavior.saturation_factor) == 1.0
+            assert behavior.density_factor == 0.5
+            assert behavior.flow_restriction == "OPEN"
+
+    def test_complete_phase_no_duplicates(self, sync_session: Session):
+        """Fase completa: re-sincronizar no genera duplicados."""
+        from app.models.operational_profile import OperationalProfile
+
+        types = self._add_zone_types(sync_session, ["a", "b"])
+        profile = OperationalProfile(name="P31B-FaseCompleta", description="")
+        sync_session.add(profile)
+        sync_session.flush()
+        phase = self._add_phase(sync_session, profile.id, "FaseCompleta", 1)
+
+        sync_zone_behaviors(sync_session, phase_ids=[phase.id])
+        combos_after_first = self._combos(sync_session)
+
+        created_second = sync_zone_behaviors(sync_session, phase_ids=[phase.id])
+        assert created_second == 0
+        assert self._combos(sync_session) == combos_after_first
+        assert len(types) == 2
+
+    def test_new_zone_type_completes_only_missing(self, sync_session: Session):
+        """Nuevo ZoneType completa únicamente las combinaciones faltantes."""
+        from app.models.operational_profile import OperationalProfile
+        from app.models.zone_behavior import ZoneBehavior
+
+        existing_type = self._add_zone_types(sync_session, ["a"])[0]
+        profile = OperationalProfile(name="P31B-NuevoTipo", description="")
+        sync_session.add(profile)
+        sync_session.flush()
+        phase = self._add_phase(sync_session, profile.id, "Fase1", 1)
+
+        sync_zone_behaviors(sync_session, phase_ids=[phase.id])
+        combos_before = self._combos(sync_session)
+        assert combos_before == {(phase.id, existing_type.id)}
+
+        new_type = self._add_zone_types(sync_session, ["nuevo"])[0]
+        created = sync_zone_behaviors(sync_session, zone_type_ids=[new_type.id])
+        assert created == 1
+
+        combos_after = self._combos(sync_session)
+        assert combos_after == {
+            (phase.id, existing_type.id),
+            (phase.id, new_type.id),
+        }
+        behaviors = sync_session.execute(
+            select(ZoneBehavior).where(ZoneBehavior.zone_type_id == new_type.id)
+        ).scalars().all()
+        assert len(behaviors) == 1
+        for behavior in behaviors:
+            assert behavior.density_factor == 0.5
+            assert behavior.flow_restriction == "OPEN"
+
+    def test_sync_twice_produces_same_result(self, sync_session: Session):
+        """Ejecutar la sincronización dos veces produce exactamente el mismo resultado."""
+        from app.models.operational_profile import OperationalProfile
+
+        types = self._add_zone_types(sync_session, ["a", "b", "c"])
+        profile = OperationalProfile(name="P31B-Idempotente", description="")
+        sync_session.add(profile)
+        sync_session.flush()
+        self._add_phase(sync_session, profile.id, "F1", 1)
+        self._add_phase(sync_session, profile.id, "F2", 2)
+
+        first = sync_zone_behaviors(sync_session)
+        combos_first = self._combos(sync_session)
+        total_first = len(combos_first)
+
+        second = sync_zone_behaviors(sync_session)
+        combos_second = self._combos(sync_session)
+
+        assert second == 0
+        assert combos_second == combos_first
+        assert len(combos_second) == total_first
+        assert total_first == 2 * len(types)

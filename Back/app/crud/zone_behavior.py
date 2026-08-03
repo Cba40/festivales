@@ -1,5 +1,4 @@
 """CRUD operations for ZoneBehavior."""
-from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import select
@@ -9,29 +8,15 @@ from app.models.zone_behavior import ZoneBehavior
 from app.models.operational_phase import OperationalPhase
 from app.models.zone_type import ZoneType
 from app.schemas.zone_behavior import ZoneBehaviorCreate, ZoneBehaviorUpdate
-
-# Valores por defecto coherentes con los defaults del modelo y del schema
-# (flujo "OPEN", densidad 0.5 y factores neutros 1.0, como en §11 / seeds).
-DEFAULT_SATURATION_FACTOR = Decimal("1.0")
-DEFAULT_AVAILABILITY_FACTOR = Decimal("1.0")
-DEFAULT_RESOURCE_FACTOR = Decimal("1.0")
-DEFAULT_PRIORITY_WEIGHT = Decimal("1.0")
-DEFAULT_DENSITY_FACTOR = 0.5
-DEFAULT_FLOW_RESTRICTION = "OPEN"
-
-
-def default_behavior(phase_id: UUID, zone_type_id: str) -> ZoneBehavior:
-    """Construye un ZoneBehavior con valores por defecto para (phase, zone_type)."""
-    return ZoneBehavior(
-        operational_phase_id=phase_id,
-        zone_type_id=zone_type_id,
-        saturation_factor=DEFAULT_SATURATION_FACTOR,
-        availability_factor=DEFAULT_AVAILABILITY_FACTOR,
-        resource_factor=DEFAULT_RESOURCE_FACTOR,
-        priority_weight=DEFAULT_PRIORITY_WEIGHT,
-        density_factor=DEFAULT_DENSITY_FACTOR,
-        flow_restriction=DEFAULT_FLOW_RESTRICTION,
-    )
+from app.services.zone_behavior_sync import (
+    DEFAULT_AVAILABILITY_FACTOR,
+    DEFAULT_DENSITY_FACTOR,
+    DEFAULT_FLOW_RESTRICTION,
+    DEFAULT_PRIORITY_WEIGHT,
+    DEFAULT_RESOURCE_FACTOR,
+    DEFAULT_SATURATION_FACTOR,
+    default_behavior,
+)
 
 
 async def create(db: AsyncSession, obj_in: ZoneBehaviorCreate) -> ZoneBehavior:

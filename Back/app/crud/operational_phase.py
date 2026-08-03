@@ -4,11 +4,10 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.crud.zone_behavior import default_behavior
 from app.models.operational_phase import OperationalPhase
 from app.models.operational_profile import OperationalProfile
-from app.models.zone_type import ZoneType
 from app.schemas.operational_phase import OperationalPhaseCreate, OperationalPhaseUpdate
+from app.services.zone_behavior_sync import sync_zone_behaviors
 
 
 async def create(db: AsyncSession, obj_in: OperationalPhaseCreate) -> OperationalPhase:
@@ -33,12 +32,9 @@ async def create(db: AsyncSession, obj_in: OperationalPhaseCreate) -> Operationa
     try:
         await db.flush()
 
-        # Integridad P3.1A: crear un ZoneBehavior por cada ZoneType existente.
-        zone_type_ids = (await db.execute(select(ZoneType.id))).scalars().all()
-        for zone_type_id in zone_type_ids:
-            db.add(default_behavior(db_obj.id, zone_type_id))
+        # Integridad P3.1B: sincronizar ZoneBehavior en la misma transacción.
+        await db.run_sync(lambda s: sync_zone_behaviors(s, phase_ids=[db_obj.id]))
 
-        await db.flush()
         await db.commit()
     except Exception:
         await db.rollback()
