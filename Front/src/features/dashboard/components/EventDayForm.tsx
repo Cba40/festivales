@@ -5,6 +5,7 @@ import { useAttendanceLevels } from '../hooks/useAttendanceLevels';
 import { useOperationalPhases } from '../hooks/useOperationalPhases';
 import type { NormalizedPhase } from '../utils/operationalMinutes';
 import { minutesToTimeStr, timeStrToMinutes, resolveOperationalMinutes, resolveOperationalWindow } from '../utils/operationalMinutes';
+import { buildPhasesForProfile, allPhasesBelongToProfile } from '../utils/eventDayPhases';
 import type {
   EventDay, EventDayCreatePayload, EventDayPhaseCreatePayload,
 } from '../types';
@@ -92,11 +93,11 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
   const [eventDayPhases, setEventDayPhases] = useState<EventDayPhaseCreatePayload[]>([]);
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  const skipNextClearRef = useRef(false);
+  const eventDayPhasesProfileRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (eventDay) {
-      skipNextClearRef.current = true;
+      eventDayPhasesProfileRef.current = eventDay.operational_profile_id;
       setDate(eventDay.date);
       setDayOfWeek(eventDay.day_of_week);
       setWeather(eventDay.weather ?? '');
@@ -119,15 +120,6 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
     }
   }, [eventDay]);
 
-  useEffect(() => {
-    if (!selectedProfileId) return;
-    if (skipNextClearRef.current) {
-      skipNextClearRef.current = false;
-      return;
-    }
-    setEventDayPhases([]);
-  }, [selectedProfileId]);
-
   const profileOperationalPhases = useMemo(
     () => operationalPhases.filter((op) => op.operational_profile_id === selectedProfileId),
     [operationalPhases, selectedProfileId],
@@ -135,16 +127,26 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
 
   useEffect(() => {
     if (!selectedProfileId) return;
-    if (profileOperationalPhases.length === 0) return;
-    if (eventDayPhases.length > 0) return;
-    const sorted = [...profileOperationalPhases].sort((a, b) => a.sort_order - b.sort_order);
-    const autoPhases: EventDayPhaseCreatePayload[] = sorted.map((op) => ({
-      operational_phase_id: op.id,
-      start_min: null,
-      end_min: null,
-    }));
-    setEventDayPhases(autoPhases);
-  }, [profileOperationalPhases, selectedProfileId, eventDayPhases.length]);
+    const profileHasPhases = profileOperationalPhases.length > 0;
+    const profileIsSame = eventDayPhasesProfileRef.current === selectedProfileId;
+    const isPopulated = eventDayPhases.length > 0;
+
+    if (profileIsSame && isPopulated) return;
+
+    if (profileIsSame && !isPopulated) {
+      if (!profileHasPhases) return;
+      eventDayPhasesProfileRef.current = selectedProfileId;
+      setEventDayPhases(buildPhasesForProfile(selectedProfileId, profileOperationalPhases));
+      return;
+    }
+
+    eventDayPhasesProfileRef.current = selectedProfileId;
+    setEventDayPhases(
+      profileHasPhases
+        ? buildPhasesForProfile(selectedProfileId, profileOperationalPhases)
+        : [],
+    );
+  }, [selectedProfileId, profileOperationalPhases, eventDayPhases.length]);
 
   const operationalStartMin = useMemo(
     () => (operationalStartStr ? timeStrToMinutes(operationalStartStr) : 0),
@@ -193,6 +195,10 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
       setValidationError('Corregí los errores en las fases antes de guardar');
       return;
     }
+    if (!allPhasesBelongToProfile(resolvedPhases, profileOperationalPhases)) {
+      setValidationError('Las fases no pertenecen al perfil seleccionado. Volvé a seleccionar el perfil.');
+      return;
+    }
 
     const payload: EventDayCreatePayload = {
       date,
@@ -211,6 +217,16 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
       notes: notes || null,
       is_active: isActive,
     };
+
+    const debugProfileIds = new Set(operationalPhases.map((op) => op.id));
+    console.log('[P3.1D-DEBUG] submit', {
+      selectedProfileId,
+      operationalPhases: operationalPhases.map((op) => op.id),
+      profileOperationalPhases: profileOperationalPhases.map((op) => op.id),
+      eventDayPhases,
+      resolvedPhases: resolvedPhases.map((p) => ({ operational_phase_id: p.operational_phase_id, belongs: debugProfileIds.has(p.operational_phase_id) })),
+      payloadPhases: payload.phases,
+    });
 
     await onSave(payload);
   };
