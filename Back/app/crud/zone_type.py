@@ -3,6 +3,8 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.crud.zone_behavior import default_behavior
+from app.models.operational_phase import OperationalPhase
 from app.models.zone_type import ZoneType
 from app.schemas.zone_type import ZoneTypeCreate, ZoneTypeUpdate
 
@@ -11,7 +13,18 @@ class ZoneTypeCRUD:
     def create(self, db: Session, obj_in: ZoneTypeCreate) -> ZoneType:
         db_obj = ZoneType(**obj_in.model_dump())
         db.add(db_obj)
-        db.commit()
+        try:
+            db.flush()
+
+            # Integridad P3.1A: crear un ZoneBehavior por cada OperationalPhase existente.
+            phase_ids = db.execute(select(OperationalPhase.id)).scalars().all()
+            for phase_id in phase_ids:
+                db.add(default_behavior(phase_id, db_obj.id))
+
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
         db.refresh(db_obj)
         return db_obj
 

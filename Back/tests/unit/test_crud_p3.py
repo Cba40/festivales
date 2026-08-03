@@ -6,8 +6,9 @@ import os
 import uuid
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import create_engine, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import settings
 from app.crud import (
@@ -26,6 +27,7 @@ from app.crud import (
     update_operational_profile,
     update_operational_phase,
 )
+from app.crud.zone_type import zone_type as zone_type_crud
 from app.db.session import Base
 from app.schemas.event_day import EventDayCreate
 from app.schemas.event_day_phase import EventDayPhaseUpdate
@@ -34,6 +36,7 @@ from app.schemas.operational_event_modifier import OperationalEventModifierCreat
 from app.schemas.operational_phase import OperationalPhaseCreate
 from app.schemas.operational_profile import OperationalProfileCreate
 from app.schemas.zone_behavior import ZoneBehaviorCreate
+from app.schemas.zone_type import ZoneTypeCreate
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", settings.DATABASE_URL)
 
@@ -173,28 +176,26 @@ class TestOperationalPhaseCRUD:
 class TestZoneBehaviorCRUD:
 
     async def test_zone_behavior_composite_key_uniqueness(
-        self, async_session: AsyncSession, seed_profile_and_phase, seed_zone_types, clean_tables,
+        self, async_session: AsyncSession, seed_profile, seed_zone_types, clean_tables,
     ):
-        """§13: Crear dos ZoneBehavior con misma (phase_id, zone_type_id) → ValueError."""
-        profile_id, phase_id = seed_profile_and_phase
-        zt_id = "zt-estacionamiento"
-
-        await create_zone_behavior(
+        """P3.1A: la fase auto-genera el ZoneBehavior; replicar (phase_id, zone_type_id) → ValueError."""
+        profile_id = seed_profile
+        phase = await create_operational_phase(
             async_session,
-            ZoneBehaviorCreate(
-                operational_phase_id=phase_id,
-                zone_type_id=zt_id,
-                saturation_factor=1.0,
-                availability_factor=1.0,
-                resource_factor=1.0,
-                priority_weight=1.0,
+            OperationalPhaseCreate(
+                operational_profile_id=profile_id,
+                name="FaseUniqueness",
+                sort_order=70,
             ),
         )
+        # seed_zone_types se ejecutó antes que esta llamada: la fase ya tiene
+        # auto-generados sus ZoneBehavior para todos los ZoneType seedeados.
+        zt_id = "zt-estacionamiento"
         with pytest.raises(ValueError) as exc_info:
             await create_zone_behavior(
                 async_session,
                 ZoneBehaviorCreate(
-                    operational_phase_id=phase_id,
+                    operational_phase_id=phase.id,
                     zone_type_id=zt_id,
                     saturation_factor=2.0,
                     availability_factor=2.0,
@@ -461,3 +462,129 @@ class TestEventDayPhaseCRUD:
                 EventDayPhaseUpdate(operational_phase_id=fake_id),
             )
         assert "not found" in str(exc_info.value).lower()
+
+
+@pytest.fixture
+def sync_session():
+    """Sesión síncrona transaccional: el commit del CRUD solo libera el SAVEPOINT."""
+    sync_engine = create_engine(TEST_DATABASE_URL)
+    connection = sync_engine.connect()
+    transaction = connection.begin()
+    session = Session(bind=connection)
+    session.begin_nested()
+    yield session
+    session.close()
+    transaction.rollback()
+    connection.close()
+    sync_engine.dispose()
+
+
+@pytest.mark.asyncio
+class TestIntegrityP31A:
+    """P3.1A — Integridad del modelo operacional (comportamientos automáticos)."""
+
+    async def test_create_operational_phase_creates_behavior_for_each_zone_type(
+        self, async_session: AsyncSession, seed_zone_types, clean_tables,
+    ):
+        """Al crear una OperationalPhase se crea un ZoneBehavior para CADA ZoneType."""
+        from app.models.operational_profile import OperationalProfile
+        from app.models.zone_behavior import ZoneBehavior
+
+        profile = await create_operational_profile(
+            async_session, OperationalProfileCreate(name="P31A-Fase-ZT", description=""),
+        )
+        phase = await create_operational_phase(
+            async_session,
+            OperationalPhaseCreate(
+                operational_profile_id=profile.id,
+                name="FaseP31A",
+                sort_order=1,
+            ),
+        )
+
+        behaviors = (
+            await async_session.execute(
+                select(ZoneBehavior).where(ZoneBehavior.operational_phase_id == phase.id)
+            )
+        ).scalars().all()
+        # seed_zone_types crea 5 ZoneTypes → la fase debe tener 5 comportamientos
+        assert len(behaviors) == 5
+        for behavior in behaviors:
+            assert float(behavior.saturation_factor) == 1.0
+            assert float(behavior.availability_factor) == 1.0
+            assert float(behavior.resource_factor) == 1.0
+            assert float(behavior.priority_weight) == 1.0
+            assert behavior.density_factor == 0.5
+            assert behavior.flow_restriction == "OPEN"
+
+    def test_create_zone_type_creates_behavior_for_each_phase(
+        self, sync_session: Session,
+    ):
+        """Al crear un nuevo ZoneType se crea un ZoneBehavior para TODAS las fases."""
+        from app.models.operational_phase import OperationalPhase
+        from app.models.operational_profile import OperationalProfile
+        from app.models.zone_behavior import ZoneBehavior
+
+        profile = OperationalProfile(name="P31A-ZoneType", description="")
+        sync_session.add(profile)
+        sync_session.flush()
+
+        p1 = OperationalPhase(operational_profile_id=profile.id, name="F1", sort_order=1)
+        p2 = OperationalPhase(operational_profile_id=profile.id, name="F2", sort_order=2)
+        sync_session.add_all([p1, p2])
+        sync_session.flush()
+        phase_ids = {p1.id, p2.id}
+
+        zt = zone_type_crud.create(
+            sync_session,
+            ZoneTypeCreate(
+                name="NuevoTipoP31A",
+                slug="nuevo_tipo_p31a",
+                icon="x",
+                description="test",
+                default_factors={"saturation": 1.0},
+            ),
+        )
+
+        behaviors = (
+            sync_session.execute(
+                select(ZoneBehavior).where(ZoneBehavior.zone_type_id == zt.id)
+            )
+        ).scalars().all()
+        assert len(behaviors) == 2
+        assert {b.operational_phase_id for b in behaviors} == phase_ids
+        for behavior in behaviors:
+            assert float(behavior.saturation_factor) == 1.0
+            assert behavior.density_factor == 0.5
+            assert behavior.flow_restriction == "OPEN"
+
+    async def test_rollback_when_behavior_creation_fails(
+        self, async_session: AsyncSession, clean_tables,
+    ):
+        """Si la creación automática falla → rollback completo, sin datos parciales."""
+        from unittest.mock import patch
+
+        from app.models.operational_phase import OperationalPhase
+
+        profile = await create_operational_profile(
+            async_session, OperationalProfileCreate(name="P31A-Rollback", description=""),
+        )
+
+        with patch(
+            "app.crud.operational_phase.default_behavior",
+            side_effect=RuntimeError("boom"),
+        ):
+            with pytest.raises(RuntimeError):
+                await create_operational_phase(
+                    async_session,
+                    OperationalPhaseCreate(
+                        operational_profile_id=profile.id,
+                        name="FaseRollback",
+                        sort_order=1,
+                    ),
+                )
+
+        result = await async_session.execute(
+            select(OperationalPhase).where(OperationalPhase.name == "FaseRollback")
+        )
+        assert result.scalar_one_or_none() is None
