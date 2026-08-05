@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, ForeignKey, func
+from sqlalchemy import CheckConstraint, Float, ForeignKey, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.infrastructure.db.base import Base
@@ -17,6 +17,7 @@ class EventDayPhaseModel(Base):
     operational_phase_id: Mapped[UUID] = mapped_column(ForeignKey("operational_phases.id"), nullable=False)
     start_min: Mapped[int] = mapped_column(nullable=False)
     end_min: Mapped[int] = mapped_column(nullable=False)
+    intensity: Mapped[float] = mapped_column(Float, nullable=False, server_default=func.text('1.0'))
 
     __table_args__ = (
         CheckConstraint("start_min >= 0", name="ck_event_day_phases_start_min_non_negative"),

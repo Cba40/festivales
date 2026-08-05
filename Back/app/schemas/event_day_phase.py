@@ -9,6 +9,7 @@ class EventDayPhaseCreate(BaseModel):
     operational_phase_id: UUID
     start_min: int = Field(ge=0)
     end_min: int = Field(ge=0)
+    intensity: float = Field(ge=0)
 
     @model_validator(mode='after')
     def check_end_min(self) -> 'EventDayPhaseCreate':
@@ -21,6 +22,7 @@ class EventDayPhaseUpdate(BaseModel):
     operational_phase_id: Optional[UUID] = None
     start_min: Optional[int] = Field(default=None, ge=0)
     end_min: Optional[int] = None
+    intensity: Optional[float] = Field(default=None, ge=0)
 
     @model_validator(mode='after')
     def check_end_min(self) -> 'EventDayPhaseUpdate':
@@ -36,6 +38,7 @@ class EventDayPhaseResponse(BaseModel):
     operational_phase_id: UUID
     start_min: int
     end_min: int
+    intensity: float
     created_at: datetime
     updated_at: datetime
 

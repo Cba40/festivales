@@ -9,19 +9,12 @@ from app.models.attendance_level import AttendanceLevel
 from app.models.event_day import EventDay
 from app.models.event_day_phase import EventDayPhase
 from app.models.operational_phase import OperationalPhase
-from app.models.operational_profile import OperationalProfile
 from app.schemas.event_day import EventDayCreate, EventDayUpdate
 
 logger = logging.getLogger(__name__)
 
 
 async def create(db: AsyncSession, obj_in: EventDayCreate, event_id: str) -> EventDay:
-    profile = await db.get(OperationalProfile, obj_in.operational_profile_id)
-    if not profile:
-        raise ValueError(
-            f"OperationalProfile with id '{obj_in.operational_profile_id}' not found"
-        )
-
     attendance_level = await db.get(AttendanceLevel, obj_in.attendance_level_id)
     if not attendance_level:
         raise ValueError(
@@ -43,12 +36,6 @@ async def create(db: AsyncSession, obj_in: EventDayCreate, event_id: str) -> Eve
             raise ValueError(
                 f"OperationalPhase with id '{phase_in.operational_phase_id}' not found"
             )
-        if op_phase.operational_profile_id != obj_in.operational_profile_id:
-            raise ValueError(
-                f"OperationalPhase with id '{phase_in.operational_phase_id}' "
-                f"does not belong to OperationalProfile "
-                f"'{obj_in.operational_profile_id}'"
-            )
 
     db.add(db_obj)
     await db.flush()
@@ -59,6 +46,7 @@ async def create(db: AsyncSession, obj_in: EventDayCreate, event_id: str) -> Eve
             operational_phase_id=phase_in.operational_phase_id,
             start_min=phase_in.start_min,
             end_min=phase_in.end_min,
+            intensity=phase_in.intensity,
         )
         db.add(ed_phase)
 
@@ -96,16 +84,6 @@ async def update(
     logger.info("CRUD update - cantidad de fases recibidas=%s", len(update_data.get("phases", [])))
     # DEBUG 422 END
 
-    if "operational_profile_id" in update_data:
-        profile = await db.get(OperationalProfile, update_data["operational_profile_id"])
-        if not profile:
-            # DEBUG 422 BEGIN
-            logger.info("CRUD update - OperationalProfile inexistente - UUID=%s", update_data["operational_profile_id"])
-            # DEBUG 422 END
-            raise ValueError(
-                f"OperationalProfile with id '{update_data['operational_profile_id']}' not found"
-            )
-
     if "attendance_level_id" in update_data:
         al = await db.get(AttendanceLevel, update_data["attendance_level_id"])
         if not al:
@@ -129,10 +107,6 @@ async def update(
 
     phases_data = update_data.pop("phases", None)
 
-    target_profile_id = update_data.get(
-        "operational_profile_id", db_obj.operational_profile_id,
-    )
-
     if phases_data is not None:
         for phase_in in phases_data:
             op_phase = await db.get(OperationalPhase, phase_in["operational_phase_id"])
@@ -140,22 +114,6 @@ async def update(
                 raise ValueError(
                     f"OperationalPhase with id "
                     f"'{phase_in['operational_phase_id']}' not found"
-                )
-            if op_phase.operational_profile_id != target_profile_id:
-                raise ValueError(
-                    f"OperationalPhase with id "
-                    f"'{phase_in['operational_phase_id']}' "
-                    f"does not belong to OperationalProfile "
-                    f"'{target_profile_id}'"
-                )
-    else:
-        if target_profile_id != db_obj.operational_profile_id:
-            existing = await db.execute(
-                select(EventDayPhase).where(EventDayPhase.event_day_id == db_obj.id)
-            )
-            if existing.scalars().first() is not None:
-                raise ValueError(
-                    "operational_profile_id cannot change without providing new 'phases'"
                 )
 
     for field, value in update_data.items():
@@ -182,6 +140,7 @@ async def update(
                 operational_phase_id=phase_in["operational_phase_id"],
                 start_min=phase_in["start_min"],
                 end_min=phase_in["end_min"],
+                intensity=phase_in["intensity"],
             )
             db.add(ed_phase)
 

@@ -15,7 +15,7 @@ class EventDayCreate(BaseModel):
     estimated_attendance: int = 0
     notes: Optional[str] = None
     is_active: bool = True
-    operational_profile_id: UUID
+    operational_profile_id: Optional[UUID] = None
     attendance_level_id: str
     operational_start_min: int = Field(ge=0)
     operational_end_min: int = Field(ge=0)
@@ -60,7 +60,7 @@ class EventDayResponse(BaseModel):
     estimated_attendance: int
     notes: Optional[str]
     is_active: bool
-    operational_profile_id: UUID
+    operational_profile_id: Optional[UUID] = None
     attendance_level_id: str
     operational_start_min: int
     operational_end_min: int
@@ -90,7 +90,7 @@ class EventDaySummary(BaseModel):
     headliner_artist: Optional[str]
     estimated_attendance: int
     is_active: bool
-    operational_profile_id: UUID
+    operational_profile_id: Optional[UUID] = None
     attendance_level_id: str
     operational_start_min: int
     operational_end_min: int

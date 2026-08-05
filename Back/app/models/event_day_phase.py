@@ -2,7 +2,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import CheckConstraint, DateTime, Float, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -25,6 +25,7 @@ class EventDayPhase(Base):
     )
     start_min: Mapped[int] = mapped_column(Integer, nullable=False)
     end_min: Mapped[int] = mapped_column(Integer, nullable=False)
+    intensity: Mapped[float] = mapped_column(Float, nullable=False, server_default=func.text('1.0'))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

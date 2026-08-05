@@ -22,12 +22,6 @@ async def create(
     event_day = await db.get(EventDay, event_day_id)
     if not event_day:
         raise ValueError(f"EventDay with id '{event_day_id}' not found")
-    if op_phase.operational_profile_id != event_day.operational_profile_id:
-        raise ValueError(
-            f"OperationalPhase with id '{obj_in.operational_phase_id}' "
-            f"does not belong to OperationalProfile "
-            f"'{event_day.operational_profile_id}'"
-        )
 
     if obj_in.end_min <= obj_in.start_min:
         raise ValueError("end_min must be greater than start_min")
@@ -37,6 +31,7 @@ async def create(
         operational_phase_id=obj_in.operational_phase_id,
         start_min=obj_in.start_min,
         end_min=obj_in.end_min,
+        intensity=obj_in.intensity,
     )
     db.add(db_obj)
     await db.flush()
@@ -75,13 +70,6 @@ async def update(
         if not event_day:
             raise ValueError(
                 f"EventDay with id '{db_obj.event_day_id}' not found"
-            )
-        if op_phase.operational_profile_id != event_day.operational_profile_id:
-            raise ValueError(
-                f"OperationalPhase with id "
-                f"'{update_data['operational_phase_id']}' "
-                f"does not belong to OperationalProfile "
-                f"'{event_day.operational_profile_id}'"
             )
 
     if "start_min" in update_data or "end_min" in update_data:

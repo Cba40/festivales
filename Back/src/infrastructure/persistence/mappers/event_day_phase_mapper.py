@@ -11,6 +11,7 @@ def event_day_phase_to_domain(model: EventDayPhaseModel) -> EventDayPhase:
         operational_phase_id=model.operational_phase_id,
         start_min=model.start_min,
         end_min=model.end_min,
+        intensity=model.intensity,
     )
 
 
@@ -21,4 +22,5 @@ def event_day_phase_to_model(entity: EventDayPhase) -> EventDayPhaseModel:
         operational_phase_id=entity.operational_phase_id,
         start_min=entity.start_min,
         end_min=entity.end_min,
+        intensity=entity.intensity,
     )

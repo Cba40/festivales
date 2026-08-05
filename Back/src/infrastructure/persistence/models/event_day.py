@@ -14,7 +14,7 @@ class EventDayModel(Base):
 
     id: Mapped[UUID] = mapped_column(primary_key=True, server_default=func.gen_random_uuid())
     event_date: Mapped[date] = mapped_column(nullable=False)
-    operational_profile_id: Mapped[UUID] = mapped_column(ForeignKey("operational_profiles.id"), nullable=False)
+    operational_profile_id: Mapped[UUID | None] = mapped_column(ForeignKey("operational_profiles.id"), nullable=True)
     attendance_level_id: Mapped[UUID] = mapped_column(ForeignKey("attendance_levels.id"), nullable=False)
     operational_start_min: Mapped[int] = mapped_column(nullable=False)
     operational_end_min: Mapped[int] = mapped_column(nullable=False)

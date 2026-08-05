@@ -28,8 +28,8 @@ class EventDay(Base):
     estimated_attendance: Mapped[int] = mapped_column(Integer, nullable=False)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    operational_profile_id: Mapped[UUID] = mapped_column(
-        ForeignKey("operational_profiles.id"), nullable=False,
+    operational_profile_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("operational_profiles.id"), nullable=True,
     )
     attendance_level_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("attendance_levels.id"), nullable=False,

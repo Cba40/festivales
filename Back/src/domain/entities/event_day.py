@@ -16,7 +16,7 @@ class EventDay:
     def __init__(
         self,
         event_date: date,
-        operational_profile_id: UUID,
+        operational_profile_id: UUID | None,
         attendance_level_id: UUID,
         operational_start_min: int,
         operational_end_min: int,
@@ -50,7 +50,7 @@ class EventDay:
         return self._event_date
 
     @property
-    def operational_profile_id(self) -> UUID:
+    def operational_profile_id(self) -> UUID | None:
         return self._operational_profile_id
 
     @property
@@ -83,8 +83,8 @@ class EventDay:
             raise TypeError("id must be a UUID")
         if not isinstance(event_date, date):
             raise TypeError("event_date must be a date")
-        if not isinstance(operational_profile_id, UUID):
-            raise TypeError("operational_profile_id must be a UUID")
+        if operational_profile_id is not None and not isinstance(operational_profile_id, UUID):
+            raise TypeError("operational_profile_id must be a UUID or None")
         if not isinstance(attendance_level_id, UUID):
             raise TypeError("attendance_level_id must be a UUID")
         if isinstance(operational_start_min, bool) or not isinstance(operational_start_min, int):
