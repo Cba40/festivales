@@ -152,7 +152,10 @@ export function OperationalProfileScreen() {
   return (
     <div className="min-h-screen bg-slate-50 w-full">
       <header className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center">
-        <h1 className="text-xl font-bold text-slate-800">Gestión de Perfiles Operativos</h1>
+        <div>
+          <h1 className="text-xl font-bold text-slate-800">Gestión de Perfiles Operativos</h1>
+          <p className="text-xs text-amber-600 font-medium mt-0.5">DEPRECADO — se mantiene solo por compatibilidad administrativa. Los días del evento ya se configuran con sus propias fases (EventDay).</p>
+        </div>
         {!showForm && (
           <button
             onClick={handleNew}

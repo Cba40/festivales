@@ -1,11 +1,9 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { EventDayPhaseEditor, validatePhases } from './EventDayPhaseEditor';
-import { useOperationalProfiles } from '../hooks/useOperationalProfiles';
 import { useAttendanceLevels } from '../hooks/useAttendanceLevels';
-import { useOperationalPhases } from '../hooks/useOperationalPhases';
+import { useOperationalPhaseCatalog } from '../hooks/useOperationalPhaseCatalog';
 import type { NormalizedPhase } from '../utils/operationalMinutes';
 import { minutesToTimeStr, timeStrToMinutes, resolveOperationalMinutes, resolveOperationalWindow } from '../utils/operationalMinutes';
-import { buildPhasesForProfile, allPhasesBelongToProfile } from '../utils/eventDayPhases';
 import type {
   EventDay, EventDayCreatePayload, EventDayPhaseCreatePayload,
 } from '../types';
@@ -80,12 +78,10 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
   const [notes, setNotes] = useState('');
   const [isActive, setIsActive] = useState(true);
 
-  const [selectedProfileId, setSelectedProfileId] = useState('');
   const [selectedLevelId, setSelectedLevelId] = useState('');
 
-  const { profiles, loading: profilesLoading } = useOperationalProfiles();
   const { levels, loading: levelsLoading } = useAttendanceLevels();
-  const { phases: operationalPhases, loading: operationalPhasesLoading } = useOperationalPhases(selectedProfileId);
+  const { byId: operationalPhaseCatalog, loading: operationalPhasesLoading } = useOperationalPhaseCatalog();
 
   const [operationalStartStr, setOperationalStartStr] = useState('');
   const [operationalEndStr, setOperationalEndStr] = useState('');
@@ -93,16 +89,12 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
   const [eventDayPhases, setEventDayPhases] = useState<EventDayPhaseCreatePayload[]>([]);
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  const eventDayPhasesProfileRef = useRef<string | null>(null);
-
   useEffect(() => {
     if (eventDay) {
-      eventDayPhasesProfileRef.current = eventDay.operational_profile_id;
       setDate(eventDay.date);
       setDayOfWeek(eventDay.day_of_week);
       setWeather(eventDay.weather ?? '');
       setHeadlinerArtist(eventDay.headliner_artist ?? '');
-      setSelectedProfileId(eventDay.operational_profile_id);
       setSelectedLevelId(eventDay.attendance_level_id);
       setOperationalStartStr(minutesToTimeStr(eventDay.operational_start_min));
       setOperationalEndStr(minutesToTimeStr(eventDay.operational_end_min));
@@ -114,39 +106,12 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
             operational_phase_id: p.operational_phase_id,
             start_min: p.start_min,
             end_min: p.end_min,
+            intensity: p.intensity ?? 1,
           })),
         );
       }
     }
   }, [eventDay]);
-
-  const profileOperationalPhases = useMemo(
-    () => operationalPhases.filter((op) => op.operational_profile_id === selectedProfileId),
-    [operationalPhases, selectedProfileId],
-  );
-
-  useEffect(() => {
-    if (!selectedProfileId) return;
-    const profileHasPhases = profileOperationalPhases.length > 0;
-    const profileIsSame = eventDayPhasesProfileRef.current === selectedProfileId;
-    const isPopulated = eventDayPhases.length > 0;
-
-    if (profileIsSame && isPopulated) return;
-
-    if (profileIsSame && !isPopulated) {
-      if (!profileHasPhases) return;
-      eventDayPhasesProfileRef.current = selectedProfileId;
-      setEventDayPhases(buildPhasesForProfile(selectedProfileId, profileOperationalPhases));
-      return;
-    }
-
-    eventDayPhasesProfileRef.current = selectedProfileId;
-    setEventDayPhases(
-      profileHasPhases
-        ? buildPhasesForProfile(selectedProfileId, profileOperationalPhases)
-        : [],
-    );
-  }, [selectedProfileId, profileOperationalPhases, eventDayPhases.length]);
 
   const operationalStartMin = useMemo(
     () => (operationalStartStr ? timeStrToMinutes(operationalStartStr) : 0),
@@ -155,6 +120,11 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
   const operationalEndMin = useMemo(
     () => (operationalEndStr ? timeStrToMinutes(operationalEndStr) : 0),
     [operationalEndStr],
+  );
+
+  const operationalPhases = useMemo(
+    () => Object.values(operationalPhaseCatalog).sort((a, b) => a.sort_order - b.sort_order),
+    [operationalPhaseCatalog],
   );
 
   const resolvedPhases = useMemo(
@@ -172,18 +142,13 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
     [resolvedPhases, operationalStartMin, resolvedOpEnd],
   );
 
-  const sortedOperationalPhases = useMemo(
-    () => [...profileOperationalPhases].sort((a, b) => a.sort_order - b.sort_order),
-    [profileOperationalPhases],
-  );
-
   const selectedLevel = levels.find((l) => l.id === selectedLevelId);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setValidationError(null);
 
-    if (!date || !dayOfWeek || !selectedProfileId || !selectedLevelId) {
+    if (!date || !dayOfWeek || !selectedLevelId) {
       setValidationError('Completá todos los campos obligatorios');
       return;
     }
@@ -195,15 +160,11 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
       setValidationError('Corregí los errores en las fases antes de guardar');
       return;
     }
-    if (!allPhasesBelongToProfile(resolvedPhases, profileOperationalPhases)) {
-      setValidationError('Las fases no pertenecen al perfil seleccionado. Volvé a seleccionar el perfil.');
-      return;
-    }
 
     const payload: EventDayCreatePayload = {
       date,
       day_of_week: dayOfWeek,
-      operational_profile_id: selectedProfileId,
+      operational_profile_id: eventDay?.operational_profile_id ?? '',
       attendance_level_id: selectedLevelId,
       operational_start_min: operationalStartMin,
       operational_end_min: resolvedOpEnd,
@@ -211,6 +172,7 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
         operational_phase_id: p.operational_phase_id,
         start_min: p.start_min,
         end_min: p.end_min,
+        intensity: p.intensity,
       })),
       weather: weather || null,
       headliner_artist: headlinerArtist || null,
@@ -218,20 +180,10 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
       is_active: isActive,
     };
 
-    const debugProfileIds = new Set(operationalPhases.map((op) => op.id));
-    console.log('[P3.1D-DEBUG] submit', {
-      selectedProfileId,
-      operationalPhases: operationalPhases.map((op) => op.id),
-      profileOperationalPhases: profileOperationalPhases.map((op) => op.id),
-      eventDayPhases,
-      resolvedPhases: resolvedPhases.map((p) => ({ operational_phase_id: p.operational_phase_id, belongs: debugProfileIds.has(p.operational_phase_id) })),
-      payloadPhases: payload.phases,
-    });
-
     await onSave(payload);
   };
 
-  const hasPhases = selectedProfileId && eventDayPhases.length > 0;
+  const hasPhases = eventDayPhases.length > 0;
   const hasAnyFilledPhase = resolvedPhases.some((p) => p.start_min !== null && p.end_min !== null);
 
   return (
@@ -259,22 +211,6 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
             <option value="">Seleccionar...</option>
             {DAYS_OF_WEEK.map((d) => (
               <option key={d} value={d}>{d.charAt(0).toUpperCase() + d.slice(1)}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-slate-700 mb-1">Perfil operativo *</label>
-          <select
-            value={selectedProfileId}
-            onChange={(e) => { setSelectedProfileId(e.target.value); }}
-            required
-            disabled={profilesLoading}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-          >
-            <option value="">{profilesLoading ? 'Cargando perfiles...' : 'Seleccionar perfil...'}</option>
-            {profiles.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>
         </div>
@@ -327,15 +263,13 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
         </div>
       </div>
 
-      {selectedProfileId && (
+      {operationalPhasesLoading ? (
+        <div className="text-xs text-slate-400">Cargando fases operativas...</div>
+      ) : (
         <div className="border-t border-slate-200 pt-4">
-          {operationalPhasesLoading ? (
-            <div className="text-xs text-slate-400">Cargando fases del perfil...</div>
-          ) : (
-            <>
-              <EventDayPhaseEditor
+<EventDayPhaseEditor
                 phases={eventDayPhases}
-                operationalPhases={sortedOperationalPhases}
+                operationalPhases={operationalPhases}
                 onChange={setEventDayPhases}
                 errors={currentPhaseErrors}
               />
@@ -345,12 +279,10 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
                     phases={resolvedPhases}
                     operationalStartMin={operationalStartMin}
                     operationalEndMin={operationalEndMin}
-                    operationalPhases={sortedOperationalPhases}
+                    operationalPhases={operationalPhases}
                   />
                 </div>
               )}
-            </>
-          )}
         </div>
       )}
 
@@ -424,7 +356,7 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
         </button>
         <button
           type="submit"
-          disabled={saving || !date || !dayOfWeek || !selectedProfileId || !selectedLevelId || !operationalStartStr || !operationalEndStr}
+          disabled={saving || !date || !dayOfWeek || !selectedLevelId || !operationalStartStr || !operationalEndStr}
           className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
         >
           {saving ? 'Guardando...' : isEditing ? 'Actualizar' : 'Crear día'}

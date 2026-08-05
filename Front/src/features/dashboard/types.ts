@@ -95,6 +95,7 @@ export interface EventDayPhaseDTO {
   operational_phase_id: string;
   start_min: number;
   end_min: number;
+  intensity: number;
   created_at: string;
   updated_at: string;
 }
@@ -103,12 +104,14 @@ export interface EventDayPhaseCreatePayload {
   operational_phase_id: string;
   start_min: number | null;
   end_min: number | null;
+  intensity: number;
 }
 
 export interface EventDayPhaseUpdatePayload {
   operational_phase_id?: string;
   start_min?: number;
   end_min?: number;
+  intensity?: number;
 }
 
 export interface EventDaySummary {

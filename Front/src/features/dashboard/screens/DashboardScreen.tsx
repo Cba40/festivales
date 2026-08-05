@@ -28,9 +28,9 @@ export function DashboardScreen() {
           </button>
           <button
             onClick={() => navigate('/dashboard/profiles')}
-            className="text-sm bg-amber-600 hover:bg-amber-700 text-white py-1 px-3 rounded font-medium"
+            className="text-sm bg-amber-600 hover:bg-amber-700 text-white py-1 px-3 rounded font-medium opacity-70"
           >
-            Perfiles
+            Perfiles *DEPRECADO*
           </button>
 
           <button

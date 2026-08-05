@@ -4,6 +4,7 @@ export interface NormalizedPhase {
   operational_phase_id: string;
   start_min: number | null;
   end_min: number | null;
+  intensity: number;
 }
 
 const DAY_MINUTES = 1440;
@@ -48,7 +49,7 @@ export function resolveOperationalMinutes(
 
   return sortedPhases.map((phase) => {
     if (phase.start_min === null || phase.end_min === null) {
-      return { start_min: null, end_min: null, operational_phase_id: phase.operational_phase_id };
+      return { start_min: null, end_min: null, operational_phase_id: phase.operational_phase_id, intensity: phase.intensity };
     }
 
     let start = phase.start_min + offset;
@@ -67,6 +68,6 @@ export function resolveOperationalMinutes(
 
     previousEnd = end;
 
-    return { start_min: start, end_min: end, operational_phase_id: phase.operational_phase_id };
+    return { start_min: start, end_min: end, operational_phase_id: phase.operational_phase_id, intensity: phase.intensity };
   });
 }

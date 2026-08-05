@@ -28,12 +28,16 @@ export function EventDayPhaseEditor({
   const [showAddSelector, setShowAddSelector] = useState(false);
 
   const addPhase = useCallback((opId: string) => {
-    onChange(insertSorted(phases, { operational_phase_id: opId, start_min: null, end_min: null }, operationalPhases));
+    onChange(insertSorted(phases, { operational_phase_id: opId, start_min: null, end_min: null, intensity: 1 }, operationalPhases));
     setShowAddSelector(false);
   }, [phases, onChange, operationalPhases]);
 
   const setTime = useCallback((index: number, field: 'start_min' | 'end_min', value: number | null) => {
     onChange(phases.map((p, i) => (i === index ? { ...p, [field]: value } : p)));
+  }, [phases, onChange]);
+
+  const setIntensity = useCallback((index: number, value: number) => {
+    onChange(phases.map((p, i) => (i === index ? { ...p, intensity: value } : p)));
   }, [phases, onChange]);
 
   const deletePhase = useCallback((index: number) => {
@@ -66,6 +70,7 @@ export function EventDayPhaseEditor({
               <th className="text-left py-2 pr-2 text-slate-500 font-medium">Comportamiento</th>
               <th className="text-left py-2 px-2 text-slate-500 font-medium">Inicio</th>
               <th className="text-left py-2 px-2 text-slate-500 font-medium">Fin</th>
+              <th className="text-left py-2 px-2 text-slate-500 font-medium">Intensidad</th>
               <th className="text-right py-2 pl-2 text-slate-500 font-medium">Acciones</th>
             </tr>
           </thead>
@@ -105,6 +110,19 @@ export function EventDayPhaseEditor({
                         setTime(index, 'end_min', val ? timeStrToMinutes(val) : null);
                       }}
                       className="w-28 px-2 py-1 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </td>
+                  <td className="py-2 px-2">
+                    <input
+                      type="number"
+                      min={0.1}
+                      step={0.1}
+                      value={phase.intensity}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        if (Number.isFinite(val) && val > 0) setIntensity(index, val);
+                      }}
+                      className="w-20 px-2 py-1 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </td>
                   <td className="py-2 pl-2 text-right whitespace-nowrap">
