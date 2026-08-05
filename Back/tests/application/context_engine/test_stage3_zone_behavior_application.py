@@ -398,6 +398,74 @@ class TestActiveRestriction:
         assert app.active_restriction == FlowRestriction.CLOSED
 
 
+class TestSpatialContextTransport:
+    def test_zone_entity_with_spatial_data_flows_into_stage3(
+        self,
+        peak_phase: OperationalPhase,
+        active_day_phase: EventDayPhase,
+        timestamp: datetime,
+        parking_type: UUID,
+        zone_behaviors: Mapping[tuple[UUID, UUID], ZoneBehavior],
+        normal_attendance: AttendanceLevel,
+    ) -> None:
+        zone = Zone(
+            id=UUID("a0000000-0000-0000-0000-000000000099"),
+            name="Plaza Central",
+            zone_type_id=parking_type,
+            capacity=100,
+            latitude=-31.4135,
+            longitude=-64.1811,
+            reference_point_distance=1250.75,
+        )
+        evaluation_result = _make_evaluation_result(
+            peak_phase, active_day_phase, timestamp
+        )
+
+        result = apply_zone_behaviors(
+            zones=[zone],
+            zone_behaviors=zone_behaviors,
+            attendance_level=normal_attendance,
+            evaluation_result=evaluation_result,
+        )
+
+        assert zone.id in result.zone_applications
+        assert zone.latitude == -31.4135
+        assert zone.longitude == -64.1811
+        assert zone.reference_point_distance == 1250.75
+
+    def test_spatial_attributes_survive_without_events(
+        self,
+        peak_phase: OperationalPhase,
+        active_day_phase: EventDayPhase,
+        timestamp: datetime,
+        parking_type: UUID,
+        zone_behaviors: Mapping[tuple[UUID, UUID], ZoneBehavior],
+        normal_attendance: AttendanceLevel,
+    ) -> None:
+        zone = Zone(
+            id=UUID("a0000000-0000-0000-0000-000000000098"),
+            name="Zona Sur",
+            zone_type_id=parking_type,
+            capacity=200,
+            latitude=-31.5,
+            longitude=-64.2,
+            reference_point_distance=None,
+        )
+        evaluation_result = _make_evaluation_result(
+            peak_phase, active_day_phase, timestamp
+        )
+
+        result = apply_zone_behaviors(
+            zones=[zone],
+            zone_behaviors=zone_behaviors,
+            attendance_level=normal_attendance,
+            evaluation_result=evaluation_result,
+        )
+
+        assert zone.id in result.zone_applications
+        assert zone.reference_point_distance is None
+
+
 class TestBehaviorNotFound:
     def test_raises_error_when_behavior_missing(
         self,

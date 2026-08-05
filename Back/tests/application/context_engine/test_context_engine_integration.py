@@ -349,6 +349,57 @@ class TestFullPipeline:
             assert s1.reasoning_factors == s2.reasoning_factors
 
 
+class TestSpatialTransportThroughPipeline:
+    def test_zone_entity_with_spatial_data_flows_through_stages(
+        self,
+        engine: ContextEngine,
+        timestamp: datetime,
+        zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
+        operational_phases: dict[UUID, OperationalPhase],
+        normal_attendance: AttendanceLevel,
+        event_day: EventDay,
+        parking_type: UUID,
+    ) -> None:
+        zones = [
+            Zone(
+                id=UUID("a0000000-0000-0000-0000-000000000001"),
+                name="Parking Norte",
+                zone_type_id=parking_type,
+                capacity=500,
+                latitude=-31.4135,
+                longitude=-64.1811,
+                reference_point_distance=1250.75,
+            ),
+            Zone(
+                id=UUID("a0000000-0000-0000-0000-000000000002"),
+                name="Sector Gastronomico",
+                zone_type_id=UUID("b0000000-0000-0000-0000-000000000001"),
+                capacity=2000,
+                latitude=-31.42,
+                longitude=-64.19,
+                reference_point_distance=800.0,
+            ),
+        ]
+
+        result = engine.predict(
+            timestamp=timestamp,
+            zones=zones,
+            zone_behaviors=zone_behaviors,
+            operational_phases=operational_phases,
+            attendance_level=normal_attendance,
+            event_day=event_day,
+            events=[],
+        )
+
+        assert len(result.zone_states) == 2
+        assert result.zone_states[0].zone_id == zones[0].id
+        assert result.zone_states[1].zone_id == zones[1].id
+        assert zones[0].reference_point_distance == 1250.75
+        assert zones[1].reference_point_distance == 800.0
+        assert zones[0].latitude == -31.4135
+        assert zones[1].longitude == -64.19
+
+
 class TestErrorPropagation:
     def test_phase_not_found_propagates(
         self,

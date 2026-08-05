@@ -5,6 +5,7 @@ GetTerritorialPrediction with infrastructure dependencies.
 """
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from datetime import date, datetime
 from uuid import UUID
@@ -13,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.models.event import Event as EventORM
 from app.models.zone import Zone as ZoneORM
 from app.models.zone_type import ZoneType as ZoneTypeORM
 from app.models.zone_behavior import ZoneBehavior as ZoneBehaviorORM
@@ -45,6 +47,56 @@ from src.domain.value_objects.territorial_prediction import TerritorialPredictio
 # Private helpers — data loading from the legacy ORM layer
 # ---------------------------------------------------------------------------
 
+_EARTH_RADIUS_M = 6_371_000.0
+
+
+def _haversine_distance_m(
+    lat1: float,
+    lon1: float,
+    lat2: float,
+    lon2: float,
+) -> float:
+    """Great-circle distance between two coordinates in meters (Haversine)."""
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    d_phi = math.radians(lat2 - lat1)
+    d_lambda = math.radians(lon2 - lon1)
+    a = (
+        math.sin(d_phi / 2.0) ** 2
+        + math.cos(phi1) * math.cos(phi2) * math.sin(d_lambda / 2.0) ** 2
+    )
+    c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
+    return _EARTH_RADIUS_M * c
+
+
+def _distance_to_reference(
+    ref_lat: float | None,
+    ref_lng: float | None,
+    lat: float | None,
+    lng: float | None,
+) -> float | None:
+    if ref_lat is None or ref_lng is None or lat is None or lng is None:
+        return None
+    return _haversine_distance_m(ref_lat, ref_lng, lat, lng)
+
+
+async def _load_event_reference_point(
+    db: AsyncSession,
+    event_id: str,
+) -> tuple[float | None, float | None]:
+    stmt = (
+        select(
+            EventORM.reference_point_latitude,
+            EventORM.reference_point_longitude,
+        )
+        .where(EventORM.id == event_id)
+    )
+    row = (await db.execute(stmt)).one_or_none()
+    if row is None:
+        return None, None
+    return row.reference_point_latitude, row.reference_point_longitude
+
+
 async def _load_zone_type_map(db: AsyncSession) -> dict[str, UUID]:
     stmt = select(ZoneTypeORM)
     rows = (await db.execute(stmt)).scalars().all()
@@ -55,6 +107,8 @@ async def _load_zones(
     db: AsyncSession,
     event_id: str,
     type_map: dict[str, UUID],
+    ref_lat: float | None = None,
+    ref_lng: float | None = None,
 ) -> list[Zone]:
     stmt = select(ZoneORM).where(ZoneORM.event_id == event_id)
     rows = (await db.execute(stmt)).scalars().all()
@@ -70,6 +124,11 @@ async def _load_zones(
             capacity=r.capacity,
             type=r.type,
             subtipo=r.subtipo,
+            latitude=r.latitude,
+            longitude=r.longitude,
+            reference_point_distance=_distance_to_reference(
+                ref_lat, ref_lng, r.latitude, r.longitude,
+            ),
         ))
     return zones
 
@@ -235,7 +294,8 @@ class PredictionModule:
     ) -> TerritorialPrediction | None:
         local_ts = timestamp.astimezone(LOCAL_TZ)
         type_map = await _load_zone_type_map(self._db)
-        zones = await _load_zones(self._db, event_id, type_map)
+        ref_lat, ref_lng = await _load_event_reference_point(self._db, event_id)
+        zones = await _load_zones(self._db, event_id, type_map, ref_lat, ref_lng)
         if not zones:
             return None
 
