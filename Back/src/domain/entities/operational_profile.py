@@ -4,6 +4,14 @@ from src.domain.entities.operational_phase import OperationalPhase
 
 
 class OperationalProfile:
+    """Entidad de compatibilidad (DEPRECADA).
+
+    RFC-007: OperationalProfile deja de formar parte del flujo operativo.
+    No modifica el comportamiento del motor. Se conserva unicamente para
+    compatibilidad con configuraciones previas; la temporalidad y la
+    evolucion de la intensidad pertenecen a las fases del EventDay.
+    """
+
     def __init__(
         self,
         name: str,

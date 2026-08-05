@@ -5,6 +5,14 @@ from src.domain.entities.event_day_phase import EventDayPhase
 
 
 class EventDay:
+    """Concentra la configuracion operacional de una jornada.
+
+    RFC-007: EventDay agrupa fecha, horario operativo, rango de concurrencia
+    (AttendanceLevel) y la coleccion de fases (EventDayPhase). La evolucion
+    temporal del evento pertenece a las fases. OperationalProfile queda
+    deprecado como entidad de compatibilidad.
+    """
+
     def __init__(
         self,
         event_date: date,
