@@ -21,6 +21,7 @@ from app.models.event_day import EventDay as EventDayORM
 from app.models.operational_profile import OperationalProfile as OperationalProfileORM
 from app.models.operational_phase import OperationalPhase as OperationalPhaseORM
 from src.application.context_engine import ContextEngine
+from src.application.context_engine.stage1_context_resolution import LOCAL_TZ
 from src.application.use_cases.generate_prediction import GeneratePrediction
 from src.application.use_cases.get_prediction import GetTerritorialPrediction
 from src.domain.entities.attendance_level import AttendanceLevel
@@ -232,6 +233,7 @@ class PredictionModule:
         timestamp: datetime,
         event_id: str,
     ) -> TerritorialPrediction | None:
+        local_ts = timestamp.astimezone(LOCAL_TZ)
         type_map = await _load_zone_type_map(self._db)
         zones = await _load_zones(self._db, event_id, type_map)
         if not zones:
@@ -242,7 +244,7 @@ class PredictionModule:
         ed_row = (
             await self._db.execute(
                 select(EventDayORM)
-                .where(EventDayORM.date == timestamp.date())
+                .where(EventDayORM.date == local_ts.date())
                 .options(selectinload(EventDayORM.phases))
             )
         ).scalar_one_or_none()
@@ -299,7 +301,7 @@ class PredictionModule:
         )
 
         prediction = await use_case.execute(
-            timestamp=timestamp,
+            timestamp=local_ts,
             zones=zones,
             zone_behaviors=zone_behaviors,
             attendance_level=attendance_level,
