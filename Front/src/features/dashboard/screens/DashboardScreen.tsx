@@ -69,6 +69,12 @@ export function DashboardScreen() {
           >
             Admin. Zonas
           </button>
+          <button
+            onClick={() => navigate('/dashboard/reference-point')}
+            className="text-sm bg-sky-600 hover:bg-sky-700 text-white py-1 px-3 rounded font-medium"
+          >
+            Referencia Oper.
+          </button>
           <button 
             onClick={() => refresh()}
             disabled={loading}

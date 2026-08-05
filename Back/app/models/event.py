@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Optional
 
 from geoalchemy2 import Geometry
-from sqlalchemy import DateTime, String, Text, func
+from sqlalchemy import DateTime, Float, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -21,6 +21,8 @@ class Event(Base):
     geometry: Mapped[Optional[str]] = mapped_column(Geometry("POLYGON"), nullable=True)
     start_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     end_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    reference_point_latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    reference_point_longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

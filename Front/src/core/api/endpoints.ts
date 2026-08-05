@@ -4,6 +4,7 @@ export const endpoints = {
   },
   events: {
     get: (id: string) => `/events/${id}`,
+    update: (id: string) => `/events/${id}`,
   },
   zones: {
     list: (eventId: string) => `/events/${eventId}/zones`,

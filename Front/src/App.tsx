@@ -27,6 +27,7 @@ import { AttendanceLevelScreen } from './features/dashboard/screens/AttendanceLe
 import { OperationalEventScreen } from './features/dashboard/screens/OperationalEventScreen';
 import { MotorConfigScreen } from './features/dashboard/screens/MotorConfigScreen';
 import { EventConfigPage } from './pages/EventConfigPage';
+import { EventReferencePointScreen } from './features/dashboard/screens/EventReferencePointScreen';
 import LoginScreen from './features/auth/screens/LoginScreen';
 import ProtectedRoute from './shared/components/ProtectedRoute';
 
@@ -134,6 +135,7 @@ function AppLayout() {
         } />
         <Route path="/dashboard/report" element={<IncidentReportScreen />} />
         <Route path="/dashboard/admin-zones" element={<ZoneAdminScreen />} />
+        <Route path="/dashboard/reference-point" element={<EventReferencePointScreen />} />
         <Route path="/dashboard/event-days" element={<EventDayScreen />} />
         <Route path="/dashboard/profiles" element={<OperationalProfileScreen />} />
         <Route path="/dashboard/zone-behaviors" element={<ZoneBehaviorScreen />} />

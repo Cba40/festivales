@@ -35,6 +35,24 @@ export interface Zone {
   descripcion?: string;
 }
 
+export interface EventDTO {
+  id: string;
+  name: string;
+  description: string | null;
+  location: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  reference_point_latitude: number | null;
+  reference_point_longitude: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EventReferencePointPayload {
+  reference_point_latitude?: number;
+  reference_point_longitude?: number;
+}
+
 export interface Incident {
   id: string;
   type: string;
