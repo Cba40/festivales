@@ -1,46 +1,63 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEventReferencePoint } from '../hooks/useEventReferencePoint';
-import { EventReferencePointMap } from '../components/EventReferencePointMap';
+import { AdminMapSelector } from '../../../components/AdminMapSelector';
 
 export function EventReferencePointScreen() {
   const navigate = useNavigate();
   const { event, loading, saving, saved, error, load, save } = useEventReferencePoint();
 
-  const [lat, setLat] = useState('');
-  const [lng, setLng] = useState('');
-  const [touched, setTouched] = useState(false);
+  const [draftLat, setDraftLat] = useState<number | null>(null);
+  const [draftLng, setDraftLng] = useState<number | null>(null);
+  const [manual, setManual] = useState(false);
+  const [mapKey, setMapKey] = useState(0);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  useEffect(() => {
-    if (event && !touched) {
-      setLat(event.reference_point_latitude != null ? String(event.reference_point_latitude) : '');
-      setLng(event.reference_point_longitude != null ? String(event.reference_point_longitude) : '');
-    }
-  }, [event, touched]);
+  const savedLat = event?.reference_point_latitude ?? null;
+  const savedLng = event?.reference_point_longitude ?? null;
 
-  const parsedLat = lat.trim() === '' ? null : Number(lat);
-  const parsedLng = lng.trim() === '' ? null : Number(lng);
-  const canSave = parsedLat != null && parsedLng != null && Number.isFinite(parsedLat) && Number.isFinite(parsedLng);
+  useEffect(() => {
+    setDraftLat(savedLat);
+    setDraftLng(savedLng);
+    setManual(false);
+  }, [savedLat, savedLng]);
+
+  const effectiveLat = manual ? draftLat : savedLat;
+  const effectiveLng = manual ? draftLng : savedLng;
+
+  const dirty = manual && (draftLat !== savedLat || draftLng !== savedLng);
+  const canSave = manual && draftLat != null && draftLng != null;
+
+  const handleChangeLocation = (lat: number, lng: number) => {
+    setDraftLat(lat);
+    setDraftLng(lng);
+    setManual(true);
+  };
+
+  const handleCancel = () => {
+    setDraftLat(savedLat);
+    setDraftLng(savedLng);
+    setManual(false);
+    setMapKey((k) => k + 1);
+  };
 
   const handleSave = async () => {
     if (!canSave) return;
     const ok = await save({
-      reference_point_latitude: parsedLat,
-      reference_point_longitude: parsedLng,
+      reference_point_latitude: draftLat,
+      reference_point_longitude: draftLng,
     });
-    setTouched(false);
     if (ok) {
-      setLat(String(parsedLat));
-      setLng(String(parsedLng));
+      setDraftLat(draftLat);
+      setDraftLng(draftLng);
+      setManual(false);
     }
   };
 
-  const savedLat = event?.reference_point_latitude ?? null;
-  const savedLng = event?.reference_point_longitude ?? null;
+  const noReferencePoint = savedLat == null || savedLng == null;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -71,41 +88,27 @@ export function EventReferencePointScreen() {
             </p>
           </div>
 
-          <p className="text-xs text-slate-500">
-            Ingresá los valores manualmente. No se edita desde el mapa.
-          </p>
+          {noReferencePoint && (
+            <div className="bg-amber-50 border-l-4 border-amber-500 text-amber-700 p-4 text-sm rounded">
+              El evento todavía no tiene un punto de referencia definido. Mové el marcador al punto deseado y guardalo.
+            </div>
+          )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <label className="block">
-              <span className="text-sm font-medium text-slate-700">Latitud</span>
-              <input
-                type="number"
-                step="any"
-                min={-90}
-                max={90}
-                value={lat}
-                disabled={loading}
-                onChange={(e) => { setTouched(true); setLat(e.target.value); }}
-                placeholder="-30.975000"
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </label>
-            <label className="block">
-              <span className="text-sm font-medium text-slate-700">Longitud</span>
-              <input
-                type="number"
-                step="any"
-                min={-180}
-                max={180}
-                value={lng}
-                disabled={loading}
-                onChange={(e) => { setTouched(true); setLng(e.target.value); }}
-                placeholder="-64.090000"
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </label>
-          </div>
+          {loading && !event ? (
+            <div className="w-full bg-white rounded-lg border border-slate-200 h-[250px] flex items-center justify-center">
+              <p className="text-sm text-slate-500 italic">Cargando evento...</p>
+            </div>
+          ) : (
+            <AdminMapSelector
+              key={mapKey}
+              lat={effectiveLat ?? undefined}
+              lng={effectiveLng ?? undefined}
+              onChangeLocation={handleChangeLocation}
+            />
+          )}
+        </section>
 
+        <div className="flex gap-3">
           <button
             onClick={handleSave}
             disabled={!canSave || saving || loading}
@@ -113,12 +116,14 @@ export function EventReferencePointScreen() {
           >
             {saving ? 'Guardando...' : 'Guardar'}
           </button>
-        </section>
-
-        <section className="bg-white rounded-lg shadow-sm border border-slate-200 p-6 space-y-4">
-          <h3 className="text-base font-semibold text-slate-700">Visualización en el mapa</h3>
-          <EventReferencePointMap lat={savedLat} lng={savedLng} />
-        </section>
+          <button
+            onClick={handleCancel}
+            disabled={!dirty || saving || loading}
+            className="bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-700 py-2 px-6 rounded text-sm font-medium"
+          >
+            Cancelar
+          </button>
+        </div>
       </main>
     </div>
   );
