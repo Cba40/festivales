@@ -1,6 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { useOperationalPhases } from '../hooks/useOperationalPhases';
-import { useOperationalProfiles } from '../hooks/useOperationalProfiles';
+import { useOperationalPhaseCatalog } from '../hooks/useOperationalPhaseCatalog';
 import { useZoneBehaviors, useZoneTypes } from '../hooks/useZoneBehaviors';
 import { useZoneBehaviorMutations } from '../hooks/useZoneBehaviorMutations';
 import type { ZoneBehaviorDTO } from '../types';
@@ -30,9 +29,11 @@ interface LocalRow {
 }
 
 export function ZoneBehaviorScreen() {
-  const { profiles } = useOperationalProfiles();
-  const [selectedProfileId, setSelectedProfileId] = useState<string>('');
-  const { phases, loading: loadingPhases } = useOperationalPhases(selectedProfileId);
+  const { byId: operationalPhaseCatalog, loading: loadingPhases } = useOperationalPhaseCatalog();
+  const phases = useMemo(
+    () => Object.values(operationalPhaseCatalog).sort((a, b) => a.sort_order - b.sort_order),
+    [operationalPhaseCatalog],
+  );
   const [selectedPhaseId, setSelectedPhaseId] = useState<string>('');
   const { behaviors, loading: loadingBehaviors, error } = useZoneBehaviors(selectedPhaseId);
   const { zoneTypes, loading: loadingZoneTypes } = useZoneTypes();
@@ -97,11 +98,6 @@ export function ZoneBehaviorScreen() {
     }
   }, [update]);
 
-  const handleProfileChange = useCallback((profileId: string) => {
-    setSelectedProfileId(profileId);
-    setSelectedPhaseId('');
-  }, []);
-
   const hasUnsaved = rows.some((r) => r.dirty);
 
   return (
@@ -125,25 +121,11 @@ export function ZoneBehaviorScreen() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Perfil operativo</label>
-            <select
-              value={selectedProfileId}
-              onChange={(e) => handleProfileChange(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Seleccionar perfil...</option>
-              {profiles.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Fase operativa</label>
             <select
               value={selectedPhaseId}
               onChange={(e) => setSelectedPhaseId(e.target.value)}
-              disabled={!selectedProfileId || loadingPhases}
+              disabled={loadingPhases}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
             >
               <option value="">Seleccionar fase...</option>
@@ -160,7 +142,7 @@ export function ZoneBehaviorScreen() {
           </div>
         ) : !selectedPhaseId ? (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 text-center text-slate-500">
-            Seleccioná un perfil y una fase para configurar los comportamientos territoriales.
+            Seleccioná una fase para configurar los comportamientos territoriales.
           </div>
         ) : (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">

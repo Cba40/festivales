@@ -26,12 +26,6 @@ export function DashboardScreen() {
           >
             Días
           </button>
-          <button
-            onClick={() => navigate('/dashboard/profiles')}
-            className="text-sm bg-amber-600 hover:bg-amber-700 text-white py-1 px-3 rounded font-medium opacity-70"
-          >
-            Perfiles *DEPRECADO*
-          </button>
 
           <button
             onClick={() => navigate('/dashboard/attendance')}
