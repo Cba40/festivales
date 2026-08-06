@@ -9,6 +9,7 @@ from src.application.recommendation.recommendation_service import (
 )
 from src.application.use_cases.generate_prediction import GeneratePrediction
 from src.domain.entities.attendance_level import AttendanceLevel
+from src.domain.entities.operational_phase import OperationalPhase
 from src.domain.entities.zone import Zone
 from src.domain.entities.zone_behavior import ZoneBehavior
 from src.domain.recommendation.mobility_context import MobilityContext
@@ -33,6 +34,7 @@ class GetRecommendations:
         zones: Sequence[Zone],
         zone_behaviors: Mapping[tuple[UUID, UUID], ZoneBehavior],
         attendance_level: AttendanceLevel,
+        operational_phases: Mapping[UUID, OperationalPhase],
         user_context: UserContext,
         mobility_context: MobilityContext,
         requested_action: RequestedAction,
@@ -43,6 +45,7 @@ class GetRecommendations:
             zones=zones,
             zone_behaviors=zone_behaviors,
             attendance_level=attendance_level,
+            operational_phases=operational_phases,
         )
 
         recommendations = self._recommendation_service.recommend(

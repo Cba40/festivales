@@ -20,7 +20,7 @@ from app.models.zone_type import ZoneType as ZoneTypeORM
 from app.models.zone_behavior import ZoneBehavior as ZoneBehaviorORM
 from app.models.attendance_level import AttendanceLevel as AttendanceLevelORM
 from app.models.event_day import EventDay as EventDayORM
-from app.models.operational_profile import OperationalProfile as OperationalProfileORM
+from app.models.event_day_phase import EventDayPhase as EventDayPhaseORM
 from app.models.operational_phase import OperationalPhase as OperationalPhaseORM
 from src.application.context_engine import ContextEngine
 from src.application.context_engine.stage1_context_resolution import LOCAL_TZ
@@ -31,13 +31,11 @@ from src.domain.entities.operational_event import OperationalEvent
 from src.domain.entities.event_day import EventDay
 from src.domain.entities.event_day_phase import EventDayPhase
 from src.domain.entities.operational_phase import OperationalPhase
-from src.domain.entities.operational_profile import OperationalProfile
 from src.domain.entities.zone import Zone
 from src.domain.entities.zone_behavior import FlowRestriction, ZoneBehavior
 from src.domain.ports import (
     EventDayRepository,
     OperationalEventRepository,
-    OperationalProfileRepository,
     PredictionRepository,
 )
 from src.domain.value_objects.territorial_prediction import TerritorialPrediction
@@ -137,18 +135,14 @@ async def _load_zone_behaviors(
     db: AsyncSession,
     event_id: str,
 ) -> dict[tuple[UUID, UUID], ZoneBehavior]:
-    profile_ids = select(OperationalProfileORM.id).join(
+    phase_ids = select(EventDayPhaseORM.operational_phase_id).join(
         EventDayORM,
-        OperationalProfileORM.id == EventDayORM.operational_profile_id,
+        EventDayPhaseORM.event_day_id == EventDayORM.id,
     ).where(EventDayORM.event_id == event_id)
 
     stmt = (
         select(ZoneBehaviorORM)
-        .join(
-            OperationalPhaseORM,
-            ZoneBehaviorORM.operational_phase_id == OperationalPhaseORM.id,
-        )
-        .where(OperationalPhaseORM.operational_profile_id.in_(profile_ids))
+        .where(ZoneBehaviorORM.operational_phase_id.in_(phase_ids))
     )
     rows = (await db.execute(stmt)).scalars().all()
     result: dict[tuple[UUID, UUID], ZoneBehavior] = {}
@@ -183,31 +177,25 @@ async def _load_attendance_level(
     )
 
 
-async def _load_operational_profile(
+async def _load_operational_phases(
     db: AsyncSession,
-    profile_id: UUID,
-) -> OperationalProfile | None:
+    phase_ids: Sequence[UUID],
+) -> dict[UUID, OperationalPhase]:
+    if not phase_ids:
+        return {}
     stmt = (
-        select(OperationalProfileORM)
-        .where(OperationalProfileORM.id == profile_id)
-        .options(selectinload(OperationalProfileORM.phases))
+        select(OperationalPhaseORM)
+        .where(OperationalPhaseORM.id.in_(list(phase_ids)))
     )
-    row = (await db.execute(stmt)).scalar_one_or_none()
-    if row is None:
-        return None
-    phases = tuple(
-        OperationalPhase(
-            id=UUID(str(p.id)),
-            name=p.name,
-            sequence_order=p.sort_order,
+    rows = (await db.execute(stmt)).scalars().all()
+    return {
+        UUID(str(r.id)): OperationalPhase(
+            id=UUID(str(r.id)),
+            name=r.name,
+            sequence_order=r.sort_order,
         )
-        for p in row.phases
-    )
-    return OperationalProfile(
-        id=UUID(str(row.id)),
-        name=row.name,
-        phases=phases,
-    )
+        for r in rows
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -221,16 +209,6 @@ class _PreloadedEventDayRepository(EventDayRepository):
     async def find_by_date(self, target_date: datetime | date) -> EventDay | None:
         if self._event_day is not None and self._event_day.event_date == target_date:
             return self._event_day
-        return None
-
-
-class _PreloadedOperationalProfileRepository(OperationalProfileRepository):
-    def __init__(self, profile: OperationalProfile | None) -> None:
-        self._profile = profile
-
-    async def find_by_id(self, profile_id: UUID) -> OperationalProfile | None:
-        if self._profile is not None and self._profile.id == profile_id:
-            return self._profile
         return None
 
 
@@ -315,12 +293,6 @@ class PredictionModule:
         if attendance_level is None:
             return None
 
-        operational_profile = await _load_operational_profile(
-            self._db, ed_row.operational_profile_id,
-        )
-        if operational_profile is None:
-            return None
-
         eid = UUID(ed_row.id)
 
         event_day = EventDay(
@@ -342,9 +314,13 @@ class PredictionModule:
             ),
         )
 
+        operational_phases = await _load_operational_phases(
+            self._db,
+            [UUID(str(p.operational_phase_id)) for p in ed_row.phases],
+        )
+
         engine = ContextEngine()
         event_day_repo = _PreloadedEventDayRepository(event_day)
-        profile_repo = _PreloadedOperationalProfileRepository(operational_profile)
         event_repo = _EmptyOperationalEventRepository()
         prediction_repo = _ReturnSavedPredictionRepository()
 
@@ -352,7 +328,6 @@ class PredictionModule:
             engine=engine,
             event_day_repo=event_day_repo,
             operational_event_repo=event_repo,
-            operational_profile_repo=profile_repo,
             prediction_repo=prediction_repo,
         )
         use_case = GetTerritorialPrediction(
@@ -365,6 +340,7 @@ class PredictionModule:
             zones=zones,
             zone_behaviors=zone_behaviors,
             attendance_level=attendance_level,
+            operational_phases=operational_phases,
         )
 
         return prediction

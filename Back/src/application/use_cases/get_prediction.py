@@ -6,6 +6,7 @@ from uuid import UUID
 
 from src.application.use_cases.generate_prediction import GeneratePrediction
 from src.domain.entities.attendance_level import AttendanceLevel
+from src.domain.entities.operational_phase import OperationalPhase
 from src.domain.entities.zone import Zone
 from src.domain.entities.zone_behavior import ZoneBehavior
 from src.domain.ports import PredictionRepository
@@ -27,6 +28,7 @@ class GetTerritorialPrediction:
         zones: Sequence[Zone],
         zone_behaviors: Mapping[tuple[UUID, UUID], ZoneBehavior],
         attendance_level: AttendanceLevel,
+        operational_phases: Mapping[UUID, OperationalPhase],
     ) -> TerritorialPrediction:
         existing = await self._prediction_repo.find_by_timestamp(timestamp)
         if existing is not None:
@@ -37,4 +39,5 @@ class GetTerritorialPrediction:
             zones=zones,
             zone_behaviors=zone_behaviors,
             attendance_level=attendance_level,
+            operational_phases=operational_phases,
         )

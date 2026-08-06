@@ -10,7 +10,6 @@ import pytest
 from src.application.context_engine.exceptions import (
     BehaviorNotDefined,
     DomainNotConfigured,
-    InvalidConfiguration,
     InvalidPhaseContext,
 )
 from src.application.use_cases.generate_prediction import GeneratePrediction
@@ -103,6 +102,13 @@ def zone_behaviors(
 
 
 @pytest.fixture
+def operational_phases(
+    peak_phase: OperationalPhase,
+) -> Mapping[UUID, OperationalPhase]:
+    return {peak_phase.id: peak_phase}
+
+
+@pytest.fixture
 def attendance_level() -> AttendanceLevel:
     return AttendanceLevel(id=UUID("50000000-0000-0000-0000-000000000001"), name="Normal", multiplier=1.0)
 
@@ -143,13 +149,6 @@ def operational_event_repo() -> AsyncMock:
 
 
 @pytest.fixture
-def operational_profile_repo(profile: OperationalProfile) -> AsyncMock:
-    repo = AsyncMock()
-    repo.find_by_id = AsyncMock(return_value=profile)
-    return repo
-
-
-@pytest.fixture
 def prediction_repo(prediction: TerritorialPrediction) -> AsyncMock:
     repo = AsyncMock()
     repo.save = AsyncMock(return_value=prediction)
@@ -161,14 +160,12 @@ def use_case(
     engine: MagicMock,
     event_day_repo: AsyncMock,
     operational_event_repo: AsyncMock,
-    operational_profile_repo: AsyncMock,
     prediction_repo: AsyncMock,
 ) -> GeneratePrediction:
     return GeneratePrediction(
         engine=engine,
         event_day_repo=event_day_repo,
         operational_event_repo=operational_event_repo,
-        operational_profile_repo=operational_profile_repo,
         prediction_repo=prediction_repo,
     )
 
@@ -182,12 +179,14 @@ class TestGeneratePrediction:
         zones: list[Zone],
         zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
         attendance_level: AttendanceLevel,
+        operational_phases: Mapping[UUID, OperationalPhase],
     ) -> None:
         result = await use_case.execute(
             timestamp=timestamp,
             zones=zones,
             zone_behaviors=zone_behaviors,
             attendance_level=attendance_level,
+            operational_phases=operational_phases,
         )
 
         assert engine.predict.call_count == 1
@@ -201,17 +200,18 @@ class TestGeneratePrediction:
         zones: list[Zone],
         zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
         attendance_level: AttendanceLevel,
+        operational_phases: Mapping[UUID, OperationalPhase],
         event_day: EventDay,
-        profile: OperationalProfile,
     ) -> None:
         await use_case.execute(
             timestamp=timestamp,
             zones=zones,
             zone_behaviors=zone_behaviors,
             attendance_level=attendance_level,
+            operational_phases=operational_phases,
         )
 
-        expected_phases = {p.id: p for p in profile.phases}
+        expected_phases = operational_phases
         engine.predict.assert_called_once_with(
             timestamp=timestamp,
             zones=zones,
@@ -236,6 +236,7 @@ class TestGeneratePrediction:
             zones=zones,
             zone_behaviors=zone_behaviors,
             attendance_level=attendance_level,
+            operational_phases=operational_phases,
         )
 
         assert result is prediction
@@ -244,23 +245,23 @@ class TestGeneratePrediction:
         self,
         use_case: GeneratePrediction,
         event_day_repo: AsyncMock,
-        operational_profile_repo: AsyncMock,
         operational_event_repo: AsyncMock,
         engine: MagicMock,
         timestamp: datetime,
         zones: list[Zone],
         zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
         attendance_level: AttendanceLevel,
+        operational_phases: Mapping[UUID, OperationalPhase],
     ) -> None:
         await use_case.execute(
             timestamp=timestamp,
             zones=zones,
             zone_behaviors=zone_behaviors,
             attendance_level=attendance_level,
+            operational_phases=operational_phases,
         )
 
         event_day_repo.find_by_date.assert_awaited_once_with(timestamp.date())
-        operational_profile_repo.find_by_id.assert_awaited_once()
         operational_event_repo.find_active_by_timestamp.assert_awaited_once_with(timestamp)
 
     async def test_raises_domain_not_configured_when_no_event_day(
@@ -271,6 +272,7 @@ class TestGeneratePrediction:
         zones: list[Zone],
         zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
         attendance_level: AttendanceLevel,
+        operational_phases: Mapping[UUID, OperationalPhase],
     ) -> None:
         event_day_repo.find_by_date = AsyncMock(return_value=None)
 
@@ -280,25 +282,7 @@ class TestGeneratePrediction:
                 zones=zones,
                 zone_behaviors=zone_behaviors,
                 attendance_level=attendance_level,
-            )
-
-    async def test_raises_invalid_configuration_when_no_profile(
-        self,
-        use_case: GeneratePrediction,
-        operational_profile_repo: AsyncMock,
-        timestamp: datetime,
-        zones: list[Zone],
-        zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
-        attendance_level: AttendanceLevel,
-    ) -> None:
-        operational_profile_repo.find_by_id = AsyncMock(return_value=None)
-
-        with pytest.raises(InvalidConfiguration):
-            await use_case.execute(
-                timestamp=timestamp,
-                zones=zones,
-                zone_behaviors=zone_behaviors,
-                attendance_level=attendance_level,
+                operational_phases=operational_phases,
             )
 
     async def test_propagates_engine_errors(
@@ -309,6 +293,7 @@ class TestGeneratePrediction:
         zones: list[Zone],
         zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
         attendance_level: AttendanceLevel,
+        operational_phases: Mapping[UUID, OperationalPhase],
     ) -> None:
         engine.predict = MagicMock(side_effect=InvalidPhaseContext("test"))
 
@@ -318,6 +303,7 @@ class TestGeneratePrediction:
                 zones=zones,
                 zone_behaviors=zone_behaviors,
                 attendance_level=attendance_level,
+                operational_phases=operational_phases,
             )
 
     async def test_propagates_behavior_not_defined(
@@ -328,6 +314,7 @@ class TestGeneratePrediction:
         zones: list[Zone],
         zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
         attendance_level: AttendanceLevel,
+        operational_phases: Mapping[UUID, OperationalPhase],
     ) -> None:
         engine.predict = MagicMock(
             side_effect=BehaviorNotDefined(
@@ -342,6 +329,7 @@ class TestGeneratePrediction:
                 zones=zones,
                 zone_behaviors=zone_behaviors,
                 attendance_level=attendance_level,
+                operational_phases=operational_phases,
             )
 
     async def test_does_not_call_engine_when_event_day_missing(
@@ -353,6 +341,7 @@ class TestGeneratePrediction:
         zones: list[Zone],
         zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
         attendance_level: AttendanceLevel,
+        operational_phases: Mapping[UUID, OperationalPhase],
     ) -> None:
         event_day_repo.find_by_date = AsyncMock(return_value=None)
 
@@ -362,28 +351,7 @@ class TestGeneratePrediction:
                 zones=zones,
                 zone_behaviors=zone_behaviors,
                 attendance_level=attendance_level,
-            )
-
-        engine.predict.assert_not_called()
-
-    async def test_does_not_call_engine_when_profile_missing(
-        self,
-        use_case: GeneratePrediction,
-        engine: MagicMock,
-        operational_profile_repo: AsyncMock,
-        timestamp: datetime,
-        zones: list[Zone],
-        zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
-        attendance_level: AttendanceLevel,
-    ) -> None:
-        operational_profile_repo.find_by_id = AsyncMock(return_value=None)
-
-        with pytest.raises(InvalidConfiguration):
-            await use_case.execute(
-                timestamp=timestamp,
-                zones=zones,
-                zone_behaviors=zone_behaviors,
-                attendance_level=attendance_level,
+                operational_phases=operational_phases,
             )
 
         engine.predict.assert_not_called()
@@ -396,12 +364,14 @@ class TestGeneratePrediction:
         zones: list[Zone],
         zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
         attendance_level: AttendanceLevel,
+        operational_phases: Mapping[UUID, OperationalPhase],
     ) -> None:
         await use_case.execute(
             timestamp=timestamp,
             zones=zones,
             zone_behaviors=zone_behaviors,
             attendance_level=attendance_level,
+            operational_phases=operational_phases,
         )
 
         prediction_repo.save.assert_awaited_once()
@@ -422,6 +392,7 @@ class TestGeneratePrediction:
             zones=zones,
             zone_behaviors=zone_behaviors,
             attendance_level=attendance_level,
+            operational_phases=operational_phases,
         )
 
         prediction_repo.save.assert_awaited_once_with(prediction)
@@ -435,6 +406,7 @@ class TestGeneratePrediction:
         zones: list[Zone],
         zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
         attendance_level: AttendanceLevel,
+        operational_phases: Mapping[UUID, OperationalPhase],
     ) -> None:
         engine.predict = MagicMock(side_effect=InvalidPhaseContext("test"))
 
@@ -444,6 +416,7 @@ class TestGeneratePrediction:
                 zones=zones,
                 zone_behaviors=zone_behaviors,
                 attendance_level=attendance_level,
+                operational_phases=operational_phases,
             )
 
         prediction_repo.save.assert_not_called()
@@ -457,6 +430,7 @@ class TestGeneratePrediction:
         zones: list[Zone],
         zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
         attendance_level: AttendanceLevel,
+        operational_phases: Mapping[UUID, OperationalPhase],
     ) -> None:
         prediction_repo.save = AsyncMock(side_effect=RuntimeError("DB failure"))
 
@@ -466,6 +440,7 @@ class TestGeneratePrediction:
                 zones=zones,
                 zone_behaviors=zone_behaviors,
                 attendance_level=attendance_level,
+                operational_phases=operational_phases,
             )
 
     async def test_returns_saved_prediction(
@@ -483,6 +458,7 @@ class TestGeneratePrediction:
             zones=zones,
             zone_behaviors=zone_behaviors,
             attendance_level=attendance_level,
+            operational_phases=operational_phases,
         )
 
         assert result is prediction
