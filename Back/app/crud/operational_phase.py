@@ -47,6 +47,15 @@ async def get_by_id(db: AsyncSession, id: UUID) -> OperationalPhase | None:
     return await db.get(OperationalPhase, id)
 
 
+async def list_operational_phases(
+    db: AsyncSession,
+) -> list[OperationalPhase]:
+    result = await db.execute(
+        select(OperationalPhase).order_by(OperationalPhase.sort_order.asc())
+    )
+    return list(result.scalars().all())
+
+
 async def list_by_profile(
     db: AsyncSession, profile_id: UUID,
 ) -> list[OperationalPhase]:

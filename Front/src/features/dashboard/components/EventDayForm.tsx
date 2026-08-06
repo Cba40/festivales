@@ -164,7 +164,6 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
     const payload: EventDayCreatePayload = {
       date,
       day_of_week: dayOfWeek,
-      operational_profile_id: eventDay?.operational_profile_id ?? '',
       attendance_level_id: selectedLevelId,
       operational_start_min: operationalStartMin,
       operational_end_min: resolvedOpEnd,

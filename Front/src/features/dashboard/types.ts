@@ -118,7 +118,7 @@ export interface EventDaySummary {
   id: string;
   date: string;
   day_of_week: string;
-  operational_profile_id: string;
+  operational_profile_id: string | null;
   attendance_level_id: string;
   operational_start_min: number;
   operational_end_min: number;
@@ -133,7 +133,7 @@ export interface EventDay {
   event_id: string;
   date: string;
   day_of_week: string;
-  operational_profile_id: string;
+  operational_profile_id: string | null;
   attendance_level_id: string;
   operational_start_min: number;
   operational_end_min: number;
@@ -252,7 +252,7 @@ export interface Stage4ConfigUpdatePayload {
 export interface EventDayCreatePayload {
   date: string;
   day_of_week: string;
-  operational_profile_id: string;
+  operational_profile_id?: string | null;
   attendance_level_id: string;
   operational_start_min: number;
   operational_end_min: number;

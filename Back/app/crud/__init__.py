@@ -8,6 +8,7 @@ from app.crud.operational_profile import (
 from app.crud.operational_phase import (
     create as create_operational_phase,
     get_by_id as get_operational_phase,
+    list_operational_phases,
     list_by_profile as list_phases_by_profile,
     update as update_operational_phase,
     delete as delete_operational_phase,
@@ -57,6 +58,7 @@ __all__ = [
     "delete_operational_profile",
     "create_operational_phase",
     "get_operational_phase",
+    "list_operational_phases",
     "list_phases_by_profile",
     "update_operational_phase",
     "delete_operational_phase",
