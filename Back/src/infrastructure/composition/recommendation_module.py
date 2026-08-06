@@ -20,6 +20,7 @@ from app.models.attendance_level import AttendanceLevel as AttendanceLevelORM
 from app.models.event_day import EventDay as EventDayORM
 from app.models.event_day_phase import EventDayPhase as EventDayPhaseORM
 from app.models.operational_phase import OperationalPhase as OperationalPhaseORM
+from app.models.operational_profile import OperationalProfile as OperationalProfileORM
 from src.application.context_engine import ContextEngine
 from src.application.recommendation.recommendation_service import RecommendationService
 from src.application.use_cases.generate_prediction import GeneratePrediction
@@ -45,6 +46,27 @@ from src.domain.value_objects.territorial_prediction import TerritorialPredictio
 # ---------------------------------------------------------------------------
 # Private helpers — data loading from the legacy ORM layer
 # ---------------------------------------------------------------------------
+
+_DEFAULT_OPERATIONAL_PROFILE_NAME = "ActividadExtendida"
+
+
+async def _load_default_operational_profile_id(
+    db: AsyncSession,
+) -> UUID | None:
+    stmt = (
+        select(OperationalProfileORM.id)
+        .where(OperationalProfileORM.name == _DEFAULT_OPERATIONAL_PROFILE_NAME)
+    )
+    profile_id = (await db.execute(stmt)).scalar_one_or_none()
+    if profile_id is None:
+        stmt = (
+            select(OperationalProfileORM.id)
+            .order_by(OperationalProfileORM.name)
+            .limit(1)
+        )
+        profile_id = (await db.execute(stmt)).scalar_one_or_none()
+    return profile_id
+
 
 async def _load_zone_type_map(db: AsyncSession) -> dict[str, UUID]:
     stmt = select(ZoneTypeORM)
@@ -222,10 +244,16 @@ class RecommendationModule:
 
         eid = UUID(ed_row.id)
 
+        operational_profile_id = ed_row.operational_profile_id
+        if operational_profile_id is None:
+            operational_profile_id = await _load_default_operational_profile_id(
+                self._db,
+            )
+
         event_day = EventDay(
             id=eid,
             event_date=ed_row.date,
-            operational_profile_id=UUID(str(ed_row.operational_profile_id)),
+            operational_profile_id=operational_profile_id,
             attendance_level_id=attendance_level.id,
             operational_start_min=ed_row.operational_start_min,
             operational_end_min=ed_row.operational_end_min,

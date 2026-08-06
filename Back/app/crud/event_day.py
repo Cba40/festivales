@@ -9,9 +9,32 @@ from app.models.attendance_level import AttendanceLevel
 from app.models.event_day import EventDay
 from app.models.event_day_phase import EventDayPhase
 from app.models.operational_phase import OperationalPhase
+from app.models.operational_profile import OperationalProfile
 from app.schemas.event_day import EventDayCreate, EventDayUpdate
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_OPERATIONAL_PROFILE_NAME = "ActividadExtendida"
+
+
+async def _default_operational_profile(db: AsyncSession) -> OperationalProfile:
+    result = await db.execute(
+        select(OperationalProfile)
+        .where(OperationalProfile.name == DEFAULT_OPERATIONAL_PROFILE_NAME)
+    )
+    profile = result.scalar_one_or_none()
+    if profile is None:
+        result = await db.execute(
+            select(OperationalProfile)
+            .order_by(OperationalProfile.name)
+            .limit(1)
+        )
+        profile = result.scalar_one_or_none()
+    if profile is None:
+        raise ValueError(
+            "No OperationalProfile configured; cannot assign a default"
+        )
+    return profile
 
 
 async def create(db: AsyncSession, obj_in: EventDayCreate, event_id: str) -> EventDay:
@@ -28,6 +51,11 @@ async def create(db: AsyncSession, obj_in: EventDayCreate, event_id: str) -> Eve
 
     phases_data = obj_in.phases
     create_data = obj_in.model_dump(exclude={"phases"})
+
+    if create_data.get("operational_profile_id") is None:
+        default_profile = await _default_operational_profile(db)
+        create_data["operational_profile_id"] = default_profile.id
+
     db_obj = EventDay(event_id=event_id, **create_data)
 
     for phase_in in phases_data:
