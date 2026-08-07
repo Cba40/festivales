@@ -12,7 +12,6 @@ class EventDayCreate(BaseModel):
     day_of_week: str
     weather: Optional[str] = None
     headliner_artist: Optional[str] = None
-    estimated_attendance: int = 0
     notes: Optional[str] = None
     is_active: bool = True
     operational_profile_id: Optional[UUID] = None
@@ -33,7 +32,6 @@ class EventDayUpdate(BaseModel):
     day_of_week: Optional[str] = None
     weather: Optional[str] = None
     headliner_artist: Optional[str] = None
-    estimated_attendance: Optional[int] = None
     notes: Optional[str] = None
     is_active: Optional[bool] = None
     operational_profile_id: Optional[UUID] = None
@@ -57,7 +55,6 @@ class EventDayResponse(BaseModel):
     day_of_week: str
     weather: Optional[str]
     headliner_artist: Optional[str]
-    estimated_attendance: int
     notes: Optional[str]
     is_active: bool
     operational_profile_id: Optional[UUID] = None
@@ -88,7 +85,6 @@ class EventDaySummary(BaseModel):
     day_of_week: str
     weather: Optional[str]
     headliner_artist: Optional[str]
-    estimated_attendance: int
     is_active: bool
     operational_profile_id: Optional[UUID] = None
     attendance_level_id: str

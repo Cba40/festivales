@@ -25,7 +25,6 @@ class EventDay(Base):
     day_of_week: Mapped[str] = mapped_column(String(10), nullable=False)
     weather: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     headliner_artist: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    estimated_attendance: Mapped[int] = mapped_column(Integer, nullable=False)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     operational_profile_id: Mapped[Optional[UUID]] = mapped_column(

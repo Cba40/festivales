@@ -194,7 +194,8 @@ async def _load_attendance_level(
     return AttendanceLevel(
         id=UUID(row.id),
         name=row.name,
-        multiplier=row.global_multiplier,
+        min_people=row.min_people,
+        max_people=row.max_people,
     )
 
 
@@ -336,6 +337,7 @@ class PredictionModule:
                     operational_phase_id=UUID(str(p.operational_phase_id)),
                     start_min=p.start_min,
                     end_min=p.end_min,
+                    intensity=p.intensity,
                 )
                 for p in ed_row.phases
             ),
