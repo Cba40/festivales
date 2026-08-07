@@ -23,7 +23,6 @@ export function AttendanceLevelList({ levels, onEdit, onDelete }: AttendanceLeve
             <th className="pb-2 font-medium">Nombre</th>
             <th className="pb-2 font-medium">Mínimo</th>
             <th className="pb-2 font-medium">Máximo</th>
-            <th className="pb-2 font-medium">Multiplicador</th>
             <th className="pb-2 font-medium text-right">Acciones</th>
           </tr>
         </thead>
@@ -35,7 +34,6 @@ export function AttendanceLevelList({ levels, onEdit, onDelete }: AttendanceLeve
               <td className="py-3 text-slate-600">
                 {level.max_people !== null ? level.max_people.toLocaleString() : '—'}
               </td>
-              <td className="py-3 text-slate-600">{level.global_multiplier.toFixed(2)}</td>
               <td className="py-3 text-right">
                 <button
                   onClick={() => onEdit(level)}

@@ -31,7 +31,6 @@ export function EventDayList({ eventDays, onEdit, onDelete }: EventDayListProps)
             <th className="pb-2 font-medium">Día</th>
             <th className="pb-2 font-medium">Clima</th>
             <th className="pb-2 font-medium">Artista</th>
-            <th className="pb-2 font-medium">Convocatoria</th>
             <th className="pb-2 font-medium">Activo</th>
             <th className="pb-2 font-medium text-right">Acciones</th>
           </tr>
@@ -45,11 +44,6 @@ export function EventDayList({ eventDays, onEdit, onDelete }: EventDayListProps)
                 {day.weather ? (weatherLabels[day.weather] ?? day.weather) : '—'}
               </td>
               <td className="py-3 text-slate-600">{day.headliner_artist || '—'}</td>
-              <td className="py-3 text-slate-600">
-                {day.estimated_attendance
-                  ? day.estimated_attendance.toLocaleString()
-                  : '—'}
-              </td>
               <td className="py-3">
                 <span
                   className={`inline-block w-2 h-2 rounded-full ${

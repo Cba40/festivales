@@ -5,13 +5,11 @@ interface AttendanceLevelFormProps {
     name: string;
     min_people: number;
     max_people: number | null;
-    global_multiplier: number;
   } | null;
   onSave: (payload: {
     name: string;
     min_people: number;
     max_people?: number | null;
-    global_multiplier: number;
   }) => Promise<void>;
   onCancel: () => void;
   saving: boolean;
@@ -22,7 +20,6 @@ export function AttendanceLevelForm({ initial, onSave, onCancel, saving }: Atten
   const [minPeople, setMinPeople] = useState('');
   const [maxPeople, setMaxPeople] = useState('');
   const [hasMax, setHasMax] = useState(true);
-  const [globalMultiplier, setGlobalMultiplier] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -36,13 +33,11 @@ export function AttendanceLevelForm({ initial, onSave, onCancel, saving }: Atten
         setHasMax(false);
         setMaxPeople('');
       }
-      setGlobalMultiplier(initial.global_multiplier.toString());
     } else {
       setName('');
       setMinPeople('');
       setMaxPeople('');
       setHasMax(true);
-      setGlobalMultiplier('');
     }
   }, [initial]);
 
@@ -79,21 +74,10 @@ export function AttendanceLevelForm({ initial, onSave, onCancel, saving }: Atten
       }
     }
 
-    const parsedMultiplier = parseFloat(globalMultiplier);
-    if (isNaN(parsedMultiplier)) {
-      setValidationError('El multiplicador global debe ser un número válido');
-      return;
-    }
-    if (parsedMultiplier < 0.1 || parsedMultiplier > 2.0) {
-      setValidationError('El multiplicador debe estar entre 0.1 y 2.0');
-      return;
-    }
-
     await onSave({
       name: trimmedName,
       min_people: parsedMin,
       max_people: parsedMax,
-      global_multiplier: parsedMultiplier,
     });
   };
 
@@ -154,27 +138,10 @@ export function AttendanceLevelForm({ initial, onSave, onCancel, saving }: Atten
         </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">
-          Multiplicador global *
-          <span className="text-xs text-slate-400 ml-2">(0.1 – 2.0)</span>
-        </label>
-        <input
-          type="number"
-          min={0.1}
-          max={2.0}
-          step={0.01}
-          value={globalMultiplier}
-          onChange={(e) => setGlobalMultiplier(e.target.value)}
-          required
-          placeholder="Ej: 1.0"
-          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <p className="text-[10px] text-slate-400 mt-0.5">
-          Factor que multiplica la capacidad de las zonas para proyectar densidad.
-          El motor usa este valor en Stage 3.
-        </p>
-      </div>
+      <p className="text-[10px] text-slate-400 mt-0.5">
+        El nivel define solo el nombre y el rango de concurrencia estimada. La intensidad de
+        afluencia se configura por fase del día (EventDayPhase).
+      </p>
 
       {validationError && (
         <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
@@ -193,7 +160,7 @@ export function AttendanceLevelForm({ initial, onSave, onCancel, saving }: Atten
         </button>
         <button
           type="submit"
-          disabled={saving || !name.trim() || !minPeople || !globalMultiplier}
+          disabled={saving || !name.trim() || !minPeople}
           className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
         >
           {saving ? 'Guardando...' : initial ? 'Actualizar' : 'Crear nivel'}

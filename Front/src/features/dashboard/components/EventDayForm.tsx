@@ -226,14 +226,15 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
             <option value="">{levelsLoading ? 'Cargando niveles...' : 'Seleccionar nivel...'}</option>
             {levels.map((l) => (
               <option key={l.id} value={l.id}>
-                {l.name} ({l.min_people.toLocaleString()}—{l.max_people ? l.max_people.toLocaleString() : '∞'}) ×{l.global_multiplier}
+                {l.name} ({l.min_people.toLocaleString()}—{l.max_people ? l.max_people.toLocaleString() : '∞'})
               </option>
             ))}
           </select>
           {selectedLevel && (
             <p className="text-[10px] text-slate-400 mt-0.5">
-              Multiplicador global: {selectedLevel.global_multiplier} — rango: {selectedLevel.min_people.toLocaleString()} a{' '}
-              {selectedLevel.max_people ? selectedLevel.max_people.toLocaleString() : 'sin límite'} personas
+              Rango de concurrencia: {selectedLevel.min_people.toLocaleString()} a{' '}
+              {selectedLevel.max_people ? selectedLevel.max_people.toLocaleString() : 'sin límite'} personas.
+              La intensidad de afluencia se configura por fase del día.
             </p>
           )}
         </div>

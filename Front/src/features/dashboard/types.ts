@@ -69,7 +69,6 @@ export interface AttendanceLevelDTO {
   name: string;
   min_people: number;
   max_people: number | null;
-  global_multiplier: number;
 }
 
 export interface OperationalPhaseDTO {
@@ -116,7 +115,6 @@ export interface EventDaySummary {
   operational_end_min: number;
   weather: string | null;
   headliner_artist: string | null;
-  estimated_attendance: number | null;
   is_active: boolean;
 }
 
@@ -131,7 +129,6 @@ export interface EventDay {
   operational_end_min: number;
   weather: string | null;
   headliner_artist: string | null;
-  estimated_attendance: number | null;
   notes: string | null;
   is_active: boolean;
   phases: EventDayPhaseDTO[];
@@ -251,7 +248,6 @@ export interface EventDayCreatePayload {
   phases?: EventDayPhaseCreatePayload[];
   weather?: string | null;
   headliner_artist?: string | null;
-  estimated_attendance?: number | null;
   notes?: string | null;
   is_active?: boolean;
 }

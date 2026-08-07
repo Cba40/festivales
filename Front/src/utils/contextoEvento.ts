@@ -42,6 +42,5 @@ export const getEventDaySchedule = () => {
     peakEnd: cachedEventDay.operational_end_min / 60,
     weather: cachedEventDay.weather,
     artist: cachedEventDay.headliner_artist,
-    attendance: cachedEventDay.estimated_attendance,
   };
 };

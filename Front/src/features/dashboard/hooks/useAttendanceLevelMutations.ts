@@ -8,14 +8,12 @@ export interface AttendanceLevelCreatePayload {
   name: string;
   min_people: number;
   max_people?: number | null;
-  global_multiplier: number;
 }
 
 export interface AttendanceLevelUpdatePayload {
   name?: string;
   min_people?: number;
   max_people?: number | null;
-  global_multiplier?: number;
 }
 
 export function useAttendanceLevelMutations() {

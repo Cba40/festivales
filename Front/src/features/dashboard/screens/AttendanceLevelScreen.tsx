@@ -49,7 +49,6 @@ export function AttendanceLevelScreen() {
       name: string;
       min_people: number;
       max_people?: number | null;
-      global_multiplier: number;
     }) => {
       setFormError(null);
       let result: AttendanceLevelDTO | null;
@@ -112,7 +111,6 @@ export function AttendanceLevelScreen() {
                 name: editingLevel.name,
                 min_people: editingLevel.min_people,
                 max_people: editingLevel.max_people,
-                global_multiplier: editingLevel.global_multiplier,
               } : null}
               onSave={handleSave}
               onCancel={handleCancel}
