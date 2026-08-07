@@ -66,7 +66,6 @@ def test_event_day_create_operational_end_gt_start():
             operational_profile_id=uuid.uuid4(),
             operational_start_min=500,
             operational_end_min=400,
-            estimated_attendance=1000,
             attendance_level_id=str(uuid.uuid4()),
         )
     assert "operational_end_min must be greater than" in str(exc_info.value)

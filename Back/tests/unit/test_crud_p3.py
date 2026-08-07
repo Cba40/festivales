@@ -280,7 +280,7 @@ class TestOperationalEventCRUD:
         await async_session.flush()
 
         al = AttendanceLevel(id="al-filter-test", event_id=event.id, name="TestAL",
-                             min_people=0, max_people=100000, global_multiplier=1.0)
+                             min_people=0, max_people=100000)
         async_session.add(al)
         await async_session.flush()
 
@@ -297,7 +297,6 @@ class TestOperationalEventCRUD:
             operational_profile_id=prof.id,
             operational_start_min=480,
             operational_end_min=1800,
-            estimated_attendance=10000,
             attendance_level_id=al.id,
             is_active=True,
         )
@@ -358,7 +357,7 @@ class TestEventDayCRUD:
         event = Event(id="test-event-crud-al", name="AL Test", description="")
         async_session.add(event)
         al = AttendanceLevel(id="al-crud-test", event_id=event.id, name="TestAL",
-                             min_people=0, max_people=100000, global_multiplier=1.0)
+                             min_people=0, max_people=100000)
         async_session.add(al)
         await async_session.flush()
 
@@ -372,7 +371,6 @@ class TestEventDayCRUD:
                     operational_profile_id=fake_profile_id,
                     operational_start_min=480,
                     operational_end_min=1800,
-                    estimated_attendance=1000,
                     attendance_level_id=al.id,
                 ),
                 event_id="test-event-crud-al",
@@ -395,7 +393,7 @@ class TestEventDayPhaseCRUD:
         prof = OperationalProfile(name="EDPProfile", description="")
         async_session.add(prof)
         al = AttendanceLevel(id="al-edp-test", event_id=event.id, name="EDPAL",
-                             min_people=0, max_people=100000, global_multiplier=1.0)
+                             min_people=0, max_people=100000)
         async_session.add(al)
         await async_session.flush()
 
@@ -407,7 +405,6 @@ class TestEventDayPhaseCRUD:
             operational_profile_id=prof.id,
             operational_start_min=480,
             operational_end_min=1800,
-            estimated_attendance=10000,
             attendance_level_id=al.id,
             is_active=True,
         )
@@ -742,7 +739,7 @@ class TestEventDayProfileIntegrityP31C:
         async_session.add(event)
         al = AttendanceLevel(
             id="al-p31c", event_id=event.id, name="P31C AL",
-            min_people=0, max_people=100000, global_multiplier=1.0,
+            min_people=0, max_people=100000,
         )
         async_session.add(al)
         await async_session.flush()
@@ -780,7 +777,6 @@ class TestEventDayProfileIntegrityP31C:
                 operational_profile_id=profile_id,
                 operational_start_min=0,
                 operational_end_min=600,
-                estimated_attendance=1000,
                 attendance_level_id=al_id,
                 phases=[
                     EventDayPhaseCreate(
@@ -808,7 +804,6 @@ class TestEventDayProfileIntegrityP31C:
                     operational_profile_id=pa,
                     operational_start_min=0,
                     operational_end_min=600,
-                    estimated_attendance=500,
                     attendance_level_id=al,
                     phases=[
                         EventDayPhaseCreate(

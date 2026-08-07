@@ -96,45 +96,47 @@ class TestSeedAttendanceLevels:
         session.add = MagicMock()
         session.flush = AsyncMock()
 
-        multipliers = {"Bajo": 0.5, "Medio": 1.0, "Alto": 1.5}
-        result = await seed_attendance_levels(session, multipliers=multipliers)
+        levels = {"Bajo": (0, 10000), "Medio": (10001, 25000), "Alto": (25001, 45000)}
+        result = await seed_attendance_levels(session, levels=levels)
 
         assert len(result) == 3
         for level in result:
             assert isinstance(level, AttendanceLevel)
-            assert level.name in multipliers
-            assert level.multiplier == multipliers[level.name]
+            assert level.name in levels
+            assert level.min_people == levels[level.name][0]
+            assert level.max_people == levels[level.name][1]
         assert session.add.call_count == 3
         session.flush.assert_awaited_once()
 
     async def test_is_idempotent_when_all_exist(self) -> None:
         session = AsyncMock()
-        multipliers = {"Bajo": 0.5, "Medio": 1.0, "Alto": 1.5}
-        existing_names = [(name,) for name in multipliers]
+        levels = {"Bajo": (0, 10000), "Medio": (10001, 25000), "Alto": (25001, 45000)}
+        existing_names = [(name,) for name in levels]
         session.execute = AsyncMock(return_value=_mock_fetchall_result(existing_names))
         session.add = MagicMock()
         session.flush = AsyncMock()
 
-        result = await seed_attendance_levels(session, multipliers=multipliers)
+        result = await seed_attendance_levels(session, levels=levels)
 
         assert len(result) == 0
         session.add.assert_not_called()
         session.flush.assert_not_called()
 
-    async def test_accepts_custom_multipliers(self) -> None:
+    async def test_accepts_custom_ranges(self) -> None:
         session = AsyncMock()
         session.execute = AsyncMock(return_value=_mock_fetchall_result([]))
         session.add = MagicMock()
         session.flush = AsyncMock()
 
-        custom = {"Bajo": 0.3, "Medio": 0.8, "Alto": 1.8}
-        result = await seed_attendance_levels(session, multipliers=custom)
+        custom = {"Bajo": (0, 5000), "Medio": (5001, 10000), "Alto": (10001, None)}
+        result = await seed_attendance_levels(session, levels=custom)
 
         assert len(result) == 3
         for level in result:
-            assert level.multiplier == custom[level.name]
+            assert level.min_people == custom[level.name][0]
+            assert level.max_people == custom[level.name][1]
 
-    async def test_multipliers_parameter_is_required(self) -> None:
+    async def test_levels_parameter_is_required(self) -> None:
         with pytest.raises(TypeError):
             await seed_attendance_levels(AsyncMock())
 

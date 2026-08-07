@@ -168,7 +168,8 @@ def normal_attendance() -> AttendanceLevel:
     return AttendanceLevel(
         id=UUID("60000000-0000-0000-0000-000000000001"),
         name="Normal",
-        multiplier=1.0,
+        min_people=10000,
+        max_people=25000,
     )
 
 

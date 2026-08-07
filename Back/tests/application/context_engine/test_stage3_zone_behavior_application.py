@@ -41,23 +41,37 @@ def active_day_phase() -> EventDayPhase:
 
 
 @pytest.fixture
+def low_intensity_phase() -> EventDayPhase:
+    return EventDayPhase(
+        event_day_id=UUID("30000000-0000-0000-0000-000000000001"),
+        operational_phase_id=UUID("10000000-0000-0000-0000-000000000001"),
+        start_min=840,
+        end_min=1080,
+        intensity=0.5,
+        id=UUID("40000000-0000-0000-0000-000000000003"),
+    )
+
+
+@pytest.fixture
+def high_intensity_phase() -> EventDayPhase:
+    return EventDayPhase(
+        event_day_id=UUID("30000000-0000-0000-0000-000000000001"),
+        operational_phase_id=UUID("10000000-0000-0000-0000-000000000001"),
+        start_min=840,
+        end_min=1080,
+        intensity=1.5,
+        id=UUID("40000000-0000-0000-0000-000000000004"),
+    )
+
+
+@pytest.fixture
 def timestamp() -> datetime:
     return datetime(2026, 7, 15, 15, 0)
 
 
 @pytest.fixture
 def normal_attendance() -> AttendanceLevel:
-    return AttendanceLevel(name="Normal", multiplier=1.0)
-
-
-@pytest.fixture
-def low_attendance() -> AttendanceLevel:
-    return AttendanceLevel(name="Low", multiplier=0.5)
-
-
-@pytest.fixture
-def high_attendance() -> AttendanceLevel:
-    return AttendanceLevel(name="High", multiplier=1.5)
+    return AttendanceLevel(name="Normal", min_people=10000, max_people=25000)
 
 
 @pytest.fixture
@@ -177,27 +191,27 @@ class TestDensityCalculation:
         # capacity=500, multiplier=1.0, density_factor=0.8 -> round(400) = 400
         assert app.projected_density == 400
 
-    def test_applies_attendance_level_multiplier(
+    def test_applies_phase_intensity(
         self,
         zone_a: Zone,
         zone_behaviors: Mapping[tuple[UUID, UUID], ZoneBehavior],
         peak_phase: OperationalPhase,
-        active_day_phase: EventDayPhase,
+        low_intensity_phase: EventDayPhase,
         timestamp: datetime,
-        low_attendance: AttendanceLevel,
+        normal_attendance: AttendanceLevel,
     ) -> None:
         evaluation_result = _make_evaluation_result(
-            peak_phase, active_day_phase, timestamp
+            peak_phase, low_intensity_phase, timestamp
         )
         result = apply_zone_behaviors(
             zones=[zone_a],
             zone_behaviors=zone_behaviors,
-            attendance_level=low_attendance,
+            attendance_level=normal_attendance,
             evaluation_result=evaluation_result,
         )
 
         app = result.zone_applications[zone_a.id]
-        # capacity=500, multiplier=0.5, density_factor=0.8 -> round(200) = 200
+        # capacity=500, intensity=0.5, density_factor=0.8 -> round(200) = 200
         assert app.projected_density == 200
 
     def test_rounds_to_nearest_integer(
@@ -205,9 +219,32 @@ class TestDensityCalculation:
         zone_a: Zone,
         zone_behaviors: Mapping[tuple[UUID, UUID], ZoneBehavior],
         peak_phase: OperationalPhase,
+        high_intensity_phase: EventDayPhase,
+        timestamp: datetime,
+        normal_attendance: AttendanceLevel,
+    ) -> None:
+        evaluation_result = _make_evaluation_result(
+            peak_phase, high_intensity_phase, timestamp
+        )
+        result = apply_zone_behaviors(
+            zones=[zone_a],
+            zone_behaviors=zone_behaviors,
+            attendance_level=normal_attendance,
+            evaluation_result=evaluation_result,
+        )
+
+        app = result.zone_applications[zone_a.id]
+        # capacity=500, intensity=1.5, density_factor=0.8 -> round(600) = 600
+        assert app.projected_density == 600
+
+    def test_defaults_intensity_to_one_when_phase_has_no_intensity(
+        self,
+        zone_a: Zone,
+        zone_behaviors: Mapping[tuple[UUID, UUID], ZoneBehavior],
+        peak_phase: OperationalPhase,
         active_day_phase: EventDayPhase,
         timestamp: datetime,
-        high_attendance: AttendanceLevel,
+        normal_attendance: AttendanceLevel,
     ) -> None:
         evaluation_result = _make_evaluation_result(
             peak_phase, active_day_phase, timestamp
@@ -215,13 +252,13 @@ class TestDensityCalculation:
         result = apply_zone_behaviors(
             zones=[zone_a],
             zone_behaviors=zone_behaviors,
-            attendance_level=high_attendance,
+            attendance_level=normal_attendance,
             evaluation_result=evaluation_result,
         )
 
         app = result.zone_applications[zone_a.id]
-        # capacity=500, multiplier=1.5, density_factor=0.8 -> round(600) = 600
-        assert app.projected_density == 600
+        # capacity=500, intensity=(None -> 1.0), factor=0.8 -> round(400) = 400
+        assert app.projected_density == 400
 
 
 class TestImpactAddition:
@@ -281,23 +318,23 @@ class TestClamping:
         zone_c: Zone,
         zone_behaviors: Mapping[tuple[UUID, UUID], ZoneBehavior],
         peak_phase: OperationalPhase,
-        active_day_phase: EventDayPhase,
+        low_intensity_phase: EventDayPhase,
         timestamp: datetime,
-        low_attendance: AttendanceLevel,
+        normal_attendance: AttendanceLevel,
     ) -> None:
         impacts = {zone_c.id: -200}
         evaluation_result = _make_evaluation_result(
-            peak_phase, active_day_phase, timestamp, impacts
+            peak_phase, low_intensity_phase, timestamp, impacts
         )
         result = apply_zone_behaviors(
             zones=[zone_c],
             zone_behaviors=zone_behaviors,
-            attendance_level=low_attendance,
+            attendance_level=normal_attendance,
             evaluation_result=evaluation_result,
         )
 
         app = result.zone_applications[zone_c.id]
-        # capacity=300, multiplier=0.5, density_factor=0.8 -> round(120) = 120
+        # capacity=300, intensity=0.5, density_factor=0.8 -> round(120) = 120
         # impact = -200 -> -80 -> clamped to 0
         assert app.projected_density == 0
 

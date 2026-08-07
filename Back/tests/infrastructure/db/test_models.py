@@ -55,8 +55,14 @@ class TestAttendanceLevelModel:
     def test_table_name(self) -> None:
         assert AttendanceLevelModel.__tablename__ == "attendance_levels"
 
-    def test_has_multiplier_column(self) -> None:
-        assert "multiplier" in AttendanceLevelModel.__table__.columns
+    def test_has_min_people_column(self) -> None:
+        assert "min_people" in AttendanceLevelModel.__table__.columns
+
+    def test_has_max_people_column(self) -> None:
+        assert "max_people" in AttendanceLevelModel.__table__.columns
+
+    def test_has_no_multiplier_column(self) -> None:
+        assert "multiplier" not in AttendanceLevelModel.__table__.columns
 
     def test_inherits_base(self) -> None:
         assert issubclass(AttendanceLevelModel, Base)

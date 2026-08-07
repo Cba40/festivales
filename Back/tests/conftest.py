@@ -154,7 +154,6 @@ def sample_event_day(db_session: Session, sample_event: Event) -> EventDay:
         event_id=sample_event.id,
         date=date(2026, 7, 10),
         day_of_week="viernes",
-        estimated_attendance=50000,
         is_active=True,
     )
     db_session.add(day)
@@ -169,7 +168,6 @@ def sample_event_day_cross_midnight(db_session: Session, sample_event: Event) ->
         event_id=sample_event.id,
         date=date(2026, 7, 10),
         day_of_week="viernes",
-        estimated_attendance=30000,
         is_active=True,
     )
     db_session.add(day)
@@ -184,7 +182,6 @@ def sample_event_day_next(db_session: Session, sample_event: Event) -> EventDay:
         event_id=sample_event.id,
         date=date(2026, 7, 11),
         day_of_week="sabado",
-        estimated_attendance=60000,
         is_active=True,
     )
     db_session.add(day)
@@ -236,11 +233,11 @@ def sample_zones(db_session: Session, sample_event: Event) -> list[Zone]:
 def sample_attendance_levels(db_session: Session, sample_event: Event) -> list:
     from app.models.attendance_level import AttendanceLevel
     levels = [
-        AttendanceLevel(id="al-baja", event_id=sample_event.id, name="Baja", min_people=0, max_people=5000, global_multiplier=0.8),
-        AttendanceLevel(id="al-media", event_id=sample_event.id, name="Media", min_people=5001, max_people=15000, global_multiplier=1.0),
-        AttendanceLevel(id="al-alta", event_id=sample_event.id, name="Alta", min_people=15001, max_people=30000, global_multiplier=1.3),
-        AttendanceLevel(id="al-muy-alta", event_id=sample_event.id, name="Muy Alta", min_people=30001, max_people=60000, global_multiplier=1.6),
-        AttendanceLevel(id="al-masiva", event_id=sample_event.id, name="Masiva", min_people=60001, max_people=None, global_multiplier=2.0),
+        AttendanceLevel(id="al-baja", event_id=sample_event.id, name="Baja", min_people=0, max_people=5000),
+        AttendanceLevel(id="al-media", event_id=sample_event.id, name="Media", min_people=5001, max_people=15000),
+        AttendanceLevel(id="al-alta", event_id=sample_event.id, name="Alta", min_people=15001, max_people=30000),
+        AttendanceLevel(id="al-muy-alta", event_id=sample_event.id, name="Muy Alta", min_people=30001, max_people=60000),
+        AttendanceLevel(id="al-masiva", event_id=sample_event.id, name="Masiva", min_people=60001, max_people=None),
     ]
     for al in levels:
         db_session.add(al)

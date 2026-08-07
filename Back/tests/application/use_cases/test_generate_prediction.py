@@ -110,7 +110,7 @@ def operational_phases(
 
 @pytest.fixture
 def attendance_level() -> AttendanceLevel:
-    return AttendanceLevel(id=UUID("50000000-0000-0000-0000-000000000001"), name="Normal", multiplier=1.0)
+    return AttendanceLevel(id=UUID("50000000-0000-0000-0000-000000000001"), name="Normal", min_people=10000, max_people=25000)
 
 
 @pytest.fixture

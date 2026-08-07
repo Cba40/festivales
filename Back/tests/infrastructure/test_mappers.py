@@ -118,28 +118,31 @@ class TestZoneMapper:
 
 class TestAttendanceLevelMapper:
     def test_to_domain(self) -> None:
-        model = AttendanceLevelModel(id=A_UUID, name="Bajo", multiplier=0.5)
+        model = AttendanceLevelModel(id=A_UUID, name="Bajo", min_people=0, max_people=5000)
         entity = attendance_level_to_domain(model)
         assert entity.id == A_UUID
         assert entity.name == "Bajo"
-        assert entity.multiplier == 0.5
+        assert entity.min_people == 0
+        assert entity.max_people == 5000
         assert isinstance(entity, AttendanceLevel)
 
     def test_to_model(self) -> None:
-        entity = AttendanceLevel(id=A_UUID, name="Bajo", multiplier=0.5)
+        entity = AttendanceLevel(id=A_UUID, name="Bajo", min_people=0, max_people=5000)
         model = attendance_level_to_model(entity)
         assert model.id == A_UUID
         assert model.name == "Bajo"
-        assert model.multiplier == 0.5
+        assert model.min_people == 0
+        assert model.max_people == 5000
         assert isinstance(model, AttendanceLevelModel)
 
     def test_round_trip(self) -> None:
-        original = AttendanceLevel(id=A_UUID, name="Bajo", multiplier=0.5)
+        original = AttendanceLevel(id=A_UUID, name="Bajo", min_people=0, max_people=5000)
         model = attendance_level_to_model(original)
         result = attendance_level_to_domain(model)
         assert result.id == original.id
         assert result.name == original.name
-        assert result.multiplier == original.multiplier
+        assert result.min_people == original.min_people
+        assert result.max_people == original.max_people
 
 
 # ---------------------------------------------------------------------------
