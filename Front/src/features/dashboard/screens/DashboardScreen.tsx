@@ -1,19 +1,14 @@
-import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useDashboardSync } from '../hooks/useDashboardSync';
 import { ZoneStatusCard } from '../components/ZoneStatusCard';
 import { useAppStore } from '../../../core/state/store';
 
 export function DashboardScreen() {
-  const { zones, incidents, refresh, loading } = useDashboardSync();
+  const zones = useAppStore((state) => state.zones);
+  const incidents = useAppStore((state) => state.incidents);
   const navigate = useNavigate();
   const logout = useAppStore((state) => state.logout);
 
   const handleLogout = () => { logout(); navigate('/'); };
-
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
 
   return (
     <div className="min-h-screen bg-slate-50 w-full">
@@ -68,13 +63,6 @@ export function DashboardScreen() {
             className="text-sm bg-sky-600 hover:bg-sky-700 text-white py-1 px-3 rounded font-medium"
           >
             Referencia Oper.
-          </button>
-          <button 
-            onClick={() => refresh()}
-            disabled={loading}
-            className="text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-1 px-3 rounded"
-          >
-            {loading ? 'Actualizando...' : 'Actualizar'}
           </button>
           <button onClick={handleLogout} type="button" className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors">Cerrar Sesión</button>
         </div>
