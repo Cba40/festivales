@@ -17,6 +17,7 @@ class EventDayCreate(BaseModel):
     operational_profile_id: Optional[UUID] = None
     attendance_level_id: str
     estimated_vehicles: Optional[int] = Field(default=None, ge=0)
+    average_parking_duration: Optional[float] = Field(default=None, ge=0)
     operational_start_min: int = Field(ge=0)
     operational_end_min: int = Field(ge=0)
     phases: list[EventDayPhaseCreate] = []
@@ -38,6 +39,7 @@ class EventDayUpdate(BaseModel):
     operational_profile_id: Optional[UUID] = None
     attendance_level_id: Optional[str] = None
     estimated_vehicles: Optional[int] = Field(default=None, ge=0)
+    average_parking_duration: Optional[float] = Field(default=None, ge=0)
     operational_start_min: Optional[int] = Field(default=None, ge=0)
     operational_end_min: Optional[int] = None
     phases: Optional[list[EventDayPhaseCreate]] = None
@@ -62,6 +64,7 @@ class EventDayResponse(BaseModel):
     operational_profile_id: Optional[UUID] = None
     attendance_level_id: str
     estimated_vehicles: Optional[int] = None
+    average_parking_duration: Optional[float] = None
     operational_start_min: int
     operational_end_min: int
     phases: list[EventDayPhaseResponse] = []

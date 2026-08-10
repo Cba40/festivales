@@ -131,6 +131,7 @@ export interface EventDay {
   headliner_artist: string | null;
   notes: string | null;
   estimated_vehicles?: number | null;
+  average_parking_duration?: number | null;
   is_active: boolean;
   phases: EventDayPhaseDTO[];
   created_at: string;
@@ -251,5 +252,6 @@ export interface EventDayCreatePayload {
   headliner_artist?: string | null;
   notes?: string | null;
   estimated_vehicles?: number | null;
+  average_parking_duration?: number | null;
   is_active?: boolean;
 }

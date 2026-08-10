@@ -4,7 +4,7 @@ from datetime import date, datetime
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func, text
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -34,6 +34,7 @@ class EventDay(Base):
         String(36), ForeignKey("attendance_levels.id"), nullable=False,
     )
     estimated_vehicles: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    average_parking_duration: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     operational_start_min: Mapped[int] = mapped_column(Integer, nullable=False)
     operational_end_min: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
