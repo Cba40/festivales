@@ -16,6 +16,7 @@ class EventDayCreate(BaseModel):
     is_active: bool = True
     operational_profile_id: Optional[UUID] = None
     attendance_level_id: str
+    estimated_vehicles: Optional[int] = Field(default=None, ge=0)
     operational_start_min: int = Field(ge=0)
     operational_end_min: int = Field(ge=0)
     phases: list[EventDayPhaseCreate] = []
@@ -36,6 +37,7 @@ class EventDayUpdate(BaseModel):
     is_active: Optional[bool] = None
     operational_profile_id: Optional[UUID] = None
     attendance_level_id: Optional[str] = None
+    estimated_vehicles: Optional[int] = Field(default=None, ge=0)
     operational_start_min: Optional[int] = Field(default=None, ge=0)
     operational_end_min: Optional[int] = None
     phases: Optional[list[EventDayPhaseCreate]] = None
@@ -59,6 +61,7 @@ class EventDayResponse(BaseModel):
     is_active: bool
     operational_profile_id: Optional[UUID] = None
     attendance_level_id: str
+    estimated_vehicles: Optional[int] = None
     operational_start_min: int
     operational_end_min: int
     phases: list[EventDayPhaseResponse] = []

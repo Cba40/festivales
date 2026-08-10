@@ -33,6 +33,7 @@ class EventDay(Base):
     attendance_level_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("attendance_levels.id"), nullable=False,
     )
+    estimated_vehicles: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     operational_start_min: Mapped[int] = mapped_column(Integer, nullable=False)
     operational_end_min: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
