@@ -130,6 +130,7 @@ export interface EventDay {
   weather: string | null;
   headliner_artist: string | null;
   notes: string | null;
+  estimated_vehicles?: number | null;
   is_active: boolean;
   phases: EventDayPhaseDTO[];
   created_at: string;
@@ -249,5 +250,6 @@ export interface EventDayCreatePayload {
   weather?: string | null;
   headliner_artist?: string | null;
   notes?: string | null;
+  estimated_vehicles?: number | null;
   is_active?: boolean;
 }

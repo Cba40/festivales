@@ -77,6 +77,7 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
   const [headlinerArtist, setHeadlinerArtist] = useState('');
   const [notes, setNotes] = useState('');
   const [isActive, setIsActive] = useState(true);
+  const [estimatedVehicles, setEstimatedVehicles] = useState('');
 
   const [selectedLevelId, setSelectedLevelId] = useState('');
 
@@ -100,6 +101,7 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
       setOperationalEndStr(minutesToTimeStr(eventDay.operational_end_min));
       setNotes(eventDay.notes ?? '');
       setIsActive(eventDay.is_active);
+      setEstimatedVehicles(eventDay.estimated_vehicles != null ? String(eventDay.estimated_vehicles) : '');
       if (eventDay.phases && eventDay.phases.length > 0) {
         setEventDayPhases(
           eventDay.phases.map((p) => ({
@@ -176,6 +178,7 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
       weather: weather || null,
       headliner_artist: headlinerArtist || null,
       notes: notes || null,
+      estimated_vehicles: estimatedVehicles === '' ? null : Number(estimatedVehicles),
       is_active: isActive,
     };
 
@@ -237,6 +240,21 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
               La intensidad de afluencia se configura por fase del día.
             </p>
           )}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Estimación de vehículos</label>
+          <input
+            type="number"
+            min={0}
+            value={estimatedVehicles}
+            onChange={(e) => setEstimatedVehicles(e.target.value)}
+            placeholder="Ej: 5000"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <p className="text-[10px] text-slate-400 mt-0.5">
+            Vehículos estimados que se espera que ingresen al territorio durante este día. Independiente del nivel de asistencia.
+          </p>
         </div>
 
         <div>
