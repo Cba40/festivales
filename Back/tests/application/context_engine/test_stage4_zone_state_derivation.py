@@ -130,7 +130,7 @@ def _make_evaluation_result(
 
 
 class TestSaturationLevel:
-    def test_exact_capacity_returns_one(
+    def test_saturation_is_none_without_model(
         self,
         peak_phase: OperationalPhase,
         active_day_phase: EventDayPhase,
@@ -138,6 +138,7 @@ class TestSaturationLevel:
         zone_a: Zone,
         default_config: Stage4Config,
     ) -> None:
+        """Sin modelo especializado, el Context Engine NO genera saturation_level (ADR-004)."""
         stage3_result = _build_stage3_result(
             peak_phase, active_day_phase, timestamp,
             {zone_a.id: (500, FlowRestriction.OPEN)},
@@ -148,51 +149,9 @@ class TestSaturationLevel:
         states = derive_zone_states(
             stage3_result, [zone_a], [], evaluation_result, default_config
         )
-        assert states[0].saturation_level == 1.0
+        assert states[0].saturation_level is None
 
-    def test_half_capacity_returns_point_five(
-        self,
-        peak_phase: OperationalPhase,
-        active_day_phase: EventDayPhase,
-        timestamp: datetime,
-        zone_b: Zone,
-        default_config: Stage4Config,
-    ) -> None:
-        stage3_result = _build_stage3_result(
-            peak_phase, active_day_phase, timestamp,
-            {zone_b.id: (1000, FlowRestriction.OPEN)},
-        )
-        evaluation_result = _make_evaluation_result(
-            peak_phase, active_day_phase, timestamp
-        )
-        states = derive_zone_states(
-            stage3_result, [zone_b], [], evaluation_result, default_config
-        )
-        assert states[0].saturation_level == 0.5
-
-    def test_empty_returns_zero(
-        self,
-        peak_phase: OperationalPhase,
-        active_day_phase: EventDayPhase,
-        timestamp: datetime,
-        zone_a: Zone,
-        default_config: Stage4Config,
-    ) -> None:
-        stage3_result = _build_stage3_result(
-            peak_phase, active_day_phase, timestamp,
-            {zone_a.id: (0, FlowRestriction.OPEN)},
-        )
-        evaluation_result = _make_evaluation_result(
-            peak_phase, active_day_phase, timestamp
-        )
-        states = derive_zone_states(
-            stage3_result, [zone_a], [], evaluation_result, default_config
-        )
-        assert states[0].saturation_level == 0.0
-
-
-class TestAvailability:
-    def test_remaining_capacity(
+    def test_projected_density_is_context_common(
         self,
         peak_phase: OperationalPhase,
         active_day_phase: EventDayPhase,
@@ -210,9 +169,53 @@ class TestAvailability:
         states = derive_zone_states(
             stage3_result, [zone_a], [], evaluation_result, default_config
         )
-        assert states[0].availability == 150
+        assert states[0].projected_density == 350
 
-    def test_over_capacity_returns_zero(
+    def test_empty_returns_zero_density(
+        self,
+        peak_phase: OperationalPhase,
+        active_day_phase: EventDayPhase,
+        timestamp: datetime,
+        zone_a: Zone,
+        default_config: Stage4Config,
+    ) -> None:
+        stage3_result = _build_stage3_result(
+            peak_phase, active_day_phase, timestamp,
+            {zone_a.id: (0, FlowRestriction.OPEN)},
+        )
+        evaluation_result = _make_evaluation_result(
+            peak_phase, active_day_phase, timestamp
+        )
+        states = derive_zone_states(
+            stage3_result, [zone_a], [], evaluation_result, default_config
+        )
+        assert states[0].projected_density == 0
+        assert states[0].saturation_level is None
+
+
+class TestAvailability:
+    def test_availability_is_none_without_model(
+        self,
+        peak_phase: OperationalPhase,
+        active_day_phase: EventDayPhase,
+        timestamp: datetime,
+        zone_a: Zone,
+        default_config: Stage4Config,
+    ) -> None:
+        """Sin modelo especializado, el Context Engine NO genera availability (ADR-004)."""
+        stage3_result = _build_stage3_result(
+            peak_phase, active_day_phase, timestamp,
+            {zone_a.id: (350, FlowRestriction.OPEN)},
+        )
+        evaluation_result = _make_evaluation_result(
+            peak_phase, active_day_phase, timestamp
+        )
+        states = derive_zone_states(
+            stage3_result, [zone_a], [], evaluation_result, default_config
+        )
+        assert states[0].availability is None
+
+    def test_over_capacity_density_preserved(
         self,
         peak_phase: OperationalPhase,
         active_day_phase: EventDayPhase,
@@ -230,7 +233,8 @@ class TestAvailability:
         states = derive_zone_states(
             stage3_result, [zone_a], [], evaluation_result, default_config
         )
-        assert states[0].availability == 0
+        assert states[0].projected_density == 600
+        assert states[0].availability is None
 
 
 class TestOperationalState:
@@ -336,7 +340,7 @@ class TestOperationalState:
 
 
 class TestEstimatedWait:
-    def test_low_saturation_no_wait(
+    def test_estimated_wait_is_none_without_model(
         self,
         peak_phase: OperationalPhase,
         active_day_phase: EventDayPhase,
@@ -344,26 +348,7 @@ class TestEstimatedWait:
         zone_a: Zone,
         default_config: Stage4Config,
     ) -> None:
-        stage3_result = _build_stage3_result(
-            peak_phase, active_day_phase, timestamp,
-            {zone_a.id: (50, FlowRestriction.OPEN)},  # 50/500 = 0.1
-        )
-        evaluation_result = _make_evaluation_result(
-            peak_phase, active_day_phase, timestamp
-        )
-        states = derive_zone_states(
-            stage3_result, [zone_a], [], evaluation_result, default_config
-        )
-        assert states[0].estimated_wait == 0
-
-    def test_high_saturation_max_wait(
-        self,
-        peak_phase: OperationalPhase,
-        active_day_phase: EventDayPhase,
-        timestamp: datetime,
-        zone_a: Zone,
-        default_config: Stage4Config,
-    ) -> None:
+        """Sin modelo especializado, el Context Engine NO genera estimated_wait (ADR-004)."""
         stage3_result = _build_stage3_result(
             peak_phase, active_day_phase, timestamp,
             {zone_a.id: (500, FlowRestriction.OPEN)},
@@ -374,33 +359,11 @@ class TestEstimatedWait:
         states = derive_zone_states(
             stage3_result, [zone_a], [], evaluation_result, default_config
         )
-        assert states[0].estimated_wait == 20
-
-    def test_configurable_mapping(
-        self,
-        peak_phase: OperationalPhase,
-        active_day_phase: EventDayPhase,
-        timestamp: datetime,
-        zone_a: Zone,
-    ) -> None:
-        custom_config = Stage4Config(
-            wait_time_mapping=[(0.0, 1.0, 99)],
-        )
-        stage3_result = _build_stage3_result(
-            peak_phase, active_day_phase, timestamp,
-            {zone_a.id: (250, FlowRestriction.OPEN)},  # 250/500 = 0.5
-        )
-        evaluation_result = _make_evaluation_result(
-            peak_phase, active_day_phase, timestamp
-        )
-        states = derive_zone_states(
-            stage3_result, [zone_a], [], evaluation_result, custom_config
-        )
-        assert states[0].estimated_wait == 99
+        assert states[0].estimated_wait is None
 
 
 class TestConfidence:
-    def test_no_events_max_confidence(
+    def test_confidence_is_none_without_model(
         self,
         peak_phase: OperationalPhase,
         active_day_phase: EventDayPhase,
@@ -408,6 +371,7 @@ class TestConfidence:
         zone_a: Zone,
         default_config: Stage4Config,
     ) -> None:
+        """Sin modelo especializado, el Context Engine NO genera confidence (ADR-004)."""
         stage3_result = _build_stage3_result(
             peak_phase, active_day_phase, timestamp,
             {zone_a.id: (250, FlowRestriction.OPEN)},
@@ -418,38 +382,9 @@ class TestConfidence:
         states = derive_zone_states(
             stage3_result, [zone_a], [], evaluation_result, default_config
         )
-        assert states[0].confidence == 1.0
+        assert states[0].confidence is None
 
-    def test_planned_event_reduces_confidence(
-        self,
-        peak_phase: OperationalPhase,
-        active_day_phase: EventDayPhase,
-        timestamp: datetime,
-        zone_a: Zone,
-        default_config: Stage4Config,
-    ) -> None:
-        stage3_result = _build_stage3_result(
-            peak_phase, active_day_phase, timestamp,
-            {zone_a.id: (250, FlowRestriction.OPEN)},
-        )
-        evaluation_result = _make_evaluation_result(
-            peak_phase, active_day_phase, timestamp
-        )
-        active_events = [
-            OperationalEvent(
-                target_zone_id=zone_a.id,
-                impact_value=-30,
-                is_incident=False,
-                start_timestamp=timestamp,
-                end_timestamp=datetime(2026, 7, 15, 16, 0),
-            )
-        ]
-        states = derive_zone_states(
-            stage3_result, [zone_a], active_events, evaluation_result, default_config
-        )
-        assert states[0].confidence == 0.8
-
-    def test_incident_lowest_confidence(
+    def test_confidence_none_even_with_events(
         self,
         peak_phase: OperationalPhase,
         active_day_phase: EventDayPhase,
@@ -476,31 +411,7 @@ class TestConfidence:
         states = derive_zone_states(
             stage3_result, [zone_a], active_events, evaluation_result, default_config
         )
-        assert states[0].confidence == 0.5
-
-    def test_configurable_confidence_values(
-        self,
-        peak_phase: OperationalPhase,
-        active_day_phase: EventDayPhase,
-        timestamp: datetime,
-        zone_a: Zone,
-    ) -> None:
-        custom_config = Stage4Config(
-            confidence_no_events=0.95,
-            confidence_planned_events=0.75,
-            confidence_incident=0.4,
-        )
-        stage3_result = _build_stage3_result(
-            peak_phase, active_day_phase, timestamp,
-            {zone_a.id: (250, FlowRestriction.OPEN)},
-        )
-        evaluation_result = _make_evaluation_result(
-            peak_phase, active_day_phase, timestamp
-        )
-        states = derive_zone_states(
-            stage3_result, [zone_a], [], evaluation_result, custom_config
-        )
-        assert states[0].confidence == 0.95
+        assert states[0].confidence is None
 
 
 class TestReasoningFactors:
@@ -554,7 +465,7 @@ class TestReasoningFactors:
         )
         assert any("Incidente activo en zona" in f for f in states[0].reasoning_factors)
 
-    def test_high_saturation_reasoning(
+    def test_high_density_reasoning(
         self,
         peak_phase: OperationalPhase,
         active_day_phase: EventDayPhase,
@@ -572,7 +483,7 @@ class TestReasoningFactors:
         states = derive_zone_states(
             stage3_result, [zone_a], [], evaluation_result, default_config
         )
-        assert any("Alta saturación proyectada" in f for f in states[0].reasoning_factors)
+        assert any("Alta densidad proyectada" in f for f in states[0].reasoning_factors)
 
     def test_regulated_reasoning(
         self,
@@ -689,16 +600,18 @@ class TestMultiZone:
 
         s_a = state_map[zone_a.id]
         assert s_a.operational_state == "REGULATED"
-        assert s_a.saturation_level == pytest.approx(350 / 500.0)
-        assert s_a.availability == 150
-        assert s_a.confidence == 0.8
+        assert s_a.saturation_level is None
+        assert s_a.availability is None
+        assert s_a.confidence is None
+        assert s_a.projected_density == 350
         assert any("Impacto de evento operativo: -50" in f for f in s_a.reasoning_factors)
 
         s_b = state_map[zone_b.id]
         assert s_b.operational_state == "CLOSED"
-        assert s_b.saturation_level == pytest.approx(1800 / 2000.0)
-        assert s_b.availability == 200
-        assert s_b.confidence == 0.5
+        assert s_b.saturation_level is None
+        assert s_b.availability is None
+        assert s_b.confidence is None
+        assert s_b.projected_density == 1800
         assert any("Zona cerrada" in f for f in s_b.reasoning_factors)
         assert any("Incidente activo en zona" in f for f in s_b.reasoning_factors)
 

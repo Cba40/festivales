@@ -250,8 +250,10 @@ class TestFullPipeline:
         assert len(result.zone_states) == 2
         zone_a_state = next(s for s in result.zone_states if str(s.zone_id).endswith("0001"))
         zone_b_state = next(s for s in result.zone_states if str(s.zone_id).endswith("0002"))
-        assert zone_a_state.confidence == 0.8
-        assert zone_b_state.confidence == 1.0
+        # Sin modelo especializado registrado, el Context Engine NO genera
+        # confidence (ADR-004): solo el modelo especializado lo produce.
+        assert zone_a_state.confidence is None
+        assert zone_b_state.confidence is None
 
     def test_pipeline_zone_states_values(
         self,
@@ -275,12 +277,17 @@ class TestFullPipeline:
         zone_a_state = next(s for s in result.zone_states if str(s.zone_id).endswith("0001"))
         zone_b_state = next(s for s in result.zone_states if str(s.zone_id).endswith("0002"))
 
-        assert zone_a_state.saturation_level == pytest.approx(400 / 500.0)
-        assert zone_a_state.availability == 100
+        # ADR-004: sin modelo especializado registrado no se genera saturación
+        # ni disponibilidad universales; se preserva el contexto común
+        # (densidad proyectada) y el estado operativo derivado.
+        assert zone_a_state.saturation_level is None
+        assert zone_a_state.availability is None
+        assert zone_a_state.projected_density == 400
         assert zone_a_state.operational_state == "REGULATED"
 
-        assert zone_b_state.saturation_level == pytest.approx(1200 / 2000.0)
-        assert zone_b_state.availability == 800
+        assert zone_b_state.saturation_level is None
+        assert zone_b_state.availability is None
+        assert zone_b_state.projected_density == 1200
         assert zone_b_state.operational_state == "MODERATE"
 
     def test_pipeline_propagates_operational_classification(

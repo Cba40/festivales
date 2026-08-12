@@ -6,11 +6,11 @@ class ZonaItemBase(BaseModel):
     name: str
     score: float = Field(ge=0.0, le=1.0)
     reasoning: list[str]
-    saturation_level: float = Field(ge=0.0, le=1.0)
-    estado: str
-    availability: int
-    estimated_wait: int
-    confidence: float = Field(ge=0.0, le=1.0)
+    saturation_level: float | None = Field(default=None, ge=0.0, le=1.0)
+    estado: str | None = None
+    availability: int | None = None
+    estimated_wait: int | None = None
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     active_restriction: str
     operational_state: str
     lat: float | None = None

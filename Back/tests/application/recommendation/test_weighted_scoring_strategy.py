@@ -1152,3 +1152,106 @@ class TestConfigInjection:
             config=custom_config,
         )
         assert result[0].score == pytest.approx(0.3)
+
+
+class TestNoSaturationSignal:
+    """Cuando NO existe `saturation_level` (sin modelo especializado) no se
+    fabrica una señal de saturación (ADR-004, Opción 3)."""
+
+    @staticmethod
+    def _zone_without_saturation(
+        active_restriction: FlowRestriction = FlowRestriction.OPEN,
+        type: str | None = None,
+        subtipo: str | None = None,
+    ) -> ZoneState:
+        return ZoneState(
+            zone_id=UUID("a0000000-0000-0000-0000-000000000001"),
+            operational_state="LOW_DEMAND",
+            reasoning_factors=[],
+            active_restriction=active_restriction,
+            type=type,
+            subtipo=subtipo,
+        )
+
+    def _evaluate(
+        self,
+        strategy: WeightedScoringStrategy,
+        zone_states: list[ZoneState],
+        action: ActionType,
+        rescue_config: RecommendationConfig | None = None,
+    ) -> list[ZoneRecommendation]:
+        return strategy.evaluate(
+            prediction=_prediction(zone_states=zone_states),
+            user_context=UserContext(
+                user_id=UUID("00000000-0000-0000-0000-000000000001"),
+                access_level=AccessLevel.STANDARD,
+            ),
+            mobility_context=MobilityContext(
+                current_zone_id=None,
+                speed=1.0,
+                accessibility_required=False,
+            ),
+            requested_action=RequestedAction(action_type=action),
+            config=rescue_config or RecommendationConfig(),
+        )
+
+    def test_absence_of_saturation_does_not_force_score_one(
+        self,
+        strategy: WeightedScoringStrategy,
+    ) -> None:
+        # Regulada y sin saturación: no hay término de densidad, pero SÍ aplican
+        # las demás componentes (penalización por restricción). El score no es 1.0.
+        result = self._evaluate(
+            strategy,
+            [self._zone_without_saturation(FlowRestriction.REGULATED)],
+            ActionType.SEEK_SERVICE,
+        )
+        assert result[0].score == pytest.approx(1.0 * (1.0 - 0.3))
+        assert result[0].score != pytest.approx(1.0)
+
+    def test_no_density_penalty_nor_bonus_without_saturation(
+        self,
+        strategy: WeightedScoringStrategy,
+    ) -> None:
+        # Abierta sin saturación: sin término de densidad, base 1.0 sin
+        # penalización/bonus derivados de densidad.
+        result = self._evaluate(
+            strategy,
+            [self._zone_without_saturation()],
+            ActionType.SEEK_SERVICE,
+        )
+        assert result[0].score == pytest.approx(1.0)
+
+    def test_present_saturation_still_uses_density_term(
+        self,
+        strategy: WeightedScoringStrategy,
+    ) -> None:
+        # Con saturación presente el comportamiento se mantiene: 1.0 - saturación.
+        zone = ZoneState(
+            zone_id=UUID("a0000000-0000-0000-0000-000000000001"),
+            operational_state="LOW_DEMAND",
+            saturation_level=0.2,
+            reasoning_factors=[],
+            active_restriction=FlowRestriction.OPEN,
+        )
+        result = self._evaluate(strategy, [zone], ActionType.SEEK_SERVICE)
+        assert result[0].score == pytest.approx(1.0 - 0.2)
+
+    def test_seek_low_density_does_not_filter_without_saturation(
+        self,
+        strategy: WeightedScoringStrategy,
+    ) -> None:
+        # Sin saturación no se aplica el filtro de baja densidad (Opción 3);
+        # ambas zonas siguen siendo elegibles.
+        zona_a = self._zone_without_saturation(type="comida")
+        zona_b = ZoneState(
+            zone_id=UUID("b0000000-0000-0000-0000-000000000002"),
+            operational_state="LOW_DEMAND",
+            reasoning_factors=[],
+            active_restriction=FlowRestriction.OPEN,
+            type="servicios",
+        )
+        result = self._evaluate(
+            strategy, [zona_a, zona_b], ActionType.SEEK_LOW_DENSITY
+        )
+        assert len(result) == 2

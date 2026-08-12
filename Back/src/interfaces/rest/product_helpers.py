@@ -75,21 +75,32 @@ def enrich_zone(
     extra_fields: dict | None = None,
 ) -> ZonaItemBase:
     if state is not None:
+        # Atributos de estado específicos: solo existen cuando el modelo
+        # especializado los produce (ADR-004). Cuando no existen se preservan
+        # como None; NO se sustituyen por valores sintéticos ni se infieren.
         saturation_level = state.saturation_level
         availability = state.availability
         estimated_wait = state.estimated_wait
         confidence = state.confidence
-        active_restriction = state.active_restriction.value
+        active_restriction = (
+            state.active_restriction.value
+            if state.active_restriction is not None
+            else "OPEN"
+        )
         operational_state = state.operational_state
     else:
-        saturation_level = 0.0
-        availability = 0
-        estimated_wait = 0
-        confidence = 0.0
+        saturation_level = None
+        availability = None
+        estimated_wait = None
+        confidence = None
         active_restriction = "OPEN"
         operational_state = "UNKNOWN"
 
-    estado = saturation_to_estado(saturation_level)
+    estado = (
+        saturation_to_estado(saturation_level)
+        if saturation_level is not None
+        else None
+    )
 
     kwargs = dict(
         zone_id=str(rec.zone_id),

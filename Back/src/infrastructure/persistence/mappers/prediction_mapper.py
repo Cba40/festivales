@@ -9,6 +9,9 @@ from src.infrastructure.persistence.models.prediction import PredictionModel
 
 
 def _zone_state_to_dict(state: ZoneState) -> dict:
+    model_result = (
+        dict(state.model_result) if state.model_result is not None else None
+    )
     return {
         "zone_id": str(state.zone_id),
         "operational_state": state.operational_state,
@@ -17,24 +20,37 @@ def _zone_state_to_dict(state: ZoneState) -> dict:
         "estimated_wait": state.estimated_wait,
         "confidence": state.confidence,
         "reasoning_factors": list(state.reasoning_factors),
-        "active_restriction": state.active_restriction.value,
+        "active_restriction": (
+            state.active_restriction.value
+            if state.active_restriction is not None
+            else None
+        ),
         "type": state.type,
         "subtipo": state.subtipo,
+        "projected_density": state.projected_density,
+        "model_result": model_result,
     }
 
 
 def _zone_state_from_dict(data: dict) -> ZoneState:
+    active_restriction = data.get("active_restriction")
     return ZoneState(
         zone_id=UUID(data["zone_id"]),
         operational_state=data["operational_state"],
-        availability=data["availability"],
-        saturation_level=data["saturation_level"],
-        estimated_wait=data["estimated_wait"],
-        confidence=data["confidence"],
-        reasoning_factors=list(data["reasoning_factors"]),
-        active_restriction=FlowRestriction(data["active_restriction"]),
+        availability=data.get("availability"),
+        saturation_level=data.get("saturation_level"),
+        estimated_wait=data.get("estimated_wait"),
+        confidence=data.get("confidence"),
+        reasoning_factors=list(data.get("reasoning_factors") or []),
+        active_restriction=(
+            FlowRestriction(active_restriction)
+            if active_restriction is not None
+            else None
+        ),
         type=data.get("type", ""),
         subtipo=data.get("subtipo"),
+        projected_density=data.get("projected_density", 0),
+        model_result=data.get("model_result"),
     )
 
 

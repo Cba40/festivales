@@ -84,7 +84,12 @@ class WeightedScoringStrategy:
                 return False
 
         if requested_action.action_type == ActionType.SEEK_LOW_DENSITY:
-            if zone.saturation_level > config.low_density_saturation_threshold:
+            # Solo se filtra por saturación cuando el modelo especializado la
+            # produce. Sin ella no se fabrica comparación (contexto común).
+            if (
+                zone.saturation_level is not None
+                and zone.saturation_level > config.low_density_saturation_threshold
+            ):
                 return False
 
         return True
@@ -113,7 +118,12 @@ class WeightedScoringStrategy:
     ) -> list[tuple[ZoneState, float]]:
         result: list[tuple[ZoneState, float]] = []
         for zone in viable_zones:
-            score = 1.0 - zone.saturation_level
+            # Término de densidad: solo cuando el modelo especializado la
+            # produce. Sin `saturation_level` NO hay señal de saturación: no
+            # se incorpora término de densidad (ni penalización ni bonus).
+            score = 1.0
+            if zone.saturation_level is not None:
+                score -= zone.saturation_level
 
             if zone.active_restriction == FlowRestriction.REGULATED:
                 score *= 1.0 - config.regulated_penalty
@@ -149,7 +159,10 @@ class WeightedScoringStrategy:
         for zone, score in scored_zones:
             reasons: list[str] = []
 
-            if zone.saturation_level < config.low_density_reasoning_threshold:
+            if (
+                zone.saturation_level is not None
+                and zone.saturation_level < config.low_density_reasoning_threshold
+            ):
                 reasons.append("Baja densidad proyectada")
 
             if zone.active_restriction == FlowRestriction.REGULATED:
@@ -168,9 +181,18 @@ class WeightedScoringStrategy:
     def _sort_recommendations(
         recommendations: list[tuple[ZoneState, float, list[str]]],
     ) -> list[ZoneRecommendation]:
+        # Desempate: se usa `saturation_level` solo cuando el modelo lo
+        # produce. Sin señal disponible no se fabrica un valor: se usa un
+        # centinela de ordenamiento (`float("inf")`) para posicionar esas
+        # zonas al final, y el identificador de zona queda como criterio
+        # determinista final.
         sorted_recs = sorted(
             recommendations,
-            key=lambda r: (-r[1], r[0].saturation_level, str(r[0].zone_id)),
+            key=lambda r: (-r[1],
+                           r[0].saturation_level
+                           if r[0].saturation_level is not None
+                           else float("inf"),
+                           str(r[0].zone_id)),
         )
         return [
             ZoneRecommendation(

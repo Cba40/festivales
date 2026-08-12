@@ -54,10 +54,12 @@ class ZoneApplication:
         zone_id: UUID,
         projected_density: int,
         active_restriction: FlowRestriction,
+        density_factor: float | None = None,
     ) -> None:
         self._zone_id = zone_id
         self._projected_density = projected_density
         self._active_restriction = active_restriction
+        self._density_factor = density_factor
 
     @property
     def zone_id(self) -> UUID:
@@ -71,12 +73,17 @@ class ZoneApplication:
     def active_restriction(self) -> FlowRestriction:
         return self._active_restriction
 
+    @property
+    def density_factor(self) -> float | None:
+        return self._density_factor
+
     def __repr__(self) -> str:
         return (
             f"ZoneApplication("
             f"zone_id={self._zone_id!r}, "
             f"projected_density={self._projected_density!r}, "
-            f"active_restriction={self._active_restriction!r})"
+            f"active_restriction={self._active_restriction!r}, "
+            f"density_factor={self._density_factor!r})"
         )
 
 

@@ -9,6 +9,7 @@ from src.application.context_engine.dto import (
 )
 from src.application.context_engine.stage4_config import Stage4Config, get_stage4_config
 from src.domain.entities.operational_event import OperationalEvent
+from src.domain.models.specialized_model import ModelSpecificResult
 from src.domain.entities.zone import Zone
 from src.domain.entities.zone_behavior import FlowRestriction
 from src.domain.value_objects.zone_state import ZoneState
@@ -20,8 +21,12 @@ def derive_zone_states(
     active_events: Sequence[OperationalEvent],
     evaluation_result: EventEvaluationResult,
     config: Stage4Config | None = None,
+    model_results: Mapping[UUID, ModelSpecificResult] | None = None,
 ) -> list[ZoneState]:
     resolved_config = config if config is not None else get_stage4_config()
+    resolved_model_results = (
+        model_results if model_results is not None else {}
+    )
 
     zones_by_id: dict[UUID, Zone] = {z.id: z for z in zones}
 
@@ -43,18 +48,41 @@ def derive_zone_states(
         projected_density = zone_app.projected_density
         active_restriction = zone_app.active_restriction
 
-        saturation_level = _compute_saturation_level(projected_density, capacity)
-        availability = _compute_availability(capacity, projected_density)
+        model_result = resolved_model_results.get(zone_id)
+        model_data = model_result.data if model_result is not None else None
+
+        # El estado operativo se clasifica desde el contexto territorial común
+        # (densidad proyectada, restricciones). El modelo especializado puede
+        # precisarlo si lo produce como resultado específico.
         operational_state = _determine_operational_state(
-            saturation_level, active_restriction, resolved_config
+            projected_density, capacity, active_restriction, resolved_config
         )
-        estimated_wait = _estimate_wait(saturation_level, resolved_config)
+        if model_data is not None and "operational_state" in model_data:
+            operational_state = model_data["operational_state"]
+
+        # Atributos de estado específicos: solo existen cuando el modelo
+        # especializado correspondiente los produce (ADR-004). El Context
+        # Engine NO genera fallback universal de estos valores.
+        saturation_level = (
+            model_data.get("saturation_level") if model_data is not None else None
+        )
+        availability = (
+            model_data.get("availability") if model_data is not None else None
+        )
+        estimated_wait = (
+            model_data.get("estimated_wait") if model_data is not None else None
+        )
+        confidence = model_data.get("confidence") if model_data is not None else None
 
         zone_events = events_by_zone.get(zone_id, [])
         accumulated_impact = evaluation_result.event_impacts.get(zone_id, 0)
-        confidence = _compute_confidence(zone_events, resolved_config)
         reasoning_factors = _build_reasoning_factors(
-            accumulated_impact, zone_events, saturation_level, active_restriction
+            accumulated_impact,
+            zone_events,
+            projected_density,
+            capacity,
+            active_restriction,
+            resolved_config,
         )
 
         zone_states.append(
@@ -69,30 +97,28 @@ def derive_zone_states(
                 active_restriction=active_restriction,
                 type=zone_type,
                 subtipo=zone_subtipo,
+                projected_density=projected_density,
+                model_result=model_data,
             )
         )
 
     return zone_states
 
 
-def _compute_saturation_level(projected_density: int, capacity: int) -> float:
+def _density_ratio(projected_density: int, capacity: int) -> float:
     if capacity <= 0:
         return 0.0
-    raw = projected_density / capacity
-    if raw < 0.0:
+    ratio = projected_density / capacity
+    if ratio < 0.0:
         return 0.0
-    if raw > 1.0:
+    if ratio > 1.0:
         return 1.0
-    return raw
-
-
-def _compute_availability(capacity: int, projected_density: int) -> int:
-    remaining = capacity - projected_density
-    return remaining if remaining > 0 else 0
+    return ratio
 
 
 def _determine_operational_state(
-    saturation_level: float,
+    projected_density: int,
+    capacity: int,
     active_restriction: FlowRestriction,
     config: Stage4Config,
 ) -> str:
@@ -100,40 +126,21 @@ def _determine_operational_state(
         return "CLOSED"
     if active_restriction == FlowRestriction.REGULATED:
         return "REGULATED"
-    if saturation_level >= config.saturation_high_threshold:
+    ratio = _density_ratio(projected_density, capacity)
+    if ratio >= config.saturation_high_threshold:
         return "HIGH_DEMAND"
-    if saturation_level >= config.saturation_moderate_threshold:
+    if ratio >= config.saturation_moderate_threshold:
         return "MODERATE"
     return "LOW_DEMAND"
-
-
-def _estimate_wait(saturation_level: float, config: Stage4Config) -> int:
-    for low, high, wait in config.wait_time_mapping:
-        if low <= saturation_level < high:
-            return wait
-    if saturation_level >= 1.0 and config.wait_time_mapping:
-        _, _, last_wait = config.wait_time_mapping[-1]
-        return last_wait
-    return 0
-
-
-def _compute_confidence(
-    zone_events: Sequence[OperationalEvent],
-    config: Stage4Config,
-) -> float:
-    has_incident = any(e.is_incident for e in zone_events)
-    if has_incident:
-        return config.confidence_incident
-    if zone_events:
-        return config.confidence_planned_events
-    return config.confidence_no_events
 
 
 def _build_reasoning_factors(
     accumulated_impact: int,
     zone_events: Sequence[OperationalEvent],
-    saturation_level: float,
+    projected_density: int,
+    capacity: int,
     active_restriction: FlowRestriction,
+    config: Stage4Config,
 ) -> list[str]:
     factors: list[str] = []
 
@@ -143,8 +150,8 @@ def _build_reasoning_factors(
     if any(e.is_incident for e in zone_events):
         factors.append("Incidente activo en zona")
 
-    if saturation_level >= 0.9:
-        factors.append("Alta saturación proyectada")
+    if _density_ratio(projected_density, capacity) >= config.saturation_high_threshold:
+        factors.append("Alta densidad proyectada")
 
     if active_restriction == FlowRestriction.REGULATED:
         factors.append("Acceso regulado")

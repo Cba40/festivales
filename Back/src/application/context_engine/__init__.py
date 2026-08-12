@@ -7,9 +7,15 @@ from src.application.context_engine.exceptions import (
     InvalidPhaseContext,
     InvalidRuntimeContext,
 )
+from src.application.context_engine.model_selector import ModelSelector
+from src.application.context_engine.stage4_model_execution import (
+    execute_specialized_models,
+)
 
 __all__ = [
     "ContextEngine",
+    "ModelSelector",
+    "execute_specialized_models",
     "ContextEngineError",
     "DomainNotConfigured",
     "InvalidPhaseContext",

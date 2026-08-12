@@ -25,11 +25,6 @@ def apply_zone_behaviors(
 
     active_phase = evaluation_result.active_operational_phase
     active_day_phase = evaluation_result.active_event_day_phase
-    phase_intensity = (
-        active_day_phase.intensity
-        if active_day_phase.intensity is not None
-        else 1.0
-    )
 
     for zone in zones:
         behavior_key = (zone.zone_type_id, active_phase.id)
@@ -40,9 +35,7 @@ def apply_zone_behaviors(
 
         accumulated_impact = evaluation_result.event_impacts.get(zone.id, 0)
 
-        projected_density = round(
-            zone.capacity * phase_intensity * behavior.density_factor
-        )
+        projected_density = round(zone.capacity * behavior.density_factor)
         projected_density += accumulated_impact
 
         if projected_density < 0:
@@ -56,6 +49,7 @@ def apply_zone_behaviors(
             zone_id=zone.id,
             projected_density=projected_density,
             active_restriction=active_restriction,
+            density_factor=behavior.density_factor,
         )
 
     return ZoneBehaviorApplicationResult(

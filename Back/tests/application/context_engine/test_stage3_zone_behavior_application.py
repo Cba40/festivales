@@ -191,7 +191,7 @@ class TestDensityCalculation:
         # capacity=500, multiplier=1.0, density_factor=0.8 -> round(400) = 400
         assert app.projected_density == 400
 
-    def test_applies_phase_intensity(
+    def test_intensity_is_not_applied_to_density(
         self,
         zone_a: Zone,
         zone_behaviors: Mapping[tuple[UUID, UUID], ZoneBehavior],
@@ -211,8 +211,10 @@ class TestDensityCalculation:
         )
 
         app = result.zone_applications[zone_a.id]
-        # capacity=500, intensity=0.5, density_factor=0.8 -> round(200) = 200
-        assert app.projected_density == 200
+        # La Intensity es un dato contextual entregado al modelo especializado,
+        # no una fórmula universal sobre capacity: capacity=500, density_factor=0.8
+        # -> round(400) = 400, independientemente de la intensity de la fase.
+        assert app.projected_density == 400
 
     def test_rounds_to_nearest_integer(
         self,
@@ -234,8 +236,9 @@ class TestDensityCalculation:
         )
 
         app = result.zone_applications[zone_a.id]
-        # capacity=500, intensity=1.5, density_factor=0.8 -> round(600) = 600
-        assert app.projected_density == 600
+        # capacity=500, density_factor=0.8 -> round(400) = 400.
+        # La intensity=1.5 de la fase no escala la densidad: es contexto del modelo.
+        assert app.projected_density == 400
 
     def test_defaults_intensity_to_one_when_phase_has_no_intensity(
         self,
@@ -334,9 +337,9 @@ class TestClamping:
         )
 
         app = result.zone_applications[zone_c.id]
-        # capacity=300, intensity=0.5, density_factor=0.8 -> round(120) = 120
-        # impact = -200 -> -80 -> clamped to 0
-        assert app.projected_density == 0
+        # capacity=300, density_factor=0.8 -> round(240) = 240
+        # impact = -200 -> 40 (positivo, sin clamp)
+        assert app.projected_density == 40
 
     def test_keeps_positive_density_unchanged(
         self,
