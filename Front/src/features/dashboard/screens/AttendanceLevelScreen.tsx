@@ -7,10 +7,11 @@ import type { AttendanceLevelDTO } from '../types';
 import { apiClient } from '@/core/api/client';
 
 const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
+const EVENT_DAY_ID = import.meta.env.VITE_EVENT_DAY_ID || '';
 
 export function AttendanceLevelScreen() {
-  const { levels, loading, error, refresh } = useAttendanceLevels();
-  const { create, update, remove, saving } = useAttendanceLevelMutations();
+  const { levels, loading, error, refresh } = useAttendanceLevels(EVENT_ID, EVENT_DAY_ID);
+  const { create, update, remove, saving } = useAttendanceLevelMutations(EVENT_ID, EVENT_DAY_ID);
 
   const [showForm, setShowForm] = useState(false);
   const [editingLevel, setEditingLevel] = useState<AttendanceLevelDTO | null>(null);
@@ -26,7 +27,7 @@ export function AttendanceLevelScreen() {
     setFormError(null);
     try {
       const { data } = await apiClient.get<AttendanceLevelDTO>(
-        `/events/${EVENT_ID}/attendance-levels/${level.id}`
+        `/events/${EVENT_ID}/days/${EVENT_DAY_ID}/attendance-levels/${level.id}`
       );
       setEditingLevel(data);
       setShowForm(true);

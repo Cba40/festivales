@@ -38,7 +38,7 @@ class GeneratePrediction:
         timestamp: datetime,
         zones: Sequence[Zone],
         zone_behaviors: Mapping[tuple[UUID, UUID], ZoneBehavior],
-        attendance_level: AttendanceLevel,
+        attendance_level: AttendanceLevel | None,
         operational_phases: Mapping[UUID, OperationalPhase],
     ) -> TerritorialPrediction:
         event_day = await self._event_day_repo.find_by_date(timestamp.date())

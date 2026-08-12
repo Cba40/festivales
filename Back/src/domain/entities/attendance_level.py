@@ -14,6 +14,7 @@ class AttendanceLevel:
         name: str,
         min_people: int,
         max_people: int | None = None,
+        event_day_id: UUID | None = None,
         id: UUID | None = None,
     ) -> None:
         resolved_id = id if id is not None else uuid4()
@@ -22,6 +23,11 @@ class AttendanceLevel:
         self._name = name.strip()
         self._min_people = min_people
         self._max_people = max_people
+        self._event_day_id = event_day_id
+
+    @property
+    def event_day_id(self) -> UUID | None:
+        return self._event_day_id
 
     @property
     def id(self) -> UUID:
@@ -73,5 +79,6 @@ class AttendanceLevel:
     def __repr__(self) -> str:
         return (
             f"AttendanceLevel(id={self._id!r}, name={self._name!r}, "
-            f"min_people={self._min_people!r}, max_people={self._max_people!r})"
+            f"min_people={self._min_people!r}, max_people={self._max_people!r}, "
+            f"event_day_id={self._event_day_id!r})"
         )

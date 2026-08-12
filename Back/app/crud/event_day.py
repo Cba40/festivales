@@ -5,7 +5,6 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.attendance_level import AttendanceLevel
 from app.models.event_day import EventDay
 from app.models.event_day_phase import EventDayPhase
 from app.models.operational_phase import OperationalPhase
@@ -38,12 +37,6 @@ async def _default_operational_profile(db: AsyncSession) -> OperationalProfile:
 
 
 async def create(db: AsyncSession, obj_in: EventDayCreate, event_id: str) -> EventDay:
-    attendance_level = await db.get(AttendanceLevel, obj_in.attendance_level_id)
-    if not attendance_level:
-        raise ValueError(
-            f"AttendanceLevel with id '{obj_in.attendance_level_id}' not found"
-        )
-
     if obj_in.operational_end_min <= obj_in.operational_start_min:
         raise ValueError(
             "operational_end_min must be greater than operational_start_min"
@@ -111,16 +104,6 @@ async def update(
     logger.info("CRUD update - claves presentes=%s", list(update_data.keys()))
     logger.info("CRUD update - cantidad de fases recibidas=%s", len(update_data.get("phases", [])))
     # DEBUG 422 END
-
-    if "attendance_level_id" in update_data:
-        al = await db.get(AttendanceLevel, update_data["attendance_level_id"])
-        if not al:
-            # DEBUG 422 BEGIN
-            logger.info("CRUD update - AttendanceLevel inexistente - UUID=%s", update_data["attendance_level_id"])
-            # DEBUG 422 END
-            raise ValueError(
-                f"AttendanceLevel with id '{update_data['attendance_level_id']}' not found"
-            )
 
     if "operational_start_min" in update_data or "operational_end_min" in update_data:
         new_start = update_data.get("operational_start_min", db_obj.operational_start_min)

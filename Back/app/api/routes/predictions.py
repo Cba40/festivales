@@ -39,21 +39,24 @@ async def _collect_prediction_debug_state(
     ed_row = (
         await db.execute(
             select(EventDay)
+            .where(EventDay.event_id == event_id)
             .where(EventDay.date == timestamp.date())
             .options(selectinload(EventDay.phases))
         )
     ).scalar_one_or_none()
 
-    attendance_row = None
+    attendance_rows = []
     profile_row = None
     if ed_row is not None:
-        attendance_row = (
-            await db.execute(
-                select(AttendanceLevel).where(
-                    AttendanceLevel.id == ed_row.attendance_level_id,
+        attendance_rows = list(
+            (
+                await db.execute(
+                    select(AttendanceLevel).where(
+                        AttendanceLevel.event_day_id == ed_row.id,
+                    )
                 )
-            )
-        ).scalar_one_or_none()
+            ).scalars().all()
+        )
         profile_row = (
             await db.execute(
                 select(OperationalProfile).where(
@@ -65,7 +68,7 @@ async def _collect_prediction_debug_state(
     logger.info(
         "[PREDICTION DEBUG] event_id=%s timestamp_recibido=%s | event=%s | "
         "event_day=%s | event_day_phases=%d | zones=%d | "
-        "attendance_level=%s | operational_profile=%s | result=%s",
+        "attendance_levels=%d | operational_profile=%s | result=%s",
         event_id,
         timestamp.isoformat(),
         {"id": event_row.id, "name": event_row.name} if event_row else None,
@@ -73,7 +76,6 @@ async def _collect_prediction_debug_state(
             {
                 "id": ed_row.id,
                 "operational_profile_id": str(ed_row.operational_profile_id),
-                "attendance_level_id": ed_row.attendance_level_id,
                 "operational_start_min": ed_row.operational_start_min,
                 "operational_end_min": ed_row.operational_end_min,
             }
@@ -82,7 +84,7 @@ async def _collect_prediction_debug_state(
         ),
         len(ed_row.phases) if ed_row else 0,
         len(zone_rows),
-        bool(attendance_row),
+        len(attendance_rows),
         bool(profile_row),
         "prediction == None" if prediction is None else "prediction generado correctamente",
     )
@@ -111,7 +113,7 @@ async def _collect_prediction_debug_state(
         return "zones_empty"
     if ed_row is None:
         return "no_event_day"
-    if attendance_row is None:
+    if not attendance_rows:
         return "no_attendance_level"
     if profile_row is None:
         return "no_operational_profile"

@@ -65,7 +65,7 @@ export interface Incident {
 
 export interface AttendanceLevelDTO {
   id: string;
-  event_id: string;
+  event_day_id: string;
   name: string;
   min_people: number;
   max_people: number | null;
@@ -110,7 +110,6 @@ export interface EventDaySummary {
   date: string;
   day_of_week: string;
   operational_profile_id: string | null;
-  attendance_level_id: string;
   operational_start_min: number;
   operational_end_min: number;
   weather: string | null;
@@ -124,7 +123,6 @@ export interface EventDay {
   date: string;
   day_of_week: string;
   operational_profile_id: string | null;
-  attendance_level_id: string;
   operational_start_min: number;
   operational_end_min: number;
   weather: string | null;
@@ -134,6 +132,7 @@ export interface EventDay {
   average_parking_duration?: number | null;
   is_active: boolean;
   phases: EventDayPhaseDTO[];
+  attendance_levels: AttendanceLevelDTO[];
   created_at: string;
   updated_at: string;
 }
@@ -244,7 +243,6 @@ export interface EventDayCreatePayload {
   date: string;
   day_of_week: string;
   operational_profile_id?: string | null;
-  attendance_level_id: string;
   operational_start_min: number;
   operational_end_min: number;
   phases?: EventDayPhaseCreatePayload[];

@@ -181,22 +181,39 @@ async def _load_zone_behaviors(
     return result
 
 
-async def _load_attendance_level(
+async def _load_attendance_levels(
     db: AsyncSession,
-    attendance_level_id: str,
-) -> AttendanceLevel | None:
+    event_day_id: str,
+) -> list[AttendanceLevel]:
     stmt = select(AttendanceLevelORM).where(
-        AttendanceLevelORM.id == attendance_level_id,
+        AttendanceLevelORM.event_day_id == event_day_id,
     )
-    row = (await db.execute(stmt)).scalar_one_or_none()
-    if row is None:
+    rows = (await db.execute(stmt)).scalars().all()
+    result: list[AttendanceLevel] = []
+    for row in rows:
+        result.append(AttendanceLevel(
+            id=UUID(row.id),
+            event_day_id=UUID(row.event_day_id),
+            name=row.name,
+            min_people=row.min_people,
+            max_people=row.max_people,
+        ))
+    return result
+
+
+def _select_attendance_level(
+    levels: Sequence[AttendanceLevel],
+    attendance: int | None,
+) -> AttendanceLevel | None:
+    """Select the unique attendance level whose range contains the attendance."""
+    if attendance is None:
         return None
-    return AttendanceLevel(
-        id=UUID(row.id),
-        name=row.name,
-        min_people=row.min_people,
-        max_people=row.max_people,
-    )
+    for level in levels:
+        if level.min_people <= attendance and (
+            level.max_people is None or attendance <= level.max_people
+        ):
+            return level
+    return None
 
 
 async def _load_operational_phases(
@@ -304,6 +321,7 @@ class PredictionModule:
         ed_row = (
             await self._db.execute(
                 select(EventDayORM)
+                .where(EventDayORM.event_id == event_id)
                 .where(EventDayORM.date == local_ts.date())
                 .options(selectinload(EventDayORM.phases))
             )
@@ -311,9 +329,8 @@ class PredictionModule:
         if ed_row is None:
             return None
 
-        attendance_level = await _load_attendance_level(self._db, ed_row.attendance_level_id)
-        if attendance_level is None:
-            return None
+        day_levels = await _load_attendance_levels(self._db, ed_row.id)
+        attendance_level = _select_attendance_level(day_levels, None)
 
         eid = UUID(ed_row.id)
 
@@ -327,7 +344,7 @@ class PredictionModule:
             id=eid,
             event_date=ed_row.date,
             operational_profile_id=operational_profile_id,
-            attendance_level_id=attendance_level.id,
+            attendance_levels=tuple(day_levels),
             operational_start_min=ed_row.operational_start_min,
             operational_end_min=ed_row.operational_end_min,
             phases=tuple(

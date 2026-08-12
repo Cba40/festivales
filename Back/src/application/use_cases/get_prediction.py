@@ -27,7 +27,7 @@ class GetTerritorialPrediction:
         timestamp: datetime,
         zones: Sequence[Zone],
         zone_behaviors: Mapping[tuple[UUID, UUID], ZoneBehavior],
-        attendance_level: AttendanceLevel,
+        attendance_level: AttendanceLevel | None,
         operational_phases: Mapping[UUID, OperationalPhase],
     ) -> TerritorialPrediction:
         existing = await self._prediction_repo.find_by_timestamp(timestamp)

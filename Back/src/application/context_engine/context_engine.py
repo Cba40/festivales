@@ -49,7 +49,7 @@ class ContextEngine:
         zones: Sequence[Zone],
         zone_behaviors: Mapping[tuple[UUID, UUID], ZoneBehavior],
         operational_phases: Mapping[UUID, OperationalPhase],
-        attendance_level: AttendanceLevel,
+        attendance_level: AttendanceLevel | None,
         event_day: EventDay,
         events: Sequence[OperationalEvent],
     ) -> TerritorialPrediction:

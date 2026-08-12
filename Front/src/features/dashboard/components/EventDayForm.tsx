@@ -52,15 +52,19 @@ function PhaseTimelineBar({
   return (
     <div className="relative h-8 bg-slate-100 rounded-full overflow-hidden">
       {visiblePhases.map((phase, index) => {
-        const left = ((phase.start_min - opWindow.start) / range) * 100;
-        const width = ((phase.end_min - phase.start_min) / range) * 100;
+        if (phase.start_min === null || phase.end_min === null) return null;
+
+        const startMin = phase.start_min;
+        const endMin = phase.end_min;
+        const left = ((startMin - opWindow.start) / range) * 100;
+        const width = ((endMin - startMin) / range) * 100;
         const op = operationalPhases.find((p) => p.id === phase.operational_phase_id);
         return (
           <div
             key={phase.operational_phase_id}
             className={`absolute top-0 h-full ${TIMELINE_COLORS[index % TIMELINE_COLORS.length]} opacity-60`}
             style={{ left: `${Math.max(0, left)}%`, width: `${Math.max(0, width)}%` }}
-            title={op ? `${op.name}: ${minutesToTimeStr(phase.start_min)}-${minutesToTimeStr(phase.end_min)}` : ''}
+            title={op ? `${op.name}: ${minutesToTimeStr(startMin)}-${minutesToTimeStr(endMin)}` : ''}
           />
         );
       })}
@@ -80,9 +84,7 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
   const [estimatedVehicles, setEstimatedVehicles] = useState('');
   const [averageParkingDuration, setAverageParkingDuration] = useState('');
 
-  const [selectedLevelId, setSelectedLevelId] = useState('');
-
-  const { levels, loading: levelsLoading } = useAttendanceLevels();
+  const { levels, loading: levelsLoading } = useAttendanceLevels(eventDay?.event_id ?? '', eventDay?.id ?? '');
   const { byId: operationalPhaseCatalog, loading: operationalPhasesLoading } = useOperationalPhaseCatalog();
 
   const [operationalStartStr, setOperationalStartStr] = useState('');
@@ -97,7 +99,6 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
       setDayOfWeek(eventDay.day_of_week);
       setWeather(eventDay.weather ?? '');
       setHeadlinerArtist(eventDay.headliner_artist ?? '');
-      setSelectedLevelId(eventDay.attendance_level_id);
       setOperationalStartStr(minutesToTimeStr(eventDay.operational_start_min));
       setOperationalEndStr(minutesToTimeStr(eventDay.operational_end_min));
       setNotes(eventDay.notes ?? '');
@@ -146,13 +147,11 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
     [resolvedPhases, operationalStartMin, resolvedOpEnd],
   );
 
-  const selectedLevel = levels.find((l) => l.id === selectedLevelId);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setValidationError(null);
 
-    if (!date || !dayOfWeek || !selectedLevelId) {
+    if (!date || !dayOfWeek) {
       setValidationError('Completá todos los campos obligatorios');
       return;
     }
@@ -168,7 +167,6 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
     const payload: EventDayCreatePayload = {
       date,
       day_of_week: dayOfWeek,
-      attendance_level_id: selectedLevelId,
       operational_start_min: operationalStartMin,
       operational_end_min: resolvedOpEnd,
       phases: resolvedPhases.map((p) => ({
@@ -221,28 +219,22 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
         </div>
 
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-slate-700 mb-1">Nivel de asistencia *</label>
-          <select
-            value={selectedLevelId}
-            onChange={(e) => setSelectedLevelId(e.target.value)}
-            required
-            disabled={levelsLoading}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-          >
-            <option value="">{levelsLoading ? 'Cargando niveles...' : 'Seleccionar nivel...'}</option>
-            {levels.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.name} ({l.min_people.toLocaleString()}—{l.max_people ? l.max_people.toLocaleString() : '∞'})
-              </option>
-            ))}
-          </select>
-          {selectedLevel && (
-            <p className="text-[10px] text-slate-400 mt-0.5">
-              Rango de concurrencia: {selectedLevel.min_people.toLocaleString()} a{' '}
-              {selectedLevel.max_people ? selectedLevel.max_people.toLocaleString() : 'sin límite'} personas.
-              La intensidad de afluencia se configura por fase del día.
-            </p>
-          )}
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+            <div className="font-medium text-slate-700 mb-1">Niveles de asistencia del día</div>
+            {levelsLoading ? (
+              <span>Cargando niveles...</span>
+            ) : levels.length === 0 ? (
+              <span>No hay niveles cargados para este día. Use la gestión de niveles de asistencia.</span>
+            ) : (
+              <ul className="list-disc pl-5 space-y-1">
+                {levels.map((l) => (
+                  <li key={l.id}>
+                    {l.name}: {l.min_people.toLocaleString()}–{l.max_people ? l.max_people.toLocaleString() : '∞'}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
 
         <div>
@@ -396,7 +388,7 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
         </button>
         <button
           type="submit"
-          disabled={saving || !date || !dayOfWeek || !selectedLevelId || !operationalStartStr || !operationalEndStr}
+          disabled={saving || !date || !dayOfWeek || !operationalStartStr || !operationalEndStr}
           className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
         >
           {saving ? 'Guardando...' : isEditing ? 'Actualizar' : 'Crear día'}

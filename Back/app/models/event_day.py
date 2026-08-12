@@ -30,9 +30,6 @@ class EventDay(Base):
     operational_profile_id: Mapped[Optional[UUID]] = mapped_column(
         ForeignKey("operational_profiles.id"), nullable=True,
     )
-    attendance_level_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("attendance_levels.id"), nullable=False,
-    )
     estimated_vehicles: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     average_parking_duration: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     operational_start_min: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -42,7 +39,9 @@ class EventDay(Base):
 
     event = relationship("Event", back_populates="event_days")
     operational_profile: Mapped["OperationalProfile"] = relationship()
-    attendance_level: Mapped["AttendanceLevel"] = relationship()
+    attendance_levels: Mapped[list["AttendanceLevel"]] = relationship(
+        back_populates="event_day", cascade="all, delete-orphan",
+    )
     phases: Mapped[list["EventDayPhase"]] = relationship(
         back_populates="event_day", cascade="all, delete-orphan",
     )
