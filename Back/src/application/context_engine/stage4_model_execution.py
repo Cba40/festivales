@@ -17,6 +17,7 @@ from src.application.context_engine.dto import (
 )
 from src.application.context_engine.model_selector import ModelSelector
 from src.domain.entities.attendance_level import AttendanceLevel
+from src.domain.entities.event_day import EventDay
 from src.domain.entities.zone import Zone
 from src.domain.models.specialized_model import (
     ModelExecutionContext,
@@ -29,6 +30,7 @@ def _build_execution_context(
     zone_app: ZoneApplication,
     evaluation_result: EventEvaluationResult,
     attendance_level: AttendanceLevel | None,
+    event_day: EventDay,
 ) -> ModelExecutionContext:
     day_phase = evaluation_result.active_event_day_phase
     return ModelExecutionContext(
@@ -42,6 +44,8 @@ def _build_execution_context(
         density_factor=zone_app.density_factor,
         active_restriction=zone_app.active_restriction,
         reference_point_distance=zone.reference_point_distance,
+        estimated_vehicles=event_day.estimated_vehicles,
+        average_parking_duration=event_day.average_parking_duration,
     )
 
 
@@ -50,6 +54,7 @@ def execute_specialized_models(
     zones: Sequence[Zone],
     evaluation_result: EventEvaluationResult,
     attendance_level: AttendanceLevel | None,
+    event_day: EventDay,
     model_selector: ModelSelector | None = None,
 ) -> Mapping[UUID, ModelSpecificResult]:
     if model_selector is None:
@@ -70,6 +75,7 @@ def execute_specialized_models(
             zone_app,
             evaluation_result,
             attendance_level,
+            event_day,
         )
         results[zone.id] = model.execute(context)
 

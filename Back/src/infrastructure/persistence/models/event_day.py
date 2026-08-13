@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, ForeignKey, func
+from sqlalchemy import CheckConstraint, Float, ForeignKey, Integer, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.infrastructure.db.base import Base
@@ -16,6 +16,8 @@ class EventDayModel(Base):
     event_date: Mapped[date] = mapped_column(nullable=False)
     operational_profile_id: Mapped[UUID | None] = mapped_column(ForeignKey("operational_profiles.id"), nullable=True)
     attendance_level_id: Mapped[UUID] = mapped_column(ForeignKey("attendance_levels.id"), nullable=False)
+    estimated_vehicles: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    average_parking_duration: Mapped[float | None] = mapped_column(Float, nullable=True)
     operational_start_min: Mapped[int] = mapped_column(nullable=False)
     operational_end_min: Mapped[int] = mapped_column(nullable=False)
 

@@ -370,3 +370,109 @@ class TestNoUniversalFields:
         assert parking_state.estimated_wait is None
         assert parking_state.confidence is None
         assert parking_state.model_result == {"free_spaces": 12}
+
+
+class TestEventDayParkingDataDelivery:
+    """Etapa 1 Parking V1: transporte de estimated_vehicles y
+    average_parking_duration desde EventDay de dominio hasta
+    ModelExecutionContext.
+    """
+
+    @pytest.fixture
+    def event_day_with_parking(
+        self,
+        event_day_phase: EventDayPhase,
+    ) -> EventDay:
+        return EventDay(
+            id=UUID("40000000-0000-0000-0000-000000000001"),
+            event_date=date(2026, 7, 15),
+            operational_profile_id=UUID("50000000-0000-0000-0000-000000000001"),
+            attendance_level_id=UUID("60000000-0000-0000-0000-000000000001"),
+            operational_start_min=840,
+            operational_end_min=1080,
+            estimated_vehicles=2500,
+            average_parking_duration=4.0,
+            phases=(event_day_phase,),
+        )
+
+    def test_estimated_vehicles_reaches_execution_context(
+        self,
+        timestamp,
+        zones,
+        zone_behaviors,
+        operational_phases,
+        attendance,
+        event_day_with_parking,
+    ) -> None:
+        capturing = FakeParkingModel()
+        selector = ModelSelector()
+        selector.register(capturing)
+        engine = ContextEngine(model_selector=selector)
+
+        _predict(
+            engine,
+            timestamp=timestamp,
+            zones=zones,
+            zone_behaviors=zone_behaviors,
+            operational_phases=operational_phases,
+            attendance=attendance,
+            event_day=event_day_with_parking,
+        )
+
+        assert capturing.last_context is not None
+        assert capturing.last_context.estimated_vehicles == 2500
+
+    def test_average_parking_duration_reaches_execution_context(
+        self,
+        timestamp,
+        zones,
+        zone_behaviors,
+        operational_phases,
+        attendance,
+        event_day_with_parking,
+    ) -> None:
+        capturing = FakeParkingModel()
+        selector = ModelSelector()
+        selector.register(capturing)
+        engine = ContextEngine(model_selector=selector)
+
+        _predict(
+            engine,
+            timestamp=timestamp,
+            zones=zones,
+            zone_behaviors=zone_behaviors,
+            operational_phases=operational_phases,
+            attendance=attendance,
+            event_day=event_day_with_parking,
+        )
+
+        assert capturing.last_context is not None
+        assert capturing.last_context.average_parking_duration == 4.0
+
+    def test_defaults_when_event_day_has_no_parking_data(
+        self,
+        timestamp,
+        zones,
+        zone_behaviors,
+        operational_phases,
+        attendance,
+        event_day,
+    ) -> None:
+        capturing = FakeParkingModel()
+        selector = ModelSelector()
+        selector.register(capturing)
+        engine = ContextEngine(model_selector=selector)
+
+        _predict(
+            engine,
+            timestamp=timestamp,
+            zones=zones,
+            zone_behaviors=zone_behaviors,
+            operational_phases=operational_phases,
+            attendance=attendance,
+            event_day=event_day,
+        )
+
+        assert capturing.last_context is not None
+        assert capturing.last_context.estimated_vehicles is None
+        assert capturing.last_context.average_parking_duration is None

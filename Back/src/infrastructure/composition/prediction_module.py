@@ -338,6 +338,8 @@ class PredictionModule:
             attendance_level_id=ed_row.attendance_level_id,
             operational_start_min=ed_row.operational_start_min,
             operational_end_min=ed_row.operational_end_min,
+            estimated_vehicles=ed_row.estimated_vehicles,
+            average_parking_duration=ed_row.average_parking_duration,
             phases=tuple(
                 EventDayPhase(
                     id=UUID(str(p.id)),

@@ -25,6 +25,8 @@ def event_day_to_domain(model: EventDayModel) -> EventDay:
         attendance_level_id=model.attendance_level_id,
         operational_start_min=model.operational_start_min,
         operational_end_min=model.operational_end_min,
+        estimated_vehicles=model.estimated_vehicles,
+        average_parking_duration=model.average_parking_duration,
         phases=phases,
     )
 
@@ -37,6 +39,8 @@ def event_day_to_model(entity: EventDay) -> EventDayModel:
         attendance_level_id=entity.attendance_level_id,
         operational_start_min=entity.operational_start_min,
         operational_end_min=entity.operational_end_min,
+        estimated_vehicles=entity.estimated_vehicles,
+        average_parking_duration=entity.average_parking_duration,
     )
     model.phases = [
         EventDayPhaseModel(

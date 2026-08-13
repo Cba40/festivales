@@ -543,6 +543,60 @@ class TestEventDayMapper:
             assert rp.start_min == op.start_min
             assert rp.end_min == op.end_min
 
+    def test_to_domain_carries_parking_fields(self) -> None:
+        phase_model = EventDayPhaseModel(
+            id=A_UUID,
+            event_day_id=B_UUID,
+            operational_phase_id=C_UUID,
+            start_min=480,
+            end_min=720,
+        )
+        model = EventDayModel(
+            id=B_UUID,
+            event_date=date(2026, 7, 10),
+            operational_profile_id=C_UUID,
+            attendance_level_id=uuid4(),
+            operational_start_min=480,
+            operational_end_min=1380,
+            estimated_vehicles=2500,
+            average_parking_duration=4.0,
+        )
+        model.phases = [phase_model]
+
+        entity = event_day_to_domain(model)
+
+        assert entity.estimated_vehicles == 2500
+        assert entity.average_parking_duration == 4.0
+
+    def test_round_trip_preserves_parking_fields(self) -> None:
+        att_id = uuid4()
+        phase = EventDayPhase(
+            id=A_UUID,
+            event_day_id=B_UUID,
+            operational_phase_id=C_UUID,
+            start_min=480,
+            end_min=720,
+        )
+        original = EventDay(
+            id=B_UUID,
+            event_date=date(2026, 7, 10),
+            operational_profile_id=C_UUID,
+            attendance_level_id=att_id,
+            operational_start_min=480,
+            operational_end_min=1380,
+            estimated_vehicles=1500,
+            average_parking_duration=3.5,
+            phases=(phase,),
+        )
+
+        model = event_day_to_model(original)
+        result = event_day_to_domain(model)
+
+        assert model.estimated_vehicles == 1500
+        assert model.average_parking_duration == 3.5
+        assert result.estimated_vehicles == 1500
+        assert result.average_parking_duration == 3.5
+
     def test_to_model_sets_fk_on_phases(self) -> None:
         day_id = uuid4()
         phase = EventDayPhase(

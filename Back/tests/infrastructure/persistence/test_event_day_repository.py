@@ -184,6 +184,21 @@ class TestSQLEventDayRepositorySave:
             phases=phases,
         )
 
+    def _make_event_day_with_parking(
+        self, id: UUID, phases: tuple[EventDayPhase, ...]
+    ) -> EventDay:
+        return EventDay(
+            id=id,
+            event_date=date(2026, 7, 10),
+            operational_profile_id=C_UUID,
+            attendance_level_id=self.ATTENDANCE_ID,
+            operational_start_min=480,
+            operational_end_min=1380,
+            estimated_vehicles=2500,
+            average_parking_duration=4.0,
+            phases=phases,
+        )
+
     async def test_save_new_aggregate(self) -> None:
         session = AsyncMock()
         session.get = AsyncMock(return_value=None)
@@ -236,6 +251,39 @@ class TestSQLEventDayRepositorySave:
         assert existing_model.operational_end_min == 1380
         assert existing_model.phases[0].start_min == 600
         assert existing_model.phases[0].end_min == 900
+        session.flush.assert_awaited_once()
+
+    async def test_save_persists_parking_fields_on_existing_aggregate(self) -> None:
+        session = AsyncMock()
+        existing_phase = EventDayPhaseModel(
+            id=A_UUID,
+            event_day_id=B_UUID,
+            operational_phase_id=C_UUID,
+            start_min=480,
+            end_min=720,
+        )
+        existing_model = EventDayModel(
+            id=B_UUID,
+            event_date=date(2026, 7, 10),
+            operational_profile_id=C_UUID,
+            attendance_level_id=self.ATTENDANCE_ID,
+            operational_start_min=480,
+            operational_end_min=1380,
+        )
+        existing_model.phases = [existing_phase]
+
+        session.get = AsyncMock(return_value=existing_model)
+        session.flush = AsyncMock()
+        session.refresh = AsyncMock()
+
+        phase = self._make_phase(A_UUID, 600, 900)
+        event_day = self._make_event_day_with_parking(B_UUID, (phase,))
+
+        repo = SQLEventDayRepository(session)
+        await repo.save(event_day)
+
+        assert existing_model.estimated_vehicles == 2500
+        assert existing_model.average_parking_duration == 4.0
         session.flush.assert_awaited_once()
 
     async def test_save_adds_new_phases(self) -> None:

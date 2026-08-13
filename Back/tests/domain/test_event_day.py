@@ -546,3 +546,56 @@ class TestEventDayRepresentation:
         assert "480" in repr_str
         assert "1320" in repr_str
         assert "phases_count=1" in repr_str
+
+
+class TestEventDayParkingTransportFields:
+    """Los inputs de Parking V1 se transportan en la entidad de dominio."""
+
+    def _make_ed(
+        self,
+        estimated_vehicles: int | None = None,
+        average_parking_duration: float | None = None,
+    ) -> EventDay:
+        return EventDay(
+            event_date=date(2026, 7, 15),
+            operational_profile_id=UUID("00000000-0000-0000-0000-000000000001"),
+            attendance_level_id=UUID("00000000-0000-0000-0000-000000000002"),
+            operational_start_min=480,
+            operational_end_min=1320,
+            phases=(_make_phase(),),
+            estimated_vehicles=estimated_vehicles,
+            average_parking_duration=average_parking_duration,
+        )
+
+    def test_defaults_are_none(self) -> None:
+        ed = self._make_ed()
+        assert ed.estimated_vehicles is None
+        assert ed.average_parking_duration is None
+
+    def test_carries_parking_inputs_without_transformation(self) -> None:
+        ed = self._make_ed(
+            estimated_vehicles=2500,
+            average_parking_duration=4.0,
+        )
+        assert ed.estimated_vehicles == 2500
+        assert ed.average_parking_duration == 4.0
+
+    def test_estimated_vehicles_wrong_type_raises_error(self) -> None:
+        with pytest.raises(TypeError, match="estimated_vehicles"):
+            self._make_ed(estimated_vehicles="2500")  # type: ignore[arg-type]
+
+    def test_estimated_vehicles_as_bool_raises_error(self) -> None:
+        with pytest.raises(TypeError, match="estimated_vehicles"):
+            self._make_ed(estimated_vehicles=True)  # type: ignore[arg-type]
+
+    def test_estimated_vehicles_negative_raises_error(self) -> None:
+        with pytest.raises(ValueError, match="estimated_vehicles"):
+            self._make_ed(estimated_vehicles=-1)
+
+    def test_average_parking_duration_wrong_type_raises_error(self) -> None:
+        with pytest.raises(TypeError, match="average_parking_duration"):
+            self._make_ed(average_parking_duration=4)  # type: ignore[arg-type]
+
+    def test_average_parking_duration_negative_raises_error(self) -> None:
+        with pytest.raises(ValueError, match="average_parking_duration"):
+            self._make_ed(average_parking_duration=-1.0)

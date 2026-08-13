@@ -78,7 +78,8 @@ class ContextEngine:
             zones,
             evaluation_result,
             attendance_level,
-            self._model_selector,
+            event_day=event_day,
+            model_selector=self._model_selector,
         )
 
         zone_states = derive_zone_states(

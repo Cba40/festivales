@@ -22,6 +22,8 @@ class EventDay:
         phases: tuple[EventDayPhase, ...],
         attendance_level_id: UUID | None = None,
         id: UUID | None = None,
+        estimated_vehicles: int | None = None,
+        average_parking_duration: float | None = None,
     ) -> None:
         resolved_id = id if id is not None else uuid4()
         self._validate(
@@ -32,6 +34,8 @@ class EventDay:
             operational_start_min,
             operational_end_min,
             phases,
+            estimated_vehicles,
+            average_parking_duration,
         )
         self._id = resolved_id
         self._event_date = event_date
@@ -40,6 +44,8 @@ class EventDay:
         self._operational_start_min = operational_start_min
         self._operational_end_min = operational_end_min
         self._phases = phases
+        self._estimated_vehicles = estimated_vehicles
+        self._average_parking_duration = average_parking_duration
 
     @property
     def id(self) -> UUID:
@@ -69,6 +75,14 @@ class EventDay:
     def phases(self) -> tuple[EventDayPhase, ...]:
         return self._phases
 
+    @property
+    def estimated_vehicles(self) -> int | None:
+        return self._estimated_vehicles
+
+    @property
+    def average_parking_duration(self) -> float | None:
+        return self._average_parking_duration
+
     @staticmethod
     def _validate(
         id: UUID,
@@ -78,6 +92,8 @@ class EventDay:
         operational_start_min: int,
         operational_end_min: int,
         phases: tuple[EventDayPhase, ...],
+        estimated_vehicles: int | None = None,
+        average_parking_duration: float | None = None,
     ) -> None:
         if not isinstance(id, UUID):
             raise TypeError("id must be a UUID")
@@ -101,6 +117,19 @@ class EventDay:
             raise ValueError("event_day must contain at least one phase")
         if not all(isinstance(p, EventDayPhase) for p in phases):
             raise TypeError("each phase must be an EventDayPhase instance")
+        if estimated_vehicles is not None:
+            if isinstance(estimated_vehicles, bool) or not isinstance(estimated_vehicles, int):
+                raise TypeError("estimated_vehicles must be an integer or None")
+            if estimated_vehicles < 0:
+                raise ValueError("estimated_vehicles must be >= 0")
+        if average_parking_duration is not None:
+            if (
+                isinstance(average_parking_duration, bool)
+                or not isinstance(average_parking_duration, float)
+            ):
+                raise TypeError("average_parking_duration must be a float or None")
+            if average_parking_duration < 0.0:
+                raise ValueError("average_parking_duration must be non-negative")
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, EventDay):

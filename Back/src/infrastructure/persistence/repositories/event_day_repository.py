@@ -44,6 +44,8 @@ class SQLEventDayRepository(EventDayRepository):
             existing.attendance_level_id = event_day.attendance_level_id
             existing.operational_start_min = event_day.operational_start_min
             existing.operational_end_min = event_day.operational_end_min
+            existing.estimated_vehicles = event_day.estimated_vehicles
+            existing.average_parking_duration = event_day.average_parking_duration
 
             existing_phase_ids = {p.id for p in existing.phases}
             new_phase_ids = {p.id for p in event_day.phases}

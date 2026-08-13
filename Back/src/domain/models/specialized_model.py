@@ -38,6 +38,8 @@ class ModelExecutionContext:
         density_factor: float | None,
         active_restriction: FlowRestriction | None,
         reference_point_distance: float | None,
+        estimated_vehicles: int | None = None,
+        average_parking_duration: float | None = None,
     ) -> None:
         self._timestamp = timestamp
         self._zone = zone
@@ -49,6 +51,8 @@ class ModelExecutionContext:
         self._density_factor = density_factor
         self._active_restriction = active_restriction
         self._reference_point_distance = reference_point_distance
+        self._estimated_vehicles = estimated_vehicles
+        self._average_parking_duration = average_parking_duration
 
     @property
     def timestamp(self) -> datetime:
@@ -90,6 +94,14 @@ class ModelExecutionContext:
     def reference_point_distance(self) -> float | None:
         return self._reference_point_distance
 
+    @property
+    def estimated_vehicles(self) -> int | None:
+        return self._estimated_vehicles
+
+    @property
+    def average_parking_duration(self) -> float | None:
+        return self._average_parking_duration
+
     def __repr__(self) -> str:
         return (
             f"ModelExecutionContext(timestamp={self._timestamp!r}, "
@@ -101,7 +113,9 @@ class ModelExecutionContext:
             f"event_impact={self._event_impact!r}, "
             f"density_factor={self._density_factor!r}, "
             f"active_restriction={self._active_restriction!r}, "
-            f"reference_point_distance={self._reference_point_distance!r})"
+            f"reference_point_distance={self._reference_point_distance!r}, "
+            f"estimated_vehicles={self._estimated_vehicles!r}, "
+            f"average_parking_duration={self._average_parking_duration!r})"
         )
 
 
