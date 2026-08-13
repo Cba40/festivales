@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from uuid import UUID, uuid4
 
+import pytest
+
 from src.domain.entities.attendance_level import AttendanceLevel
 from src.domain.entities.event_day import EventDay
 from src.domain.entities.event_day_phase import EventDayPhase
@@ -567,6 +569,72 @@ class TestEventDayMapper:
 
         assert entity.estimated_vehicles == 2500
         assert entity.average_parking_duration == 4.0
+
+    def test_to_domain_converts_attendance_level_id_varchar_to_uuid(self) -> None:
+        att_id = "55555555-5555-5555-5555-555555555555"
+        phase_model = EventDayPhaseModel(
+            id=A_UUID,
+            event_day_id=B_UUID,
+            operational_phase_id=C_UUID,
+            start_min=480,
+            end_min=720,
+        )
+        model = EventDayModel(
+            id=B_UUID,
+            event_date=date(2026, 7, 10),
+            operational_profile_id=C_UUID,
+            attendance_level_id=att_id,
+            operational_start_min=480,
+            operational_end_min=1380,
+        )
+        model.phases = [phase_model]
+
+        entity = event_day_to_domain(model)
+
+        assert entity.attendance_level_id == UUID(att_id)
+
+    def test_to_domain_accepts_none_attendance_level_id(self) -> None:
+        phase_model = EventDayPhaseModel(
+            id=A_UUID,
+            event_day_id=B_UUID,
+            operational_phase_id=C_UUID,
+            start_min=480,
+            end_min=720,
+        )
+        model = EventDayModel(
+            id=B_UUID,
+            event_date=date(2026, 7, 10),
+            operational_profile_id=C_UUID,
+            attendance_level_id=None,
+            operational_start_min=480,
+            operational_end_min=1380,
+        )
+        model.phases = [phase_model]
+
+        entity = event_day_to_domain(model)
+
+        assert entity.attendance_level_id is None
+
+    def test_to_domain_rejects_invalid_attendance_level_id(self) -> None:
+        phase_model = EventDayPhaseModel(
+            id=A_UUID,
+            event_day_id=B_UUID,
+            operational_phase_id=C_UUID,
+            start_min=480,
+            end_min=720,
+        )
+        model = EventDayModel(
+            id=B_UUID,
+            event_date=date(2026, 7, 10),
+            operational_profile_id=C_UUID,
+            attendance_level_id="not-a-uuid",
+            operational_start_min=480,
+            operational_end_min=1380,
+        )
+        model.phases = [phase_model]
+
+        with pytest.raises(ValueError):
+            event_day_to_domain(model)
 
     def test_round_trip_preserves_parking_fields(self) -> None:
         att_id = uuid4()

@@ -23,7 +23,10 @@ from src.domain.recommendation.user_context import AccessLevel, UserContext
 from src.domain.recommendation.zone_recommendation import ZoneRecommendation
 from src.domain.value_objects.territorial_prediction import TerritorialPrediction
 from src.domain.value_objects.zone_state import ZoneState
-from src.infrastructure.composition.recommendation_module import RecommendationModule
+from src.infrastructure.composition.recommendation_module import (
+    RecommendationModule,
+    _to_uuid_or_none,
+)
 
 EVENT_ID = "event-1"
 DAY_IDS = {
@@ -157,7 +160,7 @@ def _mock_full_flow_session() -> AsyncMock:
     ed_row = SimpleNamespace(
         id=DAY_IDS["id"],
         date=datetime(2026, 7, 15, 15, 0).date(),
-        attendance_level_id=UUID(ATTENDANCE_ID),
+        attendance_level_id=ATTENDANCE_ID,
         operational_profile_id=UUID("99999999-0000-0000-0000-000000000001"),
         operational_start_min=840,
         operational_end_min=1080,
@@ -322,6 +325,7 @@ class TestRecommendationModuleFullFlow:
         assert all(isinstance(r, ZoneRecommendation) for r in recommendations)
 
         assert engine.captured_event_day is not None
+        assert engine.captured_event_day.attendance_level_id == UUID(ATTENDANCE_ID)
         assert engine.captured_event_day.estimated_vehicles == 2500
         assert engine.captured_event_day.average_parking_duration == 4.0
 
@@ -333,3 +337,20 @@ class TestRecommendationModuleFullFlow:
         assert distances[UUID(ZONE_IDS["norte"])] == 0.0
         assert distances[UUID(ZONE_IDS["sur"])] is not None
         assert distances[UUID(ZONE_IDS["sur"])] > 0.0
+
+
+class TestAttendanceLevelIdConversion:
+    """Conversión ORM -> dominio de attendance_level_id (varchar a UUID)."""
+
+    def test_valid_string_uuid_is_converted(self) -> None:
+        assert _to_uuid_or_none(ATTENDANCE_ID) == UUID(ATTENDANCE_ID)
+
+    def test_none_stays_none(self) -> None:
+        assert _to_uuid_or_none(None) is None
+
+    def test_already_uuid_is_passed_through(self) -> None:
+        assert _to_uuid_or_none(UUID(ATTENDANCE_ID)) == UUID(ATTENDANCE_ID)
+
+    def test_invalid_string_raises_value_error(self) -> None:
+        with pytest.raises(ValueError):
+            _to_uuid_or_none("not-a-uuid")

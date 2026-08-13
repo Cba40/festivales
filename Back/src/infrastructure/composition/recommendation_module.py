@@ -54,6 +54,19 @@ _EARTH_RADIUS_M = 6_371_000.0
 _DEFAULT_OPERATIONAL_PROFILE_NAME = "ActividadExtendida"
 
 
+def _to_uuid_or_none(value: str | UUID | None) -> UUID | None:
+    """Normaliza un id varchar (o ya UUID) de la capa ORM a UUID de dominio.
+
+    La columna event_days.attendance_level_id es varchar(36); el dominio
+    EventDay exige UUID. La conversión ocurre en la frontera ORM -> dominio.
+    """
+    if value is None:
+        return None
+    if isinstance(value, UUID):
+        return value
+    return UUID(value)
+
+
 async def _load_default_operational_profile_id(
     db: AsyncSession,
 ) -> UUID | None:
@@ -322,7 +335,7 @@ class RecommendationModule:
             id=eid,
             event_date=ed_row.date,
             operational_profile_id=operational_profile_id,
-            attendance_level_id=ed_row.attendance_level_id,
+            attendance_level_id=_to_uuid_or_none(ed_row.attendance_level_id),
             operational_start_min=ed_row.operational_start_min,
             operational_end_min=ed_row.operational_end_min,
             estimated_vehicles=ed_row.estimated_vehicles,
