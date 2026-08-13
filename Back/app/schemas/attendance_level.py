@@ -4,7 +4,6 @@ from pydantic import BaseModel, ConfigDict
 
 
 class AttendanceLevelCreate(BaseModel):
-    event_day_id: str
     name: str
     min_people: int
     max_people: Optional[int] = None
