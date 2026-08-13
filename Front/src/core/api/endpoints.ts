@@ -21,11 +21,6 @@ export const endpoints = {
     list: (eventId: string) => `/events/${eventId}/event-days`,
     today: (eventId: string) => `/events/${eventId}/event-days/today`,
     byId: (eventId: string, id: string) => `/events/${eventId}/event-days/${id}`,
-    attendanceLevels: {
-      list: (eventId: string, dayId: string) => `/events/${eventId}/days/${dayId}/attendance-levels`,
-      byId: (eventId: string, dayId: string, levelId: string) =>
-        `/events/${eventId}/days/${dayId}/attendance-levels/${levelId}`,
-    },
     phases: {
       list: (eventId: string, dayId: string) => `/events/${eventId}/event-days/${dayId}/phases`,
       byId: (eventId: string, dayId: string, phaseId: string) =>

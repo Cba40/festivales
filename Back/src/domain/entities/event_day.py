@@ -1,20 +1,16 @@
 from datetime import date
-from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from src.domain.entities.event_day_phase import EventDayPhase
-
-if TYPE_CHECKING:
-    from src.domain.entities.attendance_level import AttendanceLevel
 
 
 class EventDay:
     """Concentra la configuracion operacional de una jornada.
 
-    RFC-007: EventDay agrupa fecha, horario operativo, la coleccion de
-    AttendanceLevel del día y las fases (EventDayPhase). La evolucion temporal
-    del evento pertenece a las fases. OperationalProfile queda deprecado como
-    entidad de compatibilidad.
+    RFC-007: EventDay agrupa fecha, horario operativo, la referencia al
+    AttendanceLevel seleccionado (attendance_level_id) y las fases
+    (EventDayPhase). La evolucion temporal del evento pertenece a las fases.
+    OperationalProfile queda deprecado como entidad de compatibilidad.
     """
 
     def __init__(
@@ -24,7 +20,7 @@ class EventDay:
         operational_start_min: int,
         operational_end_min: int,
         phases: tuple[EventDayPhase, ...],
-        attendance_levels: tuple["AttendanceLevel", ...] = (),
+        attendance_level_id: UUID | None = None,
         id: UUID | None = None,
     ) -> None:
         resolved_id = id if id is not None else uuid4()
@@ -32,6 +28,7 @@ class EventDay:
             resolved_id,
             event_date,
             operational_profile_id,
+            attendance_level_id,
             operational_start_min,
             operational_end_min,
             phases,
@@ -39,10 +36,10 @@ class EventDay:
         self._id = resolved_id
         self._event_date = event_date
         self._operational_profile_id = operational_profile_id
+        self._attendance_level_id = attendance_level_id
         self._operational_start_min = operational_start_min
         self._operational_end_min = operational_end_min
         self._phases = phases
-        self._attendance_levels = attendance_levels
 
     @property
     def id(self) -> UUID:
@@ -57,6 +54,10 @@ class EventDay:
         return self._operational_profile_id
 
     @property
+    def attendance_level_id(self) -> UUID | None:
+        return self._attendance_level_id
+
+    @property
     def operational_start_min(self) -> int:
         return self._operational_start_min
 
@@ -65,21 +66,18 @@ class EventDay:
         return self._operational_end_min
 
     @property
-    def phases(self) -> tuple["EventDayPhase", ...]:
+    def phases(self) -> tuple[EventDayPhase, ...]:
         return self._phases
-
-    @property
-    def attendance_levels(self) -> tuple["AttendanceLevel", ...]:
-        return self._attendance_levels
 
     @staticmethod
     def _validate(
         id: UUID,
         event_date: date,
         operational_profile_id: UUID,
+        attendance_level_id: UUID,
         operational_start_min: int,
         operational_end_min: int,
-        phases: tuple["EventDayPhase", ...],
+        phases: tuple[EventDayPhase, ...],
     ) -> None:
         if not isinstance(id, UUID):
             raise TypeError("id must be a UUID")
@@ -87,6 +85,8 @@ class EventDay:
             raise TypeError("event_date must be a date")
         if operational_profile_id is not None and not isinstance(operational_profile_id, UUID):
             raise TypeError("operational_profile_id must be a UUID or None")
+        if attendance_level_id is not None and not isinstance(attendance_level_id, UUID):
+            raise TypeError("attendance_level_id must be a UUID or None")
         if isinstance(operational_start_min, bool) or not isinstance(operational_start_min, int):
             raise TypeError("operational_start_min must be an integer")
         if operational_start_min < 0:
@@ -114,7 +114,7 @@ class EventDay:
         return (
             f"EventDay(id={self._id!r}, event_date={self._event_date!r}, "
             f"operational_profile_id={self._operational_profile_id!r}, "
-            f"attendance_levels_count={len(self._attendance_levels)!r}, "
+            f"attendance_level_id={self._attendance_level_id!r}, "
             f"operational_start_min={self._operational_start_min!r}, "
             f"operational_end_min={self._operational_end_min!r}, "
             f"phases_count={len(self._phases)})"

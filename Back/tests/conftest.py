@@ -233,11 +233,11 @@ def sample_zones(db_session: Session, sample_event: Event) -> list[Zone]:
 def sample_attendance_levels(db_session: Session, sample_event: Event, sample_event_day: EventDay) -> list:
     from app.models.attendance_level import AttendanceLevel
     levels = [
-        AttendanceLevel(id="al-baja", event_day_id=sample_event_day.id, name="Baja", min_people=0, max_people=5000),
-        AttendanceLevel(id="al-media", event_day_id=sample_event_day.id, name="Media", min_people=5001, max_people=15000),
-        AttendanceLevel(id="al-alta", event_day_id=sample_event_day.id, name="Alta", min_people=15001, max_people=30000),
-        AttendanceLevel(id="al-muy-alta", event_day_id=sample_event_day.id, name="Muy Alta", min_people=30001, max_people=60000),
-        AttendanceLevel(id="al-masiva", event_day_id=sample_event_day.id, name="Masiva", min_people=60001, max_people=None),
+        AttendanceLevel(id="al-baja", event_id=sample_event.id, name="Baja", min_people=0, max_people=5000),
+        AttendanceLevel(id="al-media", event_id=sample_event.id, name="Media", min_people=5001, max_people=15000),
+        AttendanceLevel(id="al-alta", event_id=sample_event.id, name="Alta", min_people=15001, max_people=30000),
+        AttendanceLevel(id="al-muy-alta", event_id=sample_event.id, name="Muy Alta", min_people=30001, max_people=60000),
+        AttendanceLevel(id="al-masiva", event_id=sample_event.id, name="Masiva", min_people=60001, max_people=None),
     ]
     for al in levels:
         db_session.add(al)

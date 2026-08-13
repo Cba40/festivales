@@ -102,6 +102,7 @@ export function EventDayScreen() {
             </h2>
             <EventDayForm
               eventDay={editingDay}
+              eventId={EVENT_ID}
               onSave={handleSave}
               onCancel={handleCancel}
               saving={saving}

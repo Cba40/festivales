@@ -15,6 +15,7 @@ class EventDayCreate(BaseModel):
     notes: Optional[str] = None
     is_active: bool = True
     operational_profile_id: Optional[UUID] = None
+    attendance_level_id: str
     estimated_vehicles: Optional[int] = Field(default=None, ge=0)
     average_parking_duration: Optional[float] = Field(default=None, ge=0)
     operational_start_min: int = Field(ge=0)
@@ -36,6 +37,7 @@ class EventDayUpdate(BaseModel):
     notes: Optional[str] = None
     is_active: Optional[bool] = None
     operational_profile_id: Optional[UUID] = None
+    attendance_level_id: Optional[str] = None
     estimated_vehicles: Optional[int] = Field(default=None, ge=0)
     average_parking_duration: Optional[float] = Field(default=None, ge=0)
     operational_start_min: Optional[int] = Field(default=None, ge=0)
@@ -53,6 +55,7 @@ class EventDayUpdate(BaseModel):
 class EventDayResponse(BaseModel):
     id: str
     event_id: str
+    attendance_level_id: Optional[str] = None
     date: date
     day_of_week: str
     weather: Optional[str]

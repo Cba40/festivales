@@ -14,14 +14,14 @@ export interface AttendanceLevelUpdatePayload {
   max_people?: number | null;
 }
 
-export function useAttendanceLevelMutations(eventId: string, eventDayId?: string) {
+export function useAttendanceLevelMutations(eventId: string) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const create = useCallback(
     async (payload: AttendanceLevelCreatePayload): Promise<AttendanceLevelDTO | null> => {
-      if (!eventId || !eventDayId) {
-        setError('Debe seleccionar un día del evento antes de crear un nivel');
+      if (!eventId) {
+        setError('Evento no disponible');
         return null;
       }
 
@@ -29,7 +29,7 @@ export function useAttendanceLevelMutations(eventId: string, eventDayId?: string
       setError(null);
       try {
         const { data } = await apiClient.post<AttendanceLevelDTO>(
-          `/events/${eventId}/days/${eventDayId}/attendance-levels`,
+          `/events/${eventId}/attendance-levels`,
           payload
         );
         return data;
@@ -41,13 +41,13 @@ export function useAttendanceLevelMutations(eventId: string, eventDayId?: string
         setSaving(false);
       }
     },
-    [eventId, eventDayId]
+    [eventId]
   );
 
   const update = useCallback(
     async (id: string, payload: AttendanceLevelUpdatePayload): Promise<AttendanceLevelDTO | null> => {
-      if (!eventId || !eventDayId) {
-        setError('Debe seleccionar un día del evento antes de actualizar un nivel');
+      if (!eventId) {
+        setError('Evento no disponible');
         return null;
       }
 
@@ -55,7 +55,7 @@ export function useAttendanceLevelMutations(eventId: string, eventDayId?: string
       setError(null);
       try {
         const { data } = await apiClient.put<AttendanceLevelDTO>(
-          `/events/${eventId}/days/${eventDayId}/attendance-levels/${id}`,
+          `/events/${eventId}/attendance-levels/${id}`,
           payload
         );
         return data;
@@ -67,20 +67,20 @@ export function useAttendanceLevelMutations(eventId: string, eventDayId?: string
         setSaving(false);
       }
     },
-    [eventId, eventDayId]
+    [eventId]
   );
 
   const remove = useCallback(
     async (id: string): Promise<boolean> => {
-      if (!eventId || !eventDayId) {
-        setError('Debe seleccionar un día del evento antes de eliminar un nivel');
+      if (!eventId) {
+        setError('Evento no disponible');
         return false;
       }
 
       setSaving(true);
       setError(null);
       try {
-        await apiClient.delete(`/events/${eventId}/days/${eventDayId}/attendance-levels/${id}`);
+        await apiClient.delete(`/events/${eventId}/attendance-levels/${id}`);
         return true;
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Error al eliminar nivel de asistencia';
@@ -90,7 +90,7 @@ export function useAttendanceLevelMutations(eventId: string, eventDayId?: string
         setSaving(false);
       }
     },
-    [eventId, eventDayId]
+    [eventId]
   );
 
   return { create, update, remove, saving, error };

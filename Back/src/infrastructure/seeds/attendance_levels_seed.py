@@ -23,7 +23,7 @@ async def seed_attendance_levels(
         if name in existing_names:
             continue
         level = AttendanceLevel(
-            id=uuid4(),
+            id=str(uuid4()),
             name=name,
             min_people=min_people,
             max_people=max_people,

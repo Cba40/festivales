@@ -10,6 +10,7 @@ import type {
 
 interface EventDayFormProps {
   eventDay?: EventDay | null;
+  eventId?: string;
   onSave: (payload: EventDayCreatePayload) => Promise<void>;
   onCancel: () => void;
   saving: boolean;
@@ -72,7 +73,7 @@ function PhaseTimelineBar({
   );
 }
 
-export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFormProps) {
+export function EventDayForm({ eventDay, eventId, onSave, onCancel, saving }: EventDayFormProps) {
   const isEditing = !!eventDay;
 
   const [date, setDate] = useState('');
@@ -83,8 +84,10 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
   const [isActive, setIsActive] = useState(true);
   const [estimatedVehicles, setEstimatedVehicles] = useState('');
   const [averageParkingDuration, setAverageParkingDuration] = useState('');
+  const [attendanceLevelId, setAttendanceLevelId] = useState('');
 
-  const { levels, loading: levelsLoading } = useAttendanceLevels(eventDay?.event_id ?? '', eventDay?.id ?? '');
+  const resolvedEventId = eventId || eventDay?.event_id || '';
+  const { levels, loading: levelsLoading } = useAttendanceLevels(resolvedEventId);
   const { byId: operationalPhaseCatalog, loading: operationalPhasesLoading } = useOperationalPhaseCatalog();
 
   const [operationalStartStr, setOperationalStartStr] = useState('');
@@ -105,6 +108,9 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
       setIsActive(eventDay.is_active);
       setEstimatedVehicles(eventDay.estimated_vehicles != null ? String(eventDay.estimated_vehicles) : '');
       setAverageParkingDuration(eventDay.average_parking_duration != null ? String(eventDay.average_parking_duration) : '');
+      if (eventDay.attendance_level_id) {
+        setAttendanceLevelId(eventDay.attendance_level_id);
+      }
       if (eventDay.phases && eventDay.phases.length > 0) {
         setEventDayPhases(
           eventDay.phases.map((p) => ({
@@ -155,6 +161,10 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
       setValidationError('Completá todos los campos obligatorios');
       return;
     }
+    if (!attendanceLevelId) {
+      setValidationError('Selecciona un nivel de asistencia');
+      return;
+    }
     if (!operationalStartStr || !operationalEndStr) {
       setValidationError('La ventana operativa es obligatoria');
       return;
@@ -169,6 +179,7 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
       day_of_week: dayOfWeek,
       operational_start_min: operationalStartMin,
       operational_end_min: resolvedOpEnd,
+      attendance_level_id: attendanceLevelId,
       phases: resolvedPhases.map((p) => ({
         operational_phase_id: p.operational_phase_id,
         start_min: p.start_min,
@@ -218,23 +229,29 @@ export function EventDayForm({ eventDay, onSave, onCancel, saving }: EventDayFor
           </select>
         </div>
 
-        <div className="md:col-span-2">
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-            <div className="font-medium text-slate-700 mb-1">Niveles de asistencia del día</div>
-            {levelsLoading ? (
-              <span>Cargando niveles...</span>
-            ) : levels.length === 0 ? (
-              <span>No hay niveles cargados para este día. Use la gestión de niveles de asistencia.</span>
-            ) : (
-              <ul className="list-disc pl-5 space-y-1">
-                {levels.map((l) => (
-                  <li key={l.id}>
-                    {l.name}: {l.min_people.toLocaleString()}–{l.max_people ? l.max_people.toLocaleString() : '∞'}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Nivel de asistencia *</label>
+          {levelsLoading ? (
+            <div className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-slate-50">Cargando niveles...</div>
+          ) : levels.length === 0 ? (
+            <div className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-slate-50 text-slate-500">
+              No hay niveles. Crea uno en Gestión de Niveles de Asistencia.
+            </div>
+          ) : (
+            <select
+              value={attendanceLevelId}
+              onChange={(e) => setAttendanceLevelId(e.target.value)}
+              required
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Seleccionar...</option>
+              {levels.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}: {l.min_people.toLocaleString()}–{l.max_people ? l.max_people.toLocaleString() : '∞'}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         <div>

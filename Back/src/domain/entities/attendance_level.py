@@ -7,6 +7,9 @@ class AttendanceLevel:
     RFC-007 / Sprint P7: AttendanceLevel representa únicamente la concurrencia
     estimada del día (rango de personas). La intensidad operativa ya no es
     global: pertenece a cada EventDayPhase (campo intensity).
+    
+    Ownership: Event → AttendanceLevels[]
+    Selection: EventDay → attendance_level_id (FK a AttendanceLevel)
     """
 
     def __init__(
@@ -14,23 +17,24 @@ class AttendanceLevel:
         name: str,
         min_people: int,
         max_people: int | None = None,
-        event_day_id: UUID | None = None,
-        id: UUID | None = None,
+        event_id: str | None = None,
+        id: str | None = None,
     ) -> None:
-        resolved_id = id if id is not None else uuid4()
+        from uuid import uuid4
+        resolved_id = id if id is not None else str(uuid4())
         self._validate(resolved_id, name, min_people, max_people)
         self._id = resolved_id
         self._name = name.strip()
         self._min_people = min_people
         self._max_people = max_people
-        self._event_day_id = event_day_id
+        self._event_id = event_id
 
     @property
-    def event_day_id(self) -> UUID | None:
-        return self._event_day_id
+    def event_id(self) -> str | None:
+        return self._event_id
 
     @property
-    def id(self) -> UUID:
+    def id(self) -> str:
         return self._id
 
     @property
@@ -47,13 +51,13 @@ class AttendanceLevel:
 
     @staticmethod
     def _validate(
-        id: UUID,
+        id: str,
         name: str,
         min_people: int,
         max_people: int | None,
     ) -> None:
-        if not isinstance(id, UUID):
-            raise TypeError("id must be a UUID")
+        if not isinstance(id, str):
+            raise TypeError("id must be a string")
         if not name or not name.strip():
             raise ValueError("name must not be empty")
         if len(name) > 50:
@@ -80,5 +84,5 @@ class AttendanceLevel:
         return (
             f"AttendanceLevel(id={self._id!r}, name={self._name!r}, "
             f"min_people={self._min_people!r}, max_people={self._max_people!r}, "
-            f"event_day_id={self._event_day_id!r})"
+            f"event_id={self._event_id!r})"
         )

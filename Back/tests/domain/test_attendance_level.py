@@ -8,13 +8,13 @@ from src.domain.entities.attendance_level import AttendanceLevel
 class TestAttendanceLevelCreation:
     def test_create_valid_attendance_level(self) -> None:
         al = AttendanceLevel(name="Bajo", min_people=5000, max_people=10000)
-        assert isinstance(al.id, UUID)
+        assert isinstance(al.id, str)
         assert al.name == "Bajo"
         assert al.min_people == 5000
         assert al.max_people == 10000
 
     def test_create_with_custom_id(self) -> None:
-        custom_id = UUID("12345678-1234-5678-1234-567812345678")
+        custom_id = "12345678-1234-5678-1234-567812345678"
         al = AttendanceLevel(name="Alto", min_people=25000, max_people=45000, id=custom_id)
         assert al.id == custom_id
         assert al.name == "Alto"
@@ -54,8 +54,13 @@ class TestAttendanceLevelValidation:
         assert al.name == name
 
     def test_invalid_id_type_raises_error(self) -> None:
-        with pytest.raises(TypeError, match="must be a UUID"):
-            AttendanceLevel(name="Test", min_people=0, max_people=1000, id="not-a-uuid")  # type: ignore[arg-type]
+        with pytest.raises(TypeError, match="must be a string"):
+            AttendanceLevel(
+                name="Test",
+                min_people=0,
+                max_people=1000,
+                id=UUID("00000000-0000-0000-0000-000000000001"),  # type: ignore[arg-type]
+            )
 
     def test_min_people_negative_raises_error(self) -> None:
         with pytest.raises(ValueError, match="min_people must be >= 0"):
@@ -80,7 +85,7 @@ class TestAttendanceLevelValidation:
 
 class TestAttendanceLevelEquality:
     def test_same_id_are_equal(self) -> None:
-        id = UUID("00000000-0000-0000-0000-000000000001")
+        id = "00000000-0000-0000-0000-000000000001"
         al1 = AttendanceLevel(name="Bajo", min_people=0, max_people=5000, id=id)
         al2 = AttendanceLevel(name="Bajo", min_people=0, max_people=5000, id=id)
         assert al1 == al2
@@ -95,13 +100,13 @@ class TestAttendanceLevelEquality:
         assert (al == "not-a-level") is False
 
     def test_hash_consistency(self) -> None:
-        id = UUID("00000000-0000-0000-0000-000000000001")
+        id = "00000000-0000-0000-0000-000000000001"
         al1 = AttendanceLevel(name="Bajo", min_people=0, max_people=5000, id=id)
         al2 = AttendanceLevel(name="Bajo", min_people=0, max_people=5000, id=id)
         assert hash(al1) == hash(al2)
 
     def test_hash_set_membership(self) -> None:
-        id = UUID("00000000-0000-0000-0000-000000000001")
+        id = "00000000-0000-0000-0000-000000000001"
         al = AttendanceLevel(name="Bajo", min_people=0, max_people=5000, id=id)
         s = {al}
         assert AttendanceLevel(name="Bajo", min_people=0, max_people=5000, id=id) in s
@@ -111,7 +116,7 @@ class TestAttendanceLevelImmutability:
     def test_id_is_readonly(self) -> None:
         al = AttendanceLevel(name="Test", min_people=0, max_people=5000)
         with pytest.raises(AttributeError):
-            al.id = UUID("00000000-0000-0000-0000-000000000000")  # type: ignore[misc]
+            al.id = "00000000-0000-0000-0000-000000000000"  # type: ignore[misc]
 
     def test_name_is_readonly(self) -> None:
         al = AttendanceLevel(name="Test", min_people=0, max_people=5000)
@@ -126,7 +131,7 @@ class TestAttendanceLevelImmutability:
 
 class TestAttendanceLevelRepresentation:
     def test_repr_contains_all_fields(self) -> None:
-        id = UUID("12345678-1234-5678-1234-567812345678")
+        id = "12345678-1234-5678-1234-567812345678"
         al = AttendanceLevel(name="Medio", min_people=10000, max_people=25000, id=id)
         repr_str = repr(al)
         assert "AttendanceLevel" in repr_str

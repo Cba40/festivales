@@ -17,7 +17,7 @@ class AttendanceLevelUpdate(BaseModel):
 
 class AttendanceLevelResponse(BaseModel):
     id: str
-    event_day_id: str
+    event_id: str
     name: str
     min_people: int
     max_people: Optional[int] = None

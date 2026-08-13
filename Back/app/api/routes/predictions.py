@@ -52,7 +52,7 @@ async def _collect_prediction_debug_state(
             (
                 await db.execute(
                     select(AttendanceLevel).where(
-                        AttendanceLevel.event_day_id == ed_row.id,
+                        AttendanceLevel.event_id == event_id,
                     )
                 )
             ).scalars().all()
