@@ -20,8 +20,13 @@ Se revierte la semántica por EventDay introducida en 1f2e3d4c5b6a:
     constraints de coherencia técnica del rango (min>=0, max>min).
 
 La relación actual (cada attendance_level pertenece a un event_day) se
-preserva: event_id se reconstruye desde el event_day propietario y
-event_days.attendance_level_id se reconstruye desde el nivel propietario.
+preserva cuando existen registros: event_id se reconstruye desde el event_day
+propietario y event_days.attendance_level_id desde el nivel propietario.
+
+event_days.attendance_level_id queda NULLABLE: las jornadas existentes sin
+nivel (por ejemplo, attendance_levels vacío) se conservan con NULL y podrán
+asignarse a un nivel posteriormente. NO se fuerza NOT NULL y NO se crean
+niveles automáticamente.
 """
 
 import uuid
@@ -101,7 +106,11 @@ def upgrade() -> None:
         ["id"],
     )
 
-    op.alter_column("event_days", "attendance_level_id", nullable=False)
+    # attendance_level_id queda NULLABLE de forma definitiva: las jornadas
+    # existentes sin nivel se conservan válidamente con NULL (no se inventan
+    # ni se asignan niveles). NO se ejecuta ALTER ... SET NOT NULL.
+    # La FK hacia attendance_levels.id se mantiene: solo acepta NULL o un
+    # nivel existente.
 
     # ── 3. Remove event_day-scoped ownership and its constraints ─────
     op.drop_index("ix_attendance_levels_event_day_id", table_name="attendance_levels")
