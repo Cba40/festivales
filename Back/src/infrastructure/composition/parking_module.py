@@ -15,7 +15,7 @@ ejecuta el modelo sobre datos reales, fuera del Context Engine.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -24,7 +24,10 @@ from sqlalchemy.orm import selectinload
 
 from app.models.event_day import EventDay as EventDayORM
 from app.models.zone import Zone as ZoneORM
-from src.application.context_engine.stage1_context_resolution import LOCAL_TZ
+from src.application.context_engine.stage1_context_resolution import (
+    LOCAL_TZ,
+    resolve_active_event_day,
+)
 from src.domain.entities.event_day import EventDay
 from src.domain.entities.event_day_phase import EventDayPhase
 from src.domain.entities.zone import Zone
@@ -127,6 +130,25 @@ def _build_event_day(ed_row: object) -> EventDay:
     )
 
 
+async def _find_event_day_for_date(
+    db: AsyncSession,
+    event_id: str,
+    target_date: date,
+) -> EventDay | None:
+    """Carga el EventDay de una fecha civil y lo mapea a entidad de dominio."""
+    ed_row = (
+        await db.execute(
+            select(EventDayORM)
+            .where(EventDayORM.event_id == event_id)
+            .where(EventDayORM.date == target_date)
+            .options(selectinload(EventDayORM.phases))
+        )
+    ).scalar_one_or_none()
+    if ed_row is None:
+        return None
+    return _build_event_day(ed_row)
+
+
 class ParkingModule:
     """Composition root que prepara el universo físico y ejecuta Parking V1.
 
@@ -157,18 +179,12 @@ class ParkingModule:
         if not parking_zones:
             return None
 
-        ed_row = (
-            await self._db.execute(
-                select(EventDayORM)
-                .where(EventDayORM.event_id == event_id)
-                .where(EventDayORM.date == local_ts.date())
-                .options(selectinload(EventDayORM.phases))
-            )
-        ).scalar_one_or_none()
-        if ed_row is None:
+        event_day = await resolve_active_event_day(
+            local_ts,
+            lambda d: _find_event_day_for_date(self._db, event_id, d),
+        )
+        if event_day is None:
             return None
-
-        event_day = _build_event_day(ed_row)
         if not event_day.phases:
             return None
         if (

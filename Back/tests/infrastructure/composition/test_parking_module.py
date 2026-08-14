@@ -192,6 +192,7 @@ def _mock_session(zone_rows, ed_row):
         _one_result(ref_row),
         _scalars_result(zone_rows),
         _scalar_one_result(ed_row),
+        _scalar_one_result(None),
     ]
     original = AsyncMock(side_effect=execute_calls)
 

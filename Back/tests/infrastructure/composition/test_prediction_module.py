@@ -153,16 +153,16 @@ def _mock_full_flow_session(
         date=date(2026, 7, 15),
         attendance_level_id=attendance_level_id,
         operational_profile_id=UUID("99999999-0000-0000-0000-000000000001"),
-        operational_start_min=840,
-        operational_end_min=1080,
+        operational_start_min=0,
+        operational_end_min=1440,
         estimated_vehicles=2500,
         average_parking_duration=4.0,
         phases=[
             SimpleNamespace(
                 id="77777777-7777-7777-7777-777777777777",
                 operational_phase_id=PHASE_ID,
-                start_min=840,
-                end_min=1080,
+                start_min=0,
+                end_min=1440,
                 intensity=0.5,
             )
         ],

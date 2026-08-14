@@ -24,7 +24,10 @@ from app.models.event_day_phase import EventDayPhase as EventDayPhaseORM
 from app.models.operational_phase import OperationalPhase as OperationalPhaseORM
 from app.models.operational_profile import OperationalProfile as OperationalProfileORM
 from src.application.context_engine import ContextEngine
-from src.application.context_engine.stage1_context_resolution import LOCAL_TZ
+from src.application.context_engine.stage1_context_resolution import (
+    LOCAL_TZ,
+    resolve_active_event_day,
+)
 from src.application.use_cases.generate_prediction import GeneratePrediction
 from src.application.use_cases.get_prediction import GetTerritorialPrediction
 from src.domain.entities.attendance_level import AttendanceLevel
@@ -239,6 +242,51 @@ async def _load_operational_phases(
     }
 
 
+async def _find_event_day_for_date(
+    db: AsyncSession,
+    event_id: str,
+    target_date: date,
+) -> EventDay | None:
+    """Carga el EventDay de una fecha civil y lo mapea a entidad de dominio."""
+    ed_row = (
+        await db.execute(
+            select(EventDayORM)
+            .where(EventDayORM.event_id == event_id)
+            .where(EventDayORM.date == target_date)
+            .options(selectinload(EventDayORM.phases))
+        )
+    ).scalar_one_or_none()
+    if ed_row is None:
+        return None
+
+    operational_profile_id = ed_row.operational_profile_id
+    if operational_profile_id is None:
+        operational_profile_id = await _load_default_operational_profile_id(db)
+
+    eid = UUID(ed_row.id)
+    return EventDay(
+        id=eid,
+        event_date=ed_row.date,
+        operational_profile_id=operational_profile_id,
+        attendance_level_id=_to_uuid_or_none(ed_row.attendance_level_id),
+        operational_start_min=ed_row.operational_start_min,
+        operational_end_min=ed_row.operational_end_min,
+        estimated_vehicles=ed_row.estimated_vehicles,
+        average_parking_duration=ed_row.average_parking_duration,
+        phases=tuple(
+            EventDayPhase(
+                id=UUID(str(p.id)),
+                event_day_id=eid,
+                operational_phase_id=UUID(str(p.operational_phase_id)),
+                start_min=p.start_min,
+                end_min=p.end_min,
+                intensity=p.intensity,
+            )
+            for p in ed_row.phases
+        ),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Private in-memory repository implementations (adapter-level)
 # ---------------------------------------------------------------------------
@@ -320,55 +368,25 @@ class PredictionModule:
 
         zone_behaviors = await _load_zone_behaviors(self._db, event_id)
 
-        ed_row = (
-            await self._db.execute(
-                select(EventDayORM)
-                .where(EventDayORM.event_id == event_id)
-                .where(EventDayORM.date == local_ts.date())
-                .options(selectinload(EventDayORM.phases))
-            )
-        ).scalar_one_or_none()
-        if ed_row is None:
+        event_day = await resolve_active_event_day(
+            local_ts,
+            lambda d: _find_event_day_for_date(self._db, event_id, d),
+        )
+        if event_day is None:
             return None
 
         attendance_level = await _load_attendance_level(
             self._db,
-            ed_row.attendance_level_id,
-        )
-
-        eid = UUID(ed_row.id)
-
-        operational_profile_id = ed_row.operational_profile_id
-        if operational_profile_id is None:
-            operational_profile_id = await _load_default_operational_profile_id(
-                self._db,
-            )
-
-        event_day = EventDay(
-            id=eid,
-            event_date=ed_row.date,
-            operational_profile_id=operational_profile_id,
-            attendance_level_id=_to_uuid_or_none(ed_row.attendance_level_id),
-            operational_start_min=ed_row.operational_start_min,
-            operational_end_min=ed_row.operational_end_min,
-            estimated_vehicles=ed_row.estimated_vehicles,
-            average_parking_duration=ed_row.average_parking_duration,
-            phases=tuple(
-                EventDayPhase(
-                    id=UUID(str(p.id)),
-                    event_day_id=eid,
-                    operational_phase_id=UUID(str(p.operational_phase_id)),
-                    start_min=p.start_min,
-                    end_min=p.end_min,
-                    intensity=p.intensity,
-                )
-                for p in ed_row.phases
+            (
+                str(event_day.attendance_level_id)
+                if event_day.attendance_level_id is not None
+                else None
             ),
         )
 
         operational_phases = await _load_operational_phases(
             self._db,
-            [UUID(str(p.operational_phase_id)) for p in ed_row.phases],
+            [p.operational_phase_id for p in event_day.phases],
         )
 
         engine = ContextEngine()

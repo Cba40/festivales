@@ -8,6 +8,9 @@ from src.application.context_engine import ContextEngine
 from src.application.context_engine.exceptions import (
     DomainNotConfigured,
 )
+from src.application.context_engine.stage1_context_resolution import (
+    resolve_active_event_day,
+)
 from src.domain.entities.attendance_level import AttendanceLevel
 from src.domain.entities.operational_phase import OperationalPhase
 from src.domain.entities.zone import Zone
@@ -41,7 +44,10 @@ class GeneratePrediction:
         attendance_level: AttendanceLevel | None,
         operational_phases: Mapping[UUID, OperationalPhase],
     ) -> TerritorialPrediction:
-        event_day = await self._event_day_repo.find_by_date(timestamp.date())
+        event_day = await resolve_active_event_day(
+            timestamp,
+            self._event_day_repo.find_by_date,
+        )
         if event_day is None:
             raise DomainNotConfigured(
                 f"No EventDay configured for date {timestamp.date()}"
