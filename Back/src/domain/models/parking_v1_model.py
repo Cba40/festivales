@@ -91,10 +91,12 @@ class ParkingV1Model:
         v_expected = self.v_expected(context.estimated_vehicles, intensity)
         capacity = zone.capacity
         duration = context.average_parking_duration
+        prev = self.initial_occupied([zone])
+        prev_stock = prev.get(zone.id, 0.0)
         temporal = self.temporal_step(
-            0.0, v_expected, float(capacity), delta_hours, duration
+            prev_stock, v_expected, float(capacity), delta_hours, duration
         )
-        occupied = self.distribute({}, [zone], temporal.stock)
+        occupied = self.distribute(prev, [zone], temporal.stock)
         zone_occupied = occupied.get(zone.id, temporal.stock)
         occupancy_ratio, free_ratio, free_spaces = self.indices(
             zone_occupied, capacity
@@ -233,6 +235,20 @@ class ParkingV1Model:
             )
         return {zone.id: current[zone.id] for zone in zones}
 
+    def initial_occupied(
+        self, zones: Sequence[Zone]
+    ) -> dict[UUID, float]:
+        """Estado inicial de la jornada: O₀ = 0 (sección 38).
+
+        Cada jornada operacional de Parking V1 comienza con ocupación cero:
+        `occupied₀(z) = 0` para toda zona y `prev_stock = 0`.
+
+        `available_capacity` es un dato operativo del tablero y NO participa
+        en la inicialización de la proyección (no se computa
+        `capacity - available_capacity` como ocupación inicial).
+        """
+        return {zone.id: 0.0 for zone in zones}
+
     def simulate(
         self,
         phases: Sequence[EventDayPhase],
@@ -242,9 +258,10 @@ class ParkingV1Model:
     ) -> list[ParkingPhaseState]:
         """Evolución temporal + espacial completa por fases.
 
-        `O_0 = 0` (sección 38). Las fases se evalúan en orden cronológico.
-        Devuelve un estado por fase, reutilizable para los tests de las
-        tablas de las secciones 30 y 31.
+        `O_0 = 0`: cada jornada comienza con ocupación cero en todas las zonas
+        (sección 38). `available_capacity` no participa en la inicialización.
+        Las fases se evalúan en orden cronológico. Devuelve un estado por fase,
+        reutilizable para los tests de las tablas de las secciones 30 y 31.
         """
         if not phases:
             raise ValueError("phases must not be empty")
@@ -252,8 +269,8 @@ class ParkingV1Model:
             raise ValueError("zones must not be empty")
         ordered = sorted(phases, key=lambda p: (p.start_min, str(p.id)))
         total_capacity = sum(zone.capacity for zone in zones)
-        prev_stock = 0.0
-        prev_occupied = {zone.id: 0.0 for zone in zones}
+        prev_occupied = self.initial_occupied(zones)
+        prev_stock = float(sum(prev_occupied.values()))
         results: list[ParkingPhaseState] = []
         for index, phase in enumerate(ordered, start=1):
             intensity = phase.intensity

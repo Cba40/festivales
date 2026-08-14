@@ -112,6 +112,7 @@ def _zone_row(zone_id, name, ztype, capacity):
         type=ztype,
         subtipo=None,
         capacity=capacity,
+        available_capacity=capacity,
         latitude=REF_LAT,
         longitude=REF_LNG,
     )

@@ -19,6 +19,7 @@ import pytest
 
 from src.domain.entities.event_day import EventDay
 from src.domain.entities.zone import Zone
+from src.domain.models.parking_v1_model import ParkingV1Model
 from src.infrastructure.composition.parking_module import (
     ParkingModule,
     _load_parking_zones,
@@ -57,14 +58,14 @@ PHASE_IDS = {
 REF_LAT = -31.4135
 REF_LNG = -64.1811
 
-# (id, capacity, latitude, longitude)
+# (id, capacity, available_capacity, latitude, longitude)
 ZONE_SPECS = {
-    "A": (500, -31.4135, -64.1811),
-    "B": (400, -31.42, -64.19),
-    "C": (300, -31.43, -64.20),
-    "D": (200, -31.40, -64.17),
-    "F": (250, -31.415, -64.185),
-    "G": (150, -31.41, -64.18),
+    "A": (500, 500, -31.4135, -64.1811),
+    "B": (400, 300, -31.42, -64.19),
+    "C": (300, 300, -31.43, -64.20),
+    "D": (200, 200, -31.40, -64.17),
+    "F": (250, 250, -31.415, -64.185),
+    "G": (150, 0, -31.41, -64.18),
 }
 
 ESTIMATED_VEHICLES = 8000
@@ -99,13 +100,14 @@ def _one_result(row):
     return result
 
 
-def _zone_row(zone_id, name, ztype, capacity, lat, lng):
+def _zone_row(zone_id, name, ztype, capacity, available_capacity, lat, lng):
     return SimpleNamespace(
         id=zone_id,
         name=name,
         type=ztype,
         subtipo=None,
         capacity=capacity,
+        available_capacity=available_capacity,
         latitude=lat,
         longitude=lng,
     )
@@ -114,13 +116,14 @@ def _zone_row(zone_id, name, ztype, capacity, lat, lng):
 def _parking_zone_rows():
     rows = []
     for letter in ("A", "B", "C", "D", "F", "G"):
-        capacity, lat, lng = ZONE_SPECS[letter]
+        capacity, available, lat, lng = ZONE_SPECS[letter]
         rows.append(
             _zone_row(
                 PARKING_IDS[letter],
                 f"Parking {letter}",
                 "estacionamiento",
                 capacity,
+                available,
                 lat,
                 lng,
             )
@@ -135,6 +138,7 @@ def _non_parking_zone_rows():
             "Parada Linea",
             "transporte",
             300,
+            300,
             -31.4135,
             -64.1811,
         ),
@@ -142,6 +146,7 @@ def _non_parking_zone_rows():
             NON_PARKING_IDS["comida"],
             "Patio Comida",
             "comida",
+            200,
             200,
             -31.42,
             -64.19,
@@ -263,8 +268,9 @@ class TestParkingModuleDataFlow:
         by_id = {zone.id: zone for zone in result.parking_zones}
         for letter in ("A", "B", "C", "D", "F", "G"):
             zone = by_id[UUID(PARKING_IDS[letter])]
-            capacity, lat, lng = ZONE_SPECS[letter]
+            capacity, available, lat, lng = ZONE_SPECS[letter]
             assert zone.capacity == capacity
+            assert zone.available_capacity == available
             assert zone.latitude == lat
             assert zone.longitude == lng
             assert zone.type == "estacionamiento"
@@ -341,6 +347,44 @@ class TestParkingModuleSimulation:
         for phase in result.phase_results:
             assert set(phase.occupied.keys()) == expected
 
+    async def test_available_capacity_delivered_to_zone_entity(self) -> None:
+        session = _mock_session(_parking_zone_rows(), _ed_row())
+        result = await ParkingModule(session).execute(
+            timestamp=TIMESTAMP,
+            event_id=EVENT_ID,
+        )
+        assert result is not None
+        by_id = {zone.id: zone for zone in result.parking_zones}
+        assert by_id[UUID(PARKING_IDS["B"])].available_capacity == 300
+        assert by_id[UUID(PARKING_IDS["G"])].available_capacity == 0
+        assert by_id[UUID(PARKING_IDS["A"])].available_capacity == 500
+
+    async def test_initial_occupied_is_zero_regardless_of_available(self) -> None:
+        session = _mock_session(_parking_zone_rows(), _ed_row())
+        result = await ParkingModule(session).execute(
+            timestamp=TIMESTAMP,
+            event_id=EVENT_ID,
+        )
+        assert result is not None
+        initial = ParkingV1Model().initial_occupied(result.parking_zones)
+        for zone in result.parking_zones:
+            assert initial[zone.id] == pytest.approx(0.0)
+        assert sum(initial.values()) == pytest.approx(0.0)
+
+    async def test_first_phase_starts_from_zero(self) -> None:
+        session = _mock_session(_parking_zone_rows(), _ed_row())
+        result = await ParkingModule(session).execute(
+            timestamp=TIMESTAMP,
+            event_id=EVENT_ID,
+        )
+        assert result is not None
+        first = result.phase_results[0]
+        assert first.remain == pytest.approx(0.0, abs=1e-9)
+        assert first.stock == pytest.approx(
+            min(first.v_expected, _total_capacity()), abs=1e-6
+        )
+        assert first.occupied[UUID(PARKING_IDS["G"])] >= 0.0
+
     async def test_invariants(self) -> None:
         session = _mock_session(_parking_zone_rows(), _ed_row())
         result = await ParkingModule(session).execute(
@@ -353,7 +397,9 @@ class TestParkingModuleSimulation:
             zone.id: zone.capacity for zone in result.parking_zones
         }
         total_capacity = _total_capacity()
-        prev_stock = 0.0
+        initial_occupied = ParkingV1Model().initial_occupied(result.parking_zones)
+        prev_stock = sum(initial_occupied.values())
+        assert prev_stock == pytest.approx(0.0)
         for phase in result.phase_results:
             occupied_sum = sum(phase.occupied.values())
             assert occupied_sum == pytest.approx(phase.stock)

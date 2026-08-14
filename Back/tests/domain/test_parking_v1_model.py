@@ -33,6 +33,7 @@ def make_zone(
     capacity: int,
     distance: float | None,
     type: str = "estacionamiento",
+    available_capacity: int | None = None,
 ) -> Zone:
     return Zone(
         id=UUID(id_value),
@@ -41,6 +42,7 @@ def make_zone(
         capacity=capacity,
         type=type,
         reference_point_distance=distance,
+        available_capacity=available_capacity,
     )
 
 
@@ -375,6 +377,134 @@ class TestAcumulacionStock:
         # la fase 4 (0.80) y la fase 5 (0.60) quedan al tope por retención.
         assert results[3].stock == pytest.approx(4500.0, abs=0.1)
         assert results[4].stock == pytest.approx(4500.0, abs=0.1)
+
+
+class TestEstadoInicialReal:
+    """Inicio de jornada: O₀ = 0 (corrección J-1).
+
+    Cada jornada operacional de Parking V1 comienza con ocupación cero en
+    todas las zonas, independientemente de `available_capacity`. El stock
+    inicial es `Σ occupied_initial = 0`.
+    """
+
+    def test_caso_1_inicio_de_jornada_ocupacion_cero(self) -> None:
+        zones = [
+            make_zone("a0000000-0000-0000-0000-000000000001", 1000, 100.0, available_capacity=1000),
+            make_zone("a0000000-0000-0000-0000-000000000002", 1000, 400.0, available_capacity=100),
+            make_zone("a0000000-0000-0000-0000-000000000003", 2000, 900.0, available_capacity=2000),
+        ]
+        model = ParkingV1Model()
+        initial = model.initial_occupied(zones)
+        for zone in zones:
+            assert initial[zone.id] == pytest.approx(0.0)
+        assert sum(initial.values()) == pytest.approx(0.0)
+
+        results = model.simulate(make_ten_phases(SCENARIO_A_INTENSITIES), zones, 8000, 4.0)
+        assert results[0].remain == pytest.approx(0.0, abs=1e-9)
+        assert results[0].stock == pytest.approx(results[0].entries, abs=1e-9)
+
+    def test_caso_1_sin_available_capacity_tambien_comienza_vacio(self) -> None:
+        zone = make_zone("a0000000-0000-0000-0000-000000000001", 1000, 100.0)
+        initial = ParkingV1Model().initial_occupied([zone])
+        assert initial[zone.id] == pytest.approx(0.0)
+
+    def test_caso_2_primera_fase_desde_prev_stock_cero(self) -> None:
+        zone = make_zone("a0000000-0000-0000-0000-000000000001", 5000, 100.0)
+        model = ParkingV1Model()
+        phases = [make_phase(0, 60, 0.1, sequence=1)]
+        results = model.simulate(phases, [zone], 5000, 4.0)
+        first = results[0]
+        assert first.v_expected == pytest.approx(500.0)
+        assert first.remain == pytest.approx(0.0, abs=1e-9)
+        assert first.stock == pytest.approx(500.0, abs=1e-9)
+        assert first.occupied[zone.id] == pytest.approx(500.0, abs=1e-9)
+
+    def test_caso_3_acumulacion_entre_fases_sin_reinicio(self) -> None:
+        zone = make_zone("a0000000-0000-0000-0000-000000000001", 5000, 100.0)
+        model = ParkingV1Model()
+        phases = [make_phase(0, 60, 0.1, sequence=1), make_phase(60, 120, 0.2, sequence=2)]
+        results = model.simulate(phases, [zone], 5000, 4.0)
+        r = math.exp(-1 / 4)
+        first, second = results
+        assert second.remain == pytest.approx(first.stock * r, abs=1e-6)
+        assert second.stock == pytest.approx(
+            second.remain + second.entries, abs=1e-6
+        )
+        assert second.stock > first.stock
+
+    def test_caso_4_permanencia_descuenta_entre_fases(self) -> None:
+        zone = make_zone("a0000000-0000-0000-0000-000000000001", 5000, 100.0)
+        model = ParkingV1Model()
+        phases = make_ten_phases(SCENARIO_A_INTENSITIES)
+        short = model.simulate(phases, [zone], 8000, 2.0)
+        long = model.simulate(phases, [zone], 8000, 8.0)
+        r_short = math.exp(-1 / 2.0)
+        r_long = math.exp(-1 / 8.0)
+        assert short[1].remain == pytest.approx(short[0].stock * r_short, abs=1e-6)
+        assert long[1].remain == pytest.approx(long[0].stock * r_long, abs=1e-6)
+        assert short[1].remain < long[1].remain
+        assert long[0].remain == pytest.approx(0.0, abs=1e-9)
+
+    def test_caso_5_capacidad_limite_fisico_y_unabsorbed(self) -> None:
+        zone = make_zone("a0000000-0000-0000-0000-000000000001", 1000, 100.0)
+        model = ParkingV1Model()
+        phases = [make_phase(0, 60, 0.5, sequence=1), make_phase(60, 120, 1.0, sequence=2)]
+        results = model.simulate(phases, [zone], 5000, 4.0)
+        r = math.exp(-1 / 4)
+        first, second = results
+        assert first.stock == pytest.approx(1000.0, abs=1e-9)
+        assert first.unabsorbed == pytest.approx(1500.0, abs=1e-6)
+        remain = first.stock * r
+        assert second.remain == pytest.approx(remain, abs=1e-6)
+        assert second.entries == pytest.approx(1000.0 - remain, abs=1e-6)
+        assert second.stock == pytest.approx(1000.0, abs=1e-9)
+        assert second.unabsorbed == pytest.approx(
+            second.v_expected - second.entries, abs=1e-6
+        )
+        assert second.unabsorbed > 0.0
+
+    def test_caso_6_available_capacity_no_inicializa_ocupacion(self) -> None:
+        zone = make_zone(
+            "a0000000-0000-0000-0000-000000000001",
+            1000,
+            100.0,
+            available_capacity=60,
+        )
+        model = ParkingV1Model()
+        initial = model.initial_occupied([zone])
+        assert initial[zone.id] == pytest.approx(0.0)
+        assert initial[zone.id] != pytest.approx(940.0)
+
+        results = model.simulate([make_phase(0, 60, 0.1, sequence=1)], [zone], 5000, 4.0)
+        first = results[0]
+        assert first.remain == pytest.approx(0.0, abs=1e-9)
+        assert first.stock == pytest.approx(500.0, abs=1e-9)
+
+    def test_invariantes_ocupacion_acotada_desde_estado_cero(self) -> None:
+        zones = [
+            make_zone("a0000000-0000-0000-0000-000000000001", 1000, 100.0, available_capacity=1000),
+            make_zone("a0000000-0000-0000-0000-000000000002", 1000, 400.0, available_capacity=100),
+            make_zone("a0000000-0000-0000-0000-000000000003", 2000, 900.0, available_capacity=2000),
+            make_zone("a0000000-0000-0000-0000-000000000004", 500, 700.0, available_capacity=0),
+        ]
+        model = ParkingV1Model()
+        capacities = {zone.id: zone.capacity for zone in zones}
+        initial = model.initial_occupied(zones)
+        assert sum(initial.values()) == pytest.approx(0.0)
+        assert all(0.0 <= value <= capacities[zid] for zid, value in initial.items())
+
+        results = model.simulate(make_ten_phases(SCENARIO_A_INTENSITIES), zones, 8000, 4.0)
+        for phase in results:
+            assert phase.stock >= 0.0
+            assert phase.unabsorbed >= 0.0
+            assert phase.entries + phase.unabsorbed == pytest.approx(
+                phase.v_expected, abs=1e-6
+            )
+            for zone_id, occupied in phase.occupied.items():
+                assert 0.0 <= occupied <= capacities[zone_id]
+            assert sum(phase.occupied.values()) == pytest.approx(
+                phase.stock, abs=1e-6
+            )
 
 
 class TestDistribucionEspacial:

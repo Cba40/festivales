@@ -13,6 +13,7 @@ class Zone:
         latitude: float | None = None,
         longitude: float | None = None,
         reference_point_distance: float | None = None,
+        available_capacity: int | None = None,
     ) -> None:
         resolved_id = id if id is not None else uuid4()
         self._validate(
@@ -25,6 +26,7 @@ class Zone:
             latitude,
             longitude,
             reference_point_distance,
+            available_capacity,
         )
         self._id = resolved_id
         self._name = name.strip()
@@ -35,6 +37,7 @@ class Zone:
         self._latitude = latitude
         self._longitude = longitude
         self._reference_point_distance = reference_point_distance
+        self._available_capacity = available_capacity
 
     @property
     def id(self) -> UUID:
@@ -72,6 +75,10 @@ class Zone:
     def reference_point_distance(self) -> float | None:
         return self._reference_point_distance
 
+    @property
+    def available_capacity(self) -> int | None:
+        return self._available_capacity
+
     @staticmethod
     def _validate(
         id: UUID,
@@ -83,6 +90,7 @@ class Zone:
         latitude: float | None = None,
         longitude: float | None = None,
         reference_point_distance: float | None = None,
+        available_capacity: int | None = None,
     ) -> None:
         if not isinstance(id, UUID):
             raise TypeError("id must be a UUID")
@@ -116,6 +124,14 @@ class Zone:
                 raise TypeError("reference_point_distance must be a float or None")
             if reference_point_distance < 0.0:
                 raise ValueError("reference_point_distance must be non-negative")
+        if available_capacity is not None:
+            if (
+                isinstance(available_capacity, bool)
+                or not isinstance(available_capacity, int)
+            ):
+                raise TypeError("available_capacity must be an integer or None")
+            if available_capacity < 0:
+                raise ValueError("available_capacity must be non-negative")
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Zone):
@@ -131,5 +147,6 @@ class Zone:
             f"zone_type_id={self._zone_type_id!r}, capacity={self._capacity!r}, "
             f"type={self._type!r}, subtipo={self._subtipo!r}, "
             f"latitude={self._latitude!r}, longitude={self._longitude!r}, "
-            f"reference_point_distance={self._reference_point_distance!r})"
+            f"reference_point_distance={self._reference_point_distance!r}, "
+            f"available_capacity={self._available_capacity!r})"
         )

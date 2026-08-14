@@ -3,8 +3,9 @@
 ETAPA 3 — conectar `ParkingV1Model.simulate()` con sus datos reales:
 
 * Event → punto de referencia operacional (`events.reference_point_*`).
-* zonas Parking (`zones.type == "estacionamiento"`) con `capacity`, `latitude`,
-  `longitude` y `reference_point_distance` (Haversine, reutilizado).
+* zonas Parking (`zones.type == "estacionamiento"`) con `capacity`,
+  `available_capacity`, `latitude`, `longitude` y `reference_point_distance`
+  (Haversine, reutilizado).
 * EventDay → `estimated_vehicles`, `average_parking_duration` y la secuencia
   completa `EventDayPhase[]` (start_min, end_min, intensity).
 
@@ -99,6 +100,7 @@ async def _load_parking_zones(
                 reference_point_distance=_distance_to_reference(
                     ref_lat, ref_lng, r.latitude, r.longitude
                 ),
+                available_capacity=r.available_capacity,
             )
         )
     return parking_zones

@@ -223,6 +223,7 @@ def _mock_bridge_session(*, parking_request: bool) -> AsyncMock:
             type="estacionamiento",
             subtipo=None,
             capacity=capacity,
+            available_capacity=capacity,
             latitude=REF_LAT,
             longitude=REF_LNG,
         )
@@ -235,6 +236,7 @@ def _mock_bridge_session(*, parking_request: bool) -> AsyncMock:
             type="comida",
             subtipo=None,
             capacity=120,
+            available_capacity=120,
             latitude=REF_LAT,
             longitude=REF_LNG,
         ),
@@ -244,6 +246,7 @@ def _mock_bridge_session(*, parking_request: bool) -> AsyncMock:
             type="transporte",
             subtipo=None,
             capacity=60,
+            available_capacity=60,
             latitude=REF_LAT,
             longitude=REF_LNG,
         ),
@@ -255,6 +258,7 @@ def _mock_bridge_session(*, parking_request: bool) -> AsyncMock:
             type="estacionamiento",
             subtipo=None,
             capacity=capacity,
+            available_capacity=capacity,
             latitude=REF_LAT,
             longitude=REF_LNG,
         )

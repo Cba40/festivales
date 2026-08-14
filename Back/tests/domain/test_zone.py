@@ -65,6 +65,59 @@ class TestZoneValidation:
         with pytest.raises(TypeError, match="must be a UUID"):
             Zone(name="Test", zone_type_id="not-a-uuid", capacity=100)  # type: ignore[arg-type]
 
+    def test_negative_available_capacity_raises_error(self) -> None:
+        with pytest.raises(ValueError, match="must be non-negative"):
+            Zone(
+                name="Test",
+                zone_type_id=UUID("00000000-0000-0000-0000-000000000001"),
+                capacity=100,
+                available_capacity=-1,
+            )
+
+    def test_available_capacity_type_raises_error(self) -> None:
+        with pytest.raises(TypeError, match="must be an integer or None"):
+            Zone(
+                name="Test",
+                zone_type_id=UUID("00000000-0000-0000-0000-000000000001"),
+                capacity=100,
+                available_capacity=50.0,  # type: ignore[arg-type]
+            )
+
+    def test_available_capacity_bool_raises_error(self) -> None:
+        with pytest.raises(TypeError, match="must be an integer or None"):
+            Zone(
+                name="Test",
+                zone_type_id=UUID("00000000-0000-0000-0000-000000000001"),
+                capacity=100,
+                available_capacity=True,  # type: ignore[arg-type]
+            )
+
+    def test_available_capacity_accepted(self) -> None:
+        zone = Zone(
+            name="Test",
+            zone_type_id=UUID("00000000-0000-0000-0000-000000000001"),
+            capacity=1000,
+            available_capacity=60,
+        )
+        assert zone.available_capacity == 60
+
+    def test_available_capacity_default_none(self) -> None:
+        zone = Zone(
+            name="Test",
+            zone_type_id=UUID("00000000-0000-0000-0000-000000000001"),
+            capacity=100,
+        )
+        assert zone.available_capacity is None
+
+    def test_available_capacity_greater_than_capacity_allowed(self) -> None:
+        zone = Zone(
+            name="Test",
+            zone_type_id=UUID("00000000-0000-0000-0000-000000000001"),
+            capacity=1000,
+            available_capacity=1500,
+        )
+        assert zone.available_capacity == 1500
+
     def test_zero_capacity_raises_error(self) -> None:
         with pytest.raises(ValueError, match="must be a positive integer"):
             Zone(name="Test", zone_type_id=UUID("00000000-0000-0000-0000-000000000001"), capacity=0)
