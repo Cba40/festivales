@@ -157,9 +157,12 @@ class ParkingV1Model:
     ) -> TemporalPhase:
         """Capa temporal cerrada de una fase (secciones 29-30).
 
-        `remain = O_(t-1) × r`, `S = O_(t-1) - remain`,
-        `A = max(0, min(V_expected, Σ capacity) - remain)`,
-        `O = remain + A`, `unabsorbed = max(0, V_expected - O)`.
+        `V_expected` representa los VEHÍCULOS QUE LLEGAN durante la fase (no un
+        stock objetivo). `remain = O_(t-1) × r`, `S = O_(t-1) - remain`,
+        `free = max(0, Σ capacity - remain)`, `A = min(V_expected, free)`
+        (llegadas absorbidas, acotadas por la capacidad restante),
+        `O = remain + A` (los retenidos NO se reemplazan por las llegadas),
+        `unabsorbed = max(0, V_expected - A)` (demanda no absorbida).
         """
         self._require_nonnegative(prev_stock, "prev_stock")
         self._require_nonnegative(v_expected, "v_expected")
@@ -172,9 +175,10 @@ class ParkingV1Model:
         r = self.retention(delta_hours, duration)
         remain = float(prev_stock) * r
         exits = float(prev_stock) - remain
-        entries = max(0.0, min(v_expected, total_capacity) - remain)
+        free_capacity = max(0.0, float(total_capacity) - remain)
+        entries = min(float(v_expected), free_capacity)
         stock = remain + entries
-        unabsorbed = max(0.0, v_expected - stock)
+        unabsorbed = max(0.0, float(v_expected) - entries)
         return TemporalPhase(
             v_expected=float(v_expected),
             remain=remain,

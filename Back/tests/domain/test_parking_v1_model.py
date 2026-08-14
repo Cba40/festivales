@@ -193,14 +193,16 @@ class TestFormulasPrincipales:
         result = ParkingV1Model().temporal_step(1600.0, 2800.0, 10000.0, 1.0, 4.0)
         assert result.remain == pytest.approx(1246.08, abs=0.1)
         assert result.exits == pytest.approx(353.92, abs=0.1)
-        assert result.entries == pytest.approx(1553.92, abs=0.1)
-        assert result.stock == pytest.approx(2800.0, abs=0.1)
+        assert result.entries == pytest.approx(2800.0, abs=0.1)
+        assert result.stock == pytest.approx(4046.08, abs=0.1)
+        assert result.unabsorbed == pytest.approx(0.0)
 
-    def test_temporal_step_descenso_sin_vaciado_inmediato(self) -> None:
+    def test_temporal_step_llegadas_se_suman_a_retenidos(self) -> None:
         result = ParkingV1Model().temporal_step(5000.0, 2000.0, 10000.0, 1.0, 4.0)
         assert result.remain == pytest.approx(3894.0, abs=0.1)
-        assert result.entries == pytest.approx(0.0)
-        assert result.stock == pytest.approx(3894.0, abs=0.1)
+        assert result.exits == pytest.approx(1105.99, abs=0.1)
+        assert result.entries == pytest.approx(2000.0, abs=0.1)
+        assert result.stock == pytest.approx(5894.0, abs=0.1)
         assert result.unabsorbed == pytest.approx(0.0)
 
 
@@ -217,7 +219,7 @@ class TestLimitesDeCapacidad:
         assert result.remain == pytest.approx(2180.64, abs=0.1)
         assert result.entries == pytest.approx(1319.36, abs=0.1)
         assert result.stock == pytest.approx(3500.0, abs=0.1)
-        assert result.unabsorbed == pytest.approx(500.0, abs=0.1)
+        assert result.unabsorbed == pytest.approx(2680.64, abs=0.1)
 
 
 class TestPermanenciaStock:
@@ -229,12 +231,12 @@ class TestPermanenciaStock:
         assert len(results) == 10
         table = {
             1: (1600.0, 0.0, 0.0, 1600.0, 1600.0, 0.0),
-            2: (2800.0, 1246.08, 353.92, 1553.92, 2800.0, 0.0),
-            3: (4000.0, 2180.64, 619.36, 1819.36, 4000.0, 0.0),
-            4: (5200.0, 3115.20, 884.80, 2084.80, 5200.0, 0.0),
-            7: (7200.0, 6230.40, 1769.60, 969.60, 7200.0, 0.0),
-            8: (5600.0, 5607.36, 1592.64, 0.0, 5607.36, 0.0),
-            10: (1200.0, 3401.05, 965.97, 0.0, 3401.05, 0.0),
+            2: (2800.0, 1246.08, 353.92, 2800.0, 4046.08, 0.0),
+            3: (4000.0, 3151.09, 894.99, 4000.0, 7151.09, 0.0),
+            4: (5200.0, 5569.28, 1581.82, 4430.72, 10000.0, 769.28),
+            7: (7200.0, 7788.01, 2211.99, 2211.99, 10000.0, 4988.01),
+            8: (5600.0, 7788.01, 2211.99, 2211.99, 10000.0, 3388.01),
+            10: (1200.0, 7788.01, 2211.99, 1200.0, 8988.01, 0.0),
         }
         for index, (v, remain, exits, entries, stock, unabsorbed) in table.items():
             phase = results[index - 1]
@@ -259,7 +261,120 @@ class TestPermanenciaStock:
         results = ParkingV1Model().simulate(
             make_ten_phases(SCENARIO_A_INTENSITIES), zones, 8000, 4.0
         )
-        assert results[5].stock == pytest.approx(8000.0, abs=0.1)
+        assert results[5].stock == pytest.approx(10000.0, abs=0.1)
+
+
+class TestAcumulacionStock:
+    """Corrección temporal: las llegadas se SUMAN a los vehículos retenidos.
+
+    Antes: `entries = max(0, min(v, cap) - remain)` → el stock quedaba clavado
+    en `min(v, cap)` (v_expected como objetivo). Ahora:
+    `entries = min(v_expected, max(0, cap - remain))` y `stock = remain + entries`.
+    """
+
+    def test_primera_fase_stock_igual_v_expected(self) -> None:
+        result = ParkingV1Model().temporal_step(0.0, 2000.0, 4500.0, 2.0, 3.5)
+        assert result.remain == pytest.approx(0.0)
+        assert result.entries == pytest.approx(2000.0)
+        assert result.stock == pytest.approx(2000.0)
+        assert result.unabsorbed == pytest.approx(0.0)
+
+    def test_llegadas_se_suman_a_retenidos(self) -> None:
+        model = ParkingV1Model()
+        r = math.exp(-2 / 3.5)
+        result = model.temporal_step(2500.0, 2000.0, 4500.0, 2.0, 3.5)
+        remain = 2500.0 * r
+        assert result.remain == pytest.approx(remain, abs=1e-6)
+        assert result.entries == pytest.approx(2000.0)
+        assert result.stock == pytest.approx(remain + 2000.0, abs=1e-6)
+        assert result.stock == pytest.approx(remain + result.entries, abs=1e-6)
+
+    def test_capacidad_acota_retenidos_mas_llegadas(self) -> None:
+        # remain=2258.87, v=3000 → remain+v=5258.87 > 4500 → tope en 4500
+        result = ParkingV1Model().temporal_step(4000.0, 3000.0, 4500.0, 2.0, 3.5)
+        remain = 4000.0 * math.exp(-2 / 3.5)
+        assert result.remain == pytest.approx(remain, abs=0.1)
+        assert result.entries == pytest.approx(4500.0 - remain, abs=0.1)
+        assert result.stock == pytest.approx(4500.0, abs=0.1)
+        assert result.unabsorbed == pytest.approx(3000.0 - (4500.0 - remain), abs=0.1)
+
+    def test_sin_llegadas_stock_igual_remain(self) -> None:
+        result = ParkingV1Model().temporal_step(2500.0, 0.0, 4500.0, 2.0, 3.5)
+        remain = 2500.0 * math.exp(-2 / 3.5)
+        assert result.entries == pytest.approx(0.0)
+        assert result.stock == pytest.approx(remain, abs=0.1)
+        assert result.unabsorbed == pytest.approx(0.0)
+
+    def test_sin_retenidos_stock_igual_min_v_capacidad(self) -> None:
+        model = ParkingV1Model()
+        assert model.temporal_step(0.0, 3000.0, 4500.0, 2.0, 3.5).stock == pytest.approx(3000.0)
+        capped = model.temporal_step(0.0, 6000.0, 4500.0, 2.0, 3.5)
+        assert capped.stock == pytest.approx(4500.0)
+        assert capped.unabsorbed == pytest.approx(1500.0)
+
+    def test_stock_puede_superar_v_expected_de_la_fase(self) -> None:
+        model = ParkingV1Model()
+        result = model.temporal_step(4000.0, 3000.0, 10000.0, 2.0, 3.5)
+        assert result.stock > result.v_expected
+        assert result.stock == pytest.approx(
+            result.remain + result.entries, abs=1e-6
+        )
+
+    def test_escenario_10_fases_2h_acumulacion(self) -> None:
+        zones = [
+            make_zone(
+                f"a0000000-0000-0000-0000-{i:012d}", cap, None
+            )
+            for i, cap in enumerate((500, 1000, 1500, 500, 600, 400), 1)
+        ]
+        phases = [
+            make_phase(start=s, end=s + 120, intensity=inten, sequence=i + 1)
+            for i, (s, inten) in enumerate(
+                (
+                    (600, 0.10),
+                    (720, 0.20),
+                    (840, 0.40),
+                    (960, 0.80),
+                    (1080, 0.60),
+                    (1200, 0.30),
+                    (1320, 0.20),
+                    (1440, 0.10),
+                    (1560, 0.05),
+                    (1680, 0.02),
+                )
+            )
+        ]
+        results = ParkingV1Model().simulate(phases, zones, 5000, 3.5)
+        table = {
+            1: (500.00, 0.00, 0.00, 500.00, 500.00, 0.00),
+            2: (1000.00, 282.36, 217.64, 1000.00, 1282.36, 0.00),
+            3: (2000.00, 724.17, 558.19, 2000.00, 2724.17, 0.00),
+            4: (4000.00, 1538.39, 1185.78, 2961.61, 4500.00, 1038.39),
+            5: (3000.00, 2541.23, 1958.77, 1958.77, 4500.00, 1041.23),
+            6: (1500.00, 2541.23, 1958.77, 1500.00, 4041.23, 0.00),
+            7: (1000.00, 2282.16, 1759.07, 1000.00, 3282.16, 0.00),
+            8: (500.00, 1853.49, 1428.66, 500.00, 2353.49, 0.00),
+            9: (250.00, 1329.06, 1024.43, 250.00, 1579.06, 0.00),
+            10: (100.00, 891.72, 687.34, 100.00, 991.72, 0.00),
+        }
+        for index, (v, remain, exits, entries, stock, unabsorbed) in table.items():
+            phase = results[index - 1]
+            assert phase.index == index
+            assert phase.v_expected == pytest.approx(v, abs=0.1)
+            assert phase.remain == pytest.approx(remain, abs=0.1)
+            assert phase.exits == pytest.approx(exits, abs=0.1)
+            assert phase.entries == pytest.approx(entries, abs=0.1)
+            assert phase.stock == pytest.approx(stock, abs=0.1)
+            assert phase.unabsorbed == pytest.approx(unabsorbed, abs=0.1)
+
+        # Comprobación fundamental: el stock de la fase 5 es mayor que su
+        # v_expected (3000) gracias a los vehículos retenidos de la fase 4.
+        assert results[4].stock == pytest.approx(4500.0, abs=0.1)
+        assert results[4].stock > results[4].v_expected
+        # La ocupación se mantiene en el pico tras el pico de intensidad:
+        # la fase 4 (0.80) y la fase 5 (0.60) quedan al tope por retención.
+        assert results[3].stock == pytest.approx(4500.0, abs=0.1)
+        assert results[4].stock == pytest.approx(4500.0, abs=0.1)
 
 
 class TestDistribucionEspacial:
@@ -365,12 +480,12 @@ class TestDemandaMayorCapacidad:
         )
         table = {
             1: (1600.0, 0.0),
-            3: (3500.0, 500.0),
-            6: (3500.0, 4500.0),
-            7: (3500.0, 3700.0),
-            8: (3500.0, 2100.0),
-            9: (3200.0, 0.0),
-            10: (2492.16, 0.0),
+            3: (3500.0, 3225.80),
+            6: (3500.0, 7225.80),
+            7: (3500.0, 6425.80),
+            8: (3500.0, 4825.80),
+            9: (3500.0, 2425.80),
+            10: (3500.0, 425.80),
         }
         for index, (stock, unabsorbed) in table.items():
             phase = results[index - 1]
@@ -382,7 +497,7 @@ class TestDemandaMayorCapacidad:
         phase_6 = ParkingV1Model().simulate(
             make_ten_phases(SCENARIO_A_INTENSITIES), zones, 8000, 4.0
         )[5]
-        assert phase_6.unabsorbed == pytest.approx(4500.0, abs=0.1)
+        assert phase_6.unabsorbed == pytest.approx(7225.80, abs=0.1)
         assert phase_6.stock == pytest.approx(3500.0, abs=0.1)
         assert sum(phase_6.occupied.values()) == pytest.approx(3500.0, abs=0.1)
 
@@ -423,10 +538,10 @@ class TestInvariantes:
                 phase.stock, abs=1e-6
             )
 
-    def test_v5_unabsorbed_igual_max_cero_v_expected_menos_o_t(self) -> None:
+    def test_v5_unabsorbed_igual_max_cero_v_expected_menos_entries(self) -> None:
         _, results = self._simulate_escenario_b()
         for phase in results:
-            expected = max(0.0, phase.v_expected - phase.stock)
+            expected = max(0.0, phase.v_expected - phase.entries)
             assert phase.unabsorbed == pytest.approx(expected, abs=1e-6)
 
     def test_v6_v7_distancia_y_capacidad_no_alteran_v_expected(self) -> None:
@@ -465,8 +580,8 @@ class TestInvariantes:
 
     def test_v10_stock_distinto_de_flujo(self) -> None:
         _, results = self._simulate_escenario_b()
-        assert results[1].stock == pytest.approx(2800.0, abs=0.1)
-        assert results[1].entries == pytest.approx(1553.92, abs=0.1)
+        assert results[1].stock == pytest.approx(3500.0, abs=0.1)
+        assert results[1].entries == pytest.approx(2253.92, abs=0.1)
         assert results[1].stock != pytest.approx(results[1].entries, abs=1.0)
         assert results[7].stock == pytest.approx(3500.0, abs=0.1)
         assert results[7].v_expected == pytest.approx(5600.0, abs=0.1)
@@ -475,7 +590,7 @@ class TestInvariantes:
     def test_v11_unabsorbed_no_se_contabiliza_como_estacionado(self) -> None:
         _, results = self._simulate_escenario_b()
         phase_6 = results[5]
-        assert phase_6.unabsorbed == pytest.approx(4500.0, abs=0.1)
+        assert phase_6.unabsorbed == pytest.approx(7225.80, abs=0.1)
         assert sum(phase_6.occupied.values()) == pytest.approx(
             phase_6.stock, abs=1e-6
         )

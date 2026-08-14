@@ -359,7 +359,7 @@ class TestParkingModuleSimulation:
             assert occupied_sum == pytest.approx(phase.stock)
             assert phase.stock <= total_capacity
             assert phase.unabsorbed == pytest.approx(
-                max(0.0, phase.v_expected - phase.stock)
+                max(0.0, phase.v_expected - phase.entries)
             )
             for zone_id, occupied in phase.occupied.items():
                 assert 0.0 <= occupied <= capacities[zone_id]
