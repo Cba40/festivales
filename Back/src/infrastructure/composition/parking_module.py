@@ -29,6 +29,8 @@ from src.domain.entities.event_day import EventDay
 from src.domain.entities.event_day_phase import EventDayPhase
 from src.domain.entities.zone import Zone
 from src.domain.models.parking_v1_model import ParkingPhaseState, ParkingV1Model
+from src.domain.value_objects.territorial_prediction import TerritorialPrediction
+from src.domain.value_objects.zone_state import ZoneState
 from src.infrastructure.composition.prediction_module import (
     _distance_to_reference,
     _load_event_reference_point,
@@ -195,3 +197,126 @@ class ParkingModule:
             average_parking_duration=event_day.average_parking_duration,
             phase_results=tuple(phase_results),
         )
+
+
+# ---------------------------------------------------------------------------
+# ETAPA 4 — puente Parking V1 → ZoneState → TerritorialPrediction → Recommendation
+# ---------------------------------------------------------------------------
+
+
+def _select_active_phase_state(
+    result: ParkingSimulationResult,
+    active_event_day_phase_id: UUID | None,
+) -> ParkingPhaseState | None:
+    """Selecciona el estado de la fase activa (la del timestamp de la predicción).
+
+    `simulate()` ordena las fases por `(start_min, id)` y asigna índices 1..n
+    en ese orden; `result.phases` es la misma secuencia. Se empareja por
+    `active_event_day_phase_id`. Si no se encuentra (p. ej. timestamp fuera de
+    rango), se devuelve el estado más avanzado como cierre defensivo.
+    """
+    if not result.phase_results:
+        return None
+    if active_event_day_phase_id is None:
+        return result.phase_results[-1]
+    ordered = sorted(result.phases, key=lambda p: (p.start_min, str(p.id)))
+    for i, phase in enumerate(ordered):
+        if phase.id == active_event_day_phase_id:
+            if i < len(result.phase_results):
+                return result.phase_results[i]
+            return None
+    return result.phase_results[-1]
+
+
+def derive_parking_zone_state(
+    zone: Zone,
+    phase_state: ParkingPhaseState,
+    base_state: ZoneState | None = None,
+    model: ParkingV1Model | None = None,
+) -> ZoneState:
+    """Construye la ZoneState de una zona Parking a partir del resultado real.
+
+    Mapeo (ETAPA 4):
+    * `occupancy_ratio` → `saturation_level` (señal de plenitud del scoring).
+    * `free_spaces` → `availability`.
+    * `confidence` y `estimated_wait` permanecen `None` (Parking V1 no los
+      produce; no se fabrican valores sintéticos).
+    * `model_result` conserva el dict completo de métricas del modelo.
+    """
+    resolved_model = model if model is not None else ParkingV1Model()
+    occupied = phase_state.occupied.get(zone.id, 0.0)
+    occupancy_ratio, free_ratio, free_spaces = resolved_model.indices(
+        occupied, zone.capacity
+    )
+    metrics = {
+        "parking_id": str(zone.id),
+        "occupied": occupied,
+        "capacity": zone.capacity,
+        "occupancy_ratio": occupancy_ratio,
+        "free_ratio": free_ratio,
+        "free_spaces": free_spaces,
+        "distance": zone.reference_point_distance,
+        "unabsorbed": phase_state.unabsorbed,
+    }
+    return ZoneState(
+        zone_id=zone.id,
+        operational_state=(
+            base_state.operational_state if base_state is not None else "NORMAL"
+        ),
+        availability=round(free_spaces),
+        saturation_level=occupancy_ratio,
+        estimated_wait=None,
+        confidence=None,
+        reasoning_factors=(
+            list(base_state.reasoning_factors) if base_state is not None else []
+        ),
+        active_restriction=(
+            base_state.active_restriction if base_state is not None else None
+        ),
+        type=zone.type,
+        subtipo=zone.subtipo,
+        projected_density=(
+            base_state.projected_density if base_state is not None else 0
+        ),
+        model_result=metrics,
+    )
+
+
+def merge_parking_into_prediction(
+    prediction: TerritorialPrediction,
+    parking_result: ParkingSimulationResult | None,
+    model: ParkingV1Model | None = None,
+) -> TerritorialPrediction:
+    """Fusiona las ZoneState Parking en la predicción base del Context Engine.
+
+    Conserva las zonas normales y reemplaza las ZoneState de zonas Parking por
+    las derivadas del resultado real de Parking V1 (mismo `zone_id`, mismo
+    orden). Preserva `timestamp`, `active_phase_id` y `active_event_day_phase_id`.
+    Si no hay resultado Parking, devuelve la predicción sin cambios.
+    """
+    if parking_result is None:
+        return prediction
+    phase_state = _select_active_phase_state(
+        parking_result, prediction.active_event_day_phase_id
+    )
+    if phase_state is None:
+        return prediction
+
+    base_by_id = {zs.zone_id: zs for zs in prediction.zone_states}
+    derived_by_id: dict[UUID, ZoneState] = {}
+    for zone in parking_result.parking_zones:
+        if zone.type != PARKING_ZONE_TYPE:
+            continue
+        derived_by_id[zone.id] = derive_parking_zone_state(
+            zone, phase_state, base_by_id.get(zone.id), model=model
+        )
+
+    combined_states = [
+        derived_by_id.get(zs.zone_id, zs) for zs in prediction.zone_states
+    ]
+    return TerritorialPrediction(
+        timestamp=prediction.timestamp,
+        zone_states=combined_states,
+        active_phase_id=prediction.active_phase_id,
+        active_event_day_phase_id=prediction.active_event_day_phase_id,
+    )

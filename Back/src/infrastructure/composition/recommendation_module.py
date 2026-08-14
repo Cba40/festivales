@@ -26,7 +26,6 @@ from app.models.operational_profile import OperationalProfile as OperationalProf
 from src.application.context_engine import ContextEngine
 from src.application.recommendation.recommendation_service import RecommendationService
 from src.application.use_cases.generate_prediction import GeneratePrediction
-from src.application.use_cases.get_recommendations import GetRecommendations
 from src.domain.entities.attendance_level import AttendanceLevel
 from src.domain.entities.event_day import EventDay
 from src.domain.entities.event_day_phase import EventDayPhase
@@ -43,6 +42,11 @@ from src.domain.recommendation.requested_action import RequestedAction
 from src.domain.recommendation.user_context import UserContext
 from src.domain.recommendation.zone_recommendation import ZoneRecommendation
 from src.domain.value_objects.territorial_prediction import TerritorialPrediction
+from src.infrastructure.composition.parking_module import (
+    PARKING_ZONE_TYPE,
+    ParkingModule,
+    merge_parking_into_prediction,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -370,21 +374,33 @@ class RecommendationModule:
             prediction_repo=prediction_repo,
         )
         recommendation_service = RecommendationService()
-        use_case = GetRecommendations(
-            generate_prediction=generate_prediction,
-            recommendation_service=recommendation_service,
-        )
 
-        recommendations = await use_case.execute(
+        prediction = await generate_prediction.execute(
             timestamp=timestamp,
             zones=zones,
             zone_behaviors=zone_behaviors,
             attendance_level=attendance_level,
             operational_phases=operational_phases,
+        )
+
+        # ETAPA 4 — puente Parking V1 → ZoneState → TerritorialPrediction.
+        # Context Engine NO procesa zonas Parking: el puente se ejecuta desde la
+        # composición con los datos reales ya disponibles y fusiona la predicción
+        # antes del scoring. Solo se activa para acciones de estacionamiento.
+        combined = prediction
+        if requested_action.type == PARKING_ZONE_TYPE:
+            parking_result = await ParkingModule(self._db).execute(
+                timestamp=timestamp,
+                event_id=event_id,
+            )
+            combined = merge_parking_into_prediction(prediction, parking_result)
+
+        recommendations = recommendation_service.recommend(
+            prediction=combined,
             user_context=user_context,
             mobility_context=mobility_context,
             requested_action=requested_action,
             limit=limit,
         )
 
-        return recommendations, prediction_repo.saved_prediction
+        return recommendations, combined
