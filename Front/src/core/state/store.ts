@@ -59,7 +59,7 @@ interface AppState {
   requestLocation: () => Promise<boolean>;
 }
 
-export const useAppStore = create<AppState>((set) => ({
+export const useAppStore = create<AppState>((set, get) => ({
   // Auth state
   auth: {
     token: localStorage.getItem('auth_token'),
@@ -131,9 +131,34 @@ export const useAppStore = create<AppState>((set) => ({
     })),
 
   // Location mutations
-  setUserLocation: (loc) => {
-    if (loc) localStorage.setItem('last_location', JSON.stringify(loc));
-    set({ userLocation: loc });
+  setUserLocation: (coords) => {
+    if (coords === null) {
+      set({ userLocation: null })
+      return
+    }
+
+    const prev = get().userLocation
+
+    if (prev === null) {
+      set({ userLocation: coords })
+      localStorage.setItem('last_location', JSON.stringify(coords))
+      return
+    }
+
+    const [lat1, lng1] = prev
+    const [lat2, lng2] = coords
+
+    const dLat = (lat2 - lat1) * 111320
+    const dLng = (lng2 - lng1) * 111320 * Math.cos((lat1 * Math.PI) / 180)
+
+    const distance = Math.sqrt(dLat * dLat + dLng * dLng)
+
+    if (distance < 50) {
+      return
+    }
+
+    set({ userLocation: coords })
+    localStorage.setItem('last_location', JSON.stringify(coords))
   },
 
   setLocationPermissionDenied: (denied) => {
