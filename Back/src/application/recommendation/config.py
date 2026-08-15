@@ -12,6 +12,7 @@ class RecommendationConfig:
         vip_bonus: float = 0.1,
         staff_bonus: float = 0.2,
         mobility_penalty: float = 0.15,
+        min_availability_threshold: float = 0.05,
     ) -> None:
         self._low_density_saturation_threshold = low_density_saturation_threshold
         self._low_density_reasoning_threshold = low_density_reasoning_threshold
@@ -19,6 +20,7 @@ class RecommendationConfig:
         self._vip_bonus = vip_bonus
         self._staff_bonus = staff_bonus
         self._mobility_penalty = mobility_penalty
+        self._min_availability_threshold = min_availability_threshold
 
     @property
     def low_density_saturation_threshold(self) -> float:
@@ -43,6 +45,10 @@ class RecommendationConfig:
     @property
     def mobility_penalty(self) -> float:
         return self._mobility_penalty
+
+    @property
+    def min_availability_threshold(self) -> float:
+        return self._min_availability_threshold
 
 
 def get_recommendation_config() -> RecommendationConfig:

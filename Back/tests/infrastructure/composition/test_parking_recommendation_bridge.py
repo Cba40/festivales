@@ -49,12 +49,12 @@ ZT_IDS = {
 
 # 6 zonas Parking (A, B, C, D, F, G) + 2 no-Parking (comida, transporte).
 PARKING_DEFS = [
-    ("Parking A", "A", 500),
-    ("Parking B", "B", 400),
-    ("Parking C", "C", 300),
-    ("Parking D", "D", 200),
-    ("Parking F", "F", 250),
-    ("Parking G", "G", 150),
+    ("Parking A", "A", 3500),
+    ("Parking B", "B", 2800),
+    ("Parking C", "C", 2100),
+    ("Parking D", "D", 1400),
+    ("Parking F", "F", 1750),
+    ("Parking G", "G", 1050),
 ]
 
 PARKING_IDS = {

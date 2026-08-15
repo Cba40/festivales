@@ -17,6 +17,7 @@ class ZonaItemBase(BaseModel):
     lng: float | None = None
     referencia: str = ""
     distancia_min: int | None = None
+    is_nearest: bool = False
 
 
 class ZonaEstacionamientoItem(ZonaItemBase):

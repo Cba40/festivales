@@ -416,12 +416,24 @@ class RecommendationModule:
             )
             combined = merge_parking_into_prediction(prediction, parking_result)
 
+        zone_coordinates: dict[UUID, tuple[float, float]] | None = None
+        if (
+            mobility_context.latitude is not None
+            and mobility_context.longitude is not None
+        ):
+            zone_coordinates = {
+                zone.id: (zone.latitude, zone.longitude)
+                for zone in zones
+                if zone.latitude is not None and zone.longitude is not None
+            }
+
         recommendations = recommendation_service.recommend(
             prediction=combined,
             user_context=user_context,
             mobility_context=mobility_context,
             requested_action=requested_action,
             limit=limit,
+            zone_coordinates=zone_coordinates,
         )
 
         return recommendations, combined

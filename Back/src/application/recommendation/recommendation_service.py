@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+from uuid import UUID
+
 from src.application.recommendation.config import (
     RecommendationConfig,
     get_recommendation_config,
@@ -28,18 +31,23 @@ class RecommendationService:
         requested_action: RequestedAction,
         limit: int = 5,
         config: RecommendationConfig | None = None,
+        zone_coordinates: Mapping[UUID, tuple[float, float]] | None = None,
     ) -> list[ZoneRecommendation]:
         resolved_config = config if config is not None else get_recommendation_config()
 
         if limit == 0:
             return []
 
-        recommendations = self._strategy.evaluate(
-            prediction=prediction,
-            user_context=user_context,
-            mobility_context=mobility_context,
-            requested_action=requested_action,
-            config=resolved_config,
-        )
+        evaluate_kwargs: dict[str, object] = {
+            "prediction": prediction,
+            "user_context": user_context,
+            "mobility_context": mobility_context,
+            "requested_action": requested_action,
+            "config": resolved_config,
+        }
+        if zone_coordinates is not None:
+            evaluate_kwargs["zone_coordinates"] = zone_coordinates
+
+        recommendations = self._strategy.evaluate(**evaluate_kwargs)
 
         return recommendations[:limit]

@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import logging
+import math
+from collections.abc import Mapping
 from typing import Protocol, runtime_checkable
+from uuid import UUID
 
 from src.application.recommendation.config import RecommendationConfig
 from src.domain.entities.zone_behavior import FlowRestriction
@@ -10,6 +14,10 @@ from src.domain.recommendation.user_context import AccessLevel, UserContext
 from src.domain.recommendation.zone_recommendation import ZoneRecommendation
 from src.domain.value_objects.territorial_prediction import TerritorialPrediction
 from src.domain.value_objects.zone_state import ZoneState
+
+PARKING_TYPE = "estacionamiento"
+
+logger = logging.getLogger(__name__)
 
 
 @runtime_checkable
@@ -35,12 +43,18 @@ class WeightedScoringStrategy:
         mobility_context: MobilityContext,
         requested_action: RequestedAction,
         config: RecommendationConfig,
+        zone_coordinates: Mapping[UUID, tuple[float, float]] | None = None,
     ) -> list[ZoneRecommendation]:
         zone_states = prediction.zone_states
 
         viable = self._filter_viable_zones(
             zone_states, requested_action, mobility_context, config
         )
+
+        if requested_action.type == PARKING_TYPE:
+            return self._select_three_options(
+                viable, user_context, mobility_context, config, zone_coordinates
+            )
 
         scored = self._calculate_scores(
             viable, user_context, mobility_context, config
@@ -108,6 +122,138 @@ class WeightedScoringStrategy:
                 z, requested_action, mobility_context, config
             )
         ]
+
+    @staticmethod
+    def _select_three_options(
+        viable_zones: list[ZoneState],
+        user_context: UserContext,
+        mobility_context: MobilityContext,
+        config: RecommendationConfig,
+        zone_coordinates: Mapping[UUID, tuple[float, float]] | None,
+    ) -> list[ZoneRecommendation]:
+        candidates: list[tuple[ZoneState, float]] = []
+        for zone in viable_zones:
+            if zone.saturation_level is None:
+                logger.warning(
+                    "Zona de estacionamiento %s excluida: saturation_level ausente",
+                    zone.zone_id,
+                )
+                continue
+            free_ratio = 1.0 - zone.saturation_level
+            candidates.append((zone, free_ratio))
+
+        available = [
+            (zone, free_ratio)
+            for zone, free_ratio in candidates
+            if free_ratio > config.min_availability_threshold
+        ]
+        available.sort(key=lambda t: (-t[1], str(t[0].zone_id)))
+
+        option1 = available[0] if len(available) >= 1 else None
+        option2 = available[1] if len(available) >= 2 else None
+
+        chosen_ids = {option1[0].zone_id} if option1 is not None else set()
+        if option2 is not None:
+            chosen_ids.add(option2[0].zone_id)
+
+        option3: tuple[ZoneState, float] | None = None
+        if (
+            zone_coordinates is not None
+            and mobility_context.latitude is not None
+            and mobility_context.longitude is not None
+        ):
+            candidates_with_distance: list[tuple[ZoneState, float]] = []
+            for zone, _free_ratio in available:
+                if zone.zone_id in chosen_ids:
+                    continue
+                coords = zone_coordinates.get(zone.zone_id)
+                if coords is None:
+                    continue
+                distance = WeightedScoringStrategy._calculate_distance(
+                    mobility_context.latitude,
+                    mobility_context.longitude,
+                    coords[0],
+                    coords[1],
+                )
+                candidates_with_distance.append((zone, distance))
+            candidates_with_distance.sort(
+                key=lambda t: (t[1], str(t[0].zone_id))
+            )
+            if candidates_with_distance:
+                option3 = candidates_with_distance[0]
+
+        recommendations: list[ZoneRecommendation] = []
+
+        if option1 is not None:
+            zone, _free_ratio = option1
+            score = WeightedScoringStrategy._calculate_scores(
+                [zone], user_context, mobility_context, config
+            )[0][1]
+            contextual_reasoning = WeightedScoringStrategy._generate_reasoning(
+                [(zone, score)], mobility_context, config
+            )[0][2]
+            recommendations.append(
+                ZoneRecommendation(
+                    zone_id=zone.zone_id,
+                    score=score,
+                    reasoning=["Más lugares libres"] + contextual_reasoning,
+                    is_nearest=False,
+                )
+            )
+
+        if option2 is not None:
+            zone, _free_ratio = option2
+            score = WeightedScoringStrategy._calculate_scores(
+                [zone], user_context, mobility_context, config
+            )[0][1]
+            contextual_reasoning = WeightedScoringStrategy._generate_reasoning(
+                [(zone, score)], mobility_context, config
+            )[0][2]
+            recommendations.append(
+                ZoneRecommendation(
+                    zone_id=zone.zone_id,
+                    score=score,
+                    reasoning=["Segunda opción con más lugares"] + contextual_reasoning,
+                    is_nearest=False,
+                )
+            )
+
+        if option3 is not None:
+            zone, _distance = option3
+            score = WeightedScoringStrategy._calculate_scores(
+                [zone], user_context, mobility_context, config
+            )[0][1]
+            contextual_reasoning = WeightedScoringStrategy._generate_reasoning(
+                [(zone, score)], mobility_context, config
+            )[0][2]
+            recommendations.append(
+                ZoneRecommendation(
+                    zone_id=zone.zone_id,
+                    score=score,
+                    reasoning=["Más cerca de vos"] + contextual_reasoning,
+                    is_nearest=True,
+                )
+            )
+
+        return recommendations
+
+    @staticmethod
+    def _calculate_distance(
+        lat1: float,
+        lon1: float,
+        lat2: float,
+        lon2: float,
+    ) -> float:
+        phi1 = math.radians(lat1)
+        phi2 = math.radians(lat2)
+        d_phi = math.radians(lat2 - lat1)
+        d_lambda = math.radians(lon2 - lon1)
+        a = (
+            math.sin(d_phi / 2.0) ** 2
+            + math.cos(phi1) * math.cos(phi2) * math.sin(d_lambda / 2.0) ** 2
+        )
+        c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
+        return 6_371_000.0 * c
 
     @staticmethod
     def _calculate_scores(

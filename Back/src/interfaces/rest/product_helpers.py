@@ -118,6 +118,7 @@ def enrich_zone(
         lng=meta["lng"] if meta else None,
         referencia=meta["referencia"] if meta else "",
         distancia_min=meta["distancia_min"] if meta else None,
+        is_nearest=rec.is_nearest,
     )
     if extra_fields:
         kwargs.update(extra_fields)

@@ -9,10 +9,12 @@ class ZoneRecommendation:
         zone_id: UUID,
         score: float,
         reasoning: list[str],
+        is_nearest: bool = False,
     ) -> None:
         self._zone_id = zone_id
         self._score = score
         self._reasoning = list(reasoning)
+        self._is_nearest = is_nearest
 
     @property
     def zone_id(self) -> UUID:
@@ -26,10 +28,15 @@ class ZoneRecommendation:
     def reasoning(self) -> list[str]:
         return list(self._reasoning)
 
+    @property
+    def is_nearest(self) -> bool:
+        return self._is_nearest
+
     def __repr__(self) -> str:
         return (
             f"ZoneRecommendation("
             f"zone_id={self._zone_id!r}, "
             f"score={self._score!r}, "
-            f"reasoning={self._reasoning!r})"
+            f"reasoning={self._reasoning!r}, "
+            f"is_nearest={self._is_nearest!r})"
         )

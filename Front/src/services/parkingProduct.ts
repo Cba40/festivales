@@ -21,6 +21,7 @@ export interface ZonaEstacionamientoItem {
   lng: number | null
   referencia: string
   distancia_min: number | null
+  is_nearest: boolean
 }
 
 export interface ParkingRecommendationResponse {
@@ -48,10 +49,13 @@ export function useParkingRecommendations() {
           params: {
             speed: 1.5,
             accessibility_required: false,
-            limit: 10,
+            limit: 3,
             current_zone_id: currentZoneId || undefined,
             user_id: '00000000-0000-0000-0000-000000000000',
             access_level: 'STANDARD',
+            ...(userLocation
+              ? { latitude: userLocation[0], longitude: userLocation[1] }
+              : {}),
           },
         }
       )
@@ -61,7 +65,7 @@ export function useParkingRecommendations() {
     } finally {
       setLoading(false)
     }
-  }, [currentZoneId])
+  }, [currentZoneId, userLocation])
 
   return { data, loading, error, refresh }
 }
