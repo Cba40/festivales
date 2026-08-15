@@ -116,7 +116,7 @@ function AppLayout() {
     const id = navigator.geolocation.watchPosition(
       onSuccess,
       onError,
-      { enableHighAccuracy: false, timeout: 30000, maximumAge: 15000 }
+      { enableHighAccuracy: true, timeout: 30000, maximumAge: 60000 }
     );
 
     return () => navigator.geolocation.clearWatch(id);

@@ -171,8 +171,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const loc: [number, number] = [pos.coords.latitude, pos.coords.longitude];
-          localStorage.setItem('last_location', JSON.stringify(loc));
-          set({ userLocation: loc, locationPermissionDenied: false });
+          set({ locationPermissionDenied: false });
+          get().setUserLocation(loc);
           resolve(true);
         },
         (err) => {
