@@ -549,69 +549,51 @@ const Estacionar = () => {
       <Header title="Estacionar" showBack onBack={() => navigate('/')} />
 
       <div className="flex-1 p-4 space-y-4">
-        <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-md">
-          <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4">
-            Zonas disponibles
-          </h2>
-          {!userLocation && (
-            <div className="flex items-start gap-2 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs rounded-lg p-3 mb-4">
-              <span>📍</span>
-              <span>Activá tu GPS para ver la opción de estacionamiento más cercana.</span>
-            </div>
-          )}
-          <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 mb-4">
-            🟢 Bajo: rápido · 🟡 Medio: demora moderada · 🔴 Alto: mucha demora
-          </div>
-          <div className="space-y-3">
-            {zonas.slice(0, 3).map((zona, index) => {
-              const dist = getDistancias(zona.lat ?? 0, zona.lng ?? 0, userLocation, zona.distancia_min ?? 5)
-              return (
-              <button
-                key={zona.zone_id}
-                onClick={() => setSelectedZona(zona)}
-                className="w-full p-4 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-left hover:border-primary dark:hover:border-primary/70 transition-colors"
-              >
-                <div className="flex justify-between items-center">
-                  <span className="font-bold mr-2 text-gray-900 dark:text-gray-100">
-                    {getTituloZona(zona, index)}
-                  </span>
-                  <span className="flex items-center gap-1.5 shrink-0">
-                    {getNearestBadge(zona)}
-                    <span
-                      className={`px-2 py-1 rounded text-xs font-bold whitespace-nowrap ${getEstadoStyles(zona.estado)}`}
-                    >
-                      {getEstadoLabel(zona.estado)}
-                    </span>
-                  </span>
-                </div>
-                <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-                  📍 {zona.referencia}
-                </p>
-                <p className="text-sm text-gray-600 dark:text-gray-300 flex flex-wrap gap-x-3 gap-y-0.5">
-                  <span>🚗 {dist.driving}</span>
-                  <span>📊 {Math.round((1 - zona.saturation_level) * 100)}% de posibilidad</span>
-                </p>
-                <p className="text-xs text-gray-400 dark:text-gray-300 mt-1">
-                  {formatUpdatedAt(Date.now())}
-                </p>
-                <p className="text-xs text-slate-500 dark:text-slate-300 mt-1">
-                  {getConfianzaLabel(zona.confidence)}
-                </p>
-              </button>
-              )
-            })}
-          </div>
-        </div>
-
         {principal && (
           <button
             onClick={() => abrirMapa(principal)}
-            className="w-full bg-primary text-white py-4 rounded-xl font-bold text-lg transition-transform active:scale-95 shadow-lg flex items-center justify-center gap-2"
+            className="w-full bg-green-600 hover:bg-green-700 text-white p-6 rounded-2xl shadow-lg transition-transform active:scale-95 mb-4"
           >
-            <Map size={20} />
-            Iniciar ruta
+            <div className="flex items-center justify-between">
+              <div className="text-left flex-1">
+                <p className="text-2xl font-bold mb-1">IR AHORA</p>
+                <p className="text-lg opacity-90">{principal.name}</p>
+                <p className="text-sm opacity-75 mt-1">
+                  🚗 {getDistancias(principal.lat ?? 0, principal.lng ?? 0, userLocation, principal.distancia_min ?? 5).driving} · 📊 {Math.round((1 - principal.saturation_level) * 100)}% libre
+                </p>
+              </div>
+              <div className="text-4xl">🧭</div>
+            </div>
           </button>
         )}
+
+        {zonas.slice(1).map((zona) => {
+          const dist = getDistancias(zona.lat ?? 0, zona.lng ?? 0, userLocation, zona.distancia_min ?? 5)
+          return (
+            <button
+              key={zona.zone_id}
+              onClick={() => setSelectedZona(zona)}
+              className="w-full p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl text-left hover:border-primary dark:hover:border-primary/70 transition-colors mb-2"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <p className="font-bold text-gray-900 dark:text-gray-100">{zona.name}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    🚗 {dist.driving} · 📊 {Math.round((1 - zona.saturation_level) * 100)}% libre
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {zona.is_nearest && (
+                    <span className="px-2 py-1 rounded text-xs font-bold bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                      ⭐ Más cercana
+                    </span>
+                  )}
+                  <span className="text-2xl text-green-600 dark:text-green-400">🧭</span>
+                </div>
+              </div>
+            </button>
+          )
+        })}
       </div>
 
       <button
