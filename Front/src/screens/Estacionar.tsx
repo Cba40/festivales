@@ -552,7 +552,7 @@ const Estacionar = () => {
         {principal && (
           <button
             onClick={() => abrirMapa(principal)}
-            className="w-full bg-green-600 hover:bg-green-700 text-white p-6 rounded-2xl shadow-lg transition-transform active:scale-95 mb-4"
+            className="w-full bg-primary hover:bg-primary-dark text-white p-6 rounded-2xl shadow-lg transition-transform active:scale-95 mb-4"
           >
             <div className="flex items-center justify-between">
               <div className="text-left flex-1">
@@ -573,12 +573,12 @@ const Estacionar = () => {
             <button
               key={zona.zone_id}
               onClick={() => setSelectedZona(zona)}
-              className="w-full p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl text-left hover:border-primary dark:hover:border-primary/70 transition-colors mb-2"
+              className="w-full p-4 bg-white dark:bg-slate-700 border-2 border-slate-200 dark:border-slate-600 rounded-xl text-left hover:border-primary dark:hover:border-primary/70 transition-colors shadow-md mb-3"
             >
               <div className="flex items-center justify-between">
                 <div className="flex-1">
-                  <p className="font-bold text-gray-900 dark:text-gray-100">{zona.name}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{zona.name}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                     🚗 {dist.driving} · 📊 {Math.round((1 - zona.saturation_level) * 100)}% libre
                   </p>
                 </div>
