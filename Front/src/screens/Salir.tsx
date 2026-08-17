@@ -22,6 +22,8 @@ import { getDistancias, haversine } from '@/utils/geo'
 
 type TipoTransporte = 'auto' | 'transporte' | 'peatonal'
 
+const LIBRE_POR_ESTADO: Record<string, number> = { bajo: 90, medio: 55, alto: 30, colapsado: 8 }
+
 const Salir = () => {
   const navigate = useNavigate()
   const zones = useAppStore(s => s.zones)
@@ -742,43 +744,46 @@ const Salir = () => {
           </div>
         )}
 
-        <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-md">
-          <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4">
-            Salidas disponibles
-          </h2>
-          <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 mb-4">
-            🟢 Bajo: rápido · 🟡 Medio: demora moderada · 🔴 Alto: mucha demora
-          </div>
-          <div className="space-y-3">
-            {salidasModo.slice(0, 3).map(zona => {
-              const dist = getDistancias(zona.lat ?? 0, zona.lng ?? 0, userLocation, zona.distancia_min)
-              return (
-              <button key={zona.id} onClick={() => setSelectedZona(zona)}
-                className="w-full p-4 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-left hover:border-primary transition-colors">
-                <div className="flex justify-between items-center">
-                  <span className="font-bold mr-2 text-gray-900 dark:text-gray-100">{zona.nombre}</span>
-                  <span className={`px-2 py-1 rounded text-xs font-bold whitespace-nowrap shrink-0 ${getEstadoStyles(zona.estado)}`}>{getEstadoLabel(zona.estado)}</span>
-                </div>
-                <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">📍 {zona.referencia}</p>
-                <p className="text-sm text-gray-600 dark:text-gray-300 flex flex-wrap gap-x-3 gap-y-0.5">
-                  <span>🚶 {dist.walking}</span>
-                  <span>🚗 {dist.driving}</span>
-                  {zona.espera_min > 0 && <span>⏱️ {zona.espera_min} min espera</span>}
-                </p>
-                <p className="text-xs text-gray-400 dark:text-gray-300 mt-1">{formatUpdatedAt(zona.updatedAt)}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-300 mt-1">{getConfianzaLabel(getConfianza(zona.estado))}</p>
-              </button>
-              )
-            })}
-          </div>
-        </div>
-
         {principal && (
-          <button onClick={() => abrirMapa(principal)}
-            className="w-full bg-primary text-white py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2">
-            <Map size={20} /> Iniciar ruta
+          <button
+            onClick={() => abrirMapa(principal)}
+            className="w-full bg-primary hover:bg-primary-dark text-white p-6 rounded-2xl shadow-lg transition-transform active:scale-95 mb-4"
+          >
+            <div className="flex items-center justify-between">
+              <div className="text-left flex-1">
+                <p className="text-2xl font-bold mb-1">IR AHORA</p>
+                <p className="text-lg opacity-90">{principal.nombre}</p>
+                <p className="text-sm opacity-75 mt-1">
+                  🚗 {getDistancias(principal.lat ?? 0, principal.lng ?? 0, userLocation, principal.distancia_min).driving} · 📊 {LIBRE_POR_ESTADO[principal.estado] ?? 50}% libre
+                </p>
+              </div>
+              <div className="text-4xl">🧭</div>
+            </div>
           </button>
         )}
+
+        {salidasModo.slice(1).map((zona) => {
+          const dist = getDistancias(zona.lat ?? 0, zona.lng ?? 0, userLocation, zona.distancia_min)
+          return (
+            <button
+              key={zona.id}
+              onClick={() => setSelectedZona(zona)}
+              className="w-full p-4 bg-white dark:bg-slate-700 border-2 border-slate-200 dark:border-slate-600 rounded-xl text-left hover:border-primary dark:hover:border-primary/70 transition-colors shadow-md mb-3"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{zona.nombre}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    🚗 {dist.driving} · 📊 {LIBRE_POR_ESTADO[zona.estado] ?? 50}% libre
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl text-primary">🧭</span>
+                </div>
+              </div>
+            </button>
+          )
+        })}
       </div>
 
       {/* Botón flotante para alternar Mapa/Lista */}
