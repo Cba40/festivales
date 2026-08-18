@@ -166,7 +166,7 @@ async def _resolve_service_duration(
     *,
     zone_type_id: UUID,
     subtipo: str,
-    event_day_id: str | None,
+    event_day_id: UUID | str | None,
 ) -> int:
     """Resuelve la permanencia (MINUTOS) de un servicio desde `service_configs`.
 
@@ -181,7 +181,7 @@ async def _resolve_service_duration(
         stmt = select(ServiceConfigORM).where(
             ServiceConfigORM.zone_type_id == str(zone_type_id),
             ServiceConfigORM.subtipo == subtipo,
-            ServiceConfigORM.event_day_id == event_day_id,
+            ServiceConfigORM.event_day_id == str(event_day_id),
         )
         row = (await db.execute(stmt)).scalar_one_or_none()
         if row is not None:
