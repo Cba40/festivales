@@ -51,6 +51,12 @@ from src.infrastructure.composition.parking_module import (
     ParkingModule,
     merge_parking_into_prediction,
 )
+from src.infrastructure.composition.bathroom_module import (
+    BATHROOM_SUBTIPO,
+    BATHROOM_ZONE_TYPE,
+    BathroomModule,
+    merge_bathroom_into_prediction,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -415,6 +421,21 @@ class RecommendationModule:
                 event_id=event_id,
             )
             combined = merge_parking_into_prediction(prediction, parking_result)
+
+        # ETAPA 4 — puente Baños V1 → ZoneState → TerritorialPrediction.
+        # Mismo patrón que Parking V1: el Context Engine NO procesa zonas de
+        # servicios/baños; el puente se ejecuta desde la composición y fusiona
+        # la predicción antes del scoring. Solo se activa para acciones de baños
+        # (type == "servicios" AND subtipo == "banos").
+        if (
+            requested_action.type == BATHROOM_ZONE_TYPE
+            and requested_action.subtipo == BATHROOM_SUBTIPO
+        ):
+            bathroom_result = await BathroomModule(self._db).execute(
+                timestamp=local_ts,
+                event_id=event_id,
+            )
+            combined = merge_bathroom_into_prediction(combined, bathroom_result)
 
         zone_coordinates: dict[UUID, tuple[float, float]] | None = None
         if (
