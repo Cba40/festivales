@@ -254,3 +254,26 @@ export interface EventDayCreatePayload {
   average_parking_duration?: number | null;
   is_active?: boolean;
 }
+
+export interface ServiceConfigDTO {
+  id: string;
+  zone_type_id: string;
+  subtipo: string | null;
+  event_day_id: string | null;
+  average_duration_min: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ServiceConfigCreatePayload {
+  zone_type_id: string;
+  subtipo?: string | null;
+  event_day_id?: string | null;
+  average_duration_min: number;
+}
+
+export interface ServiceConfigFilters {
+  zone_type_id?: string;
+  subtipo?: string;
+  event_day_id?: string;
+}

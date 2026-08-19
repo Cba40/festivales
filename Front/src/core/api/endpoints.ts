@@ -38,6 +38,12 @@ export const endpoints = {
     recommendationConfig: '/recommendation-config',
     stage4Config: '/stage4-config',
   },
+  serviceConfigs: {
+    list: () => '/service-configs',
+    create: () => '/service-configs',
+    update: (id: string) => `/service-configs/${id}`,
+    delete: (id: string) => `/service-configs/${id}`,
+  },
   operationalEvents: {
     list: (eventDayId: string) => `/operational-events/by-event-day/${eventDayId}`,
     byId: (id: string) => `/operational-events/${id}`,
