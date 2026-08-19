@@ -28,6 +28,7 @@ from app.api.routes.rest import router as rest_router
 from app.api.routes.health_product import router as health_product_router
 from app.api.routes.hydration import router as hydration_router
 from app.api.routes.motor_config import router as motor_config_router
+from app.api.routes.service_configs import router as service_configs_router
 
 app = FastAPI(title="Territorial MVP", version="0.1.0")
 
@@ -65,6 +66,7 @@ app.include_router(rest_router)
 app.include_router(health_product_router)
 app.include_router(hydration_router)
 app.include_router(motor_config_router)
+app.include_router(service_configs_router)
 
 
 @app.get("/health")
