@@ -64,7 +64,11 @@ class WeightedScoringStrategy:
             scored, mobility_context, config
         )
 
-        return self._sort_recommendations(with_reasoning)
+        return self._mark_nearest(
+            self._sort_recommendations(with_reasoning),
+            mobility_context,
+            zone_coordinates,
+        )
 
     @staticmethod
     def _is_zone_eligible(
@@ -347,4 +351,53 @@ class WeightedScoringStrategy:
                 reasoning=reasons,
             )
             for zone, score, reasons in sorted_recs
+        ]
+
+    @staticmethod
+    def _mark_nearest(
+        recommendations: list[ZoneRecommendation],
+        mobility_context: MobilityContext,
+        zone_coordinates: Mapping[UUID, tuple[float, float]] | None,
+    ) -> list[ZoneRecommendation]:
+        """Marca `is_nearest=True` en la zona más cercana al usuario.
+
+        Mismo patrón que Parking V1 (opción 3): la distancia real se calcula
+        con Haversine entre las coordenadas del usuario y las de cada zona
+        recomendada. Sin lat/lng del usuario o sin coordenadas de zona,
+        ninguna zona se marca (`is_nearest=False`).
+        """
+        if (
+            zone_coordinates is None
+            or mobility_context.latitude is None
+            or mobility_context.longitude is None
+        ):
+            return recommendations
+
+        nearest_id: UUID | None = None
+        nearest_distance = float("inf")
+        for rec in recommendations:
+            coords = zone_coordinates.get(rec.zone_id)
+            if coords is None:
+                continue
+            distance = WeightedScoringStrategy._calculate_distance(
+                mobility_context.latitude,
+                mobility_context.longitude,
+                coords[0],
+                coords[1],
+            )
+            if distance < nearest_distance:
+                nearest_distance = distance
+                nearest_id = rec.zone_id
+
+        if nearest_id is None:
+            return recommendations
+
+        return [
+            ZoneRecommendation(
+                zone_id=rec.zone_id,
+                score=rec.score,
+                reasoning=rec.reasoning,
+                is_nearest=(rec.zone_id == nearest_id),
+            )
+            for rec in recommendations
         ]

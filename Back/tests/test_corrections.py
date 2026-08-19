@@ -124,6 +124,25 @@ class TestCoordinateValidation:
 
         assert resp.status_code == 422
 
+    def test_bathroom_out_of_range_latitude_returns_422(self) -> None:
+        with patch(
+            "app.api.routes.bathroom.get_bathroom_product_adapter",
+            new_callable=AsyncMock,
+        ):
+            with TestClient(app, raise_server_exceptions=False) as client:
+                resp = client.get(
+                    f"{BASE_URL}/products/bathroom",
+                    params={
+                        "speed": 1.5,
+                        "accessibility_required": False,
+                        "user_id": "550e8400-e29b-41d4-a716-446655440000",
+                        "latitude": 95.0,
+                        "longitude": 0.0,
+                    },
+                )
+
+        assert resp.status_code == 422
+
     def test_invalid_latitude_raises_value_error(self) -> None:
         with pytest.raises(ValueError):
             MobilityContext(
