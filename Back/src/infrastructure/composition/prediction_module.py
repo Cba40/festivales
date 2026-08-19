@@ -67,6 +67,41 @@ def _to_uuid_or_none(value: str | UUID | None) -> UUID | None:
     return UUID(value)
 
 
+# Las zonas de servicios usan `type` como categoría genérica ("servicios") y el
+# slug real del catálogo puede vivir en el subtipo (ej. banos → bano). `zones`
+# no expone columna `zone_type_id`; la resolución es slug-based (type o subtipo).
+SUBTIPO_TO_ZONE_TYPE_SLUG = {
+    "banos": "bano",
+    "hidratacion": "hidratacion",
+    "descanso": "descanso",
+    "salud": "salud",
+}
+
+
+def _resolve_zone_type_id(
+    type_map: dict[str, UUID],
+    zone_type: str,
+    subtipo: str | None,
+) -> UUID:
+    """Resuelve el zone_type_id de una zona desde el catálogo de `zone_types`.
+
+    Prioridad: (1) `type` como slug directo; (2) `subtipo` mapeado a slug;
+    (3) error claro. Evita el fallback `UUID(type)` que lanza ValueError con
+    strings no-UUID (ej. "servicios").
+    """
+    zt_id = type_map.get(zone_type)
+    if zt_id is not None:
+        return zt_id
+    slug = SUBTIPO_TO_ZONE_TYPE_SLUG.get((subtipo or "").lower())
+    if slug is not None:
+        zt_id = type_map.get(slug)
+        if zt_id is not None:
+            return zt_id
+    raise ValueError(
+        f"ZoneType slug not found for zone type={zone_type!r} subtipo={subtipo!r}"
+    )
+
+
 async def _load_default_operational_profile_id(
     db: AsyncSession,
 ) -> UUID | None:
@@ -149,9 +184,7 @@ async def _load_zones(
     rows = (await db.execute(stmt)).scalars().all()
     zones: list[Zone] = []
     for r in rows:
-        zt_id = type_map.get(r.type)
-        if zt_id is None:
-            zt_id = UUID(r.type)
+        zt_id = _resolve_zone_type_id(type_map, r.type, r.subtipo)
         zones.append(Zone(
             id=UUID(r.id),
             name=r.name,

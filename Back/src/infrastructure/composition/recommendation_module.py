@@ -57,6 +57,7 @@ from src.infrastructure.composition.bathroom_module import (
     BathroomModule,
     merge_bathroom_into_prediction,
 )
+from src.infrastructure.composition.prediction_module import _resolve_zone_type_id
 
 
 # ---------------------------------------------------------------------------
@@ -163,9 +164,7 @@ async def _load_zones(
     rows = (await db.execute(stmt)).scalars().all()
     zones: list[Zone] = []
     for r in rows:
-        zt_id = type_map.get(r.type)
-        if zt_id is None:
-            zt_id = UUID(r.type)
+        zt_id = _resolve_zone_type_id(type_map, r.type, r.subtipo)
         zones.append(Zone(
             id=UUID(r.id),
             name=r.name,

@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -41,15 +41,35 @@ from src.domain.models.bathroom_v1_model import BathroomPhaseState, BathroomV1Mo
 from src.domain.value_objects.territorial_prediction import TerritorialPrediction
 from src.domain.value_objects.zone_state import ZoneState
 from src.infrastructure.composition.prediction_module import (
+    SUBTIPO_TO_ZONE_TYPE_SLUG,
     _distance_to_reference,
     _load_attendance_level,
     _load_event_reference_point,
     _load_zone_type_map,
+    _resolve_zone_type_id,
     _to_uuid_or_none,
 )
 
 BATHROOM_ZONE_TYPE = "servicios"
 BATHROOM_SUBTIPO = "banos"
+
+
+def _resolve_bathroom_zone_type_id(type_map: dict[str, UUID]) -> UUID:
+    """Resuelve el zone_type_id del catálogo para las zonas de servicios/baños.
+
+    `zones.type` es una categoría genérica ("servicios") y no el slug del
+    catálogo; el slug real de baños vive en el subtipo (banos → bano).
+    """
+    try:
+        return _resolve_zone_type_id(
+            type_map, BATHROOM_ZONE_TYPE, BATHROOM_SUBTIPO
+        )
+    except ValueError:
+        raise ValueError(
+            f"ZoneType slug {SUBTIPO_TO_ZONE_TYPE_SLUG[BATHROOM_SUBTIPO]!r} "
+            "not found in catalog; cannot resolve zone_type_id for bathroom "
+            "zones (type='servicios', subtipo='banos')"
+        ) from None
 
 
 @dataclass(frozen=True)
@@ -90,13 +110,12 @@ async def _load_bathroom_zones(
     )
     rows = (await db.execute(stmt)).scalars().all()
 
+    zt_id = _resolve_bathroom_zone_type_id(type_map)
+
     bathroom_zones: list[Zone] = []
     for r in rows:
         if r.type != BATHROOM_ZONE_TYPE or r.subtipo != BATHROOM_SUBTIPO:
             continue
-        zt_id = type_map.get(r.type)
-        if zt_id is None:
-            zt_id = UUID(r.type)
         bathroom_zones.append(
             Zone(
                 id=UUID(r.id),
@@ -177,10 +196,11 @@ async def _resolve_service_duration(
     No se inventan valores: si no existe configuración alguna, se eleva
     `ValueError`.
     """
+    normalized_subtipo = subtipo.lower().replace("ñ", "n")
     if event_day_id is not None:
         stmt = select(ServiceConfigORM).where(
             ServiceConfigORM.zone_type_id == str(zone_type_id),
-            ServiceConfigORM.subtipo == subtipo,
+            func.coalesce(ServiceConfigORM.subtipo, "") == normalized_subtipo,
             ServiceConfigORM.event_day_id == str(event_day_id),
         )
         row = (await db.execute(stmt)).scalar_one_or_none()
@@ -189,7 +209,7 @@ async def _resolve_service_duration(
 
     stmt = select(ServiceConfigORM).where(
         ServiceConfigORM.zone_type_id == str(zone_type_id),
-        ServiceConfigORM.subtipo == subtipo,
+        func.coalesce(ServiceConfigORM.subtipo, "") == normalized_subtipo,
         ServiceConfigORM.event_day_id.is_(None),
     )
     row = (await db.execute(stmt)).scalar_one_or_none()
@@ -255,9 +275,7 @@ class BathroomModule:
                 "AttendanceLevel must define max_people to execute Bathroom V1"
             )
 
-        zone_type_id = type_map.get(BATHROOM_ZONE_TYPE)
-        if zone_type_id is None:
-            zone_type_id = UUID(BATHROOM_ZONE_TYPE)
+        zone_type_id = _resolve_bathroom_zone_type_id(type_map)
         average_duration_min = await _resolve_service_duration(
             self._db,
             zone_type_id=zone_type_id,

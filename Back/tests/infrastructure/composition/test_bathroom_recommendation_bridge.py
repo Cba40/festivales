@@ -42,7 +42,8 @@ OP_ID = "99999999-0000-0000-0000-000000000001"
 OP_PHASE_ID = "99999999-0000-0000-0000-000000000002"
 
 ZT_IDS = {
-    "servicios": "22222222-2222-2222-2222-222222222222",
+    "bano": "22222222-2222-2222-2222-222222222222",
+    "hidratacion": "66666666-6666-6666-6666-666666666666",
     "comida": "33333333-3333-3333-3333-333333333333",
     "transporte": "44444444-4444-4444-4444-444444444444",
 }
@@ -87,11 +88,12 @@ def _zone(
     subtipo: str | None,
     capacity: int,
     distance: float,
+    zt_key: str | None = None,
 ) -> Zone:
     return Zone(
         id=UUID(zid),
         name=name,
-        zone_type_id=UUID(ZT_IDS[zone_type]),
+        zone_type_id=UUID(ZT_IDS[zt_key if zt_key is not None else zone_type]),
         capacity=capacity,
         type=zone_type,
         subtipo=subtipo,
@@ -110,6 +112,7 @@ def _bathroom_zones() -> list[Zone]:
             "banos",
             capacity,
             float(i) * 500.0,
+            zt_key="bano",
         )
         for i, (name, letter, capacity) in enumerate(BATHROOM_DEFS)
     ]
@@ -119,7 +122,7 @@ def _non_bathroom_zones() -> list[Zone]:
     return [
         _zone("Comida Central", str(COMIDA_ID), "comida", None, 120, 800.0),
         _zone("Transporte Norte", str(TRANSPORTE_ID), "transporte", None, 60, 1200.0),
-        _zone("Fuente Agua", str(HIDRATACION_ID), "servicios", "hidratacion", 150, 400.0),
+        _zone("Fuente Agua", str(HIDRATACION_ID), "servicios", "hidratacion", 150, 400.0, zt_key="hidratacion"),
     ]
 
 
@@ -226,7 +229,8 @@ def _mock_bridge_session(*, bathroom_request: bool) -> AsyncMock:
     session = AsyncMock()
 
     zone_type_rows = [
-        SimpleNamespace(slug="servicios", id=ZT_IDS["servicios"]),
+        SimpleNamespace(slug="bano", id=ZT_IDS["bano"]),
+        SimpleNamespace(slug="hidratacion", id=ZT_IDS["hidratacion"]),
         SimpleNamespace(slug="comida", id=ZT_IDS["comida"]),
         SimpleNamespace(slug="transporte", id=ZT_IDS["transporte"]),
     ]
@@ -303,7 +307,8 @@ def _mock_bridge_session(*, bathroom_request: bool) -> AsyncMock:
         )
         for i, (slug, density) in enumerate(
             [
-                ("servicios", 0.8),
+                ("bano", 0.8),
+                ("hidratacion", 0.5),
                 ("comida", 0.6),
                 ("transporte", 0.7),
             ],

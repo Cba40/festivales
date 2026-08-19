@@ -30,7 +30,7 @@ DAY_ID = "11111111-1111-1111-1111-111111111111"
 OP_ID = "22222222-2222-2222-2222-222222222222"
 ATTENDANCE_ID = "55555555-5555-5555-5555-555555555555"
 ZT_IDS = {
-    "servicios": "33333333-3333-3333-3333-333333333333",
+    "bano": "33333333-3333-3333-3333-333333333333",
     "transporte": "44444444-4444-4444-4444-444444444444",
     "comida": "55555555-5555-5555-5555-555555555556",
 }
@@ -219,7 +219,7 @@ def _mock_session(
     session = AsyncMock()
     captured_stmts = []
     zone_type_rows = [
-        SimpleNamespace(slug="servicios", id=ZT_IDS["servicios"]),
+        SimpleNamespace(slug="bano", id=ZT_IDS["bano"]),
         SimpleNamespace(slug="transporte", id=ZT_IDS["transporte"]),
         SimpleNamespace(slug="comida", id=ZT_IDS["comida"]),
     ]
@@ -457,6 +457,62 @@ class TestBathroomModuleDataFlow:
         )
         assert result is not None
         assert result.average_duration_min == DEFAULT_DURATION_MIN
+
+    async def test_service_config_lookup_uses_normalized_subtipo(self) -> None:
+        session = _mock_session(
+            _bathroom_zone_rows(),
+            _ed_row(),
+            attendance_row=_attendance_row(),
+            override_row=SimpleNamespace(average_duration_min=DURATION_MIN),
+            default_row=None,
+        )
+        result = await BathroomModule(session).execute(
+            timestamp=TIMESTAMP,
+            event_id=EVENT_ID,
+        )
+        assert result is not None
+        assert result.average_duration_min == DURATION_MIN
+
+        config_stmt = next(
+            str(stmt.compile(compile_kwargs={"literal_binds": True}))
+            for stmt in session.captured_stmts
+            if "service_configs" in str(stmt)
+        )
+        assert "coalesce(service_configs.subtipo, '')" in config_stmt
+        assert "= 'banos'" in config_stmt
+
+    async def test_bathroom_zones_resolve_zone_type_id_from_subtipo(self) -> None:
+        session = _mock_session(
+            _bathroom_zone_rows(),
+            _ed_row(),
+            attendance_row=_attendance_row(),
+            override_row=SimpleNamespace(average_duration_min=DURATION_MIN),
+        )
+        result = await BathroomModule(session).execute(
+            timestamp=TIMESTAMP,
+            event_id=EVENT_ID,
+        )
+        assert result is not None
+        assert all(
+            zone.zone_type_id == UUID(ZT_IDS["bano"])
+            for zone in result.bathroom_zones
+        )
+
+    async def test_missing_zone_type_slug_raises_clear_error(self) -> None:
+        session = _mock_session(
+            _bathroom_zone_rows(),
+            _ed_row(),
+            attendance_row=_attendance_row(),
+            override_row=SimpleNamespace(average_duration_min=DURATION_MIN),
+        )
+        with pytest.raises(ValueError, match="ZoneType slug 'bano' not found"):
+            await _load_bathroom_zones(
+                session,
+                EVENT_ID,
+                {"transporte": UUID(ZT_IDS["transporte"])},
+                REF_LAT,
+                REF_LNG,
+            )
 
 
 class TestBathroomModuleSimulation:
