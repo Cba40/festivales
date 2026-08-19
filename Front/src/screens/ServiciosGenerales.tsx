@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/Header'
 import { InteractiveMap } from '@/components/InteractiveMap'
-import { X, Bath, Droplets, Armchair, HeartPulse, Info, List, Map as MapIcon } from 'lucide-react'
+import { X, Bath, Droplets, Armchair, HeartPulse, Info, Map as MapIcon } from 'lucide-react'
 import { formatUpdatedAt } from '@/utils/formatTime'
 import { getDistancias } from '@/utils/geo'
 import { useAppStore } from '@/core/state/store'
@@ -91,24 +91,13 @@ const GpsModal = ({ onActivate, onClose }: { onActivate: () => void; onClose: ()
   </div>
 )
 
-const FabToggle = ({ showMap, onToggle }: { showMap: boolean; onToggle: () => void }) => (
-  <button
-    onClick={onToggle}
-    className="fixed bottom-4 right-4 bg-slate-900 text-white dark:bg-white dark:text-slate-900 py-3 px-4 rounded-full font-bold shadow-lg flex items-center gap-2 z-30 transition-transform active:scale-95 text-sm"
-  >
-    {showMap ? (
-      <>
-        <List size={20} />
-        Ver lista
-      </>
-    ) : (
-      <>
-        <MapIcon size={20} />
-        Ver mapa completo
-      </>
-    )}
-  </button>
-)
+
+
+
+
+
+
+
 
 function ZonaCardsList<T extends ZonaBase>({
   items,
@@ -172,40 +161,11 @@ function ZonaCardsList<T extends ZonaBase>({
   )
 }
 
-function MapaZonas<T extends ZonaBase>({
-  items,
-  tipo,
-  onSelect,
-}: {
-  items: T[]
-  tipo: string
-  onSelect: (zona: T) => void
-}) {
-  return (
-    <InteractiveMap
-      puntos={items
-        .filter(z => z.lat && z.lng)
-        .map(z => ({
-          id: z.zone_id,
-          nombre: z.name,
-          lat: z.lat!,
-          lng: z.lng!,
-          referencia: z.referencia,
-          tipo,
-          originalData: z
-        }))}
-      onSelectPunto={(p) => onSelect(p as T)}
-      onUserLocationUpdate={() => {}}
-    />
-  )
-}
-
 const ServiciosGenerales = () => {
   const navigate = useNavigate()
   const [subtipoActivo, setSubtipoActivo] = useState<string | null>(null)
   const userLocation = useAppStore((s) => s.userLocation)
   const requestLocation = useAppStore((s) => s.requestLocation)
-  const [showMap, setShowMap] = useState(false)
   const [mostrarGpsModal, setMostrarGpsModal] = useState(true)
   const [selectedZona, setSelectedZona] = useState<ZonaSanitaryItem | null>(null)
   const [selectedZonaRest, setSelectedZonaRest] = useState<ZonaRestItem | null>(null)
@@ -630,36 +590,6 @@ const ServiciosGenerales = () => {
           )}
         </div>
 
-        <FabToggle showMap={false} onToggle={() => setShowMap(true)} />
-
-        {renderBottomSheetBathroom}
-      </div>
-    )
-  }
-
-  if (isBanos && showMap) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        <Header title="Baños" showBack onBack={() => setSubtipoActivo(null)} />
-
-        <div className="flex-1 p-4 overflow-y-auto space-y-4">
-          <MapaZonas
-            items={bathrooms}
-            tipo="banos"
-            onSelect={(z) => setSelectedZona(z)}
-          />
-
-          <ZonaCardsList
-            items={bathrooms}
-            icon="🚻"
-            label="baños disponibles"
-            userLocation={userLocation}
-            onSelect={(z) => setSelectedZona(z)}
-          />
-        </div>
-
-        <FabToggle showMap={true} onToggle={() => setShowMap(false)} />
-
         {renderBottomSheetBathroom}
       </div>
     )
@@ -671,6 +601,22 @@ const ServiciosGenerales = () => {
         <Header title="Baños" showBack onBack={() => setSubtipoActivo(null)} />
 
         <div className="flex-1 p-4 overflow-y-auto space-y-4">
+          <InteractiveMap
+            puntos={bathrooms
+              .filter(z => z.lat && z.lng)
+              .map(z => ({
+                id: z.zone_id,
+                nombre: z.name,
+                lat: z.lat!,
+                lng: z.lng!,
+                referencia: z.referencia,
+                tipo: 'banos',
+                originalData: z
+              }))}
+            onSelectPunto={(p) => setSelectedZona(p as ZonaSanitaryItem)}
+            onUserLocationUpdate={() => {}}
+          />
+
           <ZonaCardsList
             items={bathrooms}
             icon="🚻"
@@ -679,8 +625,6 @@ const ServiciosGenerales = () => {
             onSelect={(z) => setSelectedZona(z)}
           />
         </div>
-
-        <FabToggle showMap={false} onToggle={() => setShowMap(true)} />
 
         {!userLocation && mostrarGpsModal && (
           <GpsModal
@@ -767,36 +711,6 @@ const ServiciosGenerales = () => {
           )}
         </div>
 
-        <FabToggle showMap={false} onToggle={() => setShowMap(true)} />
-
-        {renderBottomSheetRest}
-      </div>
-    )
-  }
-
-  if (isDescanso && showMap) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        <Header title="Descanso" showBack onBack={() => setSubtipoActivo(null)} />
-
-        <div className="flex-1 p-4 overflow-y-auto space-y-4">
-          <MapaZonas
-            items={restItems}
-            tipo="descanso"
-            onSelect={(z) => setSelectedZonaRest(z)}
-          />
-
-          <ZonaCardsList
-            items={restItems}
-            icon="🪑"
-            label="zonas de descanso disponibles"
-            userLocation={userLocation}
-            onSelect={(z) => setSelectedZonaRest(z)}
-          />
-        </div>
-
-        <FabToggle showMap={true} onToggle={() => setShowMap(false)} />
-
         {renderBottomSheetRest}
       </div>
     )
@@ -808,6 +722,22 @@ const ServiciosGenerales = () => {
         <Header title="Descanso" showBack onBack={() => setSubtipoActivo(null)} />
 
         <div className="flex-1 p-4 overflow-y-auto space-y-4">
+          <InteractiveMap
+            puntos={restItems
+              .filter(z => z.lat && z.lng)
+              .map(z => ({
+                id: z.zone_id,
+                nombre: z.name,
+                lat: z.lat!,
+                lng: z.lng!,
+                referencia: z.referencia,
+                tipo: 'descanso',
+                originalData: z
+              }))}
+            onSelectPunto={(p) => setSelectedZonaRest(p as ZonaRestItem)}
+            onUserLocationUpdate={() => {}}
+          />
+
           <ZonaCardsList
             items={restItems}
             icon="🪑"
@@ -816,8 +746,6 @@ const ServiciosGenerales = () => {
             onSelect={(z) => setSelectedZonaRest(z)}
           />
         </div>
-
-        <FabToggle showMap={false} onToggle={() => setShowMap(true)} />
 
         {!userLocation && mostrarGpsModal && (
           <GpsModal
@@ -904,36 +832,6 @@ const ServiciosGenerales = () => {
           )}
         </div>
 
-        <FabToggle showMap={false} onToggle={() => setShowMap(true)} />
-
-        {renderBottomSheetSalud}
-      </div>
-    )
-  }
-
-  if (isSalud && showMap) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        <Header title="Salud" showBack onBack={() => setSubtipoActivo(null)} />
-
-        <div className="flex-1 p-4 overflow-y-auto space-y-4">
-          <MapaZonas
-            items={healthItems}
-            tipo="salud"
-            onSelect={(z) => setSelectedZonaSalud(z)}
-          />
-
-          <ZonaCardsList
-            items={healthItems}
-            icon="🏥"
-            label="zonas de salud disponibles"
-            userLocation={userLocation}
-            onSelect={(z) => setSelectedZonaSalud(z)}
-          />
-        </div>
-
-        <FabToggle showMap={true} onToggle={() => setShowMap(false)} />
-
         {renderBottomSheetSalud}
       </div>
     )
@@ -945,6 +843,22 @@ const ServiciosGenerales = () => {
         <Header title="Salud" showBack onBack={() => setSubtipoActivo(null)} />
 
         <div className="flex-1 p-4 overflow-y-auto space-y-4">
+          <InteractiveMap
+            puntos={healthItems
+              .filter(z => z.lat && z.lng)
+              .map(z => ({
+                id: z.zone_id,
+                nombre: z.name,
+                lat: z.lat!,
+                lng: z.lng!,
+                referencia: z.referencia,
+                tipo: 'salud',
+                originalData: z
+              }))}
+            onSelectPunto={(p) => setSelectedZonaSalud(p as ZonaSaludItem)}
+            onUserLocationUpdate={() => {}}
+          />
+
           <ZonaCardsList
             items={healthItems}
             icon="🏥"
@@ -953,8 +867,6 @@ const ServiciosGenerales = () => {
             onSelect={(z) => setSelectedZonaSalud(z)}
           />
         </div>
-
-        <FabToggle showMap={false} onToggle={() => setShowMap(true)} />
 
         {!userLocation && mostrarGpsModal && (
           <GpsModal
@@ -1041,36 +953,6 @@ const ServiciosGenerales = () => {
           )}
         </div>
 
-        <FabToggle showMap={false} onToggle={() => setShowMap(true)} />
-
-        {renderBottomSheetHidratacion}
-      </div>
-    )
-  }
-
-  if (isHidratacion && showMap) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        <Header title="Agua" showBack onBack={() => setSubtipoActivo(null)} />
-
-        <div className="flex-1 p-4 overflow-y-auto space-y-4">
-          <MapaZonas
-            items={hydrationItems}
-            tipo="hidratacion"
-            onSelect={(z) => setSelectedZonaHidratacion(z)}
-          />
-
-          <ZonaCardsList
-            items={hydrationItems}
-            icon="💧"
-            label="puntos de hidratación disponibles"
-            userLocation={userLocation}
-            onSelect={(z) => setSelectedZonaHidratacion(z)}
-          />
-        </div>
-
-        <FabToggle showMap={true} onToggle={() => setShowMap(false)} />
-
         {renderBottomSheetHidratacion}
       </div>
     )
@@ -1082,6 +964,22 @@ const ServiciosGenerales = () => {
         <Header title="Agua" showBack onBack={() => setSubtipoActivo(null)} />
 
         <div className="flex-1 p-4 overflow-y-auto space-y-4">
+          <InteractiveMap
+            puntos={hydrationItems
+              .filter(z => z.lat && z.lng)
+              .map(z => ({
+                id: z.zone_id,
+                nombre: z.name,
+                lat: z.lat!,
+                lng: z.lng!,
+                referencia: z.referencia,
+                tipo: 'hidratacion',
+                originalData: z
+              }))}
+            onSelectPunto={(p) => setSelectedZonaHidratacion(p as ZonaHidratacionItem)}
+            onUserLocationUpdate={() => {}}
+          />
+
           <ZonaCardsList
             items={hydrationItems}
             icon="💧"
@@ -1090,8 +988,6 @@ const ServiciosGenerales = () => {
             onSelect={(z) => setSelectedZonaHidratacion(z)}
           />
         </div>
-
-        <FabToggle showMap={false} onToggle={() => setShowMap(true)} />
 
         {!userLocation && mostrarGpsModal && (
           <GpsModal
