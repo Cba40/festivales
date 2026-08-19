@@ -579,8 +579,9 @@ class TestBathroomModuleSimulation:
         assert result is not None
         first = result.phase_results[0]
         assert first.remain == pytest.approx(0.0, abs=1e-9)
+        # FLUJO: stock = ocupación concurrente = v × (D / Δt), con Δt = 2 h.
         assert first.stock == pytest.approx(
-            min(first.v_expected, _total_capacity()), abs=1e-6
+            first.v_expected * (_duration_hours() / 2.0), abs=1e-6
         )
         assert first.occupied[UUID(BATHROOM_IDS["G"])] >= 0.0
 

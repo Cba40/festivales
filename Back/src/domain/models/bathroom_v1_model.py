@@ -1,21 +1,26 @@
 """Modelo probabilístico Baños V1 (contrato `SpecializedModel`).
 
-Baños V1 replica la estructura matemática de Parking V1 (RFC-008) con dos
-inputs distintos:
+Baños V1 usa un modelo de FLUJO basado en Little's law, NO de stock
+concurrente (a diferencia de Parking V1):
 
-* Magnitud base: `AttendanceLevel.max_people` (en vez de `estimated_vehicles`).
+    concurrent_occupancy = v_expected × (D_hours / Δt_hours)
+
+Inputs:
+* Magnitud base: `AttendanceLevel.max_people` (llegadas esperadas durante la
+  fase: `v_expected = max_people × intensity`).
 * Permanencia: `ServiceConfig.average_duration_min` en MINUTOS, convertida a
   horas internamente (`D_hours = average_duration_min / 60.0`) para coincidir
   con `_phase_duration_hours` (Δt en horas).
 
-NOTA TERMINOLÓGICA: con permanencias cortas (minutos) y fases de horas,
-`exp(-Δt/D) ≈ 0` entre fases. Esto NO significa "flujo instantáneo": significa
-que el stock de una fase prácticamente no se conserva hacia la siguiente; el
-servicio en sí conserva su permanencia real (minutos) por uso.
+Con permanencias cortas (minutos) y fases de horas, `exp(-Δt/D) ≈ 0` entre
+fases: el stock de una fase NO se conserva hacia la siguiente (alta rotación).
+`stock` representa personas SIMULTÁNEAS estimadas por Little's law (no
+acumulado entre fases) y `unabsorbed` es la demanda que excede la capacidad de
+servicio de la fase (`capacity × Δt / D`); NO incrementa stock ni occupied.
 
 La matemática interna es sistémica (multi-zona, multi-fase): `simulate` evalúa
-la evolución completa y `distribute` reparte el stock entre todas las zonas de
-servicios/baños.
+la evolución completa y `distribute` reparte la ocupación concurrente entre
+todas las zonas de servicios/baños.
 """
 from __future__ import annotations
 
@@ -31,6 +36,9 @@ from src.domain.models.specialized_model import (
     ModelSpecificResult,
 )
 
+# Baños V1 usa modelo de FLUJO (Little's law), no de STOCK.
+# concurrent_occupancy = llegadas × permanencia / duración_fase.
+# Esto difiere de Parking V1 que acumula stock entre fases.
 DEFAULT_ALPHA = 0.001
 
 
@@ -182,14 +190,29 @@ class BathroomV1Model:
         delta_hours: float,
         duration: float,
     ) -> BathroomTemporalPhase:
-        """Capa temporal cerrada de una fase (espejo de Parking V1 §§29-30).
+        """Capa temporal de una fase — modelo de FLUJO (Little's law).
 
         `V_expected` representa las PERSONAS QUE LLEGAN durante la fase (no un
-        stock objetivo). `remain = O_(t-1) × r`, `S = O_(t-1) - remain`,
-        `free = max(0, Σ capacity - remain)`, `A = min(V_expected, free)`
-        (llegadas absorbidas, acotadas por la capacidad restante),
-        `O = remain + A` (los retenidos NO se reemplazan por las llegadas),
-        `unabsorbed = max(0, V_expected - A)` (demanda no absorbida).
+        stock objetivo). Para servicios de alta rotación (D ≪ Δt):
+
+        * `concurrent_occupancy = V_expected × (D / Δt)` — personas
+          simultáneas estimadas por Little's law.
+        * `stock = concurrent_occupancy` — NO acumula entre fases (no es
+          `remain + entries`).
+        * `service_capacity_phase = total_capacity × (Δt / D)` — cuántas
+          personas puede atender el sistema completo durante la fase.
+        * `entries = min(V_expected, service_capacity_phase)` — llegadas
+          efectivamente absorbidas por la capacidad de servicio.
+        * `unabsorbed = max(0, V_expected - entries)` — demanda NO atendida;
+          NO incrementa stock ni occupied.
+        * `remain = O_(t-1) × r` con `r = exp(-Δt/D)` — retención entre
+          fases (≈ 0 cuando D ≪ Δt; no se hardcodea 0).
+
+        NOTA: `remain` y `exits` se calculan por compatibilidad estructural con
+        `BathroomTemporalPhase`, pero NO intervienen en `stock`, `occupied` ni
+        `unabsorbed` en el régimen de alta rotación. `stock` =
+        `concurrent_occupancy` directamente (Little's law), NO es
+        `remain + entries`.
         """
         self._require_nonnegative(prev_stock, "prev_stock")
         self._require_nonnegative(v_expected, "v_expected")
@@ -199,13 +222,27 @@ class BathroomV1Model:
             raise TypeError("total_capacity must be a number")
         if total_capacity <= 0:
             raise ValueError("total_capacity must be > 0")
+        if isinstance(delta_hours, bool) or not isinstance(
+            delta_hours, (int, float)
+        ):
+            raise TypeError("delta_hours must be a number")
+        if delta_hours <= 0:
+            raise ValueError("delta_hours must be > 0")
+
+        concurrent_occupancy = float(v_expected) * (
+            float(duration) / float(delta_hours)
+        )
+        service_capacity_phase = float(total_capacity) * (
+            float(delta_hours) / float(duration)
+        )
+        entries = min(float(v_expected), service_capacity_phase)
+        unabsorbed = max(0.0, float(v_expected) - entries)
+
         r = self.retention(delta_hours, duration)
         remain = float(prev_stock) * r
         exits = float(prev_stock) - remain
-        free_capacity = max(0.0, float(total_capacity) - remain)
-        entries = min(float(v_expected), free_capacity)
-        stock = remain + entries
-        unabsorbed = max(0.0, float(v_expected) - entries)
+
+        stock = concurrent_occupancy
         return BathroomTemporalPhase(
             v_expected=float(v_expected),
             remain=remain,
