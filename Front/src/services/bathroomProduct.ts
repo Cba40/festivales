@@ -21,6 +21,7 @@ export interface ZonaSanitaryItem {
   lng: number | null
   referencia: string
   distancia_min: number | null
+  is_nearest: boolean
 }
 
 export interface BathroomRecommendationResponse {
@@ -55,6 +56,9 @@ export function useBathroomRecommendations() {
             // cuando exista contexto de autenticación.
             user_id: '00000000-0000-0000-0000-000000000000',
             access_level: 'STANDARD',
+            ...(userLocation
+              ? { latitude: userLocation[0], longitude: userLocation[1] }
+              : {}),
           },
         }
       )
@@ -64,7 +68,7 @@ export function useBathroomRecommendations() {
     } finally {
       setLoading(false)
     }
-  }, [currentZoneId])
+  }, [currentZoneId, userLocation])
 
   return { data, loading, error, refresh }
 }
