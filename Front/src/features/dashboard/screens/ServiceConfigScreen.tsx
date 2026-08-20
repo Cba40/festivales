@@ -16,6 +16,10 @@ export function ServiceConfigScreen() {
   const { create, update, remove, saving, error: mutationError } =
     useServiceConfigMutations(refresh);
 
+  const availableZoneTypes = zoneTypes.filter(
+    (zt) => zt.slug !== 'estacionamiento'
+  );
+
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<ServiceConfigDTO | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -92,7 +96,7 @@ export function ServiceConfigScreen() {
               {formError && <div className="text-red-600 mb-4">{formError}</div>}
               <ServiceConfigForm
                 initial={editing}
-                zoneTypes={zoneTypes}
+                zoneTypes={availableZoneTypes}
                 eventDays={eventDays}
                 onSave={handleSave}
                 onCancel={handleCancel}

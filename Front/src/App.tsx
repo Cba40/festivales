@@ -19,11 +19,9 @@ import { loadEventDayContext } from './utils/contextoEvento';
 import { recargarFases } from './config/eventoConfig';
 import { IncidentReportScreen } from './features/dashboard/screens/IncidentReportScreen';
 import { ZoneAdminScreen } from './features/dashboard/screens/ZoneAdminScreen';
-import { EventDayScreen } from './features/dashboard/screens/EventDayScreen';
-import { AttendanceLevelScreen } from './features/dashboard/screens/AttendanceLevelScreen';
+import { EventConfigScreen } from './features/dashboard/screens/EventConfigScreen';
 import { OperationalEventScreen } from './features/dashboard/screens/OperationalEventScreen';
 import { MotorConfigScreen } from './features/dashboard/screens/MotorConfigScreen';
-import { ServiceConfigScreen } from './features/dashboard/screens/ServiceConfigScreen';
 import { EventConfigPage } from './pages/EventConfigPage';
 import { EventReferencePointScreen } from './features/dashboard/screens/EventReferencePointScreen';
 import LoginScreen from './features/auth/screens/LoginScreen';
@@ -134,15 +132,13 @@ function AppLayout() {
         <Route path="/dashboard/report" element={<IncidentReportScreen />} />
         <Route path="/dashboard/admin-zones" element={<ZoneAdminScreen />} />
         <Route path="/dashboard/reference-point" element={<EventReferencePointScreen />} />
-        <Route path="/dashboard/event-days" element={<EventDayScreen />} />
-        <Route path="/dashboard/attendance" element={<AttendanceLevelScreen />} />
-        <Route path="/dashboard/operational-events" element={<OperationalEventScreen />} />
-        <Route path="/dashboard/motor-config" element={<MotorConfigScreen />} />
-        <Route path="/dashboard/service-configs" element={
+        <Route path="/dashboard/event-config" element={
           <ProtectedRoute>
-            <ServiceConfigScreen />
+            <EventConfigScreen />
           </ProtectedRoute>
         } />
+        <Route path="/dashboard/operational-events" element={<OperationalEventScreen />} />
+        <Route path="/dashboard/motor-config" element={<MotorConfigScreen />} />
         <Route path="/dashboard/context-engine" element={
           <ProtectedRoute>
             <EventConfigPage />

@@ -16,17 +16,10 @@ export function DashboardScreen() {
         <h1 className="text-xl font-bold text-slate-800">Operación Territorial</h1>
         <div className="flex gap-4">
           <button
-            onClick={() => navigate('/dashboard/event-days')}
+            onClick={() => navigate('/dashboard/event-config')}
             className="text-sm bg-indigo-600 hover:bg-indigo-700 text-white py-1 px-3 rounded font-medium"
           >
-            Días
-          </button>
-
-          <button
-            onClick={() => navigate('/dashboard/attendance')}
-            className="text-sm bg-orange-600 hover:bg-orange-700 text-white py-1 px-3 rounded font-medium"
-          >
-            Asistencia
+            Configuración del Evento
           </button>
           <button
             onClick={() => navigate('/dashboard/operational-events')}
@@ -39,12 +32,6 @@ export function DashboardScreen() {
             className="text-sm bg-purple-600 hover:bg-purple-700 text-white py-1 px-3 rounded font-medium"
           >
             Motor Config
-          </button>
-          <button
-            onClick={() => navigate('/dashboard/service-configs')}
-            className="text-sm bg-cyan-600 hover:bg-cyan-700 text-white py-1 px-3 rounded font-medium"
-          >
-            🚿 Config. Servicios
           </button>
           <button
             onClick={() => navigate('/dashboard/context-engine')}
