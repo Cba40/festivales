@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useOperationalEvents } from '../hooks/useOperationalEvents';
 import { useOperationalEventMutations } from '../hooks/useOperationalEventMutations';
 import { useEventDays } from '../hooks/useEventDays';
+import { FlowRestrictionSection } from '../components/FlowRestrictionSection';
 import type { OperationalEventDTO, OperationalEventCreatePayload, OperationalEventUpdatePayload } from '../types';
 
 const DEFAULT_EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
@@ -273,6 +274,7 @@ export function OperationalEventScreen() {
   const [showForm, setShowForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState<OperationalEventDTO | null>(null);
   const [showFinalized, setShowFinalized] = useState(false);
+  const [activeSection, setActiveSection] = useState<'events' | 'restriction'>('events');
 
   useEffect(() => {
     if (eventDays.length > 0 && !selectedDayId) {
@@ -357,7 +359,8 @@ export function OperationalEventScreen() {
           </button>
           <button
             onClick={openCreateForm}
-            className="bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow-sm"
+            disabled={activeSection !== 'events'}
+            className="bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow-sm disabled:opacity-50"
           >
             + Nuevo Evento
           </button>
@@ -365,15 +368,41 @@ export function OperationalEventScreen() {
       </header>
 
       <main className="p-6 max-w-4xl mx-auto">
-        {error && (
-          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-700">
-            {error}
-          </div>
-        )}
+        {/* Sub-tabs */}
+        <div className="flex gap-2 mb-6">
+          <button
+            onClick={() => setActiveSection('events')}
+            className={`text-sm font-medium px-4 py-2 rounded-lg transition-colors ${
+              activeSection === 'events'
+                ? 'bg-red-600 text-white'
+                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            Eventos puntuales
+          </button>
+          <button
+            onClick={() => setActiveSection('restriction')}
+            className={`text-sm font-medium px-4 py-2 rounded-lg transition-colors ${
+              activeSection === 'restriction'
+                ? 'bg-red-600 text-white'
+                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            Restricción por tipo y fase
+          </button>
+        </div>
 
         {mutationError && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
             {mutationError}
+          </div>
+        )}
+
+        {activeSection === 'events' ? (
+          <>
+        {error && (
+          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-700">
+            {error}
           </div>
         )}
 
@@ -467,6 +496,10 @@ export function OperationalEventScreen() {
               )}
             </section>
           </>
+        )}
+          </>
+        ) : (
+          <FlowRestrictionSection />
         )}
       </main>
 

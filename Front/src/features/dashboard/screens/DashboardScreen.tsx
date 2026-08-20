@@ -29,16 +29,10 @@ export function DashboardScreen() {
             Asistencia
           </button>
           <button
-            onClick={() => navigate('/dashboard/zone-behaviors')}
-            className="text-sm bg-teal-600 hover:bg-teal-700 text-white py-1 px-3 rounded font-medium"
-          >
-            Comportamiento
-          </button>
-          <button
             onClick={() => navigate('/dashboard/operational-events')}
             className="text-sm bg-red-600 hover:bg-red-700 text-white py-1 px-3 rounded font-medium"
           >
-            Eventos
+            Eventos Imprevistos
           </button>
           <button
             onClick={() => navigate('/dashboard/motor-config')}

@@ -20,7 +20,6 @@ import { recargarFases } from './config/eventoConfig';
 import { IncidentReportScreen } from './features/dashboard/screens/IncidentReportScreen';
 import { ZoneAdminScreen } from './features/dashboard/screens/ZoneAdminScreen';
 import { EventDayScreen } from './features/dashboard/screens/EventDayScreen';
-import { ZoneBehaviorScreen } from './features/dashboard/screens/ZoneBehaviorScreen';
 import { AttendanceLevelScreen } from './features/dashboard/screens/AttendanceLevelScreen';
 import { OperationalEventScreen } from './features/dashboard/screens/OperationalEventScreen';
 import { MotorConfigScreen } from './features/dashboard/screens/MotorConfigScreen';
@@ -136,7 +135,6 @@ function AppLayout() {
         <Route path="/dashboard/admin-zones" element={<ZoneAdminScreen />} />
         <Route path="/dashboard/reference-point" element={<EventReferencePointScreen />} />
         <Route path="/dashboard/event-days" element={<EventDayScreen />} />
-        <Route path="/dashboard/zone-behaviors" element={<ZoneBehaviorScreen />} />
         <Route path="/dashboard/attendance" element={<AttendanceLevelScreen />} />
         <Route path="/dashboard/operational-events" element={<OperationalEventScreen />} />
         <Route path="/dashboard/motor-config" element={<MotorConfigScreen />} />
