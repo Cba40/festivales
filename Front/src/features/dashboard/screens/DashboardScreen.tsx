@@ -28,13 +28,7 @@ export function DashboardScreen() {
             Eventos Imprevistos
           </button>
           <button
-            onClick={() => navigate('/dashboard/motor-config')}
-            className="text-sm bg-purple-600 hover:bg-purple-700 text-white py-1 px-3 rounded font-medium"
-          >
-            Motor Config
-          </button>
-          <button
-            onClick={() => navigate('/dashboard/context-engine')}
+            onClick={() => navigate('/dashboard/motor')}
             className="text-sm bg-purple-600 hover:bg-purple-700 text-white py-1 px-3 rounded font-medium"
           >
             Motor

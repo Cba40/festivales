@@ -21,8 +21,7 @@ import { IncidentReportScreen } from './features/dashboard/screens/IncidentRepor
 import { InfrastructureScreen } from './features/dashboard/screens/InfrastructureScreen';
 import { EventConfigScreen } from './features/dashboard/screens/EventConfigScreen';
 import { OperationalEventScreen } from './features/dashboard/screens/OperationalEventScreen';
-import { MotorConfigScreen } from './features/dashboard/screens/MotorConfigScreen';
-import { EventConfigPage } from './pages/EventConfigPage';
+import { MotorScreen } from './features/dashboard/screens/MotorScreen';
 import LoginScreen from './features/auth/screens/LoginScreen';
 import ProtectedRoute from './shared/components/ProtectedRoute';
 
@@ -140,10 +139,9 @@ function AppLayout() {
           </ProtectedRoute>
         } />
         <Route path="/dashboard/operational-events" element={<OperationalEventScreen />} />
-        <Route path="/dashboard/motor-config" element={<MotorConfigScreen />} />
-        <Route path="/dashboard/context-engine" element={
+        <Route path="/dashboard/motor" element={
           <ProtectedRoute>
-            <EventConfigPage />
+            <MotorScreen />
           </ProtectedRoute>
         } />
       </Routes>

@@ -187,9 +187,8 @@ export function MotorConfigScreen() {
   const loading = loadingRec || loadingStg;
 
   return (
-    <div className="min-h-screen bg-slate-50 w-full">
-      <header className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center">
-        <h1 className="text-xl font-bold text-slate-800">Configuración del Motor</h1>
+    <main className="max-w-3xl mx-auto space-y-6">
+      <div className="flex justify-end">
         <button
           onClick={() => { setDraftRec(null); setDraftStg(null); refreshRec(); refreshStg(); }}
           disabled={loading}
@@ -197,15 +196,13 @@ export function MotorConfigScreen() {
         >
           {loading ? 'Cargando...' : 'Recargar'}
         </button>
-      </header>
-
-      <main className="p-6 max-w-3xl mx-auto space-y-6">
-        {error && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
-        )}
-        {successMsg && (
-          <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">{successMsg}</div>
-        )}
+      </div>
+      {error && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
+      )}
+      {successMsg && (
+        <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">{successMsg}</div>
+      )}
 
         {/* Recommendation Config */}
         <ConfigSection title="Recomendaciones" icon="⚙️">
@@ -282,7 +279,6 @@ export function MotorConfigScreen() {
             </div>
           )}
         </ConfigSection>
-      </main>
-    </div>
+    </main>
   );
 }
