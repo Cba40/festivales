@@ -23,7 +23,6 @@ interface LocalRow {
   zoneTypeId: string;
   zoneTypeName: string;
   behavior: ZoneBehaviorDTO | null;
-  densityFactor: number;
   flowRestriction: 'OPEN' | 'REGULATED' | 'CLOSED';
   dirty: boolean;
 }
@@ -60,19 +59,12 @@ export function ZoneBehaviorScreen() {
         zoneTypeId: zt.id,
         zoneTypeName: zt.name,
         behavior: existing ?? null,
-        densityFactor: existing?.density_factor ?? 0.5,
         flowRestriction: existing?.flow_restriction ?? 'OPEN' as const,
         dirty: false,
       };
     });
     setRows(next);
   }, [zoneTypes, behaviorByZoneType]);
-
-  const handleDensityChange = useCallback((zoneTypeId: string, value: number) => {
-    setRows((prev) => prev.map((r) =>
-      r.zoneTypeId === zoneTypeId ? { ...r, densityFactor: value, dirty: true } : r
-    ));
-  }, []);
 
   const handleFlowRestrictionChange = useCallback((zoneTypeId: string, value: 'OPEN' | 'REGULATED' | 'CLOSED') => {
     setRows((prev) => prev.map((r) =>
@@ -85,7 +77,6 @@ export function ZoneBehaviorScreen() {
     setSaveError(null);
     setSavingId(row.behavior.id);
     const result = await update(row.behavior.id, {
-      density_factor: row.densityFactor,
       flow_restriction: row.flowRestriction,
     });
     setSavingId(null);
@@ -156,7 +147,6 @@ export function ZoneBehaviorScreen() {
                 <thead>
                   <tr className="border-b border-slate-200 text-left text-slate-500">
                     <th className="px-4 py-3 font-medium">Tipo de Zona</th>
-                    <th className="px-4 py-3 font-medium">Density Factor</th>
                     <th className="px-4 py-3 font-medium">Flow Restriction</th>
                     <th className="px-4 py-3 font-medium text-right">Acción</th>
                   </tr>
@@ -167,17 +157,6 @@ export function ZoneBehaviorScreen() {
                     return (
                       <tr key={row.zoneTypeId} className="border-b border-slate-100 hover:bg-slate-50">
                         <td className="px-4 py-3 text-slate-800 font-medium">{row.zoneTypeName}</td>
-                        <td className="px-4 py-3">
-                          <input
-                            type="number"
-                            min={0}
-                            max={1}
-                            step={0.05}
-                            value={row.densityFactor}
-                            onChange={(e) => handleDensityChange(row.zoneTypeId, parseFloat(e.target.value) || 0)}
-                            className="w-24 px-2 py-1 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </td>
                         <td className="px-4 py-3">
                           <FlowRestrictionSelect
                             value={row.flowRestriction}

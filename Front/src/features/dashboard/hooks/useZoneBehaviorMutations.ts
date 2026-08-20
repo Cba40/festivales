@@ -3,7 +3,6 @@ import { apiClient } from '@/core/api/client';
 import type { ZoneBehaviorDTO } from '../types';
 
 export interface ZoneBehaviorUpdatePayload {
-  density_factor?: number;
   flow_restriction?: 'OPEN' | 'REGULATED' | 'CLOSED';
 }
 
