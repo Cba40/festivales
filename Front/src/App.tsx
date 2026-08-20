@@ -18,12 +18,11 @@ import { useDashboardSync } from './features/dashboard/hooks/useDashboardSync';
 import { loadEventDayContext } from './utils/contextoEvento';
 import { recargarFases } from './config/eventoConfig';
 import { IncidentReportScreen } from './features/dashboard/screens/IncidentReportScreen';
-import { ZoneAdminScreen } from './features/dashboard/screens/ZoneAdminScreen';
+import { InfrastructureScreen } from './features/dashboard/screens/InfrastructureScreen';
 import { EventConfigScreen } from './features/dashboard/screens/EventConfigScreen';
 import { OperationalEventScreen } from './features/dashboard/screens/OperationalEventScreen';
 import { MotorConfigScreen } from './features/dashboard/screens/MotorConfigScreen';
 import { EventConfigPage } from './pages/EventConfigPage';
-import { EventReferencePointScreen } from './features/dashboard/screens/EventReferencePointScreen';
 import LoginScreen from './features/auth/screens/LoginScreen';
 import ProtectedRoute from './shared/components/ProtectedRoute';
 
@@ -130,8 +129,11 @@ function AppLayout() {
           </ProtectedRoute>
         } />
         <Route path="/dashboard/report" element={<IncidentReportScreen />} />
-        <Route path="/dashboard/admin-zones" element={<ZoneAdminScreen />} />
-        <Route path="/dashboard/reference-point" element={<EventReferencePointScreen />} />
+        <Route path="/dashboard/infrastructure" element={
+          <ProtectedRoute>
+            <InfrastructureScreen />
+          </ProtectedRoute>
+        } />
         <Route path="/dashboard/event-config" element={
           <ProtectedRoute>
             <EventConfigScreen />

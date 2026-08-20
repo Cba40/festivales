@@ -40,16 +40,10 @@ export function DashboardScreen() {
             Motor
           </button>
           <button
-            onClick={() => navigate('/dashboard/admin-zones')}
+            onClick={() => navigate('/dashboard/infrastructure')}
             className="text-sm bg-emerald-600 hover:bg-emerald-700 text-white py-1 px-3 rounded font-medium"
           >
-            Admin. Zonas
-          </button>
-          <button
-            onClick={() => navigate('/dashboard/reference-point')}
-            className="text-sm bg-sky-600 hover:bg-sky-700 text-white py-1 px-3 rounded font-medium"
-          >
-            Referencia Oper.
+            Infraestructura
           </button>
           <button onClick={handleLogout} type="button" className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors">Cerrar Sesión</button>
         </div>

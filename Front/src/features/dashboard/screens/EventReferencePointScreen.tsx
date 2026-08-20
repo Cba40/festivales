@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useEventReferencePoint } from '../hooks/useEventReferencePoint';
 import { AdminMapSelector } from '../../../components/AdminMapSelector';
 
 export function EventReferencePointScreen() {
-  const navigate = useNavigate();
   const { event, loading, saving, saved, error, load, save } = useEventReferencePoint();
 
   const [draftLat, setDraftLat] = useState<number | null>(null);
@@ -60,15 +58,7 @@ export function EventReferencePointScreen() {
   const noReferencePoint = savedLat == null || savedLng == null;
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center gap-4">
-        <button onClick={() => navigate('/dashboard')} className="text-slate-500 hover:text-slate-800">
-          &larr; Volver
-        </button>
-        <h1 className="text-xl font-bold text-slate-800">Punto de Referencia Operacional</h1>
-      </header>
-
-      <main className="p-6 max-w-4xl mx-auto space-y-6">
+    <main className="p-6 max-w-4xl mx-auto space-y-6">
         {error && (
           <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 text-sm rounded">
             {error}
@@ -125,6 +115,5 @@ export function EventReferencePointScreen() {
           </button>
         </div>
       </main>
-    </div>
   );
 }
