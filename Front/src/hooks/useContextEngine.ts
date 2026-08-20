@@ -45,6 +45,8 @@ export interface ZoneStateItem {
   confidence: number;
   reasoning_factors: string[];
   active_restriction: string;
+  type?: string;
+  subtipo?: string | null;
 }
 
 export interface TerritorialPredictionResponse {

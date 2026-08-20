@@ -1,20 +1,48 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { RefreshCw, Layers } from 'lucide-react';
-import { usePredictions, useAutoRefresh } from '../../../hooks/useContextEngine';
+import { useTerritorialPrediction, useAutoRefresh } from '../../../hooks/useContextEngine';
+import { apiClient } from '../../../core/api/client';
+import { endpoints } from '../../../core/api/endpoints';
 import { ZoneCard } from './ZoneCard';
 
 const EVENT_ID = import.meta.env.VITE_EVENT_ID || '';
+
+interface ZoneInfo {
+  id: string;
+  name: string;
+  type: string;
+  subtipo?: string | null;
+}
 
 interface ZoneListProps {
   autoRefreshMs?: number;
 }
 
 export function ZoneList({ autoRefreshMs = 30000 }: ZoneListProps) {
-  const { data, loading, error, refresh } = usePredictions(EVENT_ID);
+  const { data, loading, error, refresh } = useTerritorialPrediction(EVENT_ID);
+  const [zonesById, setZonesById] = useState<Record<string, { name: string; type: string; subtipo?: string | null }>>({});
 
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiClient
+      .get<ZoneInfo[]>(endpoints.zones.list(EVENT_ID))
+      .then((res) => {
+        if (cancelled) return;
+        const map: Record<string, { name: string; type: string; subtipo?: string | null }> = {};
+        for (const z of res.data ?? []) {
+          map[z.id] = { name: z.name, type: z.type, subtipo: z.subtipo ?? undefined };
+        }
+        setZonesById(map);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useAutoRefresh(refresh, autoRefreshMs, !!EVENT_ID);
 
@@ -67,9 +95,9 @@ export function ZoneList({ autoRefreshMs = 30000 }: ZoneListProps) {
     );
   }
 
-  const zonas = data?.zonas ?? [];
+  const zoneStates = data?.zone_states ?? [];
 
-  if (zonas.length === 0) {
+  if (zoneStates.length === 0) {
     return (
       <div>
         <div className="flex items-center gap-2 mb-3">
@@ -85,6 +113,16 @@ export function ZoneList({ autoRefreshMs = 30000 }: ZoneListProps) {
     );
   }
 
+  const zoneCards = zoneStates.map((zs) => {
+    const info = zonesById[zs.zone_id];
+    return {
+      ...zs,
+      name: info?.name,
+      type: info?.type ?? zs.type,
+      subtipo: info?.subtipo ?? zs.subtipo,
+    };
+  });
+
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
@@ -94,7 +132,7 @@ export function ZoneList({ autoRefreshMs = 30000 }: ZoneListProps) {
             Zonas del evento
           </h2>
           <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full">
-            {zonas.length}
+            {zoneCards.length}
           </span>
         </div>
         <button
@@ -108,8 +146,8 @@ export function ZoneList({ autoRefreshMs = 30000 }: ZoneListProps) {
         </button>
       </div>
       <div className="space-y-3">
-        {zonas.map((zone) => (
-          <ZoneCard key={zone.id} zone={zone} />
+        {zoneCards.map((zone) => (
+          <ZoneCard key={zone.zone_id} zone={zone} />
         ))}
       </div>
     </div>

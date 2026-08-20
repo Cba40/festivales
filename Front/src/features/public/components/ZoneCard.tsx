@@ -1,16 +1,19 @@
 import React from 'react';
 import {
   UtensilsCrossed, Droplets, Tent, DoorOpen, Music, MapPin,
-  AlertTriangle, Users, Wrench,
+  AlertTriangle, Users, RefreshCw, ShieldBan, Clock,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { ZonePredictionDTO as ZoneData } from '../../../hooks/useContextEngine';
+import type { ZoneStateItem } from '../../../hooks/useContextEngine';
 
 const ZONE_TYPE_ICONS: Record<string, LucideIcon> = {
   puesto_comida: UtensilsCrossed,
+  comida: UtensilsCrossed,
   bano: Droplets,
-  emergencia: Tent,
+  banos: Droplets,
   hidratacion: Droplets,
+  emergencia: Tent,
+  salud: Tent,
   ingreso: DoorOpen,
   escenario: Music,
 };
@@ -67,21 +70,27 @@ function getSaturationLevel(value: number): {
   };
 }
 
+export interface ZoneCardZone extends ZoneStateItem {
+  name?: string;
+}
+
 interface ZoneCardProps {
-  zone: ZoneData;
+  zone: ZoneCardZone;
 }
 
 export const ZoneCard = React.memo(function ZoneCard({ zone }: ZoneCardProps) {
-  const satVal = zone.prediccion.saturation_predicha;
+  const satVal = zone.saturation_level ?? 0;
   const satLevel = getSaturationLevel(satVal);
-  const IconComponent = getZoneIcon(zone.type);
+  const IconComponent = getZoneIcon(zone.type || zone.subtipo || '');
   const isHighDemand = satVal >= 0.8;
+  const displayName = zone.name || zone.type || 'Zona';
+  const displayType = (zone.type || zone.subtipo || '').replace(/_/g, ' ');
 
   return (
     <div
       className={`relative overflow-hidden rounded-2xl border ${satLevel.borderColor} ${satLevel.bgLight} p-4 transition-shadow hover:shadow-md`}
       role="region"
-      aria-label={`Zona ${zone.name}, saturación ${satLevel.label}`}
+      aria-label={`Zona ${displayName}, saturación ${satLevel.label}`}
     >
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -92,11 +101,20 @@ export const ZoneCard = React.memo(function ZoneCard({ zone }: ZoneCardProps) {
             <IconComponent size={20} strokeWidth={2} aria-hidden="true" />
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-bold text-slate-800 truncate">{zone.name}</p>
-            <p className="text-[10px] font-medium text-slate-500 capitalize">{zone.type.replace(/_/g, ' ')}</p>
+            <p className="text-sm font-bold text-slate-800 truncate">{displayName}</p>
+            <p className="text-[10px] font-medium text-slate-500 capitalize">{displayType}</p>
           </div>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
+          {zone.active_restriction && zone.active_restriction !== 'OPEN' && (
+            <span
+              className="inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full text-amber-700 border-amber-300 bg-amber-50"
+              aria-label={`Restricción: ${zone.active_restriction}`}
+            >
+              <ShieldBan size={11} aria-hidden="true" />
+              {zone.active_restriction}
+            </span>
+          )}
           <span
             className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${satLevel.textColor} ${satLevel.borderColor} ${satLevel.bgLight}`}
             aria-label={`Saturación: ${satLevel.label}`}
@@ -130,18 +148,18 @@ export const ZoneCard = React.memo(function ZoneCard({ zone }: ZoneCardProps) {
       <div className="grid grid-cols-3 gap-2">
         <div className="bg-white/70 rounded-lg p-2 text-center border border-slate-100">
           <Users size={14} className="text-slate-400 mx-auto mb-0.5" aria-hidden="true" />
-          <div className="text-xs font-bold text-slate-700">{zone.prediccion.saturation_predicha.toFixed(2)}</div>
+          <div className="text-xs font-bold text-slate-700">{satVal.toFixed(2)}</div>
           <div className="text-[9px] text-slate-400 font-medium">Saturación</div>
         </div>
         <div className="bg-white/70 rounded-lg p-2 text-center border border-slate-100">
-          <Users size={14} className="text-slate-400 mx-auto mb-0.5" aria-hidden="true" />
-          <div className="text-xs font-bold text-slate-700">{zone.prediccion.attendance_predicha.toFixed(2)}</div>
-          <div className="text-[9px] text-slate-400 font-medium">Afluencia</div>
+          <RefreshCw size={14} className="text-slate-400 mx-auto mb-0.5" aria-hidden="true" />
+          <div className="text-xs font-bold text-slate-700">{(zone.confidence ?? 0).toFixed(2)}</div>
+          <div className="text-[9px] text-slate-400 font-medium">Confianza</div>
         </div>
         <div className="bg-white/70 rounded-lg p-2 text-center border border-slate-100">
-          <Wrench size={14} className="text-slate-400 mx-auto mb-0.5" aria-hidden="true" />
-          <div className="text-xs font-bold text-slate-700">{zone.prediccion.recurso_requerido.toFixed(2)}</div>
-          <div className="text-[9px] text-slate-400 font-medium">Recursos</div>
+          <Clock size={14} className="text-slate-400 mx-auto mb-0.5" aria-hidden="true" />
+          <div className="text-xs font-bold text-slate-700">{zone.availability ?? '—'}</div>
+          <div className="text-[9px] text-slate-400 font-medium">Disponibilidad</div>
         </div>
       </div>
     </div>
