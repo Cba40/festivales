@@ -24,7 +24,9 @@ from src.interfaces.rest.recommendations import get_recommendations_adapter
 
 def _extra_gastronomy_fields(row) -> dict:
     categoria = ""
-    if row.subtipo in ("rapido", "comida"):
+    if row.subtipo in (
+        "foodtruck", "comida_al_paso", "penas", "patio_de_comidas", "restaurante"
+    ):
         categoria = row.subtipo
     return {"categoria": categoria}
 
