@@ -39,6 +39,8 @@ from src.infrastructure.composition.prediction_module import (
     _distance_to_reference,
     _load_event_reference_point,
     _load_zone_type_map,
+    _resolve_service_duration,
+    _resolve_zone_type_id,
     _to_uuid_or_none,
 )
 
@@ -60,6 +62,7 @@ class ParkingSimulationResult:
     estimated_vehicles: int
     average_parking_duration: float
     phase_results: tuple[ParkingPhaseState, ...]
+    duration_source: str = "event_day"
 
 
 async def _load_parking_zones(
@@ -189,13 +192,39 @@ class ParkingModule:
             return None
         if not event_day.phases:
             return None
-        if (
-            event_day.estimated_vehicles is None
-            or event_day.average_parking_duration is None
-        ):
+
+        # Permanencia efectiva en HORAS. Prioridad: service_configs
+        # (average_duration_min, MINUTOS, fila con subtipo NULL para zonas de
+        # estacionamiento); fallback: EventDay.average_parking_duration (HORAS)
+        # durante la transición.
+        zone_type_id = _resolve_zone_type_id(type_map, PARKING_ZONE_TYPE, None)
+        try:
+            config_min = await _resolve_service_duration(
+                self._db,
+                zone_type_id=zone_type_id,
+                subtipo=None,
+                event_day_id=event_day.id,
+            )
+        except ValueError:
+            config_min = None
+
+        if config_min is not None:
+            # service_configs.average_duration_min está en minutos;
+            # EventDay.average_parking_duration está en horas. Se convierte
+            # aquí (en composition) porque el fallback unifica dos fuentes de
+            # distinta unidad antes de pasar al modelo (que espera horas).
+            duration = config_min / 60.0
+            duration_source = "service_config"
+        else:
+            duration = event_day.average_parking_duration
+            duration_source = "event_day"
+
+        if event_day.estimated_vehicles is None or duration is None:
             raise ValueError(
-                "EventDay must define estimated_vehicles and "
-                "average_parking_duration to execute Parking V1"
+                "EventDay must define estimated_vehicles, and either "
+                "EventDay.average_parking_duration or "
+                "service_configs.average_duration_min for 'estacionamiento' "
+                "must be defined, to execute Parking V1"
             )
 
         model = ParkingV1Model(alpha=alpha) if alpha is not None else ParkingV1Model()
@@ -203,7 +232,7 @@ class ParkingModule:
             phases=event_day.phases,
             zones=parking_zones,
             estimated_vehicles=event_day.estimated_vehicles,
-            duration=event_day.average_parking_duration,
+            duration=duration,
         )
 
         return ParkingSimulationResult(
@@ -212,8 +241,9 @@ class ParkingModule:
             parking_zones=tuple(parking_zones),
             phases=event_day.phases,
             estimated_vehicles=event_day.estimated_vehicles,
-            average_parking_duration=event_day.average_parking_duration,
+            average_parking_duration=duration,
             phase_results=tuple(phase_results),
+            duration_source=duration_source,
         )
 
 

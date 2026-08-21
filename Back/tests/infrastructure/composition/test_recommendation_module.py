@@ -207,6 +207,10 @@ def _mock_full_flow_session() -> AsyncMock:
             _one_result(ref_row),
             _scalars_result(zone_rows),
             _scalar_one_result(ed_row),
+            # Permanencia Parking V1: service_configs override + default
+            # (sin filas → fallback a EventDay.average_parking_duration).
+            _scalar_one_result(None),
+            _scalar_one_result(None),
         ]
     )
     return session

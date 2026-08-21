@@ -190,6 +190,9 @@ def _mock_session(*, module: str, active: bool) -> AsyncMock:
             _scalars_result(parking_rows),
         ]
         effects += [_scalar_one_result(ed_row)] * ed_lookups
+        # Permanencia Parking V1: service_configs override + default
+        # (sin filas → fallback a EventDay.average_parking_duration).
+        effects += [_scalar_one_result(None)] * 2
     elif module == "prediction":
         effects = [
             _scalars_result(zone_type_rows),
@@ -220,6 +223,9 @@ def _mock_session(*, module: str, active: bool) -> AsyncMock:
                 _one_result(ref_row),
                 _scalars_result(parking_rows),
                 _scalar_one_result(ed_row),
+                # Permanencia Parking V1: service_configs override + default.
+                _scalar_one_result(None),
+                _scalar_one_result(None),
             ]
     else:
         raise ValueError(f"unknown module {module}")

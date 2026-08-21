@@ -70,6 +70,7 @@ ZONE_SPECS = {
 
 ESTIMATED_VEHICLES = 8000
 AVERAGE_PARKING_DURATION = 4.0
+DURATION_MIN = 240  # 4 h en minutos: mismo valor efectivo que AVERAGE_PARKING_DURATION
 PHASES_SPEC = [
     (PHASE_IDS["p1"], 600, 720, 0.25),
     (PHASE_IDS["p2"], 720, 840, 0.50),
@@ -180,7 +181,7 @@ def _ed_row(
     )
 
 
-def _mock_session(zone_rows, ed_row):
+def _mock_session(zone_rows, ed_row, config_override=None, config_default=None):
     session = AsyncMock()
     captured_stmts = []
     zone_type_rows = [
@@ -197,8 +198,12 @@ def _mock_session(zone_rows, ed_row):
         _one_result(ref_row),
         _scalars_result(zone_rows),
         _scalar_one_result(ed_row),
-        _scalar_one_result(None),
+        # Permanencia Parking V1: service_configs (override por jornada;
+        # default global solo se consulta si el override no existió).
+        _scalar_one_result(config_override),
     ]
+    if config_override is None:
+        execute_calls.append(_scalar_one_result(config_default))
     original = AsyncMock(side_effect=execute_calls)
 
     async def fake_execute(stmt, *args, **kwargs):
@@ -469,6 +474,62 @@ class TestParkingModuleEdges:
                 timestamp=TIMESTAMP,
                 event_id=EVENT_ID,
             )
+
+
+class TestParkingModuleDurationResolution:
+    async def test_service_config_override_takes_precedence(self) -> None:
+        session = _mock_session(
+            _parking_zone_rows(),
+            _ed_row(),
+            config_override=SimpleNamespace(average_duration_min=DURATION_MIN),
+        )
+        result = await ParkingModule(session).execute(
+            timestamp=TIMESTAMP,
+            event_id=EVENT_ID,
+        )
+        assert result is not None
+        assert result.average_parking_duration == DURATION_MIN / 60.0
+        assert result.duration_source == "service_config"
+
+    async def test_service_config_falls_back_to_default_global(self) -> None:
+        session = _mock_session(
+            _parking_zone_rows(),
+            _ed_row(),
+            config_default=SimpleNamespace(average_duration_min=DURATION_MIN),
+        )
+        result = await ParkingModule(session).execute(
+            timestamp=TIMESTAMP,
+            event_id=EVENT_ID,
+        )
+        assert result is not None
+        assert result.average_parking_duration == DURATION_MIN / 60.0
+        assert result.duration_source == "service_config"
+
+    async def test_falls_back_to_event_day_duration_without_config(self) -> None:
+        session = _mock_session(_parking_zone_rows(), _ed_row())
+        result = await ParkingModule(session).execute(
+            timestamp=TIMESTAMP,
+            event_id=EVENT_ID,
+        )
+        assert result is not None
+        assert result.average_parking_duration == AVERAGE_PARKING_DURATION
+        assert result.duration_source == "event_day"
+
+    async def test_service_config_query_uses_empty_subtipo(self) -> None:
+        session = _mock_session(_parking_zone_rows(), _ed_row())
+        await ParkingModule(session).execute(
+            timestamp=TIMESTAMP,
+            event_id=EVENT_ID,
+        )
+
+        config_sqls = [
+            str(stmt.compile(compile_kwargs={"literal_binds": True}))
+            for stmt in session.captured_stmts
+            if "service_configs" in str(stmt)
+        ]
+        assert len(config_sqls) >= 1
+        assert "coalesce(service_configs.subtipo, '') = ''" in config_sqls[0]
+        assert "service_configs.event_day_id" in config_sqls[0]
 
 
 class TestLoadParkingZones:

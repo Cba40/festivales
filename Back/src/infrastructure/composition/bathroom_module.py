@@ -23,12 +23,11 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.event_day import EventDay as EventDayORM
-from app.models.service_config import ServiceConfig as ServiceConfigORM
 from app.models.zone import Zone as ZoneORM
 from src.application.context_engine.stage1_context_resolution import (
     LOCAL_TZ,
@@ -46,6 +45,7 @@ from src.infrastructure.composition.prediction_module import (
     _load_attendance_level,
     _load_event_reference_point,
     _load_zone_type_map,
+    _resolve_service_duration,
     _resolve_zone_type_id,
     _to_uuid_or_none,
 )
@@ -178,48 +178,6 @@ async def _find_event_day_for_date(
     if ed_row is None:
         return None
     return _build_event_day(ed_row)
-
-
-async def _resolve_service_duration(
-    db: AsyncSession,
-    *,
-    zone_type_id: UUID,
-    subtipo: str,
-    event_day_id: UUID | str | None,
-) -> int:
-    """Resuelve la permanencia (MINUTOS) de un servicio desde `service_configs`.
-
-    Precedencia (SERVICIOS_PERSONAS_DISENO.md §3):
-    1. override por jornada: `(zone_type_id, subtipo, event_day_id)`.
-    2. default global: `(zone_type_id, subtipo, event_day_id IS NULL)`.
-
-    No se inventan valores: si no existe configuración alguna, se eleva
-    `ValueError`.
-    """
-    normalized_subtipo = subtipo.lower().replace("ñ", "n")
-    if event_day_id is not None:
-        stmt = select(ServiceConfigORM).where(
-            ServiceConfigORM.zone_type_id == str(zone_type_id),
-            func.coalesce(ServiceConfigORM.subtipo, "") == normalized_subtipo,
-            ServiceConfigORM.event_day_id == str(event_day_id),
-        )
-        row = (await db.execute(stmt)).scalar_one_or_none()
-        if row is not None:
-            return row.average_duration_min
-
-    stmt = select(ServiceConfigORM).where(
-        ServiceConfigORM.zone_type_id == str(zone_type_id),
-        func.coalesce(ServiceConfigORM.subtipo, "") == normalized_subtipo,
-        ServiceConfigORM.event_day_id.is_(None),
-    )
-    row = (await db.execute(stmt)).scalar_one_or_none()
-    if row is not None:
-        return row.average_duration_min
-
-    raise ValueError(
-        "ServiceConfig must define average_duration_min "
-        f"for (zone_type_id={zone_type_id}, subtipo={subtipo!r})"
-    )
 
 
 class BathroomModule:

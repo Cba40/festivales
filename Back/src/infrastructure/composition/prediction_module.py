@@ -10,7 +10,7 @@ from collections.abc import Sequence
 from datetime import date, datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -23,6 +23,7 @@ from app.models.event_day import EventDay as EventDayORM
 from app.models.event_day_phase import EventDayPhase as EventDayPhaseORM
 from app.models.operational_phase import OperationalPhase as OperationalPhaseORM
 from app.models.operational_profile import OperationalProfile as OperationalProfileORM
+from app.models.service_config import ServiceConfig as ServiceConfigORM
 from src.application.context_engine import ContextEngine
 from src.application.context_engine.stage1_context_resolution import (
     LOCAL_TZ,
@@ -99,6 +100,51 @@ def _resolve_zone_type_id(
             return zt_id
     raise ValueError(
         f"ZoneType slug not found for zone type={zone_type!r} subtipo={subtipo!r}"
+    )
+
+
+async def _resolve_service_duration(
+    db: AsyncSession,
+    *,
+    zone_type_id: UUID,
+    subtipo: str | None,
+    event_day_id: UUID | str | None,
+) -> int:
+    """Resuelve la permanencia (MINUTOS) de un servicio desde `service_configs`.
+
+    Precedencia (SERVICIOS_PERSONAS_DISENO.md §3):
+    1. override por jornada: `(zone_type_id, subtipo, event_day_id)`.
+    2. default global: `(zone_type_id, subtipo, event_day_id IS NULL)`.
+
+    `subtipo=None` compara contra cadena vacía vía COALESCE, el convenio de
+    las zonas directas sin subtipo (p. ej. estacionamiento).
+
+    No se inventan valores: si no existe configuración alguna, se eleva
+    `ValueError`.
+    """
+    normalized_subtipo = (subtipo or "").lower().replace("ñ", "n")
+    if event_day_id is not None:
+        stmt = select(ServiceConfigORM).where(
+            ServiceConfigORM.zone_type_id == str(zone_type_id),
+            func.coalesce(ServiceConfigORM.subtipo, "") == normalized_subtipo,
+            ServiceConfigORM.event_day_id == str(event_day_id),
+        )
+        row = (await db.execute(stmt)).scalar_one_or_none()
+        if row is not None:
+            return row.average_duration_min
+
+    stmt = select(ServiceConfigORM).where(
+        ServiceConfigORM.zone_type_id == str(zone_type_id),
+        func.coalesce(ServiceConfigORM.subtipo, "") == normalized_subtipo,
+        ServiceConfigORM.event_day_id.is_(None),
+    )
+    row = (await db.execute(stmt)).scalar_one_or_none()
+    if row is not None:
+        return row.average_duration_min
+
+    raise ValueError(
+        "ServiceConfig must define average_duration_min "
+        f"for (zone_type_id={zone_type_id}, subtipo={subtipo!r})"
     )
 
 
