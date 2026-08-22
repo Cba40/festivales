@@ -57,5 +57,19 @@ export function useZoneConfigMutations(eventId: string = DEFAULT_EVENT_ID) {
     }
   };
 
-  return { deleteZone, updateZone, loading };
+  // PATCH /events/{eventId}/zones/{zoneId}: acepta campos que PUT /config no
+  // admite (p. ej. subtipo, vía ZoneUpdateRequest).
+  const patchZoneFields = async (
+    id: string,
+    fields: Record<string, string | number | boolean | null>
+  ): Promise<boolean> => {
+    try {
+      await apiClient.patch(endpoints.zones.update(eventId, id), fields);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  return { deleteZone, updateZone, patchZoneFields, loading };
 }
