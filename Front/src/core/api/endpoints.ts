@@ -44,6 +44,10 @@ export const endpoints = {
     update: (id: string) => `/service-configs/${id}`,
     delete: (id: string) => `/service-configs/${id}`,
   },
+  contextEngine: {
+    zoneTypes: () => '/context-engine/zone-types',
+    zoneSubtypes: () => '/context-engine/zone-subtypes',
+  },
   operationalEvents: {
     list: (eventDayId: string) => `/operational-events/by-event-day/${eventDayId}`,
     byId: (id: string) => `/operational-events/${id}`,

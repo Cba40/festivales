@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useZoneCreation } from '../hooks/useZoneCreation';
+import { useZoneTypes } from '../hooks/useZoneBehaviors';
+import { useZoneSubtypes } from '../hooks/useZoneSubtypes';
 import { ZONE_TYPES } from '../constants';
 import { AdminMapSelector } from '../../../components/AdminMapSelector';
 
@@ -13,10 +15,6 @@ const dynamicFields: Record<string, { name: string; key: string; type: string; p
   ],
   comida: [
     { name: 'Espera (min)', key: 'espera_min', type: 'number', placeholder: '5' },
-    { name: 'Subtipo', key: 'subtipo', type: 'text', placeholder: 'rapido / comida / bebida' },
-  ],
-  servicios: [
-    { name: 'Subtipo', key: 'subtipo', type: 'text', placeholder: 'banos / hidratacion / descanso / salud' },
   ],
   emergencia: [
     { name: 'Dirección', key: 'direccion', type: 'text', placeholder: 'Av. Siempre Viva 123' },
@@ -24,7 +22,6 @@ const dynamicFields: Record<string, { name: string; key: string; type: string; p
     { name: 'Teléfono', key: 'telefono', type: 'text', placeholder: '+543511234567' },
   ],
   descanso: [
-    { name: 'Subtipo', key: 'subtipo', type: 'text', placeholder: 'descanso' },
     { name: 'X (0-100)', key: 'x', type: 'number', placeholder: '50' },
     { name: 'Y (0-100)', key: 'y', type: 'number', placeholder: '50' },
   ],
@@ -43,12 +40,26 @@ interface Props {
 
 export function CreateZoneForm({ onSuccess, onCancel }: Props) {
   const { createZone, loading, error } = useZoneCreation();
+  const { zoneTypes: catalogZoneTypes } = useZoneTypes();
   const [name, setName] = useState('');
   const [type, setType] = useState('estacionamiento');
   const [capacity, setCapacity] = useState('');
   const [lat, setLat] = useState('');
   const [lng, setLng] = useState('');
+  const [subtipo, setSubtipo] = useState('');
   const [extra, setExtra] = useState<Record<string, string>>({});
+
+  // slug → id del catálogo zone_types para consultar los subtipos del tipo elegido.
+  const selectedTypeRow = catalogZoneTypes.find((t) => t.slug === type) ?? null;
+  const zoneTypeId = selectedTypeRow?.id ?? null;
+  const {
+    data: subtipos,
+    isLoading: subtiposLoading,
+    error: subtiposError,
+  } = useZoneSubtypes(zoneTypeId);
+
+  const showSubtipoField =
+    zoneTypeId !== null && (subtipos.length > 0 || subtiposLoading || subtiposError !== null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,6 +79,7 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
       capacity: Number(capacity),
       lat: lat ? Number(lat) : undefined,
       lng: lng ? Number(lng) : undefined,
+      ...(subtipo ? { subtipo } : {}),
       ...extraPayload,
     });
 
@@ -76,6 +88,7 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
     setCapacity('');
     setLat('');
     setLng('');
+    setSubtipo('');
     setExtra({});
     if (onSuccess) onSuccess();
   };
@@ -100,7 +113,7 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
         <label className="block text-sm font-medium text-slate-700 mb-1">Tipo</label>
         <select
           value={type}
-          onChange={(e) => { setType(e.target.value); setExtra({}); }}
+          onChange={(e) => { setType(e.target.value); setSubtipo(''); setExtra({}); }}
           className="w-full border-slate-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500"
         >
           {ZONE_TYPES.map((t) => (
@@ -108,6 +121,31 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
           ))}
         </select>
       </div>
+
+      {showSubtipoField && (
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Subtipo</label>
+          {subtiposError ? (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-md p-2">
+              No se pudieron cargar los subtipos. La zona se creará sin subtipo.
+            </p>
+          ) : (
+            <select
+              value={subtipo}
+              onChange={(e) => setSubtipo(e.target.value)}
+              disabled={subtiposLoading}
+              className="w-full border-slate-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-100"
+            >
+              <option value="">
+                {subtiposLoading ? 'Cargando subtipos…' : 'Seleccioná un subtipo (opcional)'}
+              </option>
+              {subtipos.map((s) => (
+                <option key={s.id} value={s.slug}>{s.name}</option>
+              ))}
+            </select>
+          )}
+        </div>
+      )}
 
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-1">Capacidad</label>
