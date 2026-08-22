@@ -33,7 +33,7 @@ export function useZoneCreation(eventId: string = DEFAULT_EVENT_ID) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const createZone = async (data: CreateZoneInput) => {
+  const createZone = async (data: CreateZoneInput): Promise<ApiZone | null> => {
     setLoading(true);
     setError(null);
 
@@ -76,12 +76,14 @@ export function useZoneCreation(eventId: string = DEFAULT_EVENT_ID) {
         lat: res.data.latitude ?? undefined,
         lng: res.data.longitude ?? undefined,
       });
+      return res.data;
     } catch (err) {
       removeZone(optimisticZone.id);
       const msg =
         (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
         'Error al crear la zona';
       setError(msg);
+      return null;
     } finally {
       setLoading(false);
     }

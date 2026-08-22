@@ -2,7 +2,11 @@ import { useState } from 'react';
 import { useZoneCreation } from '../hooks/useZoneCreation';
 import { useZoneTypes } from '../hooks/useZoneBehaviors';
 import { useZoneSubtypes } from '../hooks/useZoneSubtypes';
-import { ZONE_TYPES } from '../constants';
+import {
+  useServiceConfigMutations,
+} from '../hooks/useServiceConfigMutations';
+import { fetchDefaultServiceConfig } from '../hooks/useServiceConfigs';
+import { DEFAULTS_POR_SUBTIPO, ZONE_TYPES } from '../constants';
 import { AdminMapSelector } from '../../../components/AdminMapSelector';
 
 const dynamicFields: Record<string, { name: string; key: string; type: string; placeholder: string }[]> = {
@@ -47,7 +51,11 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
   const [lat, setLat] = useState('');
   const [lng, setLng] = useState('');
   const [subtipo, setSubtipo] = useState('');
+  const [permanencia, setPermanencia] = useState('');
+  const [serviceError, setServiceError] = useState<string | null>(null);
   const [extra, setExtra] = useState<Record<string, string>>({});
+  const { create: createConfig, update: updateConfig } =
+    useServiceConfigMutations();
 
   // slug → id del catálogo zone_types para consultar los subtipos del tipo elegido.
   const selectedTypeRow = catalogZoneTypes.find((t) => t.slug === type) ?? null;
@@ -61,6 +69,30 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
   const showSubtipoField =
     zoneTypeId !== null && (subtipos.length > 0 || subtiposLoading || subtiposError !== null);
 
+  // Al elegir subtipo: precarga la permanencia existente en service_configs
+  // (default global) o el default sugerido si aún no hay config.
+  const handleSubtipoChange = async (slug: string) => {
+    setSubtipo(slug);
+    setServiceError(null);
+    if (!slug || !zoneTypeId) {
+      setPermanencia('');
+      return;
+    }
+    try {
+      const config = await fetchDefaultServiceConfig(zoneTypeId, slug);
+      if (config) {
+        setPermanencia(config.average_duration_min.toString());
+      } else {
+        setPermanencia(
+          (DEFAULTS_POR_SUBTIPO[slug] ?? '').toString()
+        );
+      }
+    } catch (err) {
+      console.error('[CreateZoneForm] lookup service_config falló:', err);
+      setPermanencia((DEFAULTS_POR_SUBTIPO[slug] ?? '').toString());
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !capacity || Number(capacity) <= 0) return;
@@ -73,7 +105,8 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
       else extraPayload[k] = v;
     }
 
-    await createZone({
+    // a) Crear la zona primero.
+    const created = await createZone({
       name: name.trim(),
       type,
       capacity: Number(capacity),
@@ -83,12 +116,47 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
       ...extraPayload,
     });
 
+    if (!created) return; // la zona falló: el error ya se muestra; no tocar configs.
+
+    // b-d) Sincronizar service_configs (global al subtipo). La zona ya está
+    // creada: si esto falla se informa pero NO se revierte.
+    setServiceError(null);
+    const permanenciaValue = Number(permanencia);
+    if (subtipo && zoneTypeId && permanencia !== '' && permanenciaValue > 0) {
+      try {
+        const existing = await fetchDefaultServiceConfig(zoneTypeId, subtipo);
+        if (!existing) {
+          const ok = await createConfig({
+            zone_type_id: zoneTypeId,
+            subtipo,
+            event_day_id: null,
+            average_duration_min: permanenciaValue,
+          });
+          if (!ok) {
+            setServiceError('La zona se creó, pero no se pudo guardar la permanencia.');
+          }
+        } else if (existing.average_duration_min !== permanenciaValue) {
+          const ok = await updateConfig(existing.id, {
+            average_duration_min: permanenciaValue,
+          });
+          if (!ok) {
+            setServiceError('La zona se creó, pero no se pudo actualizar la permanencia.');
+          }
+        }
+        // e) Si existe y el valor no cambió: no hacer nada.
+      } catch (err) {
+        console.error('[CreateZoneForm] sync service_config falló:', err);
+        setServiceError('La zona se creó, pero no se pudo sincronizar la permanencia.');
+      }
+    }
+
     setName('');
     setType('estacionamiento');
     setCapacity('');
     setLat('');
     setLng('');
     setSubtipo('');
+    setPermanencia('');
     setExtra({});
     if (onSuccess) onSuccess();
   };
@@ -132,7 +200,7 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
           ) : (
             <select
               value={subtipo}
-              onChange={(e) => setSubtipo(e.target.value)}
+              onChange={(e) => { void handleSubtipoChange(e.target.value); }}
               disabled={subtiposLoading}
               className="w-full border-slate-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-100"
             >
@@ -144,6 +212,25 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
               ))}
             </select>
           )}
+        </div>
+      )}
+
+      {showSubtipoField && (
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            Permanencia (min)
+          </label>
+          <input
+            type="number"
+            min={1}
+            value={permanencia}
+            onChange={(e) => setPermanencia(e.target.value)}
+            placeholder="Ej: 15"
+            className="w-full border-slate-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500"
+          />
+          <p className="text-[10px] text-slate-400 mt-0.5">
+            Se guarda globalmente para este subtipo (service_configs), no por zona.
+          </p>
         </div>
       )}
 
@@ -210,6 +297,12 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
       {error && (
         <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">
           {error}
+        </div>
+      )}
+
+      {!error && serviceError && (
+        <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-3">
+          {serviceError}
         </div>
       )}
 
