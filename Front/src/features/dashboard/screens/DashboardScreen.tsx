@@ -22,6 +22,12 @@ export function DashboardScreen() {
             Configuración del Evento
           </button>
           <button
+            onClick={() => navigate('/dashboard/infrastructure')}
+            className="text-sm bg-emerald-600 hover:bg-emerald-700 text-white py-1 px-3 rounded font-medium"
+          >
+            Infraestructura
+          </button>
+          <button
             onClick={() => navigate('/dashboard/operational-events')}
             className="text-sm bg-red-600 hover:bg-red-700 text-white py-1 px-3 rounded font-medium"
           >
@@ -32,12 +38,6 @@ export function DashboardScreen() {
             className="text-sm bg-purple-600 hover:bg-purple-700 text-white py-1 px-3 rounded font-medium"
           >
             Motor
-          </button>
-          <button
-            onClick={() => navigate('/dashboard/infrastructure')}
-            className="text-sm bg-emerald-600 hover:bg-emerald-700 text-white py-1 px-3 rounded font-medium"
-          >
-            Infraestructura
           </button>
           <button onClick={handleLogout} type="button" className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors">Cerrar Sesión</button>
         </div>

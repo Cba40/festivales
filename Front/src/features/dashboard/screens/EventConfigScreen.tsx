@@ -1,14 +1,12 @@
 import { useState } from 'react';
 import { EventDayScreen } from './EventDayScreen';
 import { AttendanceLevelScreen } from './AttendanceLevelScreen';
-import { ServiceConfigScreen } from './ServiceConfigScreen';
 
-type Section = 'days' | 'attendance' | 'services';
+type Section = 'days' | 'attendance';
 
 const SECTIONS: { key: Section; label: string }[] = [
   { key: 'days', label: 'Días del Evento' },
   { key: 'attendance', label: 'Niveles de Asistencia' },
-  { key: 'services', label: 'Servicios' },
 ];
 
 export function EventConfigScreen() {
@@ -38,7 +36,6 @@ export function EventConfigScreen() {
       <main className="p-6">
         {activeSection === 'days' && <EventDayScreen />}
         {activeSection === 'attendance' && <AttendanceLevelScreen />}
-        {activeSection === 'services' && <ServiceConfigScreen />}
       </main>
     </div>
   );
