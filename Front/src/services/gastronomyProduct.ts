@@ -22,6 +22,7 @@ export interface ZonaGastronomicaItem {
   lng: number | null
   referencia: string
   distancia_min: number | null
+  is_nearest: boolean
 }
 
 export interface GastronomyRecommendationResponse {
@@ -53,6 +54,9 @@ export function useGastronomyRecommendations() {
             current_zone_id: currentZoneId || undefined,
             user_id: '00000000-0000-0000-0000-000000000000',
             access_level: 'STANDARD',
+            ...(userLocation
+              ? { latitude: userLocation[0], longitude: userLocation[1] }
+              : {}),
           },
         }
       )
@@ -62,7 +66,7 @@ export function useGastronomyRecommendations() {
     } finally {
       setLoading(false)
     }
-  }, [currentZoneId])
+  }, [currentZoneId, userLocation])
 
   return { data, loading, error, refresh }
 }
