@@ -10,11 +10,11 @@ export interface ZonaGastronomicaItem {
   name: string
   score: number
   reasoning: string[]
-  saturation_level: number
-  estado: string
+  saturation_level: number | null
+  estado: string | null
   availability: number
-  estimated_wait: number
-  confidence: number
+  estimated_wait: number | null
+  confidence: number | null
   active_restriction: string
   operational_state: string
   categoria: string
