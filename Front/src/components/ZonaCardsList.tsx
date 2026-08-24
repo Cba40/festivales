@@ -4,17 +4,20 @@ import { getDistancias } from '@/utils/geo'
 export interface ZonaBase {
   zone_id: string
   name: string
-  estado?: string
-  saturation_level?: number | null
-  confidence?: number | null
-  estimated_wait?: number | null
+  estado: string | null
+  saturation_level: number | null
+  confidence: number | null
+  estimated_wait: number | null
+  availability: number | null
   is_nearest?: boolean
   lat: number | null
   lng: number | null
+  referencia?: string
   distancia_min?: number | null
 }
 
-export const getEstadoStyles = (estado?: string) => {
+export const getEstadoStyles = (estado: string | null | undefined) => {
+  if (!estado) return 'bg-gray-500/20 text-gray-500 dark:text-gray-300'
   switch (estado) {
     case 'bajo': return 'bg-success/20 text-success'
     case 'medio': return 'bg-warning/20 text-warning'
@@ -24,13 +27,14 @@ export const getEstadoStyles = (estado?: string) => {
   }
 }
 
-export const getEstadoLabel = (estado?: string) => {
+export const getEstadoLabel = (estado: string | null | undefined): string => {
+  if (!estado) return '—' // Fallback visual aprobado para zonas informativas
   switch (estado) {
     case 'bajo': return '🟢 Bajo'
     case 'medio': return '🟡 Medio'
     case 'alto': return '🔴 Alto'
     case 'colapsado': return '⚫ Colapsado'
-    default: return estado ?? ''
+    default: return estado
   }
 }
 

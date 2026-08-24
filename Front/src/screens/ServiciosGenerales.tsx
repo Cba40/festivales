@@ -138,9 +138,11 @@ const ServiciosGenerales = () => {
               ⏱️ Espera: {selectedZonaRest.estimated_wait} min
             </p>
           )}
-          <p className="text-sm text-slate-600 dark:text-slate-300">
-            📊 Posibilidad: {Math.round((1 - selectedZonaRest.saturation_level) * 100)}%
-          </p>
+          {selectedZonaRest.saturation_level != null && (
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              📊 Posibilidad: {Math.round((1 - selectedZonaRest.saturation_level) * 100)}%
+            </p>
+          )}
           <p className="text-xs text-slate-500 dark:text-slate-300">
             {formatUpdatedAt(restData?.timestamp ?? Date.now())}
           </p>
@@ -205,9 +207,11 @@ const ServiciosGenerales = () => {
               ⏱️ Espera: {selectedZonaSalud.estimated_wait} min
             </p>
           )}
-          <p className="text-sm text-slate-600 dark:text-slate-300">
-            📊 Posibilidad: {Math.round((1 - selectedZonaSalud.saturation_level) * 100)}%
-          </p>
+          {selectedZonaSalud.saturation_level != null && (
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              📊 Posibilidad: {Math.round((1 - selectedZonaSalud.saturation_level) * 100)}%
+            </p>
+          )}
           <p className="text-xs text-slate-500 dark:text-slate-300">
             {formatUpdatedAt(healthData?.timestamp ?? Date.now())}
           </p>
@@ -272,9 +276,11 @@ const ServiciosGenerales = () => {
               ⏱️ Espera: {selectedZonaHidratacion.estimated_wait} min
             </p>
           )}
-          <p className="text-sm text-slate-600 dark:text-slate-300">
-            📊 Posibilidad: {Math.round((1 - selectedZonaHidratacion.saturation_level) * 100)}%
-          </p>
+          {selectedZonaHidratacion.saturation_level != null && (
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              📊 Posibilidad: {Math.round((1 - selectedZonaHidratacion.saturation_level) * 100)}%
+            </p>
+          )}
           <p className="text-xs text-slate-500 dark:text-slate-300">
             {formatUpdatedAt(hydrationData?.timestamp ?? Date.now())}
           </p>
@@ -343,9 +349,11 @@ const ServiciosGenerales = () => {
               ⏱️ Espera: {selectedZona.estimated_wait} min
             </p>
           )}
-          <p className="text-sm text-slate-600 dark:text-slate-300">
-            📊 Posibilidad: {Math.round((1 - selectedZona.saturation_level) * 100)}%
-          </p>
+          {selectedZona.saturation_level != null && (
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              📊 Posibilidad: {Math.round((1 - selectedZona.saturation_level) * 100)}%
+            </p>
+          )}
           <p className="text-xs text-slate-500 dark:text-slate-300">
             {formatUpdatedAt(bathroomData?.timestamp ?? Date.now())}
           </p>
@@ -461,8 +469,8 @@ const ServiciosGenerales = () => {
                     <p className="text-xs text-gray-500 dark:text-gray-300 mt-1 flex flex-wrap gap-x-2">
                       <span>🚶 {dist.walking}</span>
                       <span>🚗 {dist.driving}</span>
-                      <span>⏱️ {zona.estimated_wait} min</span>
-                      <span>📊 {Math.round((1 - zona.saturation_level) * 100)}% de posibilidad</span>
+                      {zona.estimated_wait != null && <span>⏱️ {zona.estimated_wait} min</span>}
+                      {zona.saturation_level != null && <span>📊 {Math.round((1 - zona.saturation_level) * 100)}% de posibilidad</span>}
                     </p>
                   </button>
                 )
@@ -582,8 +590,8 @@ const ServiciosGenerales = () => {
                     <p className="text-xs text-gray-500 dark:text-gray-300 mt-1 flex flex-wrap gap-x-2">
                       <span>🚶 {dist.walking}</span>
                       <span>🚗 {dist.driving}</span>
-                      <span>⏱️ {zona.estimated_wait} min</span>
-                      <span>📊 {Math.round((1 - zona.saturation_level) * 100)}% de posibilidad</span>
+                      {zona.estimated_wait != null && <span>⏱️ {zona.estimated_wait} min</span>}
+                      {zona.saturation_level != null && <span>📊 {Math.round((1 - zona.saturation_level) * 100)}% de posibilidad</span>}
                     </p>
                   </button>
                 )
@@ -703,8 +711,8 @@ const ServiciosGenerales = () => {
                     <p className="text-xs text-gray-500 dark:text-gray-300 mt-1 flex flex-wrap gap-x-2">
                       <span>🚶 {dist.walking}</span>
                       <span>🚗 {dist.driving}</span>
-                      <span>⏱️ {zona.estimated_wait} min</span>
-                      <span>📊 {Math.round((1 - zona.saturation_level) * 100)}% de posibilidad</span>
+                      {zona.estimated_wait != null && <span>⏱️ {zona.estimated_wait} min</span>}
+                      {zona.saturation_level != null && <span>📊 {Math.round((1 - zona.saturation_level) * 100)}% de posibilidad</span>}
                     </p>
                   </button>
                 )
@@ -824,8 +832,8 @@ const ServiciosGenerales = () => {
                     <p className="text-xs text-gray-500 dark:text-gray-300 mt-1 flex flex-wrap gap-x-2">
                       <span>🚶 {dist.walking}</span>
                       <span>🚗 {dist.driving}</span>
-                      <span>⏱️ {zona.estimated_wait} min</span>
-                      <span>📊 {Math.round((1 - zona.saturation_level) * 100)}% de posibilidad</span>
+                      {zona.estimated_wait != null && <span>⏱️ {zona.estimated_wait} min</span>}
+                      {zona.saturation_level != null && <span>📊 {Math.round((1 - zona.saturation_level) * 100)}% de posibilidad</span>}
                     </p>
                   </button>
                 )

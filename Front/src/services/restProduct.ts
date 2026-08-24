@@ -12,7 +12,7 @@ export interface ZonaRestItem {
   reasoning: string[]
   saturation_level: number | null
   estado: string | null
-  availability: number
+  availability: number | null
   estimated_wait: number | null
   confidence: number | null
   active_restriction: string
