@@ -662,20 +662,21 @@ class TestBridgeThroughRecommendationModule:
 
     async def test_bathroom_bridge_not_run_for_non_bathroom_action(self) -> None:
         # Sólo 7 respuestas: si el puente Baños se ejecutara, la sesión mock
-        # se agotaría (StopIteration) y el flujo fallaría.
+        # se agotaría (StopIteration) y el flujo fallaría. SEEK_TRANSPORT no
+        # activa puente alguno (SEEK_FOOD activa el puente Food V1).
         module = RecommendationModule(_mock_bridge_session(bathroom_request=False))
         recs, prediction = await module.execute(
             timestamp=TS,
             event_id=EVENT_ID,
             user_context=_user_context(),
             mobility_context=_mobility_context(),
-            requested_action=RequestedAction(action_type=ActionType.SEEK_FOOD),
+            requested_action=RequestedAction(action_type=ActionType.SEEK_TRANSPORT),
             limit=10,
         )
 
         assert prediction is not None
         assert recs
-        assert all(r.zone_id == COMIDA_ID for r in recs)
+        assert all(r.zone_id == TRANSPORTE_ID for r in recs)
 
     async def test_parking_bridge_not_run_for_bathroom_action(self) -> None:
         # Sólo 13 respuestas (7 base + 6 Baños): si el puente Parking se
