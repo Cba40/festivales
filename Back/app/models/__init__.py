@@ -14,6 +14,7 @@ from app.models.operational_event import OperationalEvent
 from app.models.operational_event_modifier import OperationalEventModifier
 from app.models.motor_config import RecommendationConfigModel, Stage4ConfigModel
 from app.models.service_config import ServiceConfig
+from app.models.exit_destination import ExitDestination
 
 __all__ = [
     "Event",
@@ -32,4 +33,5 @@ __all__ = [
     "RecommendationConfigModel",
     "Stage4ConfigModel",
     "ServiceConfig",
+    "ExitDestination",
 ]
