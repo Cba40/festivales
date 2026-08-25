@@ -5,10 +5,12 @@ import sys
 from datetime import datetime, timezone, timedelta
 sys.path.insert(0, '.')
 
-from sqlalchemy import text
+from sqlalchemy import insert, select, text
 from app.db.session import SessionLocal
 from app.models.event import Event
 from app.models.zone import Zone
+from app.models.exit_destination import ExitDestination
+from app.models.exit_zone_destination import exit_zone_destinations_table
 
 EVENT_ID = "663e6e32-9d4a-4f20-b992-3585b9310522"
 
@@ -196,7 +198,7 @@ ZONES_DATA = [
         "capacity": 400,
         "latitude": -30.973313,
         "longitude": -64.088529,
-        "transporte": "auto",
+        "transporte": "vehicular",
         "espera_min": 15,
         "capacidad_estimada": 400,
     },
@@ -294,6 +296,102 @@ ZONES_DATA = [
 ]
 
 
+# ─────────────────────────────────────────────────────────────
+# Salir V1 (S1/PARTE 4): destinos de egreso y relaciones N:N.
+# IDs de zona tomados de la auditoría de producción (2026-08).
+# Si un ID no existe en la BD objetivo, la relación se omite con
+# advertencia (nunca se crean zonas nuevas ni otros destinos).
+# ─────────────────────────────────────────────────────────────
+EXIT_DESTINATION_NAMES = ["Córdoba", "Colonia Caroya", "Sinsacate", "Sierras Chicas"]
+
+EXIT_ZONE_DESTINATIONS = {
+    # Salida Norte Auto (vehicular): RN9 hacia Córdoba, RP10 hacia Caroya/Sinsacate.
+    "b8a6ff92-0fce-4a53-8262-20b0c2d05f0c": ["Córdoba", "Colonia Caroya", "Sinsacate"],
+    # Salida Sur Peatonal: destino peatonal realista desde la periferia sur.
+    "4a2fbeef-b6d0-4530-8a5e-b192853f5d56": ["Sierras Chicas"],
+}
+
+
+def seed_exit_destinations(session, event):
+    """Crea los destinos del evento si no existen (idempotente).
+
+    Lookup por clave natural (event_id, name); skip si existe.
+    Devuelve {"created": n, "skipped": n}.
+    """
+    created = 0
+    skipped = 0
+    for name in EXIT_DESTINATION_NAMES:
+        existente = session.query(ExitDestination).filter(
+            ExitDestination.event_id == event.id,
+            ExitDestination.name == name,
+        ).first()
+        if existente:
+            print(f"ℹ️ Destino ya existe: {name}")
+            skipped += 1
+            continue
+
+        session.add(ExitDestination(event_id=event.id, name=name, active=True))
+        session.flush()
+        created += 1
+        print(f"✅ Destino creado: {name}")
+
+    return {"created": created, "skipped": skipped}
+
+
+def seed_exit_zone_destinations(session):
+    """Relaciona las zonas de salida (por ID exacto) con sus destinos.
+
+    Guardas: la zona debe existir y ser type='salida'; el destino debe existir
+    para el evento de la zona; la tupla (exit_zone_id, destination_id) no debe
+    existir aún. Idempotente: N ejecuciones no duplican ni lanzan errores.
+    La consulta de zonas selecciona solo (id, type, event_id): nunca carga
+    columnes pesadas como geometry.
+    Devuelve la lista de tuplas (zone_id, destination_id) creadas en esta pasada.
+    """
+    creadas = []
+    for zone_id, destination_names in EXIT_ZONE_DESTINATIONS.items():
+        zona = session.execute(
+            select(Zone.id, Zone.type, Zone.event_id).where(Zone.id == zone_id)
+        ).first()
+        if zona is None:
+            print(f"⚠️ Zona de salida no encontrada en esta BD (skip): {zone_id}")
+            continue
+        if zona.type != "salida":
+            print(f"⚠️ La zona {zone_id} es type='{zona.type}', no 'salida' (skip)")
+            continue
+
+        for destination_name in destination_names:
+            destino = session.query(ExitDestination).filter(
+                ExitDestination.event_id == zona.event_id,
+                ExitDestination.name == destination_name,
+            ).first()
+            if destino is None:
+                print(f"⚠️ Destino inexistente para el evento {zona.event_id} (skip): {destination_name}")
+                continue
+
+            existe_relacion = session.execute(
+                select(exit_zone_destinations_table).where(
+                    exit_zone_destinations_table.c.exit_zone_id == zone_id,
+                    exit_zone_destinations_table.c.destination_id == destino.id,
+                )
+            ).first()
+            if existe_relacion:
+                print(f"ℹ️ Relación ya existe: {destination_name}")
+                continue
+
+            session.execute(
+                insert(exit_zone_destinations_table).values(
+                    exit_zone_id=zone_id,
+                    destination_id=destino.id,
+                )
+            )
+            session.flush()
+            creadas.append((zone_id, destino.id))
+            print(f"✅ Relación creada: {zone_id[:8]}… -> {destination_name}")
+
+    return creadas
+
+
 def get_or_create_event(session):
     event = session.query(Event).filter(Event.id == EVENT_ID).first()
     if event:
@@ -388,6 +486,13 @@ def main():
 
         seed_zones(session, event)
         session.commit()
+
+        # Salir V1 (S1/PARTE 4): destinos + relaciones N:N
+        seed_exit_destinations(session, event)
+        session.commit()
+        seed_exit_zone_destinations(session)
+        session.commit()
+
         print(f"\n\U0001f4cb VITE_EVENT_ID={event.id}")
     except Exception as e:
         session.rollback()
