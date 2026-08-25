@@ -24,6 +24,8 @@ async def transport_recommendations(
     current_zone_id: str | None = Query(None),
     user_id: str = Query(...),
     access_level: AccessLevel = Query(default=AccessLevel.STANDARD),
+    latitude: float | None = Query(None, ge=-90.0, le=90.0),
+    longitude: float | None = Query(None, ge=-180.0, le=180.0),
     db: AsyncSession = Depends(get_async_db),
 ):
     now = datetime.now(timezone.utc)
@@ -36,6 +38,8 @@ async def transport_recommendations(
         current_zone_id=UUID(current_zone_id) if current_zone_id else None,
         speed=speed,
         accessibility_required=accessibility_required,
+        latitude=latitude,
+        longitude=longitude,
     )
 
     result = await get_transport_product_adapter(

@@ -308,6 +308,152 @@ class TestTransportProductEndpoint:
         assert mob_ctx.accessibility_required is False
         assert str(mob_ctx.current_zone_id) == str(ZONE_A)
 
+    def test_latitude_longitude_propagated_to_mobility_context(
+        self,
+        client: TestClient,
+        auth_headers: dict[str, str],
+        _mock_adapter: AsyncMock,
+    ):
+        # Espejo de gastronomy.py/bathroom.py: las coordenadas del usuario
+        # llegan al MobilityContext para que _mark_nearest pueda marcar la
+        # zona más cercana (SEEK_TRANSPORT).
+        client.get(
+            f"{BASE_URL}/products/transport",
+            params={
+                "speed": 1.5,
+                "accessibility_required": False,
+                "user_id": "550e8400-e29b-41d4-a716-446655440000",
+                "latitude": -31.4012,
+                "longitude": -64.2010,
+            },
+            headers=auth_headers,
+        )
+
+        _mock_adapter.assert_awaited_once()
+        mob_ctx = _mock_adapter.await_args[1]["mobility_context"]
+        assert mob_ctx.latitude == pytest.approx(-31.4012)
+        assert mob_ctx.longitude == pytest.approx(-64.2010)
+
+    def test_coordinates_optional_default_none(
+        self,
+        client: TestClient,
+        auth_headers: dict[str, str],
+        _mock_adapter: AsyncMock,
+    ):
+        client.get(
+            f"{BASE_URL}/products/transport",
+            params={
+                "speed": 1.5,
+                "accessibility_required": False,
+                "user_id": "550e8400-e29b-41d4-a716-446655440000",
+            },
+            headers=auth_headers,
+        )
+
+        _mock_adapter.assert_awaited_once()
+        mob_ctx = _mock_adapter.await_args[1]["mobility_context"]
+        assert mob_ctx.latitude is None
+        assert mob_ctx.longitude is None
+
+    @pytest.mark.parametrize(
+        "params",
+        [
+            {"latitude": -91.0, "longitude": -64.0},
+            {"latitude": 91.0, "longitude": -64.0},
+            {"latitude": -31.0, "longitude": -181.0},
+            {"latitude": -31.0, "longitude": 181.0},
+        ],
+    )
+    def test_out_of_range_coordinates_422(
+        self,
+        client: TestClient,
+        auth_headers: dict[str, str],
+        params: dict,
+    ):
+        resp = client.get(
+            f"{BASE_URL}/products/transport",
+            params={
+                "speed": 1.5,
+                "accessibility_required": False,
+                "user_id": "550e8400-e29b-41d4-a716-446655440000",
+                **params,
+            },
+            headers=auth_headers,
+        )
+        assert resp.status_code == 422
+
+    def test_is_nearest_exposed_in_response(
+        self,
+        client: TestClient,
+        auth_headers: dict[str, str],
+        _mock_adapter: AsyncMock,
+    ):
+        # Contrato HTTP: cada item expone is_nearest tal como lo produce el
+        # Recommendation Engine (_mark_nearest), sin alteración en la ruta.
+        _mock_adapter.return_value = TransportRecommendationResponse(
+            event_id=EVENT_ID,
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            mode="informar",
+            zonas=[
+                ZonaTransporteItem(
+                    zone_id=str(ZONE_A),
+                    name="Terminal Principal",
+                    score=0.85,
+                    reasoning=[],
+                    saturation_level=0.15,
+                    estado="bajo",
+                    availability=350,
+                    estimated_wait=0,
+                    confidence=0.95,
+                    active_restriction="OPEN",
+                    operational_state="LOW_DEMAND",
+                    calle="Av. San Martín",
+                    lat=-30.97,
+                    lng=-64.08,
+                    referencia="Cerca tuyo",
+                    distancia_min=5,
+                    is_nearest=True,
+                ),
+                ZonaTransporteItem(
+                    zone_id=str(ZONE_B),
+                    name="Parada Secundaria",
+                    score=0.62,
+                    reasoning=[],
+                    saturation_level=0.60,
+                    estado="alto",
+                    availability=120,
+                    estimated_wait=5,
+                    confidence=0.85,
+                    active_restriction="REGULATED",
+                    operational_state="MODERATE_DEMAND",
+                    calle="Av. Colón",
+                    lat=-30.98,
+                    lng=-64.09,
+                    referencia="Esquina Av. Colón",
+                    distancia_min=8,
+                    is_nearest=False,
+                ),
+            ],
+        )
+
+        resp = client.get(
+            f"{BASE_URL}/products/transport",
+            params={
+                "speed": 1.5,
+                "accessibility_required": False,
+                "user_id": "550e8400-e29b-41d4-a716-446655440000",
+                "latitude": -30.971,
+                "longitude": -64.081,
+            },
+            headers=auth_headers,
+        )
+
+        assert resp.status_code == 200
+        zonas = resp.json()["zonas"]
+        assert zonas[0]["zone_id"] == str(ZONE_A)
+        assert zonas[0]["is_nearest"] is True
+        assert zonas[1]["is_nearest"] is False
+
     def test_response_structure(
         self,
         client: TestClient,
@@ -330,6 +476,7 @@ class TestTransportProductEndpoint:
             "zone_id", "name", "score", "reasoning",
             "saturation_level", "estado", "availability",
             "estimated_wait", "confidence", "active_restriction",
-            "operational_state", "calle", "lat", "lng", "referencia", "distancia_min",
+            "operational_state", "calle", "lat", "lng", "referencia",
+            "distancia_min", "is_nearest",
         }
         assert set(zona.keys()) == expected_fields
