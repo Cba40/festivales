@@ -46,6 +46,11 @@ class Zone(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     event = relationship("Event", back_populates="zones")
+    destinations = relationship(
+        "ExitDestination",
+        secondary="exit_zone_destinations",
+        back_populates="zones",
+    )
 
     @staticmethod
     def calcular_saturation(capacity: int, available_capacity: int) -> str:

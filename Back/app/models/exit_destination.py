@@ -25,3 +25,8 @@ class ExitDestination(Base):
     )
 
     event = relationship("Event")
+    zones = relationship(
+        "Zone",
+        secondary="exit_zone_destinations",
+        back_populates="destinations",
+    )

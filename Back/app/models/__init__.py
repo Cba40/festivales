@@ -15,6 +15,7 @@ from app.models.operational_event_modifier import OperationalEventModifier
 from app.models.motor_config import RecommendationConfigModel, Stage4ConfigModel
 from app.models.service_config import ServiceConfig
 from app.models.exit_destination import ExitDestination
+from app.models.exit_zone_destination import exit_zone_destinations_table
 
 __all__ = [
     "Event",
