@@ -18,6 +18,7 @@ class ExitZoneItem(BaseModel):
     lat: float | None = None
     lng: float | None = None
     status: str
+    is_nearest: bool = False
     destinations: list[ExitDestinationItem]
 
 

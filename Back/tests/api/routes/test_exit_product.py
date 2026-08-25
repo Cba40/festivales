@@ -133,6 +133,8 @@ async def _salidas_base(session):
     for dest in (cordoba, caroya, sinsacate):
         await _relacionar(session, NORTE_ID, dest)
     await _relacionar(session, SUR_ID, sierras)
+    return {"cordoba": cordoba.id, "caroya": caroya.id,
+            "sinsacate": sinsacate.id, "sierras": sierras.id}
 
 
 class TestExitProductEndpoint:
@@ -241,8 +243,111 @@ class TestExitProductEndpoint:
 
         zona = body["zonas"][0]
         assert set(zona.keys()) == {
-            "zone_id", "name", "transporte", "lat", "lng", "status", "destinations",
+            "zone_id", "name", "transporte", "lat", "lng", "status", "is_nearest", "destinations",
         }
+        assert zona["is_nearest"] is False  # sin GPS nadie es marcada
         for destino in zona["destinations"]:
             assert set(destino.keys()) == {"id", "name", "active"}
             assert isinstance(destino["active"], bool)
+
+
+class TestExitProductFilters:
+
+    async def test_filters_by_mode(self, exit_env) -> None:
+        await _salidas_base(exit_env.session)
+        env = exit_env
+
+        response_vehicular = await env.client.get(
+            f"/api/events/{EVENT_ID}/products/exit", params={"mode": "vehicular"}
+        )
+        response_peatonal = await env.client.get(
+            f"/api/events/{EVENT_ID}/products/exit", params={"mode": "peatonal"}
+        )
+        response_transporte = await env.client.get(
+            f"/api/events/{EVENT_ID}/products/exit", params={"mode": "transporte"}
+        )
+
+        assert response_vehicular.status_code == 200
+        zonas_v = response_vehicular.json()["zonas"]
+        assert [z["transporte"] for z in zonas_v] == ["vehicular"]
+        assert zonas_v[0]["zone_id"] == NORTE_ID
+
+        assert [z["zone_id"] for z in response_peatonal.json()["zonas"]] == [SUR_ID]
+        assert response_transporte.json()["zonas"] == []
+
+    async def test_mode_invalido_rechazado(self, exit_env) -> None:
+        response = await exit_env.client.get(
+            f"/api/events/{EVENT_ID}/products/exit", params={"mode": "auto"}
+        )
+        assert response.status_code == 422
+
+    async def test_filters_by_destination(self, exit_env) -> None:
+        destinos = await _salidas_base(exit_env.session)
+        env = exit_env
+
+        response = await env.client.get(
+            f"/api/events/{EVENT_ID}/products/exit",
+            params={"destination_id": destinos["cordoba"]},
+        )
+        response_sin_relacion = await env.client.get(
+            f"/api/events/{EVENT_ID}/products/exit",
+            params={"destination_id": SUR_ID},  # un id de zona no es destino
+        )
+
+        assert response.status_code == 200
+        zonas = response.json()["zonas"]
+        # El filtro restringe QUÉ ZONAS aparecen; los destinos de cada
+        # zona se listan completos.
+        assert [z["zone_id"] for z in zonas] == [NORTE_ID]
+        assert [d["name"] for d in zonas[0]["destinations"]] == [
+            "Colonia Caroya", "Córdoba", "Sinsacate",
+        ]
+
+        assert response_sin_relacion.status_code == 200
+        assert response_sin_relacion.json()["zonas"] == []
+
+    async def test_is_nearest_marked(self, exit_env) -> None:
+        await _salidas_base(exit_env.session)
+        # Punto claramente más cerca de la Salida Sur que de la Norte
+        response = await exit_env.client.get(
+            f"/api/events/{EVENT_ID}/products/exit",
+            params={"latitude": -30.9850, "longitude": -64.0938},
+        )
+
+        assert response.status_code == 200
+        zonas = response.json()["zonas"]
+        flags = {z["name"]: z["is_nearest"] for z in zonas}
+        assert flags["Salida Sur Peatonal"] is True
+        assert flags["Salida Norte Auto"] is False
+        assert sum(flags.values()) == 1
+
+    async def test_distance_ordering(self, exit_env) -> None:
+        await _salidas_base(exit_env.session)
+        # Tercera salida sin coordenadas: debe quedar siempre última
+        await _crear_zona(exit_env.session, "dddddddd-1111-2222-3333-444444444444",
+                          EVENT_ID, "Salida Sin Coordenadas", transporte="vehicular")
+        client = exit_env.client
+
+        cerca_norte = await client.get(
+            f"/api/events/{EVENT_ID}/products/exit",
+            params={"latitude": -30.9785, "longitude": -64.0852},
+        )
+        cerca_sur = await client.get(
+            f"/api/events/{EVENT_ID}/products/exit",
+            params={"latitude": -30.9850, "longitude": -64.0938},
+        )
+        sin_gps = await client.get(f"/api/events/{EVENT_ID}/products/exit")
+
+        nombres_norte = [z["name"] for z in cerca_norte.json()["zonas"]]
+        nombres_sur = [z["name"] for z in cerca_sur.json()["zonas"]]
+        # Orden por distancia ascendente; la sin coords al final
+        assert nombres_norte == ["Salida Norte Auto", "Salida Sur Peatonal",
+                                 "Salida Sin Coordenadas"]
+        assert nombres_sur == ["Salida Sur Peatonal", "Salida Norte Auto",
+                               "Salida Sin Coordenadas"]
+        # is_nearest solo sobre la primera con coordenadas reales
+        assert cerca_norte.json()["zonas"][0]["is_nearest"] is True
+        assert cerca_norte.json()["zonas"][-1]["is_nearest"] is False
+
+        # Sin GPS se conserva el orden alfabético estable
+        assert [z["name"] for z in sin_gps.json()["zonas"]] == sorted(nombres_norte)
