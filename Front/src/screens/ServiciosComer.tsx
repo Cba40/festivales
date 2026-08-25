@@ -86,7 +86,7 @@ const ServiciosComer = () => {
             </p>
           )}
           <p className="text-xs text-slate-500 dark:text-slate-300">
-            {formatUpdatedAt(data?.timestamp ?? Date.now())}
+            {formatUpdatedAt(data?.timestamp ? Date.parse(data.timestamp) : Date.now())}
           </p>
           <p className="text-xs text-slate-500 dark:text-slate-300">
             {getConfianzaLabel(selectedZona.confidence)}
@@ -252,7 +252,7 @@ const ServiciosComer = () => {
                   <p className="text-xs text-slate-500 dark:text-slate-300 mt-2">📊 {Math.round((1 - principal.saturation_level) * 100)}% de posibilidad</p>
                 )}
                 {modo === 'asistir' && (
-                  <p className="text-xs text-slate-500 dark:text-slate-300 mt-2">{formatUpdatedAt(data?.timestamp ?? Date.now())}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-300 mt-2">{formatUpdatedAt(data?.timestamp ? Date.parse(data.timestamp) : Date.now())}</p>
                 )}
                 {principal.estado === 'alto' && (
                   <p className="text-xs opacity-75 mt-2">⚠️ Últimos lugares</p>

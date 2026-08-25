@@ -90,7 +90,7 @@ const Estacionar = () => {
             </p>
           )}
           <p className="text-xs text-slate-500 dark:text-slate-300">
-            {formatUpdatedAt(data?.timestamp ?? Date.now())}
+            {formatUpdatedAt(data?.timestamp ? Date.parse(data.timestamp) : Date.now())}
           </p>
           <p className="text-xs text-slate-500 dark:text-slate-300">
             {getConfianzaLabel(selectedZona.confidence)}
@@ -275,7 +275,7 @@ const Estacionar = () => {
               {modo === 'asistir' && (
                 <>
                   <p className="text-xs text-slate-500 dark:text-slate-300 mt-2">
-                    {formatUpdatedAt(data?.timestamp ?? Date.now())}
+                    {formatUpdatedAt(data?.timestamp ? Date.parse(data.timestamp) : Date.now())}
                   </p>
                   <p className="text-xs text-slate-500 dark:text-slate-300 mt-1">
                     {getConfianzaLabel(principal.confidence)}

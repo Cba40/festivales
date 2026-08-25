@@ -144,7 +144,7 @@ const ServiciosGenerales = () => {
             </p>
           )}
           <p className="text-xs text-slate-500 dark:text-slate-300">
-            {formatUpdatedAt(restData?.timestamp ?? Date.now())}
+            {formatUpdatedAt(restData?.timestamp ? Date.parse(restData.timestamp) : Date.now())}
           </p>
           <p className="text-xs text-slate-500 dark:text-slate-300">
             {getConfianzaLabel(selectedZonaRest.confidence)}
@@ -213,7 +213,7 @@ const ServiciosGenerales = () => {
             </p>
           )}
           <p className="text-xs text-slate-500 dark:text-slate-300">
-            {formatUpdatedAt(healthData?.timestamp ?? Date.now())}
+            {formatUpdatedAt(healthData?.timestamp ? Date.parse(healthData.timestamp) : Date.now())}
           </p>
           <p className="text-xs text-slate-500 dark:text-slate-300">
             {getConfianzaLabel(selectedZonaSalud.confidence)}
@@ -282,7 +282,7 @@ const ServiciosGenerales = () => {
             </p>
           )}
           <p className="text-xs text-slate-500 dark:text-slate-300">
-            {formatUpdatedAt(hydrationData?.timestamp ?? Date.now())}
+            {formatUpdatedAt(hydrationData?.timestamp ? Date.parse(hydrationData.timestamp) : Date.now())}
           </p>
           <p className="text-xs text-slate-500 dark:text-slate-300">
             {getConfianzaLabel(selectedZonaHidratacion.confidence)}
@@ -355,7 +355,7 @@ const ServiciosGenerales = () => {
             </p>
           )}
           <p className="text-xs text-slate-500 dark:text-slate-300">
-            {formatUpdatedAt(bathroomData?.timestamp ?? Date.now())}
+            {formatUpdatedAt(bathroomData?.timestamp ? Date.parse(bathroomData.timestamp) : Date.now())}
           </p>
           <p className="text-xs text-slate-500 dark:text-slate-300">
             {getConfianzaLabel(selectedZona.confidence)}
