@@ -60,6 +60,8 @@ export const endpoints = {
       `/events/${eventId}/products/gastronomy`,
     transport: (eventId: string) =>
       `/events/${eventId}/products/transport`,
+    exit: (eventId: string) =>
+      `/events/${eventId}/products/exit`,
     bathroom: (eventId: string) =>
       `/events/${eventId}/products/bathroom`,
     rest: (eventId: string) =>
