@@ -6,10 +6,19 @@ import {
   useServiceConfigMutations,
 } from '../hooks/useServiceConfigMutations';
 import { fetchDefaultServiceConfig } from '../hooks/useServiceConfigs';
-import { DEFAULTS_POR_SUBTIPO, ZONE_TYPES } from '../constants';
+import { DEFAULTS_POR_SUBTIPO, TRANSPORTE_OPTIONS, ZONE_TYPES } from '../constants';
 import { AdminMapSelector } from '../../../components/AdminMapSelector';
 
-const dynamicFields: Record<string, { name: string; key: string; type: string; placeholder: string }[]> = {
+interface DynamicField {
+  name: string;
+  key: string;
+  type: 'text' | 'number' | 'select' | 'checkbox';
+  placeholder?: string;
+  options?: { value: string; label: string }[];
+  helperText?: string;
+}
+
+const dynamicFields: Record<string, DynamicField[]> = {
   estacionamiento: [
     { name: 'Disponibilidad (%)', key: 'disponibilidad', type: 'number', placeholder: '50' },
   ],
@@ -30,10 +39,20 @@ const dynamicFields: Record<string, { name: string; key: string; type: string; p
     { name: 'Y (0-100)', key: 'y', type: 'number', placeholder: '50' },
   ],
   salida: [
-    { name: 'Transporte', key: 'transporte', type: 'text', placeholder: 'auto / transporte / peatonal' },
+    {
+      name: 'Modo de salida',
+      key: 'transporte',
+      type: 'select',
+      placeholder: 'Seleccioná el modo de salida',
+      options: TRANSPORTE_OPTIONS,
+    },
     { name: 'Espera (min)', key: 'espera_min', type: 'number', placeholder: '5' },
-    { name: 'Capacidad estimada', key: 'capacidad_estimada', type: 'number', placeholder: '200' },
-    { name: 'Es embudo', key: 'es_embudo', type: 'text', placeholder: 'true / false' },
+    {
+      name: '¿Es un punto de embudo?',
+      key: 'es_embudo',
+      type: 'checkbox',
+      helperText: 'Marcá si esta salida concentra el flujo de egreso',
+    },
   ],
 };
 
@@ -96,6 +115,7 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !capacity || Number(capacity) <= 0) return;
+    if (type === 'salida' && !extra.transporte) return;
 
     const extraPayload: Record<string, string | number | boolean> = {};
     for (const [k, v] of Object.entries(extra)) {
@@ -103,6 +123,10 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
       else if (v === 'false') extraPayload[k] = false;
       else if (v && !isNaN(Number(v))) extraPayload[k] = Number(v);
       else extraPayload[k] = v;
+    }
+
+    if (type === 'salida') {
+      extraPayload.capacidad_estimada = Number(capacity);
     }
 
     // a) Crear la zona primero.
@@ -281,18 +305,61 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
         }}
       />
 
-      {fields.map((f) => (
-        <div key={f.key}>
-          <label className="block text-sm font-medium text-slate-700 mb-1">{f.name}</label>
-          <input
-            type={f.type}
-            value={extra[f.key] || ''}
-            onChange={(e) => setExtra(prev => ({ ...prev, [f.key]: e.target.value }))}
-            placeholder={f.placeholder}
-            className="w-full border-slate-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500"
-          />
-        </div>
-      ))}
+      {fields.map((f) => {
+        if (f.type === 'select') {
+          return (
+            <div key={f.key}>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{f.name}</label>
+              <select
+                value={extra[f.key] || ''}
+                onChange={(e) => setExtra(prev => ({ ...prev, [f.key]: e.target.value }))}
+                className="w-full border-slate-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="" disabled>{f.placeholder}</option>
+                {(f.options ?? []).map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+          );
+        }
+        if (f.type === 'checkbox') {
+          return (
+            <div key={f.key}>
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={extra[f.key] === 'true'}
+                  onChange={(e) => setExtra(prev => ({ ...prev, [f.key]: e.target.checked ? 'true' : 'false' }))}
+                  className="accent-emerald-600"
+                />
+                {f.name}
+              </label>
+              {f.helperText && (
+                <p className="text-xs text-slate-500 mt-1 ml-6">{f.helperText}</p>
+              )}
+            </div>
+          );
+        }
+        return (
+          <div key={f.key}>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{f.name}</label>
+            <input
+              type={f.type}
+              value={extra[f.key] || ''}
+              onChange={(e) => setExtra(prev => ({ ...prev, [f.key]: e.target.value }))}
+              placeholder={f.placeholder}
+              className="w-full border-slate-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+        );
+      })}
+
+      {type === 'salida' && !extra.transporte && (
+        <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">
+          Seleccioná el modo de salida para poder crear la zona.
+        </p>
+      )}
 
       {error && (
         <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">
@@ -318,7 +385,7 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
         )}
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || (type === 'salida' && !extra.transporte)}
           className="py-2 px-4 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md transition-colors"
         >
           {loading ? 'Creando...' : 'Crear Zona'}

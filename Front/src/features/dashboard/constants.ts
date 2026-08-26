@@ -8,6 +8,15 @@ export const ZONE_TYPES = [
   { value: 'hospedaje', label: 'Hospedaje' },
 ] as const;
 
+// Modos canónicos de salida (contrato V1, migración c9d3e7f1a5b8 y filtro
+// Literal del endpoint /products/exit): invariantes, NO provienen del
+// catálogo zone_subtypes.
+export const TRANSPORTE_OPTIONS: { value: string; label: string }[] = [
+  { value: 'peatonal', label: 'Peatonal' },
+  { value: 'vehicular', label: 'Vehicular' },
+  { value: 'transporte', label: 'Transporte público' },
+];
+
 // Permanencias sugeridas por subtipo (minutos) para precargar el campo
 // "Permanencia (min)" cuando aún no existe una fila en service_configs.
 export const DEFAULTS_POR_SUBTIPO: Record<string, number> = {

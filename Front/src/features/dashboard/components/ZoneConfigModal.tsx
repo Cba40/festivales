@@ -5,7 +5,7 @@ import { useZoneSubtypes } from '../hooks/useZoneSubtypes';
 import { fetchDefaultServiceConfig } from '../hooks/useServiceConfigs';
 import { useServiceConfigMutations } from '../hooks/useServiceConfigMutations';
 import type { Zone } from '../types';
-import { DEFAULTS_POR_SUBTIPO, ZONE_TYPES } from '../constants';
+import { DEFAULTS_POR_SUBTIPO, TRANSPORTE_OPTIONS, ZONE_TYPES } from '../constants';
 import { AdminMapSelector } from '../../../components/AdminMapSelector';
 
 interface Props {
@@ -25,6 +25,11 @@ export function ZoneConfigModal({ zone, onClose }: Props) {
   const [lng, setLng] = useState(zone.lng !== undefined ? String(zone.lng) : '');
   const [subtipo, setSubtipo] = useState(zone.subtipo || '');
   const [permanencia, setPermanencia] = useState('');
+  const [transporte, setTransporte] = useState(zone.transporte ?? '');
+  const [esperaMin, setEsperaMin] = useState(
+    zone.espera_min !== undefined && zone.espera_min !== null ? String(zone.espera_min) : ''
+  );
+  const [esEmbudo, setEsEmbudo] = useState(zone.es_embudo === true);
   const [serviceError, setServiceError] = useState<string | null>(null);
 
   // slug → id del catálogo zone_types para consultar los subtipos del tipo actual.
@@ -47,6 +52,11 @@ export function ZoneConfigModal({ zone, onClose }: Props) {
     setLat(zone.lat !== undefined ? String(zone.lat) : '');
     setLng(zone.lng !== undefined ? String(zone.lng) : '');
     setSubtipo(zone.subtipo || '');
+    setTransporte(zone.transporte ?? '');
+    setEsperaMin(
+      zone.espera_min !== undefined && zone.espera_min !== null ? String(zone.espera_min) : ''
+    );
+    setEsEmbudo(zone.es_embudo === true);
     setServiceError(null);
   }, [zone]);
 
@@ -84,6 +94,7 @@ export function ZoneConfigModal({ zone, onClose }: Props) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !capacity || Number(capacity) <= 0) return;
+    if (type === 'salida' && !transporte) return;
 
     // 1) Campos base vía PUT /config (name/type/capacity/coords).
     await updateZone(zone.id, {
@@ -106,7 +117,23 @@ export function ZoneConfigModal({ zone, onClose }: Props) {
       }
     }
 
-    // 3) Sincronizar service_configs (global al subtipo): create/update/ignore.
+    // 3) Campos dinámicos de salida: PUT /config no los acepta → PATCH.
+    // capacidad_estimada se mantiene espejando capacity (igual que en creación).
+    if (type === 'salida') {
+      const okSalida = await patchZoneFields(zone.id, {
+        transporte,
+        espera_min: esperaMin === '' ? null : Number(esperaMin),
+        es_embudo: esEmbudo,
+        capacidad_estimada: Number(capacity),
+      });
+      if (!okSalida) {
+        console.error('[ZoneConfigModal] persistir campos de salida falló');
+        setServiceError('La zona se actualizó, pero no se pudieron guardar los datos de salida.');
+        return;
+      }
+    }
+
+    // 4) Sincronizar service_configs (global al subtipo): create/update/ignore.
     setServiceError(null);
     const permanenciaValue = Number(permanencia);
     if (zoneTypeId && subtipo && permanencia !== '' && permanenciaValue > 0) {
@@ -264,6 +291,54 @@ export function ZoneConfigModal({ zone, onClose }: Props) {
             }}
           />
 
+          {type === 'salida' && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Modo de salida</label>
+                <select
+                  value={transporte}
+                  onChange={(e) => setTransporte(e.target.value)}
+                  className="w-full border-slate-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="" disabled>Seleccioná el modo de salida</option>
+                  {TRANSPORTE_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Espera (min)</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={esperaMin}
+                  onChange={(e) => setEsperaMin(e.target.value)}
+                  placeholder="Ej: 5"
+                  className="w-full border-slate-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={esEmbudo}
+                    onChange={(e) => setEsEmbudo(e.target.checked)}
+                    className="accent-emerald-600"
+                  />
+                  ¿Es un punto de embudo?
+                </label>
+                <p className="text-xs text-slate-500 mt-1 ml-6">
+                  Marcá si esta salida concentra el flujo de egreso
+                </p>
+              </div>
+              {!transporte && (
+                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">
+                  Seleccioná el modo de salida para poder guardar los cambios.
+                </p>
+              )}
+            </>
+          )}
+
           {serviceError && (
             <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-3">
               {serviceError}
@@ -280,7 +355,7 @@ export function ZoneConfigModal({ zone, onClose }: Props) {
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || (type === 'salida' && !transporte)}
               className="py-2 px-4 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md transition-colors"
             >
               {loading ? 'Guardando...' : 'Guardar Cambios'}
