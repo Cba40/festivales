@@ -71,4 +71,18 @@ export const endpoints = {
     hydration: (eventId: string) =>
       `/events/${eventId}/products/hydration`,
   },
+  exitAdmin: {
+    destinations: {
+      list: (eventId: string) => `/events/${eventId}/exit-destinations`,
+      create: (eventId: string) => `/events/${eventId}/exit-destinations`,
+      update: (eventId: string, id: string) => `/events/${eventId}/exit-destinations/${id}`,
+      delete: (eventId: string, id: string) => `/events/${eventId}/exit-destinations/${id}`,
+    },
+    zoneDestinations: {
+      get: (eventId: string, zoneId: string) =>
+        `/events/${eventId}/zones/${zoneId}/exit-destinations`,
+      update: (eventId: string, zoneId: string) =>
+        `/events/${eventId}/zones/${zoneId}/exit-destinations`,
+    },
+  },
 };

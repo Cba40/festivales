@@ -25,8 +25,12 @@ class ExitDestination(Base):
     )
 
     event = relationship("Event")
+    # passive_deletes: el borrado de filas de exit_zone_destinations queda
+    # delegado al ON DELETE CASCADE del FK (migración f4a6b8c0d2e4); evita
+    # cargar las entidades Zone completas al eliminar un destino.
     zones = relationship(
         "Zone",
         secondary="exit_zone_destinations",
         back_populates="destinations",
+        passive_deletes=True,
     )

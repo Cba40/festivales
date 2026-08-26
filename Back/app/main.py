@@ -24,6 +24,7 @@ from app.api.routes.parking import router as parking_router
 from app.api.routes.gastronomy import router as gastronomy_router
 from app.api.routes.transport import router as transport_router
 from app.api.routes.exit_product import router as exit_product_router
+from app.api.routes.exit_admin import router as exit_admin_router
 from app.api.routes.bathroom import router as bathroom_router
 from app.api.routes.rest import router as rest_router
 from app.api.routes.health_product import router as health_product_router
@@ -63,6 +64,7 @@ app.include_router(parking_router)
 app.include_router(gastronomy_router)
 app.include_router(transport_router)
 app.include_router(exit_product_router)
+app.include_router(exit_admin_router)
 app.include_router(bathroom_router)
 app.include_router(rest_router)
 app.include_router(health_product_router)
