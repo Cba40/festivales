@@ -10,7 +10,7 @@ Idempotente a nivel esquema vía alembic (create/drop simétricos).
 La tabla transport_line_stops (PARTE 2) y transport_schedules (PARTE 3)
 se crean en migraciones subsiguientes con down_revision encadenada.
 
-Revision ID: a1b2c3d4e5f6
+Revision ID: f1a2b3c4d5e6
 Revises: c9d3e7f1a5b8
 Create Date: 2026-08-26 00:00:00.000000
 
@@ -21,7 +21,7 @@ import sqlalchemy as sa
 from alembic import op
 
 
-revision: str = 'a1b2c3d4e5f6'
+revision: str = 'f1a2b3c4d5e6'
 down_revision: Union[str, Sequence[str], None] = 'c9d3e7f1a5b8'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
