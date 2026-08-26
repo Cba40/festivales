@@ -58,8 +58,10 @@ export function useExitRecommendations(
         }
       )
       setData(res)
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Error al obtener salidas')
+    } catch (err) {
+      const detail = (err as { response?: { data?: { detail?: string } } })
+        ?.response?.data?.detail
+      setError(detail || 'Error al obtener salidas')
     } finally {
       setLoading(false)
     }

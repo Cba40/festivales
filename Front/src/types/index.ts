@@ -2,7 +2,7 @@
 export type EstadoZona = 'bajo' | 'medio' | 'alto' | 'colapsado'
 export type Tendencia = 'subiendo' | 'estable' | 'bajando'
 export type ModoRespuesta = 'informar' | 'asistir' | 'guiar'
-export type TipoZona = 'estacionamiento' | 'transporte' | 'comida' | 'descanso' | 'servicios' | 'emergencia'
+export type TipoZona = 'estacionamiento' | 'transporte' | 'comida' | 'descanso' | 'servicios' | 'emergencia' | 'salida'
 
 // Interface principal
 export interface Zona {
