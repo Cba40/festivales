@@ -51,6 +51,9 @@ class Zone(Base):
         secondary="exit_zone_destinations",
         back_populates="zones",
     )
+    transport_line_stops: Mapped[list["TransportLineStop"]] = relationship(
+        "TransportLineStop", back_populates="zone",
+    )
 
     @staticmethod
     def calcular_saturation(capacity: int, available_capacity: int) -> str:

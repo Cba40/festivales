@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, UniqueConstraint, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
 
@@ -43,4 +43,8 @@ class TransportLine(Base):
     __table_args__ = (
         UniqueConstraint("event_id", "name", name="uq_transport_lines_event_name"),
         Index("idx_transport_lines_event", "event_id"),
+    )
+
+    stops: Mapped[list["TransportLineStop"]] = relationship(
+        "TransportLineStop", back_populates="line", order_by="TransportLineStop.stop_order",
     )
