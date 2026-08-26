@@ -16,6 +16,7 @@ from app.models.motor_config import RecommendationConfigModel, Stage4ConfigModel
 from app.models.service_config import ServiceConfig
 from app.models.exit_destination import ExitDestination
 from app.models.exit_zone_destination import exit_zone_destinations_table
+from app.models.transport_line import TransportLine
 
 __all__ = [
     "Event",
@@ -35,4 +36,5 @@ __all__ = [
     "Stage4ConfigModel",
     "ServiceConfig",
     "ExitDestination",
+    "TransportLine",
 ]
