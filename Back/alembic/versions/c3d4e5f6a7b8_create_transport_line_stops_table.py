@@ -13,7 +13,7 @@ Idempotente a nivel esquema vía alembic (create/drop simétricos).
 La tabla transport_schedules (PARTE 3) se crea en migración subsiguiente
 con down_revision encadenada.
 
-Revision ID: b2c3d4e5f6a7
+Revision ID: c3d4e5f6a7b8
 Revises: f1a2b3c4d5e6
 Create Date: 2026-08-26 00:00:00.000000
 
@@ -24,7 +24,7 @@ import sqlalchemy as sa
 from alembic import op
 
 
-revision: str = 'b2c3d4e5f6a7'
+revision: str = 'c3d4e5f6a7b8'
 down_revision: Union[str, Sequence[str], None] = 'f1a2b3c4d5e6'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

@@ -18,6 +18,7 @@ from app.models.exit_destination import ExitDestination
 from app.models.exit_zone_destination import exit_zone_destinations_table
 from app.models.transport_line import TransportLine
 from app.models.transport_line_stop import TransportLineStop
+from app.models.transport_schedule import TransportSchedule
 
 __all__ = [
     "Event",
@@ -39,4 +40,5 @@ __all__ = [
     "ExitDestination",
     "TransportLine",
     "TransportLineStop",
+    "TransportSchedule",
 ]

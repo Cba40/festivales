@@ -40,3 +40,7 @@ class TransportLineStop(Base):
 
     line: Mapped["TransportLine"] = relationship("TransportLine", back_populates="stops")
     zone: Mapped["Zone"] = relationship("Zone", back_populates="transport_line_stops")
+    schedules: Mapped[list["TransportSchedule"]] = relationship(
+        "TransportSchedule", back_populates="line_stop",
+        order_by="TransportSchedule.departure_time",
+    )
