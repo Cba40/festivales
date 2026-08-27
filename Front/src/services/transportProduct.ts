@@ -23,6 +23,11 @@ export interface ZonaTransporteItem {
   referencia: string
   distancia_min: number | null
   is_nearest: boolean
+  line_name: string | null
+  company: string | null
+  next_departure: string | null
+  minutes_until_next: number | null
+  destination: string | null
 }
 
 export interface TransportRecommendationResponse {
@@ -32,7 +37,7 @@ export interface TransportRecommendationResponse {
   zonas: ZonaTransporteItem[]
 }
 
-export function useTransportRecommendations() {
+export function useTransportRecommendations(destination?: string) {
   const [data, setData] = useState<TransportRecommendationResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -57,6 +62,7 @@ export function useTransportRecommendations() {
             ...(userLocation
               ? { latitude: userLocation[0], longitude: userLocation[1] }
               : {}),
+            ...(destination ? { destination } : {}),
           },
         }
       )
@@ -66,7 +72,7 @@ export function useTransportRecommendations() {
     } finally {
       setLoading(false)
     }
-  }, [currentZoneId, userLocation])
+  }, [currentZoneId, userLocation, destination])
 
   return { data, loading, error, refresh }
 }
