@@ -387,6 +387,24 @@ export function TransportManagementScreen({ eventId }: { eventId: string }) {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const descargarPlantilla = async () => {
+    try {
+      const res = await apiClient.get<Blob>(endpoints.transportAdmin.csvTemplate(eventId), {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(res.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'plantilla-transporte.csv';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      setCsvError('No se pudo descargar la plantilla.');
+    }
+  };
+
   const selectedLine = lines.find((l) => l.id === selectedLineId) ?? null;
 
   return (
@@ -509,6 +527,12 @@ export function TransportManagementScreen({ eventId }: { eventId: string }) {
                           Horarios ({selectedSchedules.length})
                         </h3>
                         <div className="flex gap-2">
+                          <button
+                            onClick={() => void descargarPlantilla()}
+                            className="text-sm bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 py-1.5 px-3 rounded-md transition-colors"
+                          >
+                            📥 Descargar Plantilla CSV
+                          </button>
                           <label className="text-sm bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 py-1.5 px-3 rounded-md transition-colors cursor-pointer">
                             {csvImporting ? 'Importando...' : 'Importar CSV'}
                             <input

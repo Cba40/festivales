@@ -16,7 +16,7 @@ import re
 from datetime import time
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import verify_token
@@ -552,4 +552,52 @@ async def import_transport_csv(
         stops_created=stops_created,
         schedules_created=schedules_created,
         errors=errors,
+    )
+
+
+# --------------------------------------------------------------------------
+# Plantilla CSV (descarga de referencia para el importador)
+# --------------------------------------------------------------------------
+
+
+@router.get("/transport/csv-template")
+def get_transport_csv_template():
+    """Descargar plantilla CSV para importación de transporte.
+
+    Devuelve un archivo con los headers exactos que espera
+    ``import_transport_csv`` y una fila de ejemplo con datos realistas.
+    """
+    headers = [
+        "line_name",
+        "line_type",
+        "company",
+        "stop_name",
+        "stop_order",
+        "day_type",
+        "departure_time",
+        "destination",
+    ]
+
+    example_row = {
+        "line_name": "Línea 100",
+        "line_type": "interurbano",
+        "company": "Empresa Ejemplo SRL",
+        "stop_name": "Parada Centro",
+        "stop_order": 1,
+        "day_type": "weekday",
+        "departure_time": "10:15",
+        "destination": "Córdoba",
+    }
+
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=headers)
+    writer.writeheader()
+    writer.writerow(example_row)
+
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": "attachment; filename=plantilla-transporte.csv"
+        },
     )

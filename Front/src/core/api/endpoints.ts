@@ -105,5 +105,6 @@ export const endpoints = {
         `/events/${eventId}/transport-lines/${lineId}/schedules`,
     },
     importCsv: (eventId: string) => `/events/${eventId}/transport/import-csv`,
+    csvTemplate: (eventId: string) => `/events/${eventId}/transport/csv-template`,
   },
 };
