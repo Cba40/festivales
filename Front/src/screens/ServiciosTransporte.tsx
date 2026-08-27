@@ -25,8 +25,9 @@ const ServiciosTransporte = () => {
   const [destino, setDestino] = useState<string>('Todos')
 
   const {
-    data: destinosData,
+    destinations,
     loading: cargandoDestinos,
+    refresh: refreshDestinos,
   } = useAvailableDestinations(tipo ?? undefined)
 
   const {
@@ -53,9 +54,15 @@ const ServiciosTransporte = () => {
     setDestino('Todos')
   }, [tipo])
 
+  // Load destinations when a transport type is selected
+  useEffect(() => {
+    if (tipo) {
+      refreshDestinos()
+    }
+  }, [tipo, refreshDestinos])
+
   const zonas = data?.zonas ?? []
   const timestamp = data?.timestamp ? Date.parse(data.timestamp) : Date.now()
-  const destinos = destinosData?.destinations ?? []
 
   const abrirMapa = (zona: ZonaTransporteItem) => {
     if (zona.lat && zona.lng) {
@@ -252,7 +259,7 @@ const ServiciosTransporte = () => {
                   >
                     Todos
                   </button>
-                  {destinos.map(d => (
+                  {destinations.map(d => (
                     <button
                       key={d}
                       onClick={() => setDestino(d)}
