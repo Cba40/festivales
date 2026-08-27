@@ -85,4 +85,25 @@ export const endpoints = {
         `/events/${eventId}/zones/${zoneId}/exit-destinations`,
     },
   },
+  transportAdmin: {
+    lines: {
+      list: (eventId: string) => `/events/${eventId}/transport-lines`,
+      create: (eventId: string) => `/events/${eventId}/transport-lines`,
+      update: (eventId: string, id: string) => `/events/${eventId}/transport-lines/${id}`,
+      delete: (eventId: string, id: string) => `/events/${eventId}/transport-lines/${id}`,
+    },
+    stops: {
+      list: (eventId: string, lineId: string) =>
+        `/events/${eventId}/transport-lines/${lineId}/stops`,
+      update: (eventId: string, lineId: string) =>
+        `/events/${eventId}/transport-lines/${lineId}/stops`,
+    },
+    schedules: {
+      list: (eventId: string, lineId: string) =>
+        `/events/${eventId}/transport-lines/${lineId}/schedules`,
+      update: (eventId: string, lineId: string) =>
+        `/events/${eventId}/transport-lines/${lineId}/schedules`,
+    },
+    importCsv: (eventId: string) => `/events/${eventId}/transport/import-csv`,
+  },
 };
