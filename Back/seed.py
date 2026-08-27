@@ -11,6 +11,9 @@ from app.models.event import Event
 from app.models.zone import Zone
 from app.models.exit_destination import ExitDestination
 from app.models.exit_zone_destination import exit_zone_destinations_table
+from app.models.transport_line import TransportLine
+from app.models.transport_line_stop import TransportLineStop
+from app.models.transport_schedule import TransportSchedule
 
 EVENT_ID = "663e6e32-9d4a-4f20-b992-3585b9310522"
 
@@ -392,6 +395,153 @@ def seed_exit_zone_destinations(session):
     return creadas
 
 
+# ─────────────────────────────────────────────────────────────
+# Transporte V1 (S1/PARTE 4): líneas, paradas y horarios de prueba.
+# ─────────────────────────────────────────────────────────────
+
+TRANSPORT_LINES_DATA = [
+    {
+        "name": "Línea 100 Ejemplo",
+        "type": "interurbano",
+        "company": "Empresa Ejemplo SRL",
+        "color": "#FF5733",
+    },
+    {
+        "name": "Línea 200 Ejemplo",
+        "type": "urbano",
+        "company": "Transporte Urbano SA",
+        "color": "#3498DB",
+    },
+]
+
+TRANSPORT_STOP_LINKS = [
+    {"line_name": "Línea 100 Ejemplo", "zone_name": "Parada Línea A", "stop_order": 1},
+    {"line_name": "Línea 100 Ejemplo", "zone_name": "Parada Línea B", "stop_order": 2},
+    {"line_name": "Línea 200 Ejemplo", "zone_name": "Parada Línea A", "stop_order": 1},
+    {"line_name": "Línea 200 Ejemplo", "zone_name": "Parada Express", "stop_order": 2},
+]
+
+TRANSPORT_SCHEDULES_DATA = [
+    {"line_name": "Línea 100 Ejemplo", "zone_name": "Parada Línea A", "day_type": "weekday", "hour": 10, "minute": 15, "destination": "Córdoba"},
+    {"line_name": "Línea 100 Ejemplo", "zone_name": "Parada Línea A", "day_type": "weekday", "hour": 11, "minute": 30, "destination": "Córdoba"},
+    {"line_name": "Línea 100 Ejemplo", "zone_name": "Parada Línea B", "day_type": "weekday", "hour": 10, "minute": 25, "destination": "Córdoba"},
+    {"line_name": "Línea 100 Ejemplo", "zone_name": "Parada Línea B", "day_type": "weekday", "hour": 11, "minute": 40, "destination": "Córdoba"},
+    {"line_name": "Línea 200 Ejemplo", "zone_name": "Parada Línea A", "day_type": "weekday", "hour": 8, "minute": 0, "destination": "Terminal"},
+    {"line_name": "Línea 200 Ejemplo", "zone_name": "Parada Línea A", "day_type": "weekday", "hour": 9, "minute": 0, "destination": "Terminal"},
+    {"line_name": "Línea 200 Ejemplo", "zone_name": "Parada Express", "day_type": "weekday", "hour": 8, "minute": 15, "destination": "Terminal"},
+]
+
+
+def seed_transport_data(session, event):
+    """Crea líneas, paradas y horarios de transporte de prueba (idempotente).
+
+    Las paradas son zonas existentes con type='transporte'.
+    Lookup por clave natural en cada nivel; skip si existe.
+    Devuelve {"lines_created": n, "stops_created": n, "schedules_created": n}.
+    """
+    lines_created = 0
+    stops_created = 0
+    schedules_created = 0
+
+    # --- 1. Líneas ---
+    lines_by_name = {}
+    for ld in TRANSPORT_LINES_DATA:
+        existente = session.query(TransportLine).filter(
+            TransportLine.event_id == event.id,
+            TransportLine.name == ld["name"],
+        ).first()
+        if existente:
+            print(f"ℹ️ Línea ya existe: {ld['name']}")
+            lines_by_name[ld["name"]] = existente
+            continue
+
+        line = TransportLine(
+            event_id=event.id,
+            name=ld["name"],
+            type=ld["type"],
+            company=ld["company"],
+            color=ld["color"],
+        )
+        session.add(line)
+        session.flush()
+        lines_by_name[ld["name"]] = line
+        lines_created += 1
+        print(f"✅ Línea creada: {ld['name']}")
+
+    # --- 2. Paradas (line_stops) ---
+    line_stops_by_key = {}
+    for sl in TRANSPORT_STOP_LINKS:
+        line = lines_by_name[sl["line_name"]]
+        zona_row = session.execute(
+            select(Zone.id, Zone.event_id).where(
+                Zone.event_id == event.id,
+                Zone.name == sl["zone_name"],
+                Zone.type == "transporte",
+            )
+        ).first()
+        if zona_row is None:
+            print(f"⚠️ Zona no encontrada (skip): {sl['zone_name']}")
+            continue
+        zona_id = zona_row.id
+
+        existente = session.query(TransportLineStop).filter(
+            TransportLineStop.line_id == line.id,
+            TransportLineStop.zone_id == zona_id,
+        ).first()
+        if existente:
+            print(f"ℹ️ Parada ya existe: {sl['line_name']} → {sl['zone_name']}")
+            line_stops_by_key[(sl["line_name"], sl["zone_name"])] = existente
+            continue
+
+        tls = TransportLineStop(
+            line_id=line.id,
+            zone_id=zona_id,
+            stop_order=sl["stop_order"],
+        )
+        session.add(tls)
+        session.flush()
+        line_stops_by_key[(sl["line_name"], sl["zone_name"])] = tls
+        stops_created += 1
+        print(f"✅ Parada creada: {sl['line_name']} → {sl['zone_name']} (orden {sl['stop_order']})")
+
+    # --- 3. Horarios ---
+    from datetime import time as dtime
+    for sd in TRANSPORT_SCHEDULES_DATA:
+        key = (sd["line_name"], sd["zone_name"])
+        tls = line_stops_by_key.get(key)
+        if tls is None:
+            print(f"⚠️ Line_stop no encontrado (skip): {key}")
+            continue
+
+        departure = dtime(sd["hour"], sd["minute"])
+        existente = session.query(TransportSchedule).filter(
+            TransportSchedule.line_stop_id == tls.id,
+            TransportSchedule.day_type == sd["day_type"],
+            TransportSchedule.departure_time == departure,
+            TransportSchedule.destination == sd["destination"],
+        ).first()
+        if existente:
+            print(f"ℹ️ Horario ya existe: {sd['line_name']} {departure} → {sd['destination']}")
+            continue
+
+        ts = TransportSchedule(
+            line_stop_id=tls.id,
+            day_type=sd["day_type"],
+            departure_time=departure,
+            destination=sd["destination"],
+        )
+        session.add(ts)
+        session.flush()
+        schedules_created += 1
+        print(f"✅ Horario creado: {sd['line_name']} {departure} → {sd['destination']}")
+
+    return {
+        "lines_created": lines_created,
+        "stops_created": stops_created,
+        "schedules_created": schedules_created,
+    }
+
+
 def get_or_create_event(session):
     event = session.query(Event).filter(Event.id == EVENT_ID).first()
     if event:
@@ -491,6 +641,10 @@ def main():
         seed_exit_destinations(session, event)
         session.commit()
         seed_exit_zone_destinations(session)
+        session.commit()
+
+        # Transporte V1 (S1/PARTE 4): líneas, paradas y horarios de prueba
+        seed_transport_data(session, event)
         session.commit()
 
         print(f"\n\U0001f4cb VITE_EVENT_ID={event.id}")
