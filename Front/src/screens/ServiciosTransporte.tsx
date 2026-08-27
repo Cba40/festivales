@@ -1,26 +1,23 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/Header'
-import { InteractiveMap } from '@/components/InteractiveMap'
 import { Map, X } from 'lucide-react'
 import { useAppStore } from '@/core/state/store'
 import { useTransportRecommendations, type ZonaTransporteItem } from '@/services/transportProduct'
-import {
-  ZonaCardsList,
-  getEstadoStyles,
-  getEstadoLabel,
-  getConfianzaLabel,
-  NearestBadge,
-} from '@/components/ZonaCardsList'
+import { NearestBadge } from '@/components/ZonaCardsList'
 import { GpsModal } from '@/components/GpsModal'
 import { formatUpdatedAt } from '@/utils/formatTime'
 import { getDistancias } from '@/utils/geo'
 
+const DESTINOS = ['Todos', 'Los Nogales', 'Córdoba', 'Colonia Caroya', 'Terminal']
+
 const ServiciosTransporte = () => {
   const navigate = useNavigate()
-  const { data, loading, error, refresh } = useTransportRecommendations()
+  const [destino, setDestino] = useState('Todos')
+  const { data, loading, error, refresh } = useTransportRecommendations(
+    destino === 'Todos' ? undefined : destino
+  )
   const [selectedZona, setSelectedZona] = useState<ZonaTransporteItem | null>(null)
-  const [mostrarOpciones, setMostrarOpciones] = useState(false)
   const [mostrarGpsModal, setMostrarGpsModal] = useState(true)
   const userLocation = useAppStore(s => s.userLocation)
   const requestLocation = useAppStore(s => s.requestLocation)
@@ -30,11 +27,7 @@ const ServiciosTransporte = () => {
   }, [refresh])
 
   const zonas = data?.zonas ?? []
-
-  const modo = data?.mode ?? 'informar'
-
-  const principal = zonas[0]
-  const alternativa = zonas[1]
+  const timestamp = data?.timestamp ? Date.parse(data.timestamp) : Date.now()
 
   const abrirMapa = (zona: ZonaTransporteItem) => {
     if (zona.lat && zona.lng) {
@@ -44,6 +37,49 @@ const ServiciosTransporte = () => {
       )
     }
     setSelectedZona(null)
+  }
+
+  const renderCard = (zona: ZonaTransporteItem) => {
+    const dist = getDistancias(zona.lat ?? 0, zona.lng ?? 0, userLocation, zona.distancia_min ?? 5)
+    return (
+      <button
+        key={zona.zone_id}
+        onClick={() => setSelectedZona(zona)}
+        className="w-full text-left bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 transition-colors shadow-sm flex items-start gap-2"
+      >
+        <span className="text-lg mt-0.5">🚌</span>
+        <div className="flex-1 min-w-0">
+          <div className="flex justify-between items-center gap-2">
+            <p className="font-semibold text-sm text-slate-800 dark:text-slate-100 truncate">
+              {zona.name}
+            </p>
+            <NearestBadge visible={zona.is_nearest} />
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-300 mt-0.5">
+            {zona.line_name ?? 'Línea sin nombre'}
+            {zona.company ? ` · ${zona.company}` : ''}
+          </p>
+          {zona.next_departure ? (
+            <p className="text-xs text-slate-700 dark:text-slate-200 mt-1">
+              🚌 Próximo servicio: <span className="font-semibold">{zona.next_departure}</span>
+              {zona.minutes_until_next != null && (
+                <span> (en {zona.minutes_until_next} min)</span>
+              )}
+            </p>
+          ) : (
+            <p className="text-xs text-slate-500 dark:text-slate-300 mt-1">
+              🚫 Sin servicios programados para este horario
+            </p>
+          )}
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex flex-wrap gap-x-2 gap-y-0.5 items-center">
+            {zona.destination && <span>🎯 {zona.destination}</span>}
+            {zona.distancia_min != null && <span>· 📏 {zona.distancia_min} m</span>}
+            <span>· 🚶 {dist.walking}</span>
+            <span>· 🚗 {dist.driving}</span>
+          </p>
+        </div>
+      </button>
+    )
   }
 
   const renderBottomSheet = selectedZona && (
@@ -58,43 +94,55 @@ const ServiciosTransporte = () => {
           onClick={() => setSelectedZona(null)}
         />
 
-        <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2">
+        <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-1">
           {selectedZona.name}
         </h3>
+        <p className="text-sm text-slate-500 dark:text-slate-300 mb-4">
+          {selectedZona.line_name ?? 'Línea sin nombre'} · {selectedZona.company ?? 'Empresa'}
+        </p>
 
         <div className="space-y-2 mb-4">
+          {selectedZona.next_departure ? (
+            <p className="text-sm text-slate-700 dark:text-slate-200">
+              🚌 Próximo servicio: <span className="font-semibold">{selectedZona.next_departure}</span>
+              {selectedZona.minutes_until_next != null && (
+                <span> (en {selectedZona.minutes_until_next} min)</span>
+              )}
+            </p>
+          ) : (
+            <p className="text-sm text-slate-500 dark:text-slate-300">
+              🚫 Sin servicios programados para este horario
+            </p>
+          )}
+          {selectedZona.destination && (
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              🎯 Destino: <span className="font-semibold">{selectedZona.destination}</span>
+            </p>
+          )}
           <p className="text-sm text-slate-600 dark:text-slate-300">
             📍 {selectedZona.referencia}
           </p>
+          {selectedZona.distancia_min != null && (
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              📏 Distancia: <span className="font-semibold">{selectedZona.distancia_min} m</span>
+              <NearestBadge visible={selectedZona.is_nearest} />
+            </p>
+          )}
           {(() => {
             const dist = getDistancias(selectedZona.lat ?? 0, selectedZona.lng ?? 0, userLocation, selectedZona.distancia_min ?? 5)
             return (
               <>
-                <p className="text-sm text-slate-600 dark:text-slate-300">🚶 Caminando: <span className="font-semibold text-slate-800 dark:text-slate-100">{dist.walking}</span></p>
-                <p className="text-sm text-slate-600 dark:text-slate-300">🚗 En auto: <span className="font-semibold text-slate-800 dark:text-slate-100">{dist.driving}</span></p>
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  🚶 Caminando: <span className="font-semibold text-slate-800 dark:text-slate-100">{dist.walking}</span>
+                </p>
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  🚗 En auto: <span className="font-semibold text-slate-800 dark:text-slate-100">{dist.driving}</span>
+                </p>
               </>
             )
           })()}
-          {selectedZona.calle && (
-            <p className="text-sm text-slate-600 dark:text-slate-300">
-              🧭 {selectedZona.calle}
-            </p>
-          )}
-          {selectedZona.saturation_level != null && (
-            <p className="text-sm text-slate-600 dark:text-slate-300">
-              📊 Posibilidad: {Math.round((1 - selectedZona.saturation_level) * 100)}%
-            </p>
-          )}
-          {selectedZona.estimated_wait != null && (
-            <p className="text-sm text-slate-600 dark:text-slate-300">
-              ⏱️ Espera: {selectedZona.estimated_wait} min
-            </p>
-          )}
           <p className="text-xs text-slate-500 dark:text-slate-300">
-            {formatUpdatedAt(data?.timestamp ? Date.parse(data.timestamp) : Date.now())}
-          </p>
-          <p className="text-xs text-slate-500 dark:text-slate-300">
-            {getConfianzaLabel(selectedZona.confidence)}
+            {formatUpdatedAt(timestamp)}
           </p>
         </div>
 
@@ -122,7 +170,7 @@ const ServiciosTransporte = () => {
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
         <Header title="Transporte" showBack onBack={() => navigate('/')} />
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-slate-500">Cargando recomendaciones...</p>
+          <p className="text-slate-500">Cargando horarios de transporte...</p>
         </div>
       </div>
     )
@@ -146,193 +194,65 @@ const ServiciosTransporte = () => {
     )
   }
 
-  if (modo === 'sin_solucion') {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        <Header title="Transporte" showBack onBack={() => navigate('/')} />
-
-        <div className="flex-1 p-4 space-y-4">
-          <div className="bg-danger text-white p-6 rounded-xl text-center">
-            <p className="text-xl font-bold">🚧 No conviene tomar transporte en este momento</p>
-            <p className="text-sm mt-2 opacity-90">Tiempos de espera y acceso elevados</p>
-          </div>
-
-          {!userLocation && mostrarGpsModal && (
-            <GpsModal
-              onActivate={() => {
-                requestLocation()
-                setMostrarGpsModal(false)
-              }}
-              onClose={() => setMostrarGpsModal(false)}
-            />
-          )}
-
-          <div className="bg-slate-100 dark:bg-slate-700 p-4 rounded-xl space-y-3">
-            <button
-              onClick={() => navigate('/salir')}
-              className="w-full bg-white dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 p-3 rounded-lg font-bold active:scale-95 transition-transform"
-            >
-              🚶 Ir caminando
-            </button>
-            <button className="w-full bg-white dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 p-3 rounded-lg font-bold active:scale-95 transition-transform">
-              ⏱️ Esperar 20–30 min
-            </button>
-          </div>
-
-          <div className="mt-4 text-center space-y-2">
-            <p className="text-xs text-slate-400 dark:text-slate-400">
-              No hay opciones recomendadas en este momento
-            </p>
-            <button
-              className="text-xs underline text-slate-500 dark:text-slate-300"
-              onClick={() => setMostrarOpciones(true)}
-            >
-              Ver opciones igualmente
-            </button>
-          </div>
-
-          {mostrarOpciones && (
-            <div className="mt-3 space-y-2">
-              <p className="text-xs text-red-500 text-center">
-                ⚠️ Disponibilidad muy baja — podés no encontrar lugar
-              </p>
-              {zonas.slice(0, 2).map((zona) => {
-                const dist = getDistancias(zona.lat ?? 0, zona.lng ?? 0, userLocation, zona.distancia_min ?? 5)
-                return (
-                  <button
-                    key={zona.zone_id}
-                    onClick={() => setSelectedZona(zona)}
-                    className="w-full p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-left"
-                  >
-                    <span className="font-bold text-gray-900 dark:text-gray-100">{zona.name}</span>
-                    <NearestBadge visible={zona.is_nearest} />
-                    <span className={`ml-2 px-2 py-1 rounded text-xs font-bold ${getEstadoStyles(zona.estado)}`}>
-                      {getEstadoLabel(zona.estado)}
-                    </span>
-                    <p className="text-xs text-gray-500 dark:text-gray-300 mt-1 flex flex-wrap gap-x-2">
-                      <span>🚶 {dist.walking}</span>
-                      <span>🚗 {dist.driving}</span>
-                      {zona.estimated_wait != null && <span>⏱️ {zona.estimated_wait} min</span>}
-                    </p>
-                  </button>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
-        {renderBottomSheet}
-      </div>
-    )
-  }
-
-  const listaRestante =
-    modo === 'guiar' || modo === 'asistir' ? zonas.slice(2) : zonas.slice(1)
+  const sinServicios = data?.mode === 'sin_solucion' || zonas.length === 0
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
       <Header title="Transporte" showBack onBack={() => navigate('/')} />
 
-      {modo === 'guiar' && (
-        <div className="bg-danger text-white px-4 py-3">
-          <h2 className="font-bold text-lg">👉 Zona actual saturada</h2>
-        </div>
-      )}
-
       <div className="flex-1 p-4 overflow-y-auto space-y-4">
-        {(modo === 'guiar' || modo === 'asistir') && principal && (() => {
-          const dist = getDistancias(principal.lat ?? 0, principal.lng ?? 0, userLocation, principal.distancia_min ?? 5)
-          return (
-            <button onClick={() => setSelectedZona(principal)} className="w-full">
-              <div className={modo === 'guiar'
-                ? 'bg-primary text-white p-6 rounded-xl text-left shadow-lg'
-                : 'bg-white dark:bg-slate-800 border-l-4 border-primary p-4 rounded-xl text-left shadow-md'}>
-                <p className={`font-bold ${modo === 'guiar' ? 'text-lg' : 'text-slate-800 dark:text-slate-100 text-lg'} flex items-center gap-2`}>
-                  <span>{modo === 'guiar' ? `👉 Dirigite ahora a ${principal.name}` : `👉 Mejor opción ahora: ${principal.name}`}</span>
-                  <NearestBadge visible={principal.is_nearest} />
-                </p>
-                <p className="text-sm opacity-90 mt-2">📍 {principal.referencia}</p>
-                <p className="text-sm opacity-90 flex gap-3">
-                  <span>🚶 {dist.walking}</span>
-                  <span>🚗 {dist.driving}</span>
-                  {principal.estimated_wait != null && <span>⏱️ Espera: {principal.estimated_wait} min</span>}
-                </p>
-                {modo === 'asistir' && principal.saturation_level != null && (
-                  <p className="text-xs text-slate-500 dark:text-slate-300 mt-2">📊 {Math.round((1 - principal.saturation_level) * 100)}% de posibilidad</p>
-                )}
-                {modo === 'asistir' && (
-                  <p className="text-xs text-slate-500 dark:text-slate-300 mt-2">{formatUpdatedAt(data?.timestamp ? Date.parse(data.timestamp) : Date.now())}</p>
-                )}
-                {principal.estado === 'alto' && (
-                  <p className="text-xs opacity-75 mt-2">⚠️ Últimos lugares</p>
-                )}
-              </div>
-            </button>
-          )
-        })()}
+        {/* Selector de destino */}
+        <div>
+          <p className="text-xs font-bold text-slate-600 dark:text-slate-300 mb-2 px-1">
+            🎯 ¿A dónde vas?
+          </p>
+          <div className="flex flex-wrap gap-2 px-1">
+            {DESTINOS.map(d => (
+              <button
+                key={d}
+                onClick={() => setDestino(d)}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  destino === d
+                    ? 'bg-primary text-white'
+                    : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+                }`}
+              >
+                {d}
+              </button>
+            ))}
+          </div>
+        </div>
 
-        {(modo === 'guiar' || modo === 'asistir') && alternativa && (() => {
-          const dist = getDistancias(alternativa.lat ?? 0, alternativa.lng ?? 0, userLocation, alternativa.distancia_min ?? 5)
-          return (
-            <button onClick={() => setSelectedZona(alternativa)} className="w-full">
-              <div className="bg-slate-100 dark:bg-slate-700 border-2 border-slate-300 dark:border-slate-600 p-4 rounded-xl text-left">
-                <p className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                  <span>{modo === 'guiar' ? `👉 Si está lleno → ${alternativa.name}` : `Alternativa: ${alternativa.name}`}</span>
-                  <NearestBadge visible={alternativa.is_nearest} />
-                </p>
-                <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">📍 {alternativa.referencia}</p>
-                <p className="text-sm text-slate-600 dark:text-slate-300 flex gap-3">
-                  <span>🚶 {dist.walking}</span>
-                  <span>🚗 {dist.driving}</span>
-                  {alternativa.estimated_wait != null && <span>⏱️ {alternativa.estimated_wait} min</span>}
-                </p>
-              </div>
-            </button>
-          )
-        })()}
-
-        <InteractiveMap
-          puntos={zonas
-            .filter(z => z.lat && z.lng)
-            .map(z => ({
-              id: z.zone_id,
-              nombre: z.name,
-              lat: z.lat!,
-              lng: z.lng!,
-              referencia: z.referencia,
-              tipo: 'transporte',
-              originalData: z
-            }))}
-          onSelectPunto={(p) => setSelectedZona(p as ZonaTransporteItem)}
-          onUserLocationUpdate={() => {}}
-        />
-
-        {listaRestante.length > 0 && (
-          <ZonaCardsList
-            items={listaRestante}
-            icon="🚌"
-            label="paradas de transporte disponibles"
-            userLocation={userLocation}
-            onSelect={(z) => setSelectedZona(z)}
+        {!userLocation && mostrarGpsModal && (
+          <GpsModal
+            mensaje="Para mostrarte la parada de transporte más cercana, necesitamos tu ubicación GPS."
+            onActivate={() => {
+              requestLocation()
+              setMostrarGpsModal(false)
+            }}
+            onClose={() => setMostrarGpsModal(false)}
           />
         )}
 
-        {(modo === 'guiar' || modo === 'asistir') && (
-          <p className="text-xs text-slate-400 dark:text-slate-400 text-center pb-16">
-            {getConfianzaLabel(principal?.confidence)}
-          </p>
+        {sinServicios ? (
+          <div className="bg-slate-100 dark:bg-slate-700 p-6 rounded-xl text-center space-y-2">
+            <p className="text-lg font-bold text-slate-800 dark:text-slate-100">
+              🚌 No hay servicios de transporte disponibles hacia ese destino en este horario
+            </p>
+            <p className="text-sm text-slate-500 dark:text-slate-300">
+              Probá otro destino o consultá más tarde.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2 pb-16">
+            <p className="text-xs font-bold text-slate-600 dark:text-slate-300 px-1 flex justify-between">
+              <span>🚌 {zonas.length} paradas de transporte disponibles</span>
+              {userLocation && <span className="text-blue-500 text-[10px] font-semibold">📡 Ubicación GPS activa</span>}
+            </p>
+            {zonas.map(renderCard)}
+          </div>
         )}
       </div>
-
-      {!userLocation && mostrarGpsModal && (
-        <GpsModal
-          onActivate={() => {
-            requestLocation()
-            setMostrarGpsModal(false)
-          }}
-          onClose={() => setMostrarGpsModal(false)}
-        />
-      )}
 
       {renderBottomSheet}
     </div>
