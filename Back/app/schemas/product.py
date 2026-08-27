@@ -37,6 +37,11 @@ class ZonaGastronomicaItem(ZonaItemBase):
 
 class ZonaTransporteItem(ZonaItemBase):
     calle: str = ""
+    line_name: str | None = None
+    company: str | None = None
+    next_departure: str | None = None
+    minutes_until_next: int | None = None
+    destination: str | None = None
 
 
 class GastronomyRecommendationResponse(BaseModel):

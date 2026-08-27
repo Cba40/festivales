@@ -8,8 +8,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_async_db
 from app.schemas.product import TransportRecommendationResponse
-from src.domain.recommendation.mobility_context import MobilityContext
-from src.domain.recommendation.user_context import AccessLevel, UserContext
 from src.interfaces.rest.transport_product import get_transport_product_adapter
 
 router = APIRouter(prefix="/api/events/{event_id}", tags=["Transport Product"])
@@ -18,36 +16,26 @@ router = APIRouter(prefix="/api/events/{event_id}", tags=["Transport Product"])
 @router.get("/products/transport", response_model=TransportRecommendationResponse)
 async def transport_recommendations(
     event_id: str,
-    speed: float = Query(..., ge=0.0),
-    accessibility_required: bool = Query(...),
-    limit: int = Query(5, ge=1, le=50),
-    current_zone_id: str | None = Query(None),
-    user_id: str = Query(...),
-    access_level: AccessLevel = Query(default=AccessLevel.STANDARD),
+    destination: str | None = Query(None),
     latitude: float | None = Query(None, ge=-90.0, le=90.0),
     longitude: float | None = Query(None, ge=-180.0, le=180.0),
+    limit: int = Query(5, ge=1, le=50),
+    speed: float | None = Query(None, ge=0.0),
+    accessibility_required: bool = Query(False),
+    user_id: str | None = Query(None),
+    access_level: str | None = Query(None),
+    current_zone_id: str | None = Query(None),
     db: AsyncSession = Depends(get_async_db),
 ):
     now = datetime.now(timezone.utc)
-
-    user_ctx = UserContext(
-        user_id=UUID(user_id),
-        access_level=access_level,
-    )
-    mobility_ctx = MobilityContext(
-        current_zone_id=UUID(current_zone_id) if current_zone_id else None,
-        speed=speed,
-        accessibility_required=accessibility_required,
-        latitude=latitude,
-        longitude=longitude,
-    )
 
     result = await get_transport_product_adapter(
         db=db,
         timestamp=now,
         event_id=event_id,
-        user_context=user_ctx,
-        mobility_context=mobility_ctx,
+        destination=destination,
+        user_latitude=latitude,
+        user_longitude=longitude,
         limit=limit,
     )
 
