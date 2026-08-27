@@ -7,7 +7,8 @@ from __future__ import annotations
 
 import logging
 import math
-from datetime import datetime, time, timezone
+from datetime import datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +25,8 @@ from app.schemas.product import (
 logger = logging.getLogger(__name__)
 
 _EARTH_RADIUS_M = 6_371_000
+
+ARGENTINA_TZ = ZoneInfo("America/Argentina/Buenos_Aires")
 
 
 def _haversine_distance_m(
@@ -68,6 +71,7 @@ async def get_transport_product_adapter(
     timestamp: datetime,
     event_id: str,
     destination: str | None = None,
+    transport_type: str | None = None,
     user_latitude: float | None = None,
     user_longitude: float | None = None,
     limit: int = 5,
@@ -76,17 +80,19 @@ async def get_transport_product_adapter(
 
     Logic:
     1. Load all transport_line_stops for this event, joining line + zone.
-    2. If *destination* is provided, keep only stops whose line has at least
+    2. If *transport_type* is provided, keep only stops of lines of that type.
+    3. If *destination* is provided, keep only stops whose line has at least
        one schedule with that destination.
-    3. For each stop, compute Haversine distance (if user coords available).
-    4. For each stop, find the next departure after *timestamp* for the
-       current day_type.
-    5. Sort by distance ascending (stops without coordinates go last).
-    6. Mark ``is_nearest=True`` on the first stop with valid coordinates.
+    4. For each stop, compute Haversine distance (if user coords available).
+    5. For each stop, find the next departure after *timestamp* for the
+       current day_type (civil calendar in Argentina time).
+    6. Sort by distance ascending (stops without coordinates go last).
+    7. Mark ``is_nearest=True`` on the first stop with valid coordinates.
     """
-    now_utc = timestamp.astimezone(timezone.utc)
-    day_type = _resolve_day_type(now_utc)
-    current_time = now_utc.time()
+    now_local = timestamp.astimezone(ARGENTINA_TZ)
+    day_type = _resolve_day_type(now_local)
+    current_time = now_local.time()
+    tomorrow_day_type = _resolve_day_type(now_local + timedelta(days=1))
 
     # --- 1. Load line_stops with line + zone metadata (single query) ---
     stmt = (
@@ -107,12 +113,14 @@ async def get_transport_product_adapter(
         .where(TransportLine.event_id == event_id)
         .where(TransportLine.active == True)
     )
+    if transport_type is not None:
+        stmt = stmt.where(TransportLine.type == transport_type)
     rows = (await db.execute(stmt)).all()
 
     if not rows:
         return TransportRecommendationResponse(
             event_id=event_id,
-            timestamp=now_utc.isoformat(),
+            timestamp=now_local.isoformat(),
             mode="sin_solucion",
             zonas=[],
         )
@@ -132,7 +140,7 @@ async def get_transport_product_adapter(
         if not matching_line_stop_ids:
             return TransportRecommendationResponse(
                 event_id=event_id,
-                timestamp=now_utc.isoformat(),
+                timestamp=now_local.isoformat(),
                 mode="sin_solucion",
                 zonas=[],
             )
@@ -147,19 +155,23 @@ async def get_transport_product_adapter(
     if not rows:
         return TransportRecommendationResponse(
             event_id=event_id,
-            timestamp=now_utc.isoformat(),
+            timestamp=now_local.isoformat(),
             mode="sin_solucion",
             zonas=[],
         )
 
-    # --- 3. For each stop: load schedules, find next departure ---
+    # --- 3. For each stop: load schedules (today + tomorrow), find next departure ---
     line_stop_ids = [r.line_stop_id for r in rows]
-    all_scheds = await _load_schedules(db, line_stop_ids, day_type)
+    today_scheds = await _load_schedules(db, line_stop_ids, day_type)
+    tomorrow_scheds = await _load_schedules(db, line_stop_ids, tomorrow_day_type)
 
-    # Group schedules by line_stop_id
+    # Group by line_stop_id, keeping today and tomorrow separate
     scheds_by_ls: dict[str, list] = {}
-    for s in all_scheds:
+    scheds_by_ls_tomorrow: dict[str, list] = {}
+    for s in today_scheds:
         scheds_by_ls.setdefault(s.line_stop_id, []).append(s)
+    for s in tomorrow_scheds:
+        scheds_by_ls_tomorrow.setdefault(s.line_stop_id, []).append(s)
 
     # --- 4. Build enriched items ---
     items: list[ZonaTransporteItem] = []
@@ -170,26 +182,31 @@ async def get_transport_product_adapter(
         else:
             distance_m = float("inf")
 
-        # Next departure for this stop
+        # Next departure for this stop (today first, then tomorrow)
         stop_scheds = scheds_by_ls.get(row.line_stop_id, [])
-        next_dep, mins_until = _find_next_departure(stop_scheds, current_time)
+        stop_scheds_tomorrow = scheds_by_ls_tomorrow.get(row.line_stop_id, [])
+        next_dep, mins_until, is_tomorrow = _find_next_departure(
+            stop_scheds, stop_scheds_tomorrow, current_time
+        )
 
         # If destination filter is active, filter matching destinations
         if destination is not None and next_dep is None:
-            # Check if this stop has ANY schedule matching destination
             matching = [
-                s for s in stop_scheds
+                s for s in stop_scheds + stop_scheds_tomorrow
                 if destination.strip().upper() in s.destination.upper()
             ]
-            if matching:
-                # Use first matching schedule's departure
-                next_dep, mins_until = _find_next_departure(matching, current_time)
+            matching_today = [s for s in matching if s.day_type == day_type]
+            matching_tomorrow = [s for s in matching if s.day_type == tomorrow_day_type]
+            if matching_today or matching_tomorrow:
+                next_dep, mins_until, is_tomorrow = _find_next_departure(
+                    matching_today, matching_tomorrow, current_time
+                )
 
         items.append(ZonaTransporteItem(
             zone_id=str(row.zone_id),
             name=row.zone_name or str(row.zone_id),
             score=1.0 if next_dep is not None else 0.0,
-            reasoning=_build_reasoning(row, next_dep, mins_until, distance_m),
+            reasoning=_build_reasoning(row, next_dep, mins_until, distance_m, is_tomorrow),
             saturation_level=None,
             estado=None,
             availability=None,
@@ -208,6 +225,7 @@ async def get_transport_product_adapter(
             next_departure=next_dep,
             minutes_until_next=mins_until,
             destination=destination,
+            is_tomorrow=is_tomorrow,
         ))
 
     # --- 5. Sort by distance (None/inf last) ---
@@ -227,7 +245,7 @@ async def get_transport_product_adapter(
 
     return TransportRecommendationResponse(
         event_id=event_id,
-        timestamp=now_utc.isoformat(),
+        timestamp=now_local.isoformat(),
         mode=mode,
         zonas=items,
     )
@@ -254,28 +272,54 @@ async def _load_schedules(
     return (await db.execute(stmt)).scalars().all()
 
 
+def _minutes_to_midnight(current_time: time) -> int:
+    """Minutes from *current_time* until the next midnight (23:59:59 -> 0)."""
+    current = current_time.hour * 60 + current_time.minute
+    return 24 * 60 - current
+
+
+def _extract_time(value) -> time:
+    return value if isinstance(value, time) else value.time()
+
+
 def _find_next_departure(
     schedules: list,
+    schedules_tomorrow: list,
     current_time: time,
-) -> tuple[str | None, int | None]:
-    """Find the first departure_time > current_time. Returns (HH:MM, minutes)."""
+) -> tuple[str | None, int | None, bool]:
+    """Find the next departure today, else the first departure tomorrow.
+
+    Returns ``(HH:MM, minutes_until, is_tomorrow)``.
+    ``is_tomorrow`` is True when the match comes from the following day.
+    """
+    # 1. Try today: first departure after current_time
     for sched in schedules:
-        dep = sched.departure_time
-        # Handle time objects (might be datetime.time or datetime)
-        dep_time = dep if isinstance(dep, time) else dep.time()
+        dep_time = _extract_time(sched.departure_time)
         mins = _minutes_until(current_time, dep_time)
         if mins > 0:
-            return dep_time.strftime("%H:%M"), mins
-    return None, None
+            return dep_time.strftime("%H:%M"), mins, False
+
+    # 2. No more services today: first departure tomorrow.
+    #    Minutes = time-to-midnight + departure minutes after midnight.
+    base_minutes = _minutes_to_midnight(current_time)
+    for sched in schedules_tomorrow:
+        dep_time = _extract_time(sched.departure_time)
+        dep_minutes = dep_time.hour * 60 + dep_time.minute
+        return dep_time.strftime("%H:%M"), base_minutes + dep_minutes, True
+
+    # 3. No service today nor tomorrow
+    return None, None, False
 
 
 def _build_reasoning(
     row, next_dep: str | None, mins: int | None, distance_m: float,
+    is_tomorrow: bool = False,
 ) -> list[str]:
     """Build human-readable reasoning for the recommendation."""
     reasons = []
     if next_dep is not None:
-        reasons.append(f"Próximo servicio a las {next_dep} en {mins} min")
+        prefijo = "mañana " if is_tomorrow else ""
+        reasons.append(f"Próximo servicio {prefijo}a las {next_dep} en {mins} min")
     else:
         reasons.append("Sin horarios disponibles para este horario")
     if distance_m != float("inf"):

@@ -3,20 +3,42 @@ import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/Header'
 import { Map, X } from 'lucide-react'
 import { useAppStore } from '@/core/state/store'
-import { useTransportRecommendations, type ZonaTransporteItem } from '@/services/transportProduct'
+import {
+  useTransportRecommendations,
+  useAvailableDestinations,
+  type ZonaTransporteItem,
+  type TransportType,
+} from '@/services/transportProduct'
 import { NearestBadge } from '@/components/ZonaCardsList'
 import { GpsModal } from '@/components/GpsModal'
 import { formatUpdatedAt } from '@/utils/formatTime'
 import { getDistancias } from '@/utils/geo'
 
-const DESTINOS = ['Todos', 'Los Nogales', 'Córdoba', 'Colonia Caroya', 'Terminal']
+const TIPOS: { valor: TransportType; etiqueta: string; icono: string }[] = [
+  { valor: 'urbano', etiqueta: 'Urbano', icono: '🚌' },
+  { valor: 'interurbano', etiqueta: 'Interurbano', icono: '🚍' },
+]
 
 const ServiciosTransporte = () => {
   const navigate = useNavigate()
-  const [destino, setDestino] = useState('Todos')
-  const { data, loading, error, refresh } = useTransportRecommendations(
-    destino === 'Todos' ? undefined : destino
+  const [tipo, setTipo] = useState<TransportType | null>(null)
+  const [destino, setDestino] = useState<string>('Todos')
+
+  const {
+    data: destinosData,
+    loading: cargandoDestinos,
+  } = useAvailableDestinations(tipo ?? undefined)
+
+  const {
+    data,
+    loading,
+    error,
+    refresh,
+  } = useTransportRecommendations(
+    destino === 'Todos' ? undefined : destino,
+    tipo ?? undefined
   )
+
   const [selectedZona, setSelectedZona] = useState<ZonaTransporteItem | null>(null)
   const [mostrarGpsModal, setMostrarGpsModal] = useState(true)
   const userLocation = useAppStore(s => s.userLocation)
@@ -26,8 +48,14 @@ const ServiciosTransporte = () => {
     refresh()
   }, [refresh])
 
+  // Reset destino when the type changes
+  useEffect(() => {
+    setDestino('Todos')
+  }, [tipo])
+
   const zonas = data?.zonas ?? []
   const timestamp = data?.timestamp ? Date.parse(data.timestamp) : Date.now()
+  const destinos = destinosData?.destinations ?? []
 
   const abrirMapa = (zona: ZonaTransporteItem) => {
     if (zona.lat && zona.lng) {
@@ -37,6 +65,25 @@ const ServiciosTransporte = () => {
       )
     }
     setSelectedZona(null)
+  }
+
+  const renderHorario = (zona: ZonaTransporteItem) => {
+    if (!zona.next_departure) {
+      return <p className="text-xs text-slate-500 dark:text-slate-300 mt-1">🚫 Sin servicios programados para este horario</p>
+    }
+    const prefijo = zona.is_tomorrow ? 'mañana ' : ''
+    const sufijo = zona.minutes_until_next != null ? ` (en ${zona.minutes_until_next} min)` : ''
+    return (
+      <p
+        className={`text-xs mt-1 ${
+          zona.is_tomorrow
+            ? 'text-blue-600 dark:text-blue-400 font-semibold'
+            : 'text-slate-700 dark:text-slate-200'
+        }`}
+      >
+        {zona.is_tomorrow ? '🌙 ' : '🚌 '}Próximo servicio: <span className="font-semibold">{prefijo}{zona.next_departure}{sufijo}</span>
+      </p>
+    )
   }
 
   const renderCard = (zona: ZonaTransporteItem) => {
@@ -59,18 +106,7 @@ const ServiciosTransporte = () => {
             {zona.line_name ?? 'Línea sin nombre'}
             {zona.company ? ` · ${zona.company}` : ''}
           </p>
-          {zona.next_departure ? (
-            <p className="text-xs text-slate-700 dark:text-slate-200 mt-1">
-              🚌 Próximo servicio: <span className="font-semibold">{zona.next_departure}</span>
-              {zona.minutes_until_next != null && (
-                <span> (en {zona.minutes_until_next} min)</span>
-              )}
-            </p>
-          ) : (
-            <p className="text-xs text-slate-500 dark:text-slate-300 mt-1">
-              🚫 Sin servicios programados para este horario
-            </p>
-          )}
+          {renderHorario(zona)}
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex flex-wrap gap-x-2 gap-y-0.5 items-center">
             {zona.destination && <span>🎯 {zona.destination}</span>}
             {zona.distancia_min != null && <span>· 📏 {zona.distancia_min} m</span>}
@@ -102,18 +138,7 @@ const ServiciosTransporte = () => {
         </p>
 
         <div className="space-y-2 mb-4">
-          {selectedZona.next_departure ? (
-            <p className="text-sm text-slate-700 dark:text-slate-200">
-              🚌 Próximo servicio: <span className="font-semibold">{selectedZona.next_departure}</span>
-              {selectedZona.minutes_until_next != null && (
-                <span> (en {selectedZona.minutes_until_next} min)</span>
-              )}
-            </p>
-          ) : (
-            <p className="text-sm text-slate-500 dark:text-slate-300">
-              🚫 Sin servicios programados para este horario
-            </p>
-          )}
+          {renderHorario(selectedZona)}
           {selectedZona.destination && (
             <p className="text-sm text-slate-600 dark:text-slate-300">
               🎯 Destino: <span className="font-semibold">{selectedZona.destination}</span>
@@ -165,92 +190,128 @@ const ServiciosTransporte = () => {
     </>
   )
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        <Header title="Transporte" showBack onBack={() => navigate('/')} />
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-slate-500">Cargando horarios de transporte...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        <Header title="Transporte" showBack onBack={() => navigate('/')} />
-        <div className="flex-1 p-4 flex flex-col items-center justify-center space-y-4">
-          <p className="text-danger font-bold">Error al cargar</p>
-          <p className="text-sm text-slate-500 text-center">{error}</p>
-          <button
-            onClick={refresh}
-            className="bg-primary text-white px-6 py-2 rounded-lg font-bold"
-          >
-            Reintentar
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  const sinServicios = data?.mode === 'sin_solucion' || zonas.length === 0
-
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
       <Header title="Transporte" showBack onBack={() => navigate('/')} />
 
       <div className="flex-1 p-4 overflow-y-auto space-y-4">
-        {/* Selector de destino */}
-        <div>
-          <p className="text-xs font-bold text-slate-600 dark:text-slate-300 mb-2 px-1">
-            🎯 ¿A dónde vas?
-          </p>
-          <div className="flex flex-wrap gap-2 px-1">
-            {DESTINOS.map(d => (
-              <button
-                key={d}
-                onClick={() => setDestino(d)}
-                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                  destino === d
-                    ? 'bg-primary text-white'
-                    : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
-                }`}
-              >
-                {d}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {!userLocation && mostrarGpsModal && (
-          <GpsModal
-            mensaje="Para mostrarte la parada de transporte más cercana, necesitamos tu ubicación GPS."
-            onActivate={() => {
-              requestLocation()
-              setMostrarGpsModal(false)
-            }}
-            onClose={() => setMostrarGpsModal(false)}
-          />
-        )}
-
-        {sinServicios ? (
-          <div className="bg-slate-100 dark:bg-slate-700 p-6 rounded-xl text-center space-y-2">
-            <p className="text-lg font-bold text-slate-800 dark:text-slate-100">
-              🚌 No hay servicios de transporte disponibles hacia ese destino en este horario
-            </p>
-            <p className="text-sm text-slate-500 dark:text-slate-300">
-              Probá otro destino o consultá más tarde.
-            </p>
+        {/* PASO 1: Selector de tipo */}
+        {!tipo ? (
+          <div className="space-y-4">
+            <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm text-center">
+              <p className="text-3xl mb-2">🚌</p>
+              <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">
+                ¿Qué tipo de transporte necesitás?
+              </h2>
+              <p className="text-sm text-slate-500 dark:text-slate-300 mt-1">
+                Seleccioná una opción para ver los servicios disponibles.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 px-1">
+              {TIPOS.map(t => (
+                <button
+                  key={t.valor}
+                  onClick={() => setTipo(t.valor)}
+                  className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 rounded-xl p-4 shadow-sm transition-colors flex flex-col items-center gap-1"
+                >
+                  <span className="text-3xl">{t.icono}</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-100">
+                    {t.etiqueta}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
         ) : (
-          <div className="space-y-2 pb-16">
-            <p className="text-xs font-bold text-slate-600 dark:text-slate-300 px-1 flex justify-between">
-              <span>🚌 {zonas.length} paradas de transporte disponibles</span>
-              {userLocation && <span className="text-blue-500 text-[10px] font-semibold">📡 Ubicación GPS activa</span>}
-            </p>
-            {zonas.map(renderCard)}
-          </div>
+          <>
+            {/* PASO 2: Selector de destino (dinámico) */}
+            <div>
+              <div className="flex items-center justify-between px-1">
+                <p className="text-xs font-bold text-slate-600 dark:text-slate-300 mb-2">
+                  🎯 ¿A dónde vas?
+                </p>
+                <button
+                  onClick={() => setTipo(null)}
+                  className="text-xs text-slate-500 dark:text-slate-400 underline"
+                >
+                  Cambiar tipo
+                </button>
+              </div>
+              {cargandoDestinos ? (
+                <p className="text-sm text-slate-500 italic px-1">Cargando destinos...</p>
+              ) : (
+                <div className="flex flex-wrap gap-2 px-1">
+                  <button
+                    key="todos"
+                    onClick={() => setDestino('Todos')}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                      destino === 'Todos'
+                        ? 'bg-primary text-white'
+                        : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+                    }`}
+                  >
+                    Todos
+                  </button>
+                  {destinos.map(d => (
+                    <button
+                      key={d}
+                      onClick={() => setDestino(d)}
+                      className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                        destino === d
+                          ? 'bg-primary text-white'
+                          : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+                      }`}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {!userLocation && mostrarGpsModal && (
+              <GpsModal
+                mensaje="Para mostrarte la parada de transporte más cercana, necesitamos tu ubicación GPS."
+                onActivate={() => {
+                  requestLocation()
+                  setMostrarGpsModal(false)
+                }}
+                onClose={() => setMostrarGpsModal(false)}
+              />
+            )}
+
+            {/* PASO 3: Lista de paradas */}
+            {loading ? (
+              <div className="py-10 text-center">
+                <p className="text-slate-500">Cargando horarios de transporte...</p>
+              </div>
+            ) : error ? (
+              <div className="p-4 flex flex-col items-center space-y-4 bg-slate-100 dark:bg-slate-700 rounded-xl">
+                <p className="text-danger font-bold">Error al cargar</p>
+                <p className="text-sm text-slate-500 dark:text-slate-300 text-center">{error}</p>
+                <button onClick={refresh} className="bg-primary text-white px-6 py-2 rounded-lg font-bold">
+                  Reintentar
+                </button>
+              </div>
+            ) : data?.mode === 'sin_solucion' || zonas.length === 0 ? (
+              <div className="bg-slate-100 dark:bg-slate-700 p-6 rounded-xl text-center space-y-2">
+                <p className="text-lg font-bold text-slate-800 dark:text-slate-100">
+                  🚌 No hay servicios de transporte disponibles hacia ese destino en este horario
+                </p>
+                <p className="text-sm text-slate-500 dark:text-slate-300">
+                  Probá otro destino o consultá más tarde.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2 pb-16">
+                <p className="text-xs font-bold text-slate-600 dark:text-slate-300 px-1 flex justify-between">
+                  <span>🚌 {zonas.length} paradas de transporte disponibles</span>
+                  {userLocation && <span className="text-blue-500 text-[10px] font-semibold">📡 Ubicación GPS activa</span>}
+                </p>
+                {zonas.map(renderCard)}
+              </div>
+            )}
+          </>
         )}
       </div>
 

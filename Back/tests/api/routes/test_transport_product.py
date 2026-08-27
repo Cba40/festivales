@@ -201,9 +201,11 @@ class TestTransportAdapter:
         zona = result.zonas[0]
         assert zona.line_name == "Línea 1"
         assert zona.company == "CopSA"
+        # 2026-08-26 10:00 UTC == 07:00 local (UTC-3); 10:30 - 07:00 = 210 min
         assert zona.next_departure == "10:30"
-        assert zona.minutes_until_next == 30
+        assert zona.minutes_until_next == 210
         assert zona.destination is None
+        assert zona.is_tomorrow is False
 
     @pytest.mark.asyncio
     async def test_filters_by_destination(self):
@@ -345,7 +347,7 @@ class TestTransportAdapter:
         assert result.zonas[-1].distancia_min is None
 
     @pytest.mark.asyncio
-    async def test_no_future_departures_today(self):
+    async def test_no_future_today_falls_back_to_tomorrow(self):
         rows = [_make_row()]
         schedules = [_make_schedule(departure_time=time(6, 0))]
         db = _mock_db(rows, schedules)
@@ -357,9 +359,53 @@ class TestTransportAdapter:
         )
 
         zona = result.zonas[0]
-        assert zona.next_departure is None
-        assert zona.minutes_until_next is None
-        assert zona.score == 0.0
+        # 2026-08-26 10:00 UTC == 07:00 local. Today's 06:00 already passed; falls back to tomorrow 06:00
+        assert zona.next_departure == "06:00"
+        # 07:00 -> midnight = 1020 min; + 06:00 (360) = 1380
+        assert zona.minutes_until_next == 1380
+        assert zona.is_tomorrow is True
+        assert zona.score == 1.0
+
+    @pytest.mark.asyncio
+    async def test_timezone_argentina_correct_minutes(self):
+        """Regression: 17:11 local (== 20:11 UTC) vs a 21:10 local departure -> 239 min, not 59."""
+        rows = [_make_row()]
+        schedules = [_make_schedule(departure_time=time(21, 10))]
+        db = _mock_db(rows, schedules)
+
+        result = await get_transport_product_adapter(
+            db=db,
+            timestamp=datetime(2026, 8, 26, 20, 11, tzinfo=timezone.utc),  # 20:11 UTC == 17:11 local
+            event_id=EVENT_ID,
+        )
+
+        zona = result.zonas[0]
+        assert zona.next_departure == "21:10"
+        assert zona.minutes_until_next == 239
+        assert zona.is_tomorrow is False
+
+    @pytest.mark.asyncio
+    async def test_next_day_service(self):
+        """23:30 local (21:00 -> service ended) -> first service next day at 06:20."""
+        rows = [_make_row()]
+        schedules = [
+            _make_schedule(departure_time=time(6, 20)),
+            _make_schedule(departure_time=time(23, 0)),
+        ]
+        db = _mock_db(rows, schedules)
+
+        # 2026-08-27 02:30 UTC == 2026-08-26 23:30 local (Wednesday)
+        result = await get_transport_product_adapter(
+            db=db,
+            timestamp=datetime(2026, 8, 27, 2, 30, tzinfo=timezone.utc),
+            event_id=EVENT_ID,
+        )
+
+        zona = result.zonas[0]
+        assert zona.next_departure == "06:20"
+        # 23:30 -> midnight = 30 min; + 06:20 (380) = 410
+        assert zona.minutes_until_next == 410
+        assert zona.is_tomorrow is True
 
     @pytest.mark.asyncio
     async def test_limit_truncates_results(self):
@@ -484,6 +530,76 @@ class TestTransportEndpointHTTP:
         assert kwargs["user_longitude"] == pytest.approx(-64.19)
         assert kwargs["limit"] == 10
 
+    def test_adapter_receives_transport_type(
+        self,
+        client: TestClient,
+        auth_headers: dict[str, str],
+        _mock_adapter: AsyncMock,
+    ):
+        client.get(
+            f"{BASE_URL}/products/transport",
+            params={"transport_type": "urbano"},
+            headers=auth_headers,
+        )
+
+        _mock_adapter.assert_awaited_once()
+        kwargs = _mock_adapter.await_args[1]
+        assert kwargs["transport_type"] == "urbano"
+
+    @pytest.mark.parametrize("tt", ["urbano", "interurbano"])
+    def test_transport_type_valid_values(
+        self,
+        client: TestClient,
+        auth_headers: dict[str, str],
+        tt: str,
+    ):
+        resp = client.get(
+            f"{BASE_URL}/products/transport",
+            params={"transport_type": tt},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+
+    @pytest.mark.parametrize("tt", ["URBANO", "urb", "nacional", "aereo"])
+    def test_transport_type_invalid_values_422(
+        self,
+        client: TestClient,
+        auth_headers: dict[str, str],
+        tt: str,
+    ):
+        resp = client.get(
+            f"{BASE_URL}/products/transport",
+            params={"transport_type": tt},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 422
+
+    def test_destinations_endpoint_public(self, client: TestClient, mock_async_db: AsyncMock):
+        result = MagicMock()
+        result.all.return_value = [("Córdoba",), ("Los Nogales",)]
+        mock_async_db.execute = AsyncMock(return_value=result)
+        resp = client.get(f"{BASE_URL}/transport/destinations")
+        assert resp.status_code == 200
+        assert resp.json()["destinations"] == ["Córdoba", "Los Nogales"]
+
+    def test_destinations_endpoint_filters_by_type(self, client: TestClient, mock_async_db: AsyncMock):
+        result = MagicMock()
+        result.all.return_value = [("Córdoba",)]
+        mock_async_db.execute = AsyncMock(return_value=result)
+        resp = client.get(
+            f"{BASE_URL}/transport/destinations",
+            params={"transport_type": "urbano"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["destinations"] == ["Córdoba"]
+
+    def test_destinations_invalid_type_422(self, client: TestClient):
+        resp = client.get(
+            f"{BASE_URL}/transport/destinations",
+            params={"transport_type": "nacional"},
+        )
+        assert resp.status_code == 422
+
     def test_coordinates_optional(
         self,
         client: TestClient,
@@ -551,6 +667,6 @@ class TestTransportEndpointHTTP:
             "operational_state", "calle", "lat", "lng", "referencia",
             "distancia_min", "is_nearest",
             "line_name", "company", "next_departure",
-            "minutes_until_next", "destination",
+            "minutes_until_next", "destination", "is_tomorrow",
         }
         assert set(zona.keys()) == expected_fields

@@ -28,6 +28,7 @@ export interface ZonaTransporteItem {
   next_departure: string | null
   minutes_until_next: number | null
   destination: string | null
+  is_tomorrow: boolean
 }
 
 export interface TransportRecommendationResponse {
@@ -37,7 +38,12 @@ export interface TransportRecommendationResponse {
   zonas: ZonaTransporteItem[]
 }
 
-export function useTransportRecommendations(destination?: string) {
+export type TransportType = 'urbano' | 'interurbano'
+
+export function useTransportRecommendations(
+  destination?: string,
+  transportType?: TransportType
+) {
   const [data, setData] = useState<TransportRecommendationResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -63,6 +69,7 @@ export function useTransportRecommendations(destination?: string) {
               ? { latitude: userLocation[0], longitude: userLocation[1] }
               : {}),
             ...(destination ? { destination } : {}),
+            ...(transportType ? { transport_type: transportType } : {}),
           },
         }
       )
@@ -72,7 +79,37 @@ export function useTransportRecommendations(destination?: string) {
     } finally {
       setLoading(false)
     }
-  }, [currentZoneId, userLocation, destination])
+  }, [currentZoneId, userLocation, destination, transportType])
 
   return { data, loading, error, refresh }
+}
+
+export interface AvailableDestinationsResponse {
+  destinations: string[]
+}
+
+export function useAvailableDestinations(transportType?: TransportType) {
+  const [destinations, setDestinations] = useState<string[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const refresh = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const { data } = await apiClient.get<AvailableDestinationsResponse>(
+        endpoints.products.transportDestinations(EVENT_ID),
+        {
+          params: transportType ? { transport_type: transportType } : {},
+        }
+      )
+      setDestinations(data.destinations ?? [])
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || 'Error al obtener destinos de transporte')
+    } finally {
+      setLoading(false)
+    }
+  }, [transportType])
+
+  return { destinations, loading, error, refresh }
 }

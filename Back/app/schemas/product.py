@@ -42,6 +42,7 @@ class ZonaTransporteItem(ZonaItemBase):
     next_departure: str | None = None
     minutes_until_next: int | None = None
     destination: str | None = None
+    is_tomorrow: bool = False
 
 
 class GastronomyRecommendationResponse(BaseModel):
