@@ -570,26 +570,33 @@ export function TransportManagementScreen({ eventId }: { eventId: string }) {
                       ) : selectedSchedules.length === 0 ? (
                         <p className="text-sm text-slate-500 italic">Sin horarios registrados.</p>
                       ) : (
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="text-left text-slate-500">
-                              <th className="pb-1 font-medium">Día</th>
-                              <th className="pb-1 font-medium">Hora</th>
-                              <th className="pb-1 font-medium">Destino</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-200">
-                            {selectedSchedules.map((s) => (
-                              <tr key={s.id}>
-                                <td className="py-1.5 text-slate-700">
-                                  {DAY_TYPE_LABELS[s.day_type] ?? s.day_type}
-                                </td>
-                                <td className="py-1.5 text-slate-700">{s.departure_time}</td>
-                                <td className="py-1.5 text-slate-700">{s.destination}</td>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm table-fixed">
+                            <colgroup>
+                              <col className="w-[120px]" />
+                              <col className="w-[100px]" />
+                              <col className="w-[auto]" />
+                            </colgroup>
+                            <thead>
+                              <tr className="text-left text-slate-500">
+                                <th className="pb-1 font-medium">Día</th>
+                                <th className="pb-1 font-medium">Hora</th>
+                                <th className="pb-1 font-medium">Destino</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody className="divide-y divide-slate-200">
+                              {selectedSchedules.map((s) => (
+                                <tr key={s.id}>
+                                  <td className="py-1.5 text-slate-700">
+                                    {DAY_TYPE_LABELS[s.day_type] ?? s.day_type}
+                                  </td>
+                                  <td className="py-1.5 text-slate-700">{s.departure_time}</td>
+                                  <td className="py-1.5 text-slate-700 break-words">{s.destination}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
                       )}
                     </div>
                   </div>
