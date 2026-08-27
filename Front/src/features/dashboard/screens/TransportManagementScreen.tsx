@@ -350,8 +350,7 @@ export function TransportManagementScreen({ eventId }: { eventId: string }) {
 
   // ----- Importación CSV -----
 
-  const onCsvFile = async (file: File) => {
-    if (!selectedLineId) return;
+  const importarCsv = async (file: File, refreshDetail: boolean) => {
     const formData = new FormData();
     formData.append('file', file);
     setCsvImporting(true);
@@ -376,16 +375,27 @@ export function TransportManagementScreen({ eventId }: { eventId: string }) {
       ].join(' · ');
       setCsvResult(r.errors.length ? `${resumen} — Errores: ${r.errors.join('; ')}` : resumen);
       await cargarLines();
-      await cargarDetalle(selectedLineId);
+      if (refreshDetail && selectedLineId) await cargarDetalle(selectedLineId);
     } catch {
       setCsvError('No se pudo importar el archivo CSV. Verificá el formato.');
     } finally {
       setCsvImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
+      if (globalCsvInputRef.current) globalCsvInputRef.current.value = '';
     }
   };
 
+  const onCsvFile = async (file: File) => {
+    if (!selectedLineId) return;
+    await importarCsv(file, true);
+  };
+
+  const onGlobalCsvFile = async (file: File) => {
+    await importarCsv(file, false);
+  };
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const globalCsvInputRef = useRef<HTMLInputElement>(null);
 
   const descargarPlantilla = async () => {
     try {
@@ -413,13 +423,40 @@ export function TransportManagementScreen({ eventId }: { eventId: string }) {
       <section>
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-semibold text-slate-700">Líneas de Transporte ({lines.length})</h2>
-          <button
-            onClick={abrirCrearLinea}
-            className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md text-sm font-medium transition-colors"
-          >
-            + Nueva Línea
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={abrirCrearLinea}
+              className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md text-sm font-medium transition-colors"
+            >
+              + Nueva Línea
+            </button>
+            <label className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-md text-sm font-medium transition-colors cursor-pointer">
+              {csvImporting ? 'Importando...' : '📥 Importar CSV'}
+              <input
+                ref={globalCsvInputRef}
+                type="file"
+                accept=".csv"
+                className="hidden"
+                disabled={csvImporting}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void onGlobalCsvFile(file);
+                }}
+              />
+            </label>
+          </div>
         </div>
+
+        {csvError && (
+          <p className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">
+            {csvError}
+          </p>
+        )}
+        {csvResult && (
+          <p className="mb-4 text-sm text-green-700 bg-green-50 border border-green-200 rounded-md p-3">
+            {csvResult}
+          </p>
+        )}
 
         {linesError && (
           <p className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">
@@ -810,7 +847,7 @@ function ModalFrame({
 }) {
   return (
     <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6 mx-4 space-y-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl p-6 mx-4 space-y-4">
         <h3 className="text-lg font-semibold text-slate-800">{title}</h3>
         {children}
       </div>
