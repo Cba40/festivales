@@ -72,6 +72,8 @@ export const endpoints = {
       `/events/${eventId}/products/health`,
     hydration: (eventId: string) =>
       `/events/${eventId}/products/hydration`,
+    accommodation: (eventId: string) =>
+      `/events/${eventId}/products/accommodation`,
   },
   exitAdmin: {
     destinations: {
