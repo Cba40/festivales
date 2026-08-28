@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { isAxiosError } from 'axios';
 import { apiClient } from '../../../core/api/client';
 import { endpoints } from '../../../core/api/endpoints';
+import { AdminMapSelector } from '../../../components/AdminMapSelector';
 
 type AccommodationType = 'hotel' | 'hostel' | 'camping' | 'other';
 
@@ -75,6 +76,8 @@ export function AccommodationManagementScreen({ eventId }: { eventId: string }) 
   const [form, setForm] = useState<ModalForm>(emptyForm);
   const [modalSaving, setModalSaving] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
+  const [mapPickerOpen, setMapPickerOpen] = useState(false);
+  const [showManualCoords, setShowManualCoords] = useState(false);
 
   const cargar = useCallback(async () => {
     try {
@@ -364,28 +367,75 @@ export function AccommodationManagementScreen({ eventId }: { eventId: string }) 
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Latitud</label>
-                <input
-                  type="number"
-                  step="0.0001"
-                  value={form.latitude}
-                  onChange={(e) => setCampo('latitude', e.target.value)}
-                  placeholder="-30.9815"
-                  className={inputCls}
-                />
-              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Ubicación (coordenadas)
+                </label>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Longitud</label>
-                <input
-                  type="number"
-                  step="0.0001"
-                  value={form.longitude}
-                  onChange={(e) => setCampo('longitude', e.target.value)}
-                  placeholder="-64.0935"
-                  className={inputCls}
-                />
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setMapPickerOpen(true)}
+                    className="py-2 px-4 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-md transition-colors"
+                  >
+                    📍 Seleccionar en mapa
+                  </button>
+
+                  {form.latitude !== '' || form.longitude !== '' ? (
+                    <>
+                      <span className="text-sm text-slate-600 font-mono">
+                        {form.latitude || '—'}, {form.longitude || '—'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCampo('latitude', '');
+                          setCampo('longitude', '');
+                        }}
+                        className="text-sm font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-100 px-2 py-1 rounded-md transition-colors"
+                      >
+                        Limpiar
+                      </button>
+                    </>
+                  ) : (
+                    <span className="text-sm text-slate-400">Sin coordenadas definidas</span>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowManualCoords((v) => !v)}
+                  className="mt-2 text-xs font-medium text-blue-600 hover:underline"
+                >
+                  {showManualCoords ? '▲ Ocultar edición manual' : '▼ Edición manual avanzada'}
+                </button>
+
+                {showManualCoords && (
+                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Latitud</label>
+                      <input
+                        type="number"
+                        step="0.0001"
+                        value={form.latitude}
+                        onChange={(e) => setCampo('latitude', e.target.value)}
+                        placeholder="-30.9815"
+                        className={inputCls}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Longitud</label>
+                      <input
+                        type="number"
+                        step="0.0001"
+                        value={form.longitude}
+                        onChange={(e) => setCampo('longitude', e.target.value)}
+                        placeholder="-64.0935"
+                        className={inputCls}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="sm:col-span-2">
@@ -442,6 +492,54 @@ export function AccommodationManagementScreen({ eventId }: { eventId: string }) 
                 className="py-2 px-4 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md transition-colors"
               >
                 {modalSaving ? 'Guardando...' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mapPickerOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 mx-4 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-semibold text-slate-800">Seleccionar ubicación</h3>
+              <button
+                type="button"
+                onClick={() => setMapPickerOpen(false)}
+                className="text-slate-500 hover:text-slate-700 text-2xl leading-none"
+                aria-label="Cerrar"
+              >
+                ×
+              </button>
+            </div>
+
+            <AdminMapSelector
+              lat={form.latitude !== '' ? Number(form.latitude) : undefined}
+              lng={form.longitude !== '' ? Number(form.longitude) : undefined}
+              onChangeLocation={(newLat, newLng) => {
+                setCampo('latitude', String(newLat));
+                setCampo('longitude', String(newLng));
+              }}
+            />
+
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setCampo('latitude', '');
+                  setCampo('longitude', '');
+                  setMapPickerOpen(false);
+                }}
+                className="py-2 px-4 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors"
+              >
+                Limpiar y cerrar
+              </button>
+              <button
+                type="button"
+                onClick={() => setMapPickerOpen(false)}
+                className="py-2 px-4 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-md transition-colors"
+              >
+                Confirmar ubicación
               </button>
             </div>
           </div>

@@ -5,7 +5,6 @@ export const ZONE_TYPES = [
   { value: 'servicios', label: 'Servicios' },
   { value: 'emergencia', label: 'Emergencia' },
   { value: 'salida', label: 'Salida' },
-  { value: 'hospedaje', label: 'Hospedaje' },
 ] as const;
 
 // Modos canónicos de salida (contrato V1, migración c9d3e7f1a5b8 y filtro
