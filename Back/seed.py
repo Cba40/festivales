@@ -15,6 +15,8 @@ from app.models.transport_line import TransportLine
 from app.models.transport_line_stop import TransportLineStop
 from app.models.transport_schedule import TransportSchedule
 from app.models.accommodation import Accommodation, AccommodationType
+from app.models.city import City
+from app.models.emergency import Emergency, EmergencyType
 
 EVENT_ID = "663e6e32-9d4a-4f20-b992-3585b9310522"
 
@@ -666,6 +668,147 @@ def seed_accommodations(session, event):
         print(f"\u2705 Alojamiento creado: {acc.name} ({acc.type.value})")
 
 
+# ─────────────────────────────────────────────────────────────
+# Emergencia V1 (S1): ciudades y puntos de emergencia.
+# ─────────────────────────────────────────────────────────────
+
+CITIES_SEED = [
+    {"name": "Jesús María", "province": "Córdoba", "country": "Argentina"},
+    {"name": "Córdoba", "province": "Córdoba", "country": "Argentina"},
+]
+
+EMERGENCIES_SEED = [
+    {
+        "name": "Destacamento Policial Norte",
+        "type": EmergencyType.policia,
+        "phone": "+54 3525 123456",
+        "address": "Av. Vélez Sarsfield 1200",
+        "reference": "Frente a la terminal",
+        "latitude": -30.9785,
+        "longitude": -64.0950,
+        "services": "Atención 24hs, denuncias",
+        "schedule": "24hs",
+    },
+    {
+        "name": "Cuartel Bomberos Voluntarios",
+        "type": EmergencyType.bomberos,
+        "phone": "+54 3525 420100",
+        "emergency_number": "100",
+        "address": "Calle Los Bomberos 450",
+        "reference": "A 300m de la plaza",
+        "latitude": -30.9801,
+        "longitude": -64.0935,
+        "services": "Incendios, rescates, prevención",
+        "schedule": "24hs",
+    },
+    {
+        "name": "Hospital Municipal",
+        "type": EmergencyType.salud,
+        "phone": "+54 3525 421234",
+        "emergency_number": "107",
+        "address": "Av. San Martín 123",
+        "reference": "Frente a la Plaza San Martín",
+        "latitude": -30.9815,
+        "longitude": -64.0920,
+        "services": "Urgencias, guardia 24hs",
+        "schedule": "24hs",
+    },
+    {
+        "name": "Defensa Civil Jesús María",
+        "type": EmergencyType.defensa_civil,
+        "phone": "+54 3525 422345",
+        "address": "Calle Defensa 789",
+        "reference": "Edificio municipal",
+        "latitude": -30.9795,
+        "longitude": -64.0940,
+        "services": "Emergencias climáticas, evacuaciones",
+        "schedule": "24hs",
+    },
+    {
+        "name": "SAME 107",
+        "type": EmergencyType.numero_emergencia,
+        "emergency_number": "107",
+        "services": "Emergencias médicas",
+        "schedule": "24hs",
+        # latitude y longitude son NULL (no tiene ubicación física)
+    },
+    {
+        "name": "Emergencias 911",
+        "type": EmergencyType.numero_emergencia,
+        "emergency_number": "911",
+        "services": "Número único de emergencias",
+        "schedule": "24hs",
+        # latitude y longitude son NULL
+    },
+]
+
+
+def seed_cities_and_emergencies(session):
+    """Seed idempotente de ciudades y emergencias (Emergencia V1).
+
+    Lookup por clave natural: City por (name, province, country); Emergency por
+    (city_id, name). Las emergencias se asocian a la ciudad "Jesús María".
+    Devuelve {"cities_created": n, "cities_skipped": n,
+              "emergencies_created": n, "emergencies_skipped": n}.
+    """
+    cities_created = 0
+    cities_skipped = 0
+    emergencies_created = 0
+    emergencies_skipped = 0
+
+    jesus_maria = None
+
+    for cd in CITIES_SEED:
+        city = session.query(City).filter(
+            City.name == cd["name"],
+            City.province == cd["province"],
+            City.country == cd["country"],
+        ).first()
+        if city:
+            print(f"\u2139\ufe0f Ciudad ya existe: {city.name} ({city.province})")
+            cities_skipped += 1
+        else:
+            city = City(name=cd["name"], province=cd["province"], country=cd["country"])
+            session.add(city)
+            session.flush()
+            cities_created += 1
+            print(f"\u2705 Ciudad creada: {city.name} ({city.province})")
+
+        if city.name == "Jesús María" and city.province == "Córdoba":
+            jesus_maria = city
+
+    if jesus_maria is None:
+        print("⚠️ No se encontró la ciudad 'Jesús María' para las emergencias (skip)")
+        return {
+            "cities_created": cities_created,
+            "cities_skipped": cities_skipped,
+            "emergencies_created": 0,
+            "emergencies_skipped": 0,
+        }
+
+    for ed in EMERGENCIES_SEED:
+        existing = session.query(Emergency).filter(
+            Emergency.city_id == jesus_maria.id,
+            Emergency.name == ed["name"],
+        ).first()
+        if existing:
+            print(f"\u2139\ufe0f Emergencia ya existe: {existing.name}")
+            emergencies_skipped += 1
+            continue
+        em = Emergency(city_id=jesus_maria.id, **ed)
+        session.add(em)
+        session.flush()
+        emergencies_created += 1
+        print(f"\u2705 Emergencia creada: {em.name} ({em.type.value})")
+
+    return {
+        "cities_created": cities_created,
+        "cities_skipped": cities_skipped,
+        "emergencies_created": emergencies_created,
+        "emergencies_skipped": emergencies_skipped,
+    }
+
+
 def main():
     session = SessionLocal()
     try:
@@ -706,6 +849,10 @@ def main():
 
         # Hospedaje V1 (S1): alojamientos de ejemplo
         seed_accommodations(session, event)
+        session.commit()
+
+        # Emergencia V1 (S1): ciudades y puntos de emergencia
+        seed_cities_and_emergencies(session)
         session.commit()
 
         print(f"\n\U0001f4cb VITE_EVENT_ID={event.id}")

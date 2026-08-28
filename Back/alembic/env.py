@@ -23,6 +23,8 @@ import app.models.exit_destination
 import app.models.transport_line
 import app.models.transport_line_stop
 import app.models.transport_schedule
+import app.models.city
+import app.models.emergency
 
 config = context.config
 
