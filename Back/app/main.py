@@ -34,6 +34,7 @@ from app.api.routes.motor_config import router as motor_config_router
 from app.api.routes.service_configs import router as service_configs_router
 from app.api.routes.accommodation import router as accommodation_router
 from app.api.routes.accommodation_admin import router as accommodation_admin_router
+from app.api.routes.emergency import router as emergency_router
 
 app = FastAPI(title="Territorial MVP", version="0.1.0")
 
@@ -77,6 +78,7 @@ app.include_router(motor_config_router)
 app.include_router(service_configs_router)
 app.include_router(accommodation_router)
 app.include_router(accommodation_admin_router)
+app.include_router(emergency_router)
 
 
 @app.get("/health")
