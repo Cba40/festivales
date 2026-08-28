@@ -18,6 +18,11 @@ from app.models.zone_behavior import ZoneBehavior
 from app.models.operational_event import OperationalEvent
 from app.models.operational_event_modifier import OperationalEventModifier
 from app.models.motor_config import RecommendationConfigModel, Stage4ConfigModel
+import app.models.accommodation
+import app.models.exit_destination
+import app.models.transport_line
+import app.models.transport_line_stop
+import app.models.transport_schedule
 
 config = context.config
 

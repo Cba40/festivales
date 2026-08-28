@@ -14,6 +14,7 @@ from app.models.exit_zone_destination import exit_zone_destinations_table
 from app.models.transport_line import TransportLine
 from app.models.transport_line_stop import TransportLineStop
 from app.models.transport_schedule import TransportSchedule
+from app.models.accommodation import Accommodation, AccommodationType
 
 EVENT_ID = "663e6e32-9d4a-4f20-b992-3585b9310522"
 
@@ -609,6 +610,62 @@ def seed_zones(session, event):
         print(f"\u2705 Zona creada: {zone.name}")
 
 
+ACCOMMODATIONS_DATA = [
+    {
+        "name": "Hotel de la Estación",
+        "type": AccommodationType.HOTEL,
+        "address": "Av. Independencia 1250, Jesús María, Córdoba",
+        "reference": "A 1,2 km del anfiteatro, sobre Av. Independencia",
+        "latitude": -30.9815,
+        "longitude": -64.0935,
+        "phone": "+54 3525 420-101",
+        "website": "https://hoteldelaestacion.com.ar",
+        "official_info_url": "https://jesusmaria.gob.ar/turismo",
+    },
+    {
+        "name": "Hostel La Doma",
+        "type": AccommodationType.HOSTEL,
+        "address": "Calle Córdoba 340, Jesús María, Córdoba",
+        "reference": "A 800 m del festival, ambiente joven",
+        "latitude": -30.9790,
+        "longitude": -64.0910,
+        "phone": "+54 3525 420-202",
+        "website": "https://hostelladoma.com.ar",
+        "official_info_url": "https://jesusmaria.gob.ar/turismo",
+    },
+    {
+        "name": "Camping Municipal Ribera",
+        "type": AccommodationType.CAMPING,
+        "address": "Ruta Nacional 9 km 148, Jesús María, Córdoba",
+        "reference": "A 3,5 km del predio, a orillas del río",
+        "latitude": -30.9700,
+        "longitude": -64.1000,
+        "phone": "+54 3525 420-303",
+        "website": "https://jesusmaria.gob.ar/turismo/camping",
+        "official_info_url": "https://jesusmaria.gob.ar/turismo",
+    },
+]
+
+
+def seed_accommodations(session, event):
+    """Seed idempotente de alojamientos de ejemplo (Hospedaje V1)."""
+    for ad in ACCOMMODATIONS_DATA:
+        existing = session.query(Accommodation).filter(
+            Accommodation.event_id == event.id,
+            Accommodation.name == ad["name"],
+        ).first()
+        if existing:
+            print(f"\u2139\ufe0f Alojamiento ya existe: {existing.name}")
+            continue
+        acc = Accommodation(
+            event_id=event.id,
+            **ad,
+        )
+        session.add(acc)
+        session.flush()
+        print(f"\u2705 Alojamiento creado: {acc.name} ({acc.type.value})")
+
+
 def main():
     session = SessionLocal()
     try:
@@ -645,6 +702,10 @@ def main():
 
         # Transporte V1 (S1/PARTE 4): líneas, paradas y horarios de prueba
         seed_transport_data(session, event)
+        session.commit()
+
+        # Hospedaje V1 (S1): alojamientos de ejemplo
+        seed_accommodations(session, event)
         session.commit()
 
         print(f"\n\U0001f4cb VITE_EVENT_ID={event.id}")
