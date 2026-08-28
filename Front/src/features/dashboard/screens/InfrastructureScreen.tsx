@@ -3,16 +3,18 @@ import { ZoneAdminScreen } from './ZoneAdminScreen';
 import { EventReferencePointScreen } from './EventReferencePointScreen';
 import { ExitManagementScreen } from './ExitManagementScreen';
 import { TransportManagementScreen } from './TransportManagementScreen';
+import { AccommodationManagementScreen } from './AccommodationManagementScreen';
 
 const DEFAULT_EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 
-type Section = 'zones' | 'reference' | 'salidas' | 'transporte';
+type Section = 'zones' | 'reference' | 'salidas' | 'transporte' | 'hospedaje';
 
 const SECTIONS: { key: Section; label: string }[] = [
   { key: 'zones', label: 'Zonas' },
   { key: 'reference', label: 'Referencia Operativa' },
   { key: 'salidas', label: 'Salidas y Destinos' },
   { key: 'transporte', label: 'Transporte' },
+  { key: 'hospedaje', label: 'Hospedaje' },
 ];
 
 export function InfrastructureScreen() {
@@ -45,6 +47,9 @@ export function InfrastructureScreen() {
         {activeSection === 'salidas' && <ExitManagementScreen eventId={DEFAULT_EVENT_ID} />}
         {activeSection === 'transporte' && (
           <TransportManagementScreen eventId={DEFAULT_EVENT_ID} />
+        )}
+        {activeSection === 'hospedaje' && (
+          <AccommodationManagementScreen eventId={DEFAULT_EVENT_ID} />
         )}
       </main>
     </div>

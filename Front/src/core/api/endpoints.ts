@@ -111,4 +111,10 @@ export const endpoints = {
     importCsv: (eventId: string) => `/events/${eventId}/transport/import-csv`,
     csvTemplate: (eventId: string) => `/events/${eventId}/transport/csv-template`,
   },
+  accommodationAdmin: {
+    list: (eventId: string) => `/events/${eventId}/accommodations`,
+    create: (eventId: string) => `/events/${eventId}/accommodations`,
+    update: (eventId: string, id: string) => `/events/${eventId}/accommodations/${id}`,
+    delete: (eventId: string, id: string) => `/events/${eventId}/accommodations/${id}`,
+  },
 };
