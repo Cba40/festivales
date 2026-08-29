@@ -103,7 +103,6 @@ export function EmergencyManagementScreen() {
     setLoading(true);
     try {
       const data = await getCities();
-      console.log('DEBUG_VERCEL_CITIES:', data);
       setCities(data);
       if (data && data.length > 0) {
         setCityId((prev) => (prev && data.some((c) => c.id === prev) ? prev : data[0].id));
@@ -111,8 +110,7 @@ export function EmergencyManagementScreen() {
         setCityId('');
       }
       setError(null);
-    } catch (err) {
-      console.error('DEBUG_VERCEL_CITIES_ERROR:', err);
+    } catch {
       setError('No se pudieron cargar las ciudades. Verifica la conexión.');
       setCityId('');
     } finally {

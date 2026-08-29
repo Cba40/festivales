@@ -1,7 +1,11 @@
 import axios from 'axios';
 import { useAppStore } from '../state/store';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const API_URL =
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.PROD
+    ? 'https://festivales-back.vercel.app/api'
+    : 'http://localhost:8000/api');
 
 export const apiClient = axios.create({
   baseURL: API_URL,
