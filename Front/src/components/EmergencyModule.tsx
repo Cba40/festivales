@@ -1,27 +1,32 @@
 import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, Loader2, MapPin, Phone, PhoneCall } from 'lucide-react'
+import {
+  AlertTriangle,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  Loader2,
+  MapPin,
+  Phone,
+  PhoneCall,
+} from 'lucide-react'
 import {
   getCities,
   getEmergencies,
+  getProtocols,
+  getRecommendedResource,
   useEmergencyRecommendations,
   type EmergencyItem,
   type EmergencyType,
+  type ProtocolContext,
+  type ProtocolDTO,
 } from '@/services/emergencyProduct'
-
-type CategoryKey = 'todos' | 'policia' | 'bomberos' | 'salud' | 'defensa_civil'
+import { useAppStore } from '@/core/state/store'
 
 interface EmergencyModuleProps {
+  context: ProtocolContext
   cityId?: string
-  defaultType?: EmergencyType
 }
-
-const CATEGORIAS: Array<{ key: CategoryKey; label: string; emoji: string }> = [
-  { key: 'todos', label: 'Todos', emoji: '📋' },
-  { key: 'policia', label: 'Policía', emoji: '👮' },
-  { key: 'bomberos', label: 'Bomberos', emoji: '🚒' },
-  { key: 'salud', label: 'Salud', emoji: '🚑' },
-  { key: 'defensa_civil', label: 'Defensa Civil', emoji: '🛡️' },
-]
 
 const TYPE_LABEL: Record<EmergencyType, string> = {
   policia: 'Policía',
@@ -47,17 +52,24 @@ const handleMaps = (lat: number, lng: number) => {
   window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank')
 }
 
-export const EmergencyModule = ({ cityId, defaultType }: EmergencyModuleProps) => {
+export const EmergencyModule = ({ context, cityId }: EmergencyModuleProps) => {
   const [resolvedCityId, setResolvedCityId] = useState<string | null>(cityId ?? null)
   const [resolvingCity, setResolvingCity] = useState(false)
   const [cityError, setCityError] = useState<string | null>(null)
   const [cityAttempt, setCityAttempt] = useState(0)
 
-  const [activeType, setActiveType] = useState<CategoryKey>(
-    defaultType && defaultType !== 'otro' && defaultType !== 'numero_emergencia'
-      ? (defaultType as CategoryKey)
-      : 'todos'
-  )
+  const [protocols, setProtocols] = useState<ProtocolDTO[] | null>(null)
+  const [protocolsError, setProtocolsError] = useState<string | null>(null)
+  const [protocolsAttempt, setProtocolsAttempt] = useState(0)
+
+  const [selectedProtocol, setSelectedProtocol] = useState<ProtocolDTO | null>(null)
+  const [recommendedResource, setRecommendedResource] =
+    useState<EmergencyItem | null>(null)
+  const [resourceLoading, setResourceLoading] = useState(false)
+  const [resourceError, setResourceError] = useState<string | null>(null)
+  const [showTerritorial, setShowTerritorial] = useState(false)
+
+  const userLocation = useAppStore(s => s.userLocation)
 
   // Auto-descubrimiento: si no se provee cityId explícito, se resuelve la
   // primera ciudad disponible para el módulo público (sin config externa).
@@ -112,8 +124,38 @@ export const EmergencyModule = ({ cityId, defaultType }: EmergencyModuleProps) =
     }
   }, [cityId, cityAttempt])
 
+  // Carga de protocolos del contexto elegido.
+  useEffect(() => {
+    let cancelled = false
+    setProtocols(null)
+    setProtocolsError(null)
+    ;(async () => {
+      try {
+        const list = await getProtocols(context)
+        if (!cancelled) setProtocols(list)
+      } catch {
+        if (!cancelled) setProtocolsError('No se pudieron cargar los protocolos')
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [context, protocolsAttempt])
+
+  // Geolocalización opcional: se intenta pedir el permiso una sola vez al
+  // montar el módulo. Si se niega o no hay GPS, todo sigue funcionando.
+  useEffect(() => {
+    if (!('geolocation' in navigator)) return
+    if (useAppStore.getState().userLocation !== null) return
+    useAppStore.getState().requestLocation()
+  }, [])
+
   const retryCities = useCallback(() => {
     setCityAttempt(a => a + 1)
+  }, [])
+
+  const retryProtocols = useCallback(() => {
+    setProtocolsAttempt(a => a + 1)
   }, [])
 
   const effectiveCityId = resolvedCityId ?? cityId
@@ -124,12 +166,61 @@ export const EmergencyModule = ({ cityId, defaultType }: EmergencyModuleProps) =
     refresh()
   }, [refresh])
 
+  // Resolución del recurso territorial recomendado (S3) cuando el protocolo
+  // elegido declara target_type y ya conocemos la ciudad.
+  const targetType = selectedProtocol?.target_type ?? null
+  const canResolve = targetType !== null && effectiveCityId !== null
+
+  useEffect(() => {
+    if (!canResolve) {
+      setRecommendedResource(null)
+      setResourceError(null)
+      setResourceLoading(false)
+      return
+    }
+
+    let cancelled = false
+    setResourceLoading(true)
+    setResourceError(null)
+
+    ;(async () => {
+      try {
+        const lat = userLocation?.[0]
+        const lng = userLocation?.[1]
+        const resource = await getRecommendedResource(
+          targetType,
+          effectiveCityId as string,
+          lat,
+          lng
+        )
+        if (cancelled) return
+        setRecommendedResource(resource)
+      } catch {
+        if (cancelled) return
+        setRecommendedResource(null)
+        setResourceError('No se pudo obtener el recurso recomendado')
+      } finally {
+        if (!cancelled) setResourceLoading(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [canResolve, targetType, effectiveCityId, userLocation])
+
+  const backToList = useCallback(() => {
+    setSelectedProtocol(null)
+    setRecommendedResource(null)
+    setResourceError(null)
+    setResourceLoading(false)
+    setShowTerritorial(false)
+  }, [])
+
   const all = data?.emergencies ?? []
-  // Registros sin ubicación física (911, 107, 100): siempre destacados al principio.
+  // Registros sin ubicación física (911, 107, 100): siempre destacados.
   const numerosEmergencia = all.filter(e => e.type === 'numero_emergencia')
   const rest = all.filter(e => e.type !== 'numero_emergencia')
-  const filtered =
-    activeType === 'todos' ? rest : rest.filter(e => e.type === activeType)
 
   if (resolvingCity) {
     return (
@@ -157,24 +248,24 @@ export const EmergencyModule = ({ cityId, defaultType }: EmergencyModuleProps) =
     )
   }
 
-  if (loading) {
+  if (protocols === null && !protocolsError) {
     return (
       <div className="flex flex-col items-center justify-center p-8 text-slate-500 dark:text-slate-300 gap-2">
         <Loader2 size={28} className="animate-spin" />
-        <p className="text-sm font-semibold">Cargando emergencias...</p>
+        <p className="text-sm font-semibold">Cargando protocolos...</p>
       </div>
     )
   }
 
-  if (error) {
+  if (protocolsError) {
     return (
       <div className="flex flex-col items-center justify-center p-8 space-y-3">
         <p className="text-danger font-bold flex items-center gap-2">
           <AlertTriangle size={18} /> Error al cargar
         </p>
-        <p className="text-sm text-slate-500 text-center">{error}</p>
+        <p className="text-sm text-slate-500 text-center">{protocolsError}</p>
         <button
-          onClick={() => refresh()}
+          onClick={retryProtocols}
           className="bg-primary text-white px-6 py-2 rounded-lg font-bold active:scale-95 transition-transform"
         >
           Reintentar
@@ -183,80 +274,251 @@ export const EmergencyModule = ({ cityId, defaultType }: EmergencyModuleProps) =
     )
   }
 
-  if (all.length === 0) {
+  if (protocols.length === 0) {
     return (
       <div className="text-center text-slate-500 dark:text-slate-300 py-10">
-        No hay emergencias registradas para esta ciudad.
+        No hay protocolos disponibles para esta sección.
       </div>
     )
   }
 
+  if (selectedProtocol) {
+    return (
+      <div className="space-y-4">
+        <button
+          onClick={backToList}
+          className="flex items-center gap-1 text-primary font-bold text-sm active:scale-95 transition-transform"
+        >
+          <ChevronLeft size={18} /> Volver
+        </button>
+
+        {/* Detalle del protocolo */}
+        <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
+          <div className="flex items-center gap-3">
+            <span className="text-3xl">{selectedProtocol.icon}</span>
+            <h2 className="font-black text-lg text-slate-800 dark:text-slate-100 leading-tight">
+              {selectedProtocol.title}
+            </h2>
+          </div>
+          {selectedProtocol.description && (
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              {selectedProtocol.description}
+            </p>
+          )}
+          <ol className="space-y-2">
+            {selectedProtocol.steps.map((step, i) => (
+              <li key={i} className="flex gap-2 items-start">
+                <span className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-black">
+                  {i + 1}
+                </span>
+                <p className="text-sm text-slate-700 dark:text-slate-200">{step}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+
+        {/* Recurso recomendado (S3) */}
+        {targetType !== null && (
+          <RecommendedResourceBlock
+            loading={resourceLoading}
+            error={resourceError}
+            resource={recommendedResource}
+            onMaps={handleMaps}
+          />
+        )}
+
+        {/* Ayuda territorial cercana (lista de emergencias de la ciudad) */}
+        <div className="pt-1">
+          <button
+            onClick={() => setShowTerritorial(v => !v)}
+            className="w-full flex items-center justify-between bg-white dark:bg-slate-800 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm active:scale-[0.98] transition-transform"
+          >
+            <span className="font-bold text-slate-800 dark:text-slate-100 text-sm">
+              Ayuda territorial cercana
+            </span>
+            {showTerritorial ? (
+              <ChevronUp size={18} className="text-slate-400" />
+            ) : (
+              <ChevronDown size={18} className="text-slate-400" />
+            )}
+          </button>
+
+          {showTerritorial && (
+            <div className="space-y-3 mt-3">
+              {loading ? (
+                <div className="flex items-center justify-center gap-2 p-4 text-slate-500 text-sm">
+                  <Loader2 size={16} className="animate-spin" /> Cargando recursos...
+                </div>
+              ) : error ? (
+                <div className="flex flex-col items-center gap-2 p-4">
+                  <p className="text-danger text-sm font-bold flex items-center gap-1.5">
+                    <AlertTriangle size={16} /> {error}
+                  </p>
+                  <button
+                    onClick={() => refresh()}
+                    className="bg-primary text-white px-5 py-2 rounded-lg font-bold text-sm active:scale-95 transition-transform"
+                  >
+                    Reintentar
+                  </button>
+                </div>
+              ) : all.length === 0 ? (
+                <div className="text-center text-slate-500 dark:text-slate-300 py-6 text-sm">
+                  No hay recursos registrados en esta ciudad.
+                </div>
+              ) : (
+                <>
+                  {numerosEmergencia.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-bold text-red-600 dark:text-red-400 uppercase tracking-wide flex items-center gap-1.5">
+                        <PhoneCall size={14} /> Llamadas de emergencia
+                      </p>
+                      {numerosEmergencia.map(e => (
+                        <div
+                          key={e.id}
+                          className="rounded-2xl p-4 bg-red-600 text-white shadow-lg shadow-red-600/30 border-2 border-red-500 flex flex-col gap-3"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div>
+                              <p className="font-black text-lg leading-tight">
+                                {e.name}
+                              </p>
+                              <p className="text-xs text-red-100">
+                                {e.services || 'Servicio de emergencias'}
+                              </p>
+                            </div>
+                            <span className="px-2 py-1 rounded-full bg-white/20 text-[10px] font-bold uppercase">
+                              {e.emergency_number
+                                ? `Nro ${e.emergency_number}`
+                                : 'Gratuito'}
+                            </span>
+                          </div>
+                          <a
+                            href={`tel:${e.phone || (e.emergency_number ? `*${e.emergency_number}` : '')}`}
+                            className="flex-1 flex items-center justify-center gap-2 bg-white text-red-600 font-black py-3 rounded-xl text-base transition-transform active:scale-95"
+                          >
+                            <PhoneCall size={20} /> Llamar al{' '}
+                            {e.emergency_number || e.phone || e.name}
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="space-y-3">
+                    {rest.map(e => (
+                      <EmergencyCard key={e.id} emergency={e} />
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // Vista inicial: lista de protocolos del contexto.
   return (
     <div className="space-y-4">
-      {/* Bloque superior fijo: números de emergencia sin ubicación física */}
-      {numerosEmergencia.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs font-bold text-red-600 dark:text-red-400 uppercase tracking-wide flex items-center gap-1.5">
-            <PhoneCall size={14} /> Llamadas de emergencia
-          </p>
-          {numerosEmergencia.map(e => (
-            <div
-              key={e.id}
-              className="rounded-2xl p-4 bg-red-600 text-white shadow-lg shadow-red-600/30 border-2 border-red-500 flex flex-col gap-3"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <p className="font-black text-lg leading-tight">{e.name}</p>
-                  <p className="text-xs text-red-100">
-                    {e.services || 'Servicio de emergencias'}
-                  </p>
-                </div>
-                <span className="px-2 py-1 rounded-full bg-white/20 text-[10px] font-bold uppercase">
-                  {e.emergency_number ? `Nro ${e.emergency_number}` : 'Gratuito'}
-                </span>
-              </div>
-              <a
-                href={`tel:${e.phone || (e.emergency_number ? `*${e.emergency_number}` : '')}`}
-                className="flex-1 flex items-center justify-center gap-2 bg-white text-red-600 font-black py-3 rounded-xl text-base transition-transform active:scale-95"
-              >
-                <PhoneCall size={20} /> Llamar al {e.emergency_number || e.phone || e.name}
-              </a>
-            </div>
-          ))}
-        </div>
-      )}
+      <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+        ¿Qué necesitás hacer? Elegí una opción
+      </p>
+      <div className="space-y-2">
+        {protocols.map(p => (
+          <button
+            key={p.id}
+            onClick={() => {
+              setSelectedProtocol(p)
+              setShowTerritorial(false)
+            }}
+            className="w-full flex items-center gap-3 bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:border-blue-400 dark:hover:border-blue-500 transition-colors active:scale-[0.98]"
+          >
+            <span className="text-2xl">{p.icon}</span>
+            <span className="font-bold text-slate-800 dark:text-slate-100 text-left">
+              {p.title}
+            </span>
+            <ChevronRight size={18} className="ml-auto flex-shrink-0 text-slate-400" />
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
 
-      {/* Selector de categoría */}
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-        {CATEGORIAS.map(cat => {
-          const activa = activeType === cat.key
-          return (
-            <button
-              key={cat.key}
-              onClick={() => setActiveType(cat.key)}
-              className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 font-bold text-sm transition-transform active:scale-95 ${
-                activa
-                  ? 'bg-primary text-white border-primary shadow-lg shadow-primary/25'
-                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500'
-              }`}
-            >
-              <span>{cat.emoji}</span>
-              <span>{cat.label}</span>
-            </button>
-          )
-        })}
+const RecommendedResourceBlock = ({
+  loading,
+  error,
+  resource,
+  onMaps,
+}: {
+  loading: boolean
+  error: string | null
+  resource: EmergencyItem | null
+  onMaps: (lat: number, lng: number) => void
+}) => {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center gap-2 bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm text-slate-500 text-sm">
+        <Loader2 size={16} className="animate-spin" /> Buscando ayuda cercana...
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center gap-2 bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+        <p className="text-danger text-sm font-bold flex items-center gap-1.5">
+          <AlertTriangle size={16} /> {error}
+        </p>
+      </div>
+    )
+  }
+
+  if (!resource) {
+    return (
+      <div className="text-center bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm text-sm text-slate-500 dark:text-slate-300">
+        No hay un recurso territorial recomendado para esta emergencia en la
+        ciudad.
+      </div>
+    )
+  }
+
+  const hasLocation = resource.latitude != null && resource.longitude != null
+
+  return (
+    <div className="rounded-2xl p-4 bg-primary text-white shadow-lg shadow-primary/30 border-2 border-primary flex flex-col gap-3">
+      <p className="text-xs font-bold uppercase tracking-wide text-white/80">
+        Recurso recomendado
+      </p>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-black text-lg leading-tight truncate">{resource.name}</p>
+          {resource.address && <p className="text-xs text-white/70 truncate">{resource.address}</p>}
+        </div>
+        {resource.distance_km != null && (
+          <span className="flex-shrink-0 text-xs font-bold bg-white/20 rounded-full px-2 py-1">
+            📍 {resource.distance_km.toFixed(1)} km
+          </span>
+        )}
       </div>
 
-      {/* Lista de resultados */}
-      {filtered.length === 0 ? (
-        <div className="text-center text-slate-500 dark:text-slate-300 py-8">
-          No hay emergencias de esta categoría.
-        </div>
+      {resource.phone ? (
+        <a
+          href={`tel:${resource.phone}`}
+          className="flex items-center justify-center gap-2 bg-white text-primary font-black py-3 rounded-xl text-base transition-transform active:scale-95"
+        >
+          <Phone size={20} /> Contactar {TYPE_LABEL[resource.type]}
+        </a>
+      ) : hasLocation ? (
+        <button
+          onClick={() => onMaps(resource.latitude!, resource.longitude!)}
+          className="flex items-center justify-center gap-2 bg-white text-primary font-black py-3 rounded-xl text-base transition-transform active:scale-95"
+        >
+          <MapPin size={20} /> Cómo llegar
+        </button>
       ) : (
-        <div className="space-y-3">
-          {filtered.map(e => (
-            <EmergencyCard key={e.id} emergency={e} />
-          ))}
+        <div className="text-center text-white/80 text-sm font-bold py-2">
+          Sin contacto registrado
         </div>
       )}
     </div>

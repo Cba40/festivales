@@ -47,6 +47,11 @@ export const endpoints = {
   emergency: {
     list: () => `/emergencies`,
     cities: () => `/cities`,
+    protocols: (context: string) => `/emergency-protocols?context=${context}`,
+    recommendedResource: (targetType: string, cityId: string, lat?: number, lng?: number) =>
+      `/emergency-protocols/recommended-resource?target_type=${targetType}&city_id=${cityId}${
+        lat ? `&latitude=${lat}` : ''
+      }${lng ? `&longitude=${lng}` : ''}`,
   },
   emergencyAdmin: {
     list: (cityId?: string) =>

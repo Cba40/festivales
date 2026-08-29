@@ -38,9 +38,58 @@ export interface CityDTO {
   country: string
 }
 
+export type ProtocolContext = 'festival' | 'transporte' | 'hospedaje'
+
+export interface ProtocolDTO {
+  id: string
+  context: ProtocolContext
+  title: string
+  description: string | null
+  icon: string
+  steps: string[]
+  priority: number
+  order: number
+  target_type: EmergencyType | null
+  active: boolean
+}
+
+export interface EmergencyProtocolResponse {
+  context: ProtocolContext
+  protocols: ProtocolDTO[]
+}
+
 export async function getCities(): Promise<CityDTO[]> {
   const { data } = await apiClient.get<CityDTO[]>(endpoints.emergency.cities())
   return data
+}
+
+export async function getProtocols(context: string): Promise<ProtocolDTO[]> {
+  const { data } = await apiClient.get<EmergencyProtocolResponse>(
+    endpoints.emergency.protocols(context)
+  )
+  return data.protocols
+}
+
+export async function getRecommendedResource(
+  targetType: string,
+  cityId: string,
+  lat?: number,
+  lng?: number
+): Promise<EmergencyItem | null> {
+  try {
+    const { data } = await apiClient.get<EmergencyItem>(
+      endpoints.emergency.recommendedResource(targetType, cityId, lat, lng)
+    )
+    return data
+  } catch (err) {
+    const status: unknown =
+      err &&
+      typeof err === 'object' &&
+      'response' in err &&
+      (err as { response?: { status?: unknown } }).response?.status
+    if (status === 404) return null
+    throw err
+  }
 }
 
 export async function getEmergencies(
