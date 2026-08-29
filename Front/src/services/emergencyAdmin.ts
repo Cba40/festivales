@@ -69,7 +69,7 @@ export interface EmergencyUpdateDTO {
 }
 
 export async function getCities(): Promise<CityDTO[]> {
-  const { data } = await apiClient.get<CityDTO[]>(endpoints.emergencyAdmin.cities)
+  const { data } = await apiClient.get<CityDTO[]>(endpoints.emergencyAdmin.cities())
   return data
 }
 

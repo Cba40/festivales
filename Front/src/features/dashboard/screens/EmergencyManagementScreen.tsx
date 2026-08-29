@@ -103,11 +103,6 @@ export function EmergencyManagementScreen() {
     setLoading(true);
     try {
       const data = await getCities();
-      console.log('=== DIAGNÓSTICO CIUDADES ===', {
-        cantidad: data?.length,
-        primera: data?.[0]?.name,
-        url_intenta: 'debería ser /admin/cities',
-      });
       setCities(data || []);
       if (data && data.length > 0) {
         setCityId((prev) => (prev && data.some((c) => c.id === prev) ? prev : data[0].id));
@@ -115,9 +110,8 @@ export function EmergencyManagementScreen() {
         setCityId('');
       }
       setError(null);
-    } catch (err) {
-      console.error('=== ERROR CARGA CIUDADES ===', (err as Error)?.message, isAxiosError(err) ? err.response?.status : undefined);
-      setError(`Error al cargar: ${(err as Error)?.message || 'Desconocido'}`);
+    } catch {
+      setError('No se pudieron cargar las ciudades. Verifica la conexión.');
       setCityId('');
     } finally {
       setLoading(false);
@@ -329,16 +323,6 @@ export function EmergencyManagementScreen() {
           >
             + Nuevo Punto de Emergencia
           </button>
-        </div>
-
-        {/* PANEL DE DIAGNÓSTICO TEMPORAL - NO BORRAR HASTA CONFIRMACIÓN */}
-        <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md text-xs font-mono text-yellow-800">
-          <p><strong>DEBUG ESTADO:</strong></p>
-          <p>1. Loading: {loading ? 'SÍ' : 'NO'}</p>
-          <p>2. Error: {error || 'NINGUNO'}</p>
-          <p>3. CityId actual: {cityId || 'VACÍO'}</p>
-          <p>4. Cantidad de ciudades en estado: {cities.length}</p>
-          <p>5. Primer ciudad (si existe): {cities[0]?.name || 'N/A'}</p>
         </div>
 
         {result && (
