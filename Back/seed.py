@@ -17,6 +17,7 @@ from app.models.transport_schedule import TransportSchedule
 from app.models.accommodation import Accommodation, AccommodationType
 from app.models.city import City
 from app.models.emergency import Emergency, EmergencyType
+from app.models.emergency_protocol import EmergencyProtocol, EmergencyProtocolContext
 
 EVENT_ID = "663e6e32-9d4a-4f20-b992-3585b9310522"
 
@@ -809,6 +810,217 @@ def seed_cities_and_emergencies(session):
     }
 
 
+# ─────────────────────────────────────────────────────────────
+# Emergencia V2 (Fase S1): protocolos de emergencia por contexto.
+# ─────────────────────────────────────────────────────────────
+
+PROTOCOLS_SEED = [
+    # ▼ Festival (order 0..3)
+    {
+        "context": EmergencyProtocolContext.FESTIVAL,
+        "title": "Niño perdido",
+        "description": "Protocolo de localización inmediata de un menor en el predio.",
+        "icon": "🧒",
+        "target_type": EmergencyType.policia,
+        "priority": 1,
+        "order": 0,
+        "active": True,
+        "steps": [
+            "Mantener la calma y quedarse junto a quien acompaña al menor",
+            "Avisar al puesto policial más cercano con la descripción del niño",
+            "Dar nombre, ropa que lleva y la última ubicación donde lo vio",
+            "Esperar en un punto fijo de encuentro junto al personal de seguridad",
+        ],
+    },
+    {
+        "context": EmergencyProtocolContext.FESTIVAL,
+        "title": "Persona herida",
+        "description": "Primeros auxilios y derivación médica inmediata en el predio.",
+        "icon": "🩹",
+        "target_type": EmergencyType.salud,
+        "priority": 1,
+        "order": 1,
+        "active": True,
+        "steps": [
+            "Evaluar la gravedad de la lesión sin mover a la persona",
+            "Aplicar primeros auxilios básicos hasta que llegue el personal",
+            "Derivar al puesto sanitario o llamar al 107",
+            "Despejar la zona y evitar aglomeraciones",
+        ],
+    },
+    {
+        "context": EmergencyProtocolContext.FESTIVAL,
+        "title": "Robo o agresión",
+        "description": "Actuación segura ante un robo o agresión dentro del festival.",
+        "icon": "🚨",
+        "target_type": EmergencyType.policia,
+        "priority": 2,
+        "order": 2,
+        "active": True,
+        "steps": [
+            "No exponerse ni confrontar al agresor",
+            "Avisar de inmediato a seguridad y a la policía",
+            "Registrar rasgos del agresor y dirección de escape",
+            "Realizar la denuncia formal en la comisaría de Jesús María",
+        ],
+    },
+    {
+        "context": EmergencyProtocolContext.FESTIVAL,
+        "title": "Intoxicación o descompensación",
+        "description": "Asistencia ante un cuadro de intoxicación o descompensación.",
+        "icon": "🤢",
+        "target_type": EmergencyType.salud,
+        "priority": 2,
+        "order": 3,
+        "active": True,
+        "steps": [
+            "Sentar a la persona y aflojar su ropa",
+            "Ofrecer agua en pequeños sorbos si está consciente",
+            "Llamar al 107 si no responde o empeora",
+            "Permanecer a su lado hasta que llegue asistencia",
+        ],
+    },
+    # ▼ Transporte (order 0..3)
+    {
+        "context": EmergencyProtocolContext.TRANSPORTE,
+        "title": "Accidente",
+        "description": "Procedimiento ante un accidente de tránsito del servicio.",
+        "icon": "🚗",
+        "target_type": EmergencyType.salud,
+        "priority": 1,
+        "order": 0,
+        "active": True,
+        "steps": [
+            "Detener la unidad en un lugar seguro y señalizar la zona",
+            "Asistir a los heridos con primeros auxilios básicos",
+            "Avisar al 107 o 100 según la gravedad",
+            "Esperar a los equipos de emergencia sin mover a los lesionados",
+        ],
+    },
+    {
+        "context": EmergencyProtocolContext.TRANSPORTE,
+        "title": "Asalto",
+        "description": "Actuación segura ante un asalto a la unidad.",
+        "icon": "🚨",
+        "target_type": EmergencyType.policia,
+        "priority": 1,
+        "order": 1,
+        "active": True,
+        "steps": [
+            "No resistirse ni arriesgar la integridad de los pasajeros",
+            "Activar el botón de pánico o avisar a la central",
+            "Memorizar características del agresor sin confrontar",
+            "Realizar la denuncia posterior en la comisaría",
+        ],
+    },
+    {
+        "context": EmergencyProtocolContext.TRANSPORTE,
+        "title": "Pasajero descompuesto",
+        "description": "Asistencia a un pasajero que se descompone durante el viaje.",
+        "icon": "🤒",
+        "target_type": EmergencyType.salud,
+        "priority": 2,
+        "order": 2,
+        "active": True,
+        "steps": [
+            "Detener el servicio en un lugar seguro",
+            "Acomodar al pasajero en una posición cómoda",
+            "Pedir asistencia médica al 107",
+            "Informar a la central para coordinar el traslado",
+        ],
+    },
+    {
+        "context": EmergencyProtocolContext.TRANSPORTE,
+        "title": "Unidad averiada",
+        "description": "Gestión de una unidad del servicio fuera de servicio.",
+        "icon": "🚌",
+        "target_type": None,
+        "priority": 3,
+        "order": 3,
+        "active": True,
+        "steps": [
+            "Detener la unidad fuera de la vía de circulación",
+            "Activar balizas y señalización de emergencia",
+            "Informar a la central y a los pasajeros de la avería",
+            "Coordinar el traslado de pasajeros a una unidad de respaldo",
+        ],
+    },
+    # ▼ Hospedaje (order 0..2)
+    {
+        "context": EmergencyProtocolContext.HOSPEDAJE,
+        "title": "Emergencia médica",
+        "description": "Asistencia médica a un huésped dentro del alojamiento.",
+        "icon": "🚑",
+        "target_type": EmergencyType.salud,
+        "priority": 1,
+        "order": 0,
+        "active": True,
+        "steps": [
+            "Avisar al personal de recepción del alojamiento",
+            "Pedir asistencia médica al 107",
+            "Facilitar el acceso de la ambulancia al sector",
+            "Comunicar la situación a la familia del huésped",
+        ],
+    },
+    {
+        "context": EmergencyProtocolContext.HOSPEDAJE,
+        "title": "Incendio",
+        "description": "Evacuación segura ante un principio de incendio.",
+        "icon": "🔥",
+        "target_type": EmergencyType.bomberos,
+        "priority": 1,
+        "order": 1,
+        "active": True,
+        "steps": [
+            "Avisar a bomberos al 100 de inmediato",
+            "Evacuar la zona siguiendo las salidas de emergencia",
+            "No usar ascensores y avisar a los huéspedes",
+            "Verificar que nadie permanezca en el sector afectado",
+        ],
+    },
+    {
+        "context": EmergencyProtocolContext.HOSPEDAJE,
+        "title": "Robo",
+        "description": "Actuación ante un robo dentro del alojamiento.",
+        "icon": "🚨",
+        "target_type": EmergencyType.policia,
+        "priority": 2,
+        "order": 2,
+        "active": True,
+        "steps": [
+            "No confrontar al delincuente",
+            "Avisar a seguridad del alojamiento",
+            "No tocar el lugar hasta preservar las evidencias",
+            "Realizar la denuncia policial correspondiente",
+        ],
+    },
+]
+
+
+def seed_protocols(session):
+    """Seed idempotente de protocolos de emergencia (Emergencia V2 - Fase S1).
+
+    Lookup por clave natural (context, title); skip si existe.
+    Devuelve {"protocols_created": n, "protocols_skipped": n}.
+    """
+    created = 0
+    skipped = 0
+    for pd in PROTOCOLS_SEED:
+        existing = session.query(EmergencyProtocol).filter(
+            EmergencyProtocol.context == pd["context"],
+            EmergencyProtocol.title == pd["title"],
+        ).first()
+        if existing:
+            print(f"\u2139\ufe0f Protocolo ya existe: {pd['title']}")
+            skipped += 1
+            continue
+        session.add(EmergencyProtocol(**pd))
+        session.flush()
+        created += 1
+        print(f"\u2705 Protocolo creado: {pd['title']} ({pd['context'].value})")
+    return {"protocols_created": created, "protocols_skipped": skipped}
+
+
 def main():
     session = SessionLocal()
     try:
@@ -853,6 +1065,10 @@ def main():
 
         # Emergencia V1 (S1): ciudades y puntos de emergencia
         seed_cities_and_emergencies(session)
+        session.commit()
+
+        # Emergencia V2 (Fase S1): protocolos de emergencia
+        seed_protocols(session)
         session.commit()
 
         print(f"\n\U0001f4cb VITE_EVENT_ID={event.id}")

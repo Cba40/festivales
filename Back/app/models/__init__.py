@@ -22,6 +22,7 @@ from app.models.transport_schedule import TransportSchedule
 from app.models.accommodation import Accommodation, AccommodationType
 from app.models.city import City
 from app.models.emergency import Emergency, EmergencyType
+from app.models.emergency_protocol import EmergencyProtocol, EmergencyProtocolContext
 
 __all__ = [
     "Event",
@@ -49,4 +50,6 @@ __all__ = [
     "City",
     "Emergency",
     "EmergencyType",
+    "EmergencyProtocol",
+    "EmergencyProtocolContext",
 ]

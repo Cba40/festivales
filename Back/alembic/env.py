@@ -25,6 +25,7 @@ import app.models.transport_line_stop
 import app.models.transport_schedule
 import app.models.city
 import app.models.emergency
+import app.models.emergency_protocol
 
 config = context.config
 
