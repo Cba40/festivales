@@ -105,9 +105,13 @@ export function EmergencyManagementScreen() {
       setCities(data);
       if (data.length > 0) {
         setCityId((prev) => (prev && data.some((c) => c.id === prev) ? prev : data[0].id));
+      } else {
+        setCityId('');
       }
+      setLoading(false);
       setError(null);
     } catch {
+      setLoading(false);
       setError('No se pudieron cargar las ciudades.');
     }
   }, []);
@@ -297,7 +301,7 @@ export function EmergencyManagementScreen() {
               onChange={(e) => setCityId(e.target.value)}
               className="border-slate-300 rounded-md py-1.5 px-3 text-sm"
             >
-              {cities.length === 0 && <option value="">Cargando ciudades...</option>}
+              {cities.length === 0 && <option value="">Sin ciudades configuradas</option>}
               {cities.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name} {c.province ? `(${c.province})` : ''}
@@ -334,7 +338,7 @@ export function EmergencyManagementScreen() {
           <p className="text-sm text-slate-500 italic">Cargando emergencias...</p>
         ) : !cityId ? (
           <p className="text-sm text-slate-500 italic text-center py-8 bg-white border border-slate-200 rounded-lg">
-            No hay ciudades disponibles. Creá una ciudad en el backend o los seeds.
+            No hay ciudades disponibles. Creá una con "Gestionar / Crear Ciudad".
           </p>
         ) : emergencies.length === 0 ? (
           <p className="text-sm text-slate-500 italic text-center py-8 bg-white border border-slate-200 rounded-lg">
