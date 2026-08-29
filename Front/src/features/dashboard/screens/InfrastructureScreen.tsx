@@ -4,10 +4,11 @@ import { EventReferencePointScreen } from './EventReferencePointScreen';
 import { ExitManagementScreen } from './ExitManagementScreen';
 import { TransportManagementScreen } from './TransportManagementScreen';
 import { AccommodationManagementScreen } from './AccommodationManagementScreen';
+import { EmergencyManagementScreen } from './EmergencyManagementScreen';
 
 const DEFAULT_EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 
-type Section = 'zones' | 'reference' | 'salidas' | 'transporte' | 'hospedaje';
+type Section = 'zones' | 'reference' | 'salidas' | 'transporte' | 'hospedaje' | 'emergencias';
 
 const SECTIONS: { key: Section; label: string }[] = [
   { key: 'zones', label: 'Zonas' },
@@ -15,6 +16,7 @@ const SECTIONS: { key: Section; label: string }[] = [
   { key: 'salidas', label: 'Salidas y Destinos' },
   { key: 'transporte', label: 'Transporte' },
   { key: 'hospedaje', label: 'Hospedaje' },
+  { key: 'emergencias', label: 'Emergencias' },
 ];
 
 export function InfrastructureScreen() {
@@ -51,6 +53,7 @@ export function InfrastructureScreen() {
         {activeSection === 'hospedaje' && (
           <AccommodationManagementScreen eventId={DEFAULT_EVENT_ID} />
         )}
+        {activeSection === 'emergencias' && <EmergencyManagementScreen />}
       </main>
     </div>
   );

@@ -47,6 +47,14 @@ export const endpoints = {
   emergency: {
     list: () => `/emergencies`,
   },
+  emergencyAdmin: {
+    list: (cityId?: string) =>
+      `/admin/emergencies${cityId ? `?city_id=${cityId}` : ''}`,
+    create: () => `/admin/emergencies`,
+    update: (id: string) => `/admin/emergencies/${id}`,
+    delete: (id: string) => `/admin/emergencies/${id}`,
+    cities: () => `/admin/cities`,
+  },
   contextEngine: {
     zoneTypes: () => '/context-engine/zone-types',
     zoneSubtypes: () => '/context-engine/zone-subtypes',
