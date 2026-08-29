@@ -5,10 +5,11 @@ import { ExitManagementScreen } from './ExitManagementScreen';
 import { TransportManagementScreen } from './TransportManagementScreen';
 import { AccommodationManagementScreen } from './AccommodationManagementScreen';
 import { EmergencyManagementScreen } from './EmergencyManagementScreen';
+import { ProtocolManagementScreen } from './ProtocolManagementScreen';
 
 const DEFAULT_EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 
-type Section = 'zones' | 'reference' | 'salidas' | 'transporte' | 'hospedaje' | 'emergencias';
+type Section = 'zones' | 'reference' | 'salidas' | 'transporte' | 'hospedaje' | 'emergencias' | 'protocolos';
 
 const SECTIONS: { key: Section; label: string }[] = [
   { key: 'zones', label: 'Zonas' },
@@ -17,6 +18,7 @@ const SECTIONS: { key: Section; label: string }[] = [
   { key: 'transporte', label: 'Transporte' },
   { key: 'hospedaje', label: 'Hospedaje' },
   { key: 'emergencias', label: 'Emergencias' },
+  { key: 'protocolos', label: 'Protocolos de Emergencia' },
 ];
 
 export function InfrastructureScreen() {
@@ -54,6 +56,7 @@ export function InfrastructureScreen() {
           <AccommodationManagementScreen eventId={DEFAULT_EVENT_ID} />
         )}
         {activeSection === 'emergencias' && <EmergencyManagementScreen />}
+        {activeSection === 'protocolos' && <ProtocolManagementScreen />}
       </main>
     </div>
   );

@@ -61,6 +61,11 @@ export const endpoints = {
     delete: (id: string) => `/admin/emergencies/${id}`,
     cities: () => `/admin/cities`,
     createCity: () => `/admin/cities`,
+    listProtocols: (context?: string) =>
+      `/admin/emergency-protocols${context ? `?context=${context}` : ''}`,
+    createProtocol: () => `/admin/emergency-protocols`,
+    updateProtocol: (id: string) => `/admin/emergency-protocols/${id}`,
+    deleteProtocol: (id: string) => `/admin/emergency-protocols/${id}`,
   },
   contextEngine: {
     zoneTypes: () => '/context-engine/zone-types',
