@@ -20,6 +20,7 @@ from app.db.session import get_db
 from app.models.city import City
 from app.models.emergency import Emergency
 from app.schemas.emergency_admin import (
+    CityCreate,
     CityResponse,
     EmergencyCreate,
     EmergencyResponse,
@@ -67,6 +68,40 @@ def list_cities(
     db: Session = Depends(get_db),
 ):
     return db.query(City).order_by(City.name).all()
+
+
+@router.post("/cities", response_model=CityResponse, status_code=status.HTTP_201_CREATED)
+def create_city(
+    body: CityCreate,
+    db: Session = Depends(get_db),
+    _=Depends(verify_token),
+):
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Name must not be empty",
+        )
+
+    province = _clean(body.province)
+    country = (body.country or "Argentina").strip() or "Argentina"
+
+    existing = db.query(City).filter(
+        City.name == name,
+        City.province == province,
+        City.country == country,
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="City already exists",
+        )
+
+    city = City(name=name, province=province, country=country)
+    db.add(city)
+    db.commit()
+    db.refresh(city)
+    return city
 
 
 @router.get("/emergencies", response_model=list[EmergencyResponse])

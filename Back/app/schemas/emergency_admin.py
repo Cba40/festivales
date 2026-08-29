@@ -14,6 +14,13 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.models.emergency import EmergencyType
 
 
+class CityCreate(BaseModel):
+    """DTO de creación de una ciudad (nombre requerido; provincia/país opcionales)."""
+    name: str = Field(..., min_length=1, max_length=100)
+    province: Optional[str] = None
+    country: str = Field(default="Argentina", max_length=100)
+
+
 class CityResponse(BaseModel):
     """DTO mínimo de respuesta de una ciudad (id + nombre para el selector)."""
     id: str

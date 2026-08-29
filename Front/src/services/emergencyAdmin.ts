@@ -16,6 +16,12 @@ export interface CityDTO {
   country: string
 }
 
+export interface CityCreateDTO {
+  name: string
+  province?: string | null
+  country?: string
+}
+
 export interface EmergencyAdminDTO {
   id: string
   city_id: string
@@ -64,6 +70,14 @@ export interface EmergencyUpdateDTO {
 
 export async function getCities(): Promise<CityDTO[]> {
   const { data } = await apiClient.get<CityDTO[]>(endpoints.emergencyAdmin.cities)
+  return data
+}
+
+export async function createCity(payload: CityCreateDTO): Promise<CityDTO> {
+  const { data } = await apiClient.post<CityDTO>(
+    endpoints.emergencyAdmin.createCity(),
+    payload
+  )
   return data
 }
 

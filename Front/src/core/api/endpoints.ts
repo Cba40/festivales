@@ -55,6 +55,7 @@ export const endpoints = {
     update: (id: string) => `/admin/emergencies/${id}`,
     delete: (id: string) => `/admin/emergencies/${id}`,
     cities: () => `/admin/cities`,
+    createCity: () => `/admin/cities`,
   },
   contextEngine: {
     zoneTypes: () => '/context-engine/zone-types',

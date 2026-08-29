@@ -5,6 +5,7 @@ import {
   getCities,
   getEmergencies,
   createEmergency,
+  createCity,
   updateEmergency,
   deleteEmergency,
   type CityDTO,
@@ -16,6 +17,18 @@ type ModalState =
   | { mode: 'create' }
   | { mode: 'edit'; emergencia: EmergencyAdminDTO }
   | null;
+
+interface CityModalForm {
+  name: string;
+  province: string;
+  country: string;
+}
+
+const emptyCityForm: CityModalForm = {
+  name: '',
+  province: 'Córdoba',
+  country: 'Argentina',
+};
 
 const TYPE_LABELS: Record<EmergencyType, string> = {
   policia: 'Policía',
@@ -78,6 +91,11 @@ export function EmergencyManagementScreen() {
   const [modalError, setModalError] = useState<string | null>(null);
   const [mapPickerOpen, setMapPickerOpen] = useState(false);
   const [showManualCoords, setShowManualCoords] = useState(false);
+
+  const [cityModalOpen, setCityModalOpen] = useState(false);
+  const [cityForm, setCityForm] = useState<CityModalForm>(emptyCityForm);
+  const [citySaving, setCitySaving] = useState(false);
+  const [cityError, setCityError] = useState<string | null>(null);
 
   const ciudadSeleccionada = cities.find((c) => c.id === cityId);
 
@@ -200,6 +218,42 @@ export function EmergencyManagementScreen() {
     }
   };
 
+  const abrirCrearCiudad = () => {
+    setCityForm(emptyCityForm);
+    setCityError(null);
+    setCityModalOpen(true);
+  };
+
+  const guardarCiudad = async () => {
+    const name = cityForm.name.trim();
+    if (!name) {
+      setCityError('El nombre de la ciudad es obligatorio.');
+      return;
+    }
+    setCitySaving(true);
+    setCityError(null);
+    try {
+      const nueva = await createCity({
+        name,
+        province: cityForm.province.trim() || null,
+        country: cityForm.country.trim() || 'Argentina',
+      });
+      await cargarCiudades();
+      setCityId(nueva.id);
+      setCityModalOpen(false);
+      setResult(`Ciudad "${nueva.name}" creada.`);
+    } catch (err) {
+      const status = isAxiosError(err) ? err.response?.status : undefined;
+      if (status === 409) {
+        setCityError('Ya existe una ciudad con ese nombre y provincia.');
+      } else {
+        setCityError('No se pudo crear la ciudad.');
+      }
+    } finally {
+      setCitySaving(false);
+    }
+  };
+
   const alternarActivo = async (e: EmergencyAdminDTO) => {
     try {
       await updateEmergency(e.id, { active: !e.active });
@@ -250,6 +304,12 @@ export function EmergencyManagementScreen() {
                 </option>
               ))}
             </select>
+            <button
+              onClick={abrirCrearCiudad}
+              className="text-sm text-blue-600 hover:bg-blue-50 border border-blue-200 rounded-md py-1.5 px-3 transition-colors"
+            >
+              ⚙️ Gestionar / Crear Ciudad
+            </button>
           </div>
           <button
             onClick={abrirCrear}
@@ -569,6 +629,71 @@ export function EmergencyManagementScreen() {
                 className="py-2 px-4 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md transition-colors"
               >
                 {modalSaving ? 'Guardando...' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {cityModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6 mx-4 space-y-4">
+            <h3 className="text-lg font-semibold text-slate-800">Crear Ciudad</h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Nombre de la ciudad *</label>
+                <input
+                  type="text"
+                  value={cityForm.name}
+                  onChange={(e) => setCityForm((prev) => ({ ...prev, name: e.target.value }))}
+                  placeholder="Ej: Jesús María"
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Provincia</label>
+                <input
+                  type="text"
+                  value={cityForm.province}
+                  onChange={(e) => setCityForm((prev) => ({ ...prev, province: e.target.value }))}
+                  placeholder="Córdoba"
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">País</label>
+                <input
+                  type="text"
+                  value={cityForm.country}
+                  onChange={(e) => setCityForm((prev) => ({ ...prev, country: e.target.value }))}
+                  placeholder="Argentina"
+                  className={inputCls}
+                />
+              </div>
+            </div>
+
+            {cityError && (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">
+                {cityError}
+              </p>
+            )}
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setCityModalOpen(false)}
+                className="py-2 px-4 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => void guardarCiudad()}
+                disabled={citySaving}
+                className="py-2 px-4 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md transition-colors"
+              >
+                {citySaving ? 'Guardando...' : 'Guardar'}
               </button>
             </div>
           </div>
