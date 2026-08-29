@@ -20,6 +20,7 @@ from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.dialects.postgresql import JSONB
 
 
@@ -44,9 +45,12 @@ def upgrade() -> None:
         sa.Column('priority', sa.Integer(), nullable=False),
         sa.Column('order', sa.Integer(), nullable=False, server_default='0'),
         sa.Column('target_type',
-                  sa.Enum('policia', 'bomberos', 'salud', 'defensa_civil',
-                          'numero_emergencia', 'otro', name='emergency_type',
-                          create_type=False),
+                  postgresql.ENUM(
+                      'policia', 'bomberos', 'salud', 'defensa_civil',
+                      'numero_emergencia', 'otro',
+                      name='emergency_type',
+                      create_type=False
+                  ),
                   nullable=True),
         sa.Column('active', sa.Boolean(), nullable=False, server_default=sa.true()),
         sa.Column('created_at', sa.DateTime(timezone=True),
