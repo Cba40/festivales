@@ -43,6 +43,24 @@ export async function getCities(): Promise<CityDTO[]> {
   return data
 }
 
+export async function getEmergencies(
+  cityId: string,
+  limit = 20,
+  type?: EmergencyType | 'todos'
+): Promise<EmergencyRecommendationResponse> {
+  const { data } = await apiClient.get<EmergencyRecommendationResponse>(
+    endpoints.emergency.list(),
+    {
+      params: {
+        city_id: cityId,
+        limit,
+        ...(type && type !== 'todos' ? { type } : {}),
+      },
+    }
+  )
+  return data
+}
+
 export function useEmergencyRecommendations(
   cityId?: string,
   type?: EmergencyType | 'todos'
@@ -77,10 +95,17 @@ export function useEmergencyRecommendations(
         }
       )
       setData(res)
-    } catch (err: any) {
+    } catch (err) {
+      const detail: unknown =
+        err &&
+        typeof err === 'object' &&
+        'response' in err &&
+        (err as { response?: { data?: { detail?: unknown } } }).response?.data
+          ?.detail
       setError(
-        err?.response?.data?.detail ||
-          'Error al obtener las emergencias de la ciudad'
+        typeof detail === 'string' && detail
+          ? detail
+          : 'Error al obtener las emergencias de la ciudad'
       )
     } finally {
       setLoading(false)

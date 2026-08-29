@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { AlertTriangle, Loader2, MapPin, Phone, PhoneCall } from 'lucide-react'
 import {
   getCities,
+  getEmergencies,
   useEmergencyRecommendations,
   type EmergencyItem,
   type EmergencyType,
@@ -80,7 +81,21 @@ export const EmergencyModule = ({ cityId, defaultType }: EmergencyModuleProps) =
           setResolvedCityId(null)
           setCityError('No hay ciudades configuradas')
         } else {
-          setResolvedCityId(cities[0].id)
+          // Auto-descubrimiento con datos: se elige la primera ciudad que
+          // realmente tenga emergencias registradas, en el orden del backend.
+          const ciudadConDatos = (
+            await Promise.all(
+              cities.map(async (c) => {
+                try {
+                  const res = await getEmergencies(c.id, 1)
+                  return res.emergencies.length > 0 ? c : null
+                } catch {
+                  return null
+                }
+              })
+            )
+          ).find((c) => c !== null)
+          setResolvedCityId((ciudadConDatos ?? cities[0]).id)
           setCityError(null)
         }
       } catch {
