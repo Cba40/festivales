@@ -100,19 +100,23 @@ export function EmergencyManagementScreen() {
   const ciudadSeleccionada = cities.find((c) => c.id === cityId);
 
   const cargarCiudades = useCallback(async () => {
+    setLoading(true);
     try {
       const data = await getCities();
+      console.log('DEBUG_VERCEL_CITIES:', data);
       setCities(data);
-      if (data.length > 0) {
+      if (data && data.length > 0) {
         setCityId((prev) => (prev && data.some((c) => c.id === prev) ? prev : data[0].id));
       } else {
         setCityId('');
       }
-      setLoading(false);
       setError(null);
-    } catch {
+    } catch (err) {
+      console.error('DEBUG_VERCEL_CITIES_ERROR:', err);
+      setError('No se pudieron cargar las ciudades. Verifica la conexión.');
+      setCityId('');
+    } finally {
       setLoading(false);
-      setError('No se pudieron cargar las ciudades.');
     }
   }, []);
 
@@ -323,11 +327,6 @@ export function EmergencyManagementScreen() {
           </button>
         </div>
 
-        {error && (
-          <p className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">
-            {error}
-          </p>
-        )}
         {result && (
           <p className="mb-4 text-sm text-green-700 bg-green-50 border border-green-200 rounded-md p-3">
             {result}
@@ -335,11 +334,26 @@ export function EmergencyManagementScreen() {
         )}
 
         {loading ? (
-          <p className="text-sm text-slate-500 italic">Cargando emergencias...</p>
-        ) : !cityId ? (
-          <p className="text-sm text-slate-500 italic text-center py-8 bg-white border border-slate-200 rounded-lg">
-            No hay ciudades disponibles. Creá una con "Gestionar / Crear Ciudad".
-          </p>
+          <p className="text-sm text-slate-500 italic">Cargando ciudades y emergencias...</p>
+        ) : error ? (
+          <div className="mb-4 flex items-center justify-between gap-3 p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
+            <span>{error}</span>
+            <button
+              type="button"
+              onClick={() => {
+                void cargarCiudades();
+                void cargar();
+              }}
+              className="whitespace-nowrap underline font-medium"
+            >
+              Reintentar
+            </button>
+          </div>
+        ) : !cityId || cities.length === 0 ? (
+          <div className="text-center text-slate-500 py-8 bg-white border border-slate-200 rounded-lg">
+            <p className="text-sm">No hay ciudades configuradas en el sistema.</p>
+            <p className="text-xs mt-2">Usa el botón "⚙️ Gestionar / Crear Ciudad" para agregar una.</p>
+          </div>
         ) : emergencies.length === 0 ? (
           <p className="text-sm text-slate-500 italic text-center py-8 bg-white border border-slate-200 rounded-lg">
             No hay puntos de emergencia en esta ciudad. Creá el primero con "+ Nuevo Punto de Emergencia".
