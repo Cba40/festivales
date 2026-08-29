@@ -9,7 +9,7 @@ import {
 type CategoryKey = 'todos' | 'policia' | 'bomberos' | 'salud' | 'defensa_civil'
 
 interface EmergencyModuleProps {
-  cityId: string
+  cityId?: string
   defaultType?: EmergencyType
 }
 
@@ -69,6 +69,14 @@ export const EmergencyModule = ({ cityId, defaultType }: EmergencyModuleProps) =
       <div className="flex flex-col items-center justify-center p-8 text-slate-500 dark:text-slate-300 gap-2">
         <Loader2 size={28} className="animate-spin" />
         <p className="text-sm font-semibold">Cargando emergencias...</p>
+      </div>
+    )
+  }
+
+  if (!cityId) {
+    return (
+      <div className="text-center text-slate-500 dark:text-slate-300 py-10">
+        No se especificó la ciudad para mostrar las emergencias.
       </div>
     )
   }

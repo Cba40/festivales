@@ -32,7 +32,7 @@ export interface EmergencyRecommendationResponse {
 }
 
 export function useEmergencyRecommendations(
-  cityId: string,
+  cityId?: string,
   type?: EmergencyType | 'todos'
 ) {
   const [data, setData] = useState<EmergencyRecommendationResponse | null>(null)
@@ -42,6 +42,13 @@ export function useEmergencyRecommendations(
   const userLocation = useAppStore(s => s.userLocation)
 
   const refresh = useCallback(async () => {
+    if (!cityId) {
+      setData(null)
+      setLoading(false)
+      setError(null)
+      return
+    }
+    setLoading(true)
     setLoading(true)
     setError(null)
     try {

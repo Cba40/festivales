@@ -42,33 +42,6 @@ export interface ZonaSalida {
   updatedAt: number
 }
 
-export interface PuntoSeguro {
-  id: string
-  nombre: string
-  lat: number
-  lng: number
-  direccion: string
-  referencia: string
-  distancia_min: number
-  horario: string
-  telefono: string
-  updatedAt: number
-}
-
-export interface PuestoSanitario {
-  id: string
-  nombre: string
-  lat: number
-  lng: number
-  direccion: string
-  referencia: string
-  distancia_min: number
-  horario: string
-  telefono: string
-  servicios: string[]
-  updatedAt: number
-}
-
 export interface PuntoComida {
   id: string
   nombre: string
@@ -223,44 +196,4 @@ export const mapZonesToPernoctar = (zones: Zone[]): PuntoPernoctar[] => {
       lng: z.lng || 0,
       updatedAt: Date.now()
     }))
-}
-
-export const mapZonesToEmergencia = (zones: Zone[]): { puntoSeguro: PuntoSeguro; puestoSanitario: PuestoSanitario; zonasReferencia: { nombre: string; salidaCercana: string; distanciaSalida: number; zonaTranquila: string; distanciaTranquila: number } } => {
-  const emergenciaZones = zones.filter(z => z.type === 'emergencia')
-  const first = emergenciaZones[0]
-
-  return {
-    puntoSeguro: {
-      id: first?.id || 'punto-default',
-      nombre: first?.name || 'Punto de Referencia',
-      lat: first?.lat || 0,
-      lng: first?.lng || 0,
-      direccion: first?.direccion || '',
-      referencia: first?.referencia || first?.name || '',
-      distancia_min: first?.distancia_min || 5,
-      horario: first?.horario || '24hs',
-      telefono: first?.telefono || '',
-      updatedAt: Date.now()
-    },
-    puestoSanitario: {
-      id: 'puesto-' + (first?.id || 'default'),
-      nombre: first?.name ? `Puesto ${first.name}` : 'Puesto Sanitario',
-      lat: first?.lat || 0,
-      lng: first?.lng || 0,
-      direccion: first?.direccion || '',
-      referencia: first?.referencia || first?.name || '',
-      distancia_min: first?.distancia_min || 5,
-      horario: first?.horario || '24hs',
-      telefono: first?.telefono || '',
-      servicios: first?.servicios || ['Primeros auxilios'],
-      updatedAt: Date.now()
-    },
-    zonasReferencia: {
-      nombre: first?.name || 'Zona Centro',
-      salidaCercana: 'Av. Principal',
-      distanciaSalida: first?.distancia_min || 3,
-      zonaTranquila: first?.referencia || 'Plaza Principal',
-      distanciaTranquila: first?.distancia_min ? first.distancia_min + 2 : 5
-    }
-  }
 }
