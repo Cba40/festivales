@@ -29,11 +29,6 @@ const dynamicFields: Record<string, DynamicField[]> = {
   comida: [
     { name: 'Espera (min)', key: 'espera_min', type: 'number', placeholder: '5' },
   ],
-  emergencia: [
-    { name: 'Dirección', key: 'direccion', type: 'text', placeholder: 'Av. Siempre Viva 123' },
-    { name: 'Horario', key: 'horario', type: 'text', placeholder: '24hs' },
-    { name: 'Teléfono', key: 'telefono', type: 'text', placeholder: '+543511234567' },
-  ],
   descanso: [
     { name: 'X (0-100)', key: 'x', type: 'number', placeholder: '50' },
     { name: 'Y (0-100)', key: 'y', type: 'number', placeholder: '50' },

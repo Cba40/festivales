@@ -5,10 +5,12 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronUp,
+  Info,
   Loader2,
   MapPin,
   Phone,
   PhoneCall,
+  X,
 } from 'lucide-react'
 import {
   getCities,
@@ -22,10 +24,22 @@ import {
   type ProtocolDTO,
 } from '@/services/emergencyProduct'
 import { useAppStore } from '@/core/state/store'
+import { InteractiveMap, type InteractiveMapPoint } from '@/components/InteractiveMap'
 
 interface EmergencyModuleProps {
   context: ProtocolContext
   cityId?: string
+}
+
+// Mapeo de tipos de emergencia → tipos de marcador del mapa interactivo
+// ('salud_emergencia' evita colisión con el servicio 'salud' del mapa de Servicios).
+const TIPO_MAPA: Record<EmergencyType, string> = {
+  policia: 'policia',
+  bomberos: 'bomberos',
+  salud: 'salud_emergencia',
+  defensa_civil: 'defensa_civil',
+  numero_emergencia: 'numero_emergencia',
+  otro: 'otro',
 }
 
 const TYPE_LABEL: Record<EmergencyType, string> = {
@@ -68,6 +82,7 @@ export const EmergencyModule = ({ context, cityId }: EmergencyModuleProps) => {
   const [resourceLoading, setResourceLoading] = useState(false)
   const [resourceError, setResourceError] = useState<string | null>(null)
   const [showTerritorial, setShowTerritorial] = useState(false)
+  const [selectedResource, setSelectedResource] = useState<EmergencyItem | null>(null)
 
   const userLocation = useAppStore(s => s.userLocation)
 
@@ -284,7 +299,15 @@ export const EmergencyModule = ({ context, cityId }: EmergencyModuleProps) => {
 
   if (selectedProtocol) {
     return (
+      <>
       <div className="space-y-4">
+        <EmergencyMapSection
+          emergencies={all}
+          typeFilter={selectedProtocol.target_type}
+          recomendadoId={recommendedResource?.id ?? null}
+          onSelect={setSelectedResource}
+        />
+
         <button
           onClick={backToList}
           className="flex items-center gap-1 text-primary font-bold text-sm active:scale-95 transition-transform"
@@ -414,12 +437,25 @@ export const EmergencyModule = ({ context, cityId }: EmergencyModuleProps) => {
           )}
         </div>
       </div>
+
+      <ResourceBottomSheet
+        resource={selectedResource}
+        onClose={() => setSelectedResource(null)}
+      />
+      </>
     )
   }
 
   // Vista inicial: lista de protocolos del contexto.
   return (
     <div className="space-y-4">
+      <EmergencyMapSection
+        emergencies={all}
+        typeFilter={null}
+        recomendadoId={null}
+        onSelect={setSelectedResource}
+      />
+
       <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
         ¿Qué necesitás hacer? Elegí una opción
       </p>
@@ -441,7 +477,131 @@ export const EmergencyModule = ({ context, cityId }: EmergencyModuleProps) => {
           </button>
         ))}
       </div>
+
+      <ResourceBottomSheet
+        resource={selectedResource}
+        onClose={() => setSelectedResource(null)}
+      />
     </div>
+  )
+}
+
+interface EmergencyMapSectionProps {
+  emergencies: EmergencyItem[]
+  typeFilter: EmergencyType | null
+  recomendadoId: string | null
+  onSelect: (e: EmergencyItem) => void
+}
+
+const EmergencyMapSection = ({
+  emergencies,
+  typeFilter,
+  recomendadoId,
+  onSelect,
+}: EmergencyMapSectionProps) => {
+  const visibles =
+    typeFilter === null
+      ? emergencies
+      : emergencies.filter(e => e.type === typeFilter)
+
+  const puntos: InteractiveMapPoint[] = visibles
+    .filter(e => e.latitude != null && e.longitude != null)
+    .map(e => ({
+      id: e.id,
+      tipo: TIPO_MAPA[e.type],
+      nombre: e.name,
+      lat: e.latitude!,
+      lng: e.longitude!,
+      referencia: e.reference ?? undefined,
+      originalData: e,
+    }))
+
+  return (
+    <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm">
+      <InteractiveMap
+        puntos={puntos}
+        onSelectPunto={(p) => onSelect(p as EmergencyItem)}
+        onUserLocationUpdate={() => {}}
+        puntoResaltadoId={
+          recomendadoId != null && puntos.some(p => p.id === recomendadoId)
+            ? recomendadoId
+            : null
+        }
+      />
+    </div>
+  )
+}
+
+const ResourceBottomSheet = ({
+  resource,
+  onClose,
+}: {
+  resource: EmergencyItem | null
+  onClose: () => void
+}) => {
+  if (!resource) return null
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/50 z-[9999]" onClick={onClose} />
+      <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 rounded-t-2xl p-4 z-[10000] max-w-md mx-auto shadow-2xl">
+        <div
+          className="w-12 h-1 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto mb-4 cursor-pointer"
+          onClick={onClose}
+        />
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">
+            {resource.name}
+          </h3>
+          <span
+            className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${TYPE_BADGE[resource.type]}`}
+          >
+            {TYPE_LABEL[resource.type]}
+          </span>
+        </div>
+        <div className="space-y-2 mb-4 text-sm text-slate-600 dark:text-slate-300">
+          {resource.address && (
+            <p className="flex items-start gap-1.5">
+              <MapPin size={16} className="flex-shrink-0 mt-0.5" /> {resource.address}
+            </p>
+          )}
+          {resource.reference && (
+            <p className="flex items-start gap-1.5">
+              <Info size={16} className="flex-shrink-0 mt-0.5" /> {resource.reference}
+            </p>
+          )}
+          {resource.services && <p>🛟 {resource.services}</p>}
+          {resource.schedule != null && <p>🕐 {resource.schedule}</p>}
+          {resource.distance_km != null && (
+            <p>📍 A {resource.distance_km.toFixed(1)} km de tu ubicación</p>
+          )}
+        </div>
+        <div className="flex flex-col gap-2">
+          {resource.phone && (
+            <a
+              href={`tel:${resource.phone}`}
+              className="w-full bg-primary text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform"
+            >
+              <Phone size={18} /> Llamar
+            </a>
+          )}
+          {resource.latitude != null && resource.longitude != null && (
+            <button
+              onClick={() => handleMaps(resource.latitude!, resource.longitude!)}
+              className="w-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 py-3 rounded-xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform"
+            >
+              <MapPin size={18} /> Iniciar ruta
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="w-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 py-3 rounded-xl font-bold flex items-center justify-center gap-2"
+          >
+            <X size={16} /> Cerrar
+          </button>
+        </div>
+      </div>
+    </>
   )
 }
 

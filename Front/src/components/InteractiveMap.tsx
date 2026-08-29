@@ -37,7 +37,7 @@ const UserLocationMarker = ({ onLocationUpdate }: { onLocationUpdate: (pos: [num
   return <Marker position={storeLocation} icon={userIcon} />
 }
 
-export interface InteractiveMapPoint {
+export interface InteractiveMapPoint<T = unknown> {
   id: string
   tipo: string // 'banos', 'hidratacion', 'descanso', 'salud', 'estacionamiento', 'transporte', 'salida', 'hospedaje', 'emergencia', 'comer', etc.
   nombre: string
@@ -46,17 +46,23 @@ export interface InteractiveMapPoint {
   referencia: string
   distancia?: number
   updatedAt?: number
-  originalData?: any // Objeto original
+  originalData?: T
 }
 
-interface InteractiveMapProps {
-  puntos: InteractiveMapPoint[]
-  onSelectPunto: (punto: any) => void
+interface InteractiveMapProps<T = unknown> {
+  puntos: InteractiveMapPoint<T>[]
+  onSelectPunto: (punto: InteractiveMapPoint<T>) => void
   onUserLocationUpdate?: (pos: [number, number]) => void
+  puntoResaltadoId?: string | null
 }
 
-export const InteractiveMap = ({ puntos, onSelectPunto, onUserLocationUpdate }: InteractiveMapProps) => {
-  const getIcon = (tipo: string) => {
+export const InteractiveMap = <T,>({
+  puntos,
+  onSelectPunto,
+  onUserLocationUpdate,
+  puntoResaltadoId,
+}: InteractiveMapProps<T>) => {
+  const getIcon = (tipo: string, resaltado: boolean) => {
     let emoji = '📍'
     let color = 'bg-gray-500 shadow-gray-500/50'
 
@@ -74,9 +80,36 @@ export const InteractiveMap = ({ puntos, onSelectPunto, onUserLocationUpdate }: 
         color = 'bg-purple-500 shadow-purple-500/50'
         break
       case 'salud':
+        emoji = '🏧'
+        color = 'bg-emerald-500 shadow-emerald-500/50'
+        break
       case 'emergencia':
         emoji = '🏥'
         color = 'bg-red-500 shadow-red-500/50'
+        break
+      case 'policia':
+        emoji = '👮'
+        color = 'bg-blue-700 shadow-blue-700/50'
+        break
+      case 'bomberos':
+        emoji = '🚒'
+        color = 'bg-red-600 shadow-red-600/50'
+        break
+      case 'salud_emergencia':
+        emoji = '🚑'
+        color = 'bg-green-600 shadow-green-600/50'
+        break
+      case 'defensa_civil':
+        emoji = '🛡️'
+        color = 'bg-amber-600 shadow-amber-600/50'
+        break
+      case 'numero_emergencia':
+        emoji = '☎️'
+        color = 'bg-red-600 shadow-red-600/50'
+        break
+      case 'otro':
+        emoji = '📍'
+        color = 'bg-slate-600 shadow-slate-600/50'
         break
       case 'estacionamiento':
         emoji = '🚗'
@@ -104,12 +137,16 @@ export const InteractiveMap = ({ puntos, onSelectPunto, onUserLocationUpdate }: 
     return L.divIcon({
       className: 'custom-service-icon',
       html: `
-        <div class="relative w-9 h-9 rounded-full ${color} shadow-lg border-2 border-white dark:border-slate-800 flex items-center justify-center text-base font-bold text-white transition-transform hover:scale-110 active:scale-95 cursor-pointer">
+        <div class="relative ${resaltado ? 'w-11 h-11' : 'w-9 h-9'} rounded-full ${color} shadow-lg border-2 ${
+        resaltado
+          ? 'border-yellow-300 ring-2 ring-yellow-300'
+          : 'border-white dark:border-slate-800'
+      } flex items-center justify-center text-base font-bold text-white transition-transform hover:scale-110 active:scale-95 cursor-pointer">
           ${emoji}
         </div>
       `,
-      iconSize: [36, 36],
-      iconAnchor: [18, 18],
+      iconSize: resaltado ? [44, 44] : [36, 36],
+      iconAnchor: resaltado ? [22, 22] : [18, 18],
     })
   }
 
@@ -145,13 +182,14 @@ export const InteractiveMap = ({ puntos, onSelectPunto, onUserLocationUpdate }: 
 
         {puntos.map((punto) => {
           if (!punto.lat || !punto.lng) return null
+          const resaltado = puntoResaltadoId === punto.id
           return (
             <Marker
               key={punto.id}
               position={[punto.lat, punto.lng]}
-              icon={getIcon(punto.tipo)}
+              icon={getIcon(punto.tipo, resaltado)}
               eventHandlers={{
-                click: () => onSelectPunto(punto.originalData || punto),
+                click: () => onSelectPunto((punto.originalData || punto) as InteractiveMapPoint<T>),
               }}
             />
           )

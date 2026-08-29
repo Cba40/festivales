@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/Header'
 import { InteractiveMap } from '@/components/InteractiveMap'
-import { X, Bath, Droplets, Armchair, HeartPulse, Info, Map as MapIcon } from 'lucide-react'
+import { X, Bath, Droplets, Armchair, CreditCard, Map as MapIcon } from 'lucide-react'
 import { formatUpdatedAt } from '@/utils/formatTime'
 import { getDistancias } from '@/utils/geo'
 import { useAppStore } from '@/core/state/store'
@@ -11,7 +11,6 @@ import {
   getEstadoStyles,
   getEstadoLabel,
   getConfianzaLabel,
-  type ZonaBase,
 } from '@/components/ZonaCardsList'
 import { GpsModal } from '@/components/GpsModal'
 import { useBathroomRecommendations, type ZonaSanitaryItem } from '@/services/bathroomProduct'
@@ -23,7 +22,7 @@ const opciones = [
   { icon: Bath, label: 'Baños', subtipo: 'banos', colorScheme: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' },
   { icon: Droplets, label: 'Agua', subtipo: 'hidratacion', colorScheme: 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400' },
   { icon: Armchair, label: 'Descanso', subtipo: 'descanso', colorScheme: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400' },
-  { icon: HeartPulse, label: 'Salud', subtipo: 'salud', colorScheme: 'bg-danger/10 dark:bg-danger/20 text-danger' }
+  { icon: CreditCard, label: 'Cajeros', subtipo: 'salud', colorScheme: 'bg-danger/10 dark:bg-danger/20 text-danger' }
 ]
 
 
@@ -654,7 +653,7 @@ const ServiciosGenerales = () => {
   if (isSalud && healthLoading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        <Header title="Salud" showBack onBack={() => setSubtipoActivo(null)} />
+        <Header title="Cajeros" showBack onBack={() => setSubtipoActivo(null)} />
         <div className="flex-1 flex items-center justify-center">
           <p className="text-slate-500">Cargando recomendaciones...</p>
         </div>
@@ -665,7 +664,7 @@ const ServiciosGenerales = () => {
   if (isSalud && healthError) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        <Header title="Salud" showBack onBack={() => setSubtipoActivo(null)} />
+        <Header title="Cajeros" showBack onBack={() => setSubtipoActivo(null)} />
         <div className="flex-1 p-4 flex flex-col items-center justify-center space-y-4">
           <p className="text-danger font-bold">Error al cargar</p>
           <p className="text-sm text-slate-500 text-center">{healthError}</p>
@@ -683,11 +682,11 @@ const ServiciosGenerales = () => {
   if (isSalud && modoHealth === 'sin_solucion') {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        <Header title="Salud" showBack onBack={() => setSubtipoActivo(null)} />
+        <Header title="Cajeros" showBack onBack={() => setSubtipoActivo(null)} />
 
         <div className="flex-1 p-4 space-y-4">
           <div className="bg-danger text-white p-6 rounded-xl text-center">
-            <p className="text-xl font-bold">🏥 Todas las zonas de salud están colapsadas</p>
+            <p className="text-xl font-bold">💳 Todas las zonas de cajeros están colapsadas</p>
             <p className="text-sm mt-2 opacity-90">Tiempos de espera y acceso elevados</p>
           </div>
 
@@ -729,7 +728,7 @@ const ServiciosGenerales = () => {
   if (isSalud) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        <Header title="Salud" showBack onBack={() => setSubtipoActivo(null)} />
+        <Header title="Cajeros" showBack onBack={() => setSubtipoActivo(null)} />
 
         <div className="flex-1 p-4 overflow-y-auto space-y-4">
           <InteractiveMap
@@ -750,8 +749,8 @@ const ServiciosGenerales = () => {
 
           <ZonaCardsList
             items={healthItems}
-            icon="🏥"
-            label="zonas de salud disponibles"
+            icon="🏧"
+            label="zonas de cajeros disponibles"
             userLocation={userLocation}
             onSelect={(z) => setSelectedZonaSalud(z)}
           />

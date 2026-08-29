@@ -3,7 +3,6 @@ export const ZONE_TYPES = [
   { value: 'transporte', label: 'Transporte' },
   { value: 'comida', label: 'Comida' },
   { value: 'servicios', label: 'Servicios' },
-  { value: 'emergencia', label: 'Emergencia' },
   { value: 'salida', label: 'Salida' },
 ] as const;
 
