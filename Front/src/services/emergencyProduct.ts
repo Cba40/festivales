@@ -31,6 +31,18 @@ export interface EmergencyRecommendationResponse {
   emergencies: EmergencyItem[]
 }
 
+export interface CityDTO {
+  id: string
+  name: string
+  province: string | null
+  country: string
+}
+
+export async function getCities(): Promise<CityDTO[]> {
+  const { data } = await apiClient.get<CityDTO[]>(endpoints.emergency.cities())
+  return data
+}
+
 export function useEmergencyRecommendations(
   cityId?: string,
   type?: EmergencyType | 'todos'
@@ -48,7 +60,6 @@ export function useEmergencyRecommendations(
       setError(null)
       return
     }
-    setLoading(true)
     setLoading(true)
     setError(null)
     try {

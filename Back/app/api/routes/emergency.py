@@ -4,13 +4,30 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.db.session import get_async_db
+from app.models.city import City
 from app.models.emergency import EmergencyType
 from app.schemas.emergency import EmergencyRecommendationResponse
+from app.schemas.emergency_admin import CityResponse
 from src.interfaces.rest.emergency_product import get_emergency_product_adapter
 
 router = APIRouter(prefix="/api", tags=["Emergency"])
+
+
+@router.get("/cities", response_model=list[CityResponse])
+async def list_cities(
+    db: AsyncSession = Depends(get_async_db),
+):
+    """Lista las ciudades disponibles (público) para el módulo de emergencias.
+
+    Permite que ``<EmergencyModule />`` se auto-descubra: sin un ``city_id``
+    explícito, la app pública consulta esta ruta y usa la primera ciudad
+    disponible, sin depender de configuración externa.
+    """
+    result = await db.execute(select(City).order_by(City.name))
+    return result.scalars().all()
 
 
 @router.get("/emergencies", response_model=EmergencyRecommendationResponse)

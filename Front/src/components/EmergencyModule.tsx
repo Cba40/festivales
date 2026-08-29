@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { AlertTriangle, Loader2, MapPin, Phone, PhoneCall } from 'lucide-react'
 import {
+  getCities,
   useEmergencyRecommendations,
   type EmergencyItem,
   type EmergencyType,
@@ -46,12 +47,63 @@ const handleMaps = (lat: number, lng: number) => {
 }
 
 export const EmergencyModule = ({ cityId, defaultType }: EmergencyModuleProps) => {
-  const { data, loading, error, refresh } = useEmergencyRecommendations(cityId)
+  const [resolvedCityId, setResolvedCityId] = useState<string | null>(cityId ?? null)
+  const [resolvingCity, setResolvingCity] = useState(false)
+  const [cityError, setCityError] = useState<string | null>(null)
+  const [cityAttempt, setCityAttempt] = useState(0)
+
   const [activeType, setActiveType] = useState<CategoryKey>(
     defaultType && defaultType !== 'otro' && defaultType !== 'numero_emergencia'
       ? (defaultType as CategoryKey)
       : 'todos'
   )
+
+  // Auto-descubrimiento: si no se provee cityId explícito, se resuelve la
+  // primera ciudad disponible para el módulo público (sin config externa).
+  useEffect(() => {
+    let cancelled = false
+
+    if (cityId) {
+      setResolvedCityId(cityId)
+      setCityError(null)
+      setResolvingCity(false)
+      return
+    }
+
+    setResolvingCity(true)
+    setCityError(null)
+    ;(async () => {
+      try {
+        const cities = await getCities()
+        if (cancelled) return
+        if (cities.length === 0) {
+          setResolvedCityId(null)
+          setCityError('No hay ciudades configuradas')
+        } else {
+          setResolvedCityId(cities[0].id)
+          setCityError(null)
+        }
+      } catch {
+        if (cancelled) return
+        setResolvedCityId(null)
+        setCityError('No se pudieron cargar las ciudades')
+      } finally {
+        if (!cancelled) setResolvingCity(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [cityId, cityAttempt])
+
+  const retryCities = useCallback(() => {
+    setCityAttempt(a => a + 1)
+  }, [])
+
+  const effectiveCityId = resolvedCityId ?? cityId
+  const { data, loading, error, refresh } =
+    useEmergencyRecommendations(effectiveCityId)
 
   useEffect(() => {
     refresh()
@@ -64,19 +116,37 @@ export const EmergencyModule = ({ cityId, defaultType }: EmergencyModuleProps) =
   const filtered =
     activeType === 'todos' ? rest : rest.filter(e => e.type === activeType)
 
+  if (resolvingCity) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 text-slate-500 dark:text-slate-300 gap-2">
+        <Loader2 size={28} className="animate-spin" />
+        <p className="text-sm font-semibold">Cargando ubicación...</p>
+      </div>
+    )
+  }
+
+  if (cityError) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 space-y-3">
+        <p className="text-danger font-bold flex items-center gap-2">
+          <AlertTriangle size={18} /> Error al cargar
+        </p>
+        <p className="text-sm text-slate-500 text-center">{cityError}</p>
+        <button
+          onClick={retryCities}
+          className="bg-primary text-white px-6 py-2 rounded-lg font-bold active:scale-95 transition-transform"
+        >
+          Reintentar
+        </button>
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center p-8 text-slate-500 dark:text-slate-300 gap-2">
         <Loader2 size={28} className="animate-spin" />
         <p className="text-sm font-semibold">Cargando emergencias...</p>
-      </div>
-    )
-  }
-
-  if (!cityId) {
-    return (
-      <div className="text-center text-slate-500 dark:text-slate-300 py-10">
-        No se especificó la ciudad para mostrar las emergencias.
       </div>
     )
   }

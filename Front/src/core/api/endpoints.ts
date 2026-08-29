@@ -46,6 +46,7 @@ export const endpoints = {
   },
   emergency: {
     list: () => `/emergencies`,
+    cities: () => `/cities`,
   },
   emergencyAdmin: {
     list: (cityId?: string) =>

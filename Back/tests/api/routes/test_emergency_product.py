@@ -16,6 +16,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.db.session import get_async_db
+from app.models.city import City
 from app.models.emergency import Emergency, EmergencyType
 from app.schemas.emergency import (
     EmergencyItem,
@@ -289,3 +291,41 @@ class TestHaversine:
     def test_haversine_zero_distance(self):
         d = _haversine_distance_km(-30.98, -64.09, -30.98, -64.09)
         assert d == pytest.approx(0.0, abs=1e-6)
+
+
+# ─────────────────────────────────────────────────────────────
+# Endpoint público GET /api/cities (auto-descubrimiento)
+# ─────────────────────────────────────────────────────────────
+
+class TestCitiesEndpoint:
+    @pytest.fixture(autouse=True)
+    def _override_db(self):
+        db = AsyncMock()
+        row = City(id=CITY_ID, name="Jesús María", province="Córdoba", country="Argentina")
+        result = MagicMock()
+        scalars_result = MagicMock()
+        scalars_result.all.return_value = [row]
+        result.scalars.return_value = scalars_result
+        db.execute.return_value = result
+
+        async def _fake_get_db():
+            yield db
+
+        app.dependency_overrides[get_async_db] = _fake_get_db
+        yield db
+        app.dependency_overrides.clear()
+
+    def test_cities_returns_public_list(self, client: TestClient):
+        resp = client.get("/api/cities")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body[0]["id"] == CITY_ID
+        assert body[0]["name"] == "Jesús María"
+        assert body[0]["country"] == "Argentina"
+
+    def test_cities_is_public_without_token(self, client: TestClient):
+        resp = client.get("/api/cities")
+        assert resp.status_code == 200
+        assert "Jesús María" in resp.text
+
