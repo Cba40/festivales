@@ -16,12 +16,11 @@ class ActionType(Enum):
     SEEK_LOW_DENSITY = "SEEK_LOW_DENSITY"
     SEEK_SERVICE = "SEEK_SERVICE"
     SEEK_HYDRATION = "SEEK_HYDRATION"
-    SEEK_HEALTH = "SEEK_HEALTH"
 
 
 # Clasificación Operativa canónica (P3.0 §11.5): ActionType → (type, subtipo).
 # type ∈ {estacionamiento, comida, servicios, transporte, hospedaje, salida, emergencia}
-# subtipo ∈ {banos, hidratacion, descanso, salud} — solo cuando type == "servicios".
+# subtipo ∈ {banos, hidratacion, descanso} — solo cuando type == "servicios".
 OPERATIONAL_CLASSIFICATION_BY_ACTION: dict[ActionType, tuple[str | None, str | None]] = {
     ActionType.SEEK_PARKING: ("estacionamiento", None),
     ActionType.SEEK_FOOD: ("comida", None),
@@ -32,7 +31,6 @@ OPERATIONAL_CLASSIFICATION_BY_ACTION: dict[ActionType, tuple[str | None, str | N
     ActionType.SEEK_BATHROOM: ("servicios", "banos"),
     ActionType.SEEK_HYDRATION: ("servicios", "hidratacion"),
     ActionType.SEEK_REST: ("servicios", "descanso"),
-    ActionType.SEEK_HEALTH: ("servicios", "salud"),
     ActionType.SEEK_INFORMATION: (None, None),
     ActionType.SEEK_LOW_DENSITY: (None, None),
     ActionType.SEEK_SERVICE: (None, None),

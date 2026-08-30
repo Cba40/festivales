@@ -795,7 +795,6 @@ class TestActionTypeCatalog:
             (ActionType.SEEK_BATHROOM, "servicios", "banos"),
             (ActionType.SEEK_HYDRATION, "servicios", "hidratacion"),
             (ActionType.SEEK_REST, "servicios", "descanso"),
-            (ActionType.SEEK_HEALTH, "servicios", "salud"),
             (ActionType.SEEK_INFORMATION, None, None),
             (ActionType.SEEK_LOW_DENSITY, None, None),
             (ActionType.SEEK_SERVICE, None, None),
@@ -826,7 +825,6 @@ class TestActionTypeCatalog:
             ActionType.SEEK_EXIT,
             ActionType.SEEK_REST,
             ActionType.SEEK_SECURITY,
-            ActionType.SEEK_HEALTH,
         ]
         for at in intention_oriented:
             assert at in OPERATIONAL_CLASSIFICATION_BY_ACTION
@@ -858,7 +856,6 @@ class TestActionTypeCatalog:
             ActionType.SEEK_SECURITY,
             ActionType.SEEK_INFORMATION,
             ActionType.SEEK_HYDRATION,
-            ActionType.SEEK_HEALTH,
         }
         service = ActionType.SEEK_SERVICE
         assert service not in specific
@@ -900,7 +897,6 @@ class TestNewActionTypesNoRegression:
             (ActionType.SEEK_REST, "servicios", "descanso"),
             (ActionType.SEEK_SECURITY, "emergencia", None),
             (ActionType.SEEK_HYDRATION, "servicios", "hidratacion"),
-            (ActionType.SEEK_HEALTH, "servicios", "salud"),
         ],
     )
     def test_new_action_types_filter_by_classification(

@@ -75,7 +75,6 @@ SUBTIPO_TO_ZONE_TYPE_SLUG = {
     "banos": "bano",
     "hidratacion": "hidratacion",
     "descanso": "descanso",
-    "salud": "salud",
 }
 
 

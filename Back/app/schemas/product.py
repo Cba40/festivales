@@ -74,10 +74,6 @@ class BathroomRecommendationResponse(BaseModel):
     zonas: list[ZonaSanitaryItem]
 
 
-class ZonaSaludItem(ZonaItemBase):
-    pass
-
-
 class RestRecommendationResponse(BaseModel):
     event_id: str
     timestamp: str
@@ -87,13 +83,6 @@ class RestRecommendationResponse(BaseModel):
 
 class ZonaHidratacionItem(ZonaItemBase):
     pass
-
-
-class HealthRecommendationResponse(BaseModel):
-    event_id: str
-    timestamp: str
-    mode: str
-    zonas: list[ZonaSaludItem]
 
 
 class HydrationRecommendationResponse(BaseModel):

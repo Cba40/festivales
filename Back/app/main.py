@@ -28,7 +28,6 @@ from app.api.routes.exit_admin import router as exit_admin_router
 from app.api.routes.transport_admin import router as transport_admin_router
 from app.api.routes.bathroom import router as bathroom_router
 from app.api.routes.rest import router as rest_router
-from app.api.routes.health_product import router as health_product_router
 from app.api.routes.hydration import router as hydration_router
 from app.api.routes.motor_config import router as motor_config_router
 from app.api.routes.service_configs import router as service_configs_router
@@ -76,7 +75,6 @@ app.include_router(exit_admin_router)
 app.include_router(transport_admin_router)
 app.include_router(bathroom_router)
 app.include_router(rest_router)
-app.include_router(health_product_router)
 app.include_router(hydration_router)
 app.include_router(motor_config_router)
 app.include_router(service_configs_router)

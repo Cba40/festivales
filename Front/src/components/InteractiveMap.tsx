@@ -39,7 +39,7 @@ const UserLocationMarker = ({ onLocationUpdate }: { onLocationUpdate: (pos: [num
 
 export interface InteractiveMapPoint<T = unknown> {
   id: string
-  tipo: string // 'banos', 'hidratacion', 'descanso', 'salud', 'estacionamiento', 'transporte', 'salida', 'hospedaje', 'emergencia', 'comer', etc.
+  tipo: string // 'banos', 'hidratacion', 'descanso', 'cajeros', 'estacionamiento', 'transporte', 'salida', 'hospedaje', 'emergencia', 'comer', etc.
   nombre: string
   lat: number
   lng: number
@@ -78,10 +78,6 @@ export const InteractiveMap = <T,>({
       case 'descanso':
         emoji = '🪑'
         color = 'bg-purple-500 shadow-purple-500/50'
-        break
-      case 'salud':
-        emoji = '🏥'
-        color = 'bg-emerald-500 shadow-emerald-500/50'
         break
       case 'cajeros':
         emoji = '💳'

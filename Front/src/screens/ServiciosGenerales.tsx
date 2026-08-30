@@ -2,7 +2,7 @@
 import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/Header'
 import { InteractiveMap } from '@/components/InteractiveMap'
-import { X, Bath, Droplets, Armchair, HeartPulse, CreditCard, Map as MapIcon } from 'lucide-react'
+import { X, Bath, Droplets, Armchair, CreditCard, Map as MapIcon } from 'lucide-react'
 import { formatUpdatedAt } from '@/utils/formatTime'
 import { getDistancias } from '@/utils/geo'
 import { useAppStore } from '@/core/state/store'
@@ -15,7 +15,6 @@ import {
 import { GpsModal } from '@/components/GpsModal'
 import { useBathroomRecommendations, type ZonaSanitaryItem } from '@/services/bathroomProduct'
 import { useRestRecommendations, type ZonaRestItem } from '@/services/restProduct'
-import { useHealthRecommendations, type ZonaSaludItem } from '@/services/healthProduct'
 import { useHydrationRecommendations, type ZonaHidratacionItem } from '@/services/hydrationProduct'
 import { useCajeros } from '@/services/cajerosProduct'
 
@@ -23,7 +22,6 @@ const opciones = [
   { icon: Bath, label: 'Baños', subtipo: 'banos', colorScheme: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' },
   { icon: Droplets, label: 'Agua', subtipo: 'hidratacion', colorScheme: 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400' },
   { icon: Armchair, label: 'Descanso', subtipo: 'descanso', colorScheme: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400' },
-  { icon: HeartPulse, label: 'Salud', subtipo: 'salud', colorScheme: 'bg-danger/10 dark:bg-danger/20 text-danger' },
   { icon: CreditCard, label: 'Cajeros', subtipo: 'cajeros', colorScheme: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300' }
 ]
 
@@ -43,13 +41,11 @@ const ServiciosGenerales = () => {
   const [mostrarGpsModal, setMostrarGpsModal] = useState(true)
   const [selectedZona, setSelectedZona] = useState<ZonaSanitaryItem | null>(null)
   const [selectedZonaRest, setSelectedZonaRest] = useState<ZonaRestItem | null>(null)
-  const [selectedZonaSalud, setSelectedZonaSalud] = useState<ZonaSaludItem | null>(null)
   const [selectedZonaHidratacion, setSelectedZonaHidratacion] = useState<ZonaHidratacionItem | null>(null)
   const [selectedCajero, setSelectedCajero] = useState<CajeroItem | null>(null)
 
   const isBanos = subtipoActivo === 'banos'
   const isDescanso = subtipoActivo === 'descanso'
-  const isSalud = subtipoActivo === 'salud'
   const isHidratacion = subtipoActivo === 'hidratacion'
   const isCajeros = subtipoActivo === 'cajeros'
 
@@ -60,12 +56,6 @@ const ServiciosGenerales = () => {
     error: restError,
     refresh: refreshRest,
   } = useRestRecommendations()
-  const {
-    data: healthData,
-    loading: healthLoading,
-    error: healthError,
-    refresh: refreshHealth,
-  } = useHealthRecommendations()
   const {
     data: hydrationData,
     loading: hydrationLoading,
@@ -88,10 +78,6 @@ const ServiciosGenerales = () => {
   }, [isDescanso, refreshRest])
 
   useEffect(() => {
-    if (isSalud) refreshHealth()
-  }, [isSalud, refreshHealth])
-
-  useEffect(() => {
     if (isHidratacion) refreshHydration()
   }, [isHidratacion, refreshHydration])
 
@@ -104,9 +90,6 @@ const ServiciosGenerales = () => {
 
   const restItems = restData?.zonas ?? []
   const modoRest = restData?.mode ?? 'informar'
-
-  const healthItems = healthData?.zonas ?? []
-  const modoHealth = healthData?.mode ?? 'informar'
 
   const hydrationItems = hydrationData?.zonas ?? []
   const modoHydration = hydrationData?.mode ?? 'informar'
@@ -172,75 +155,6 @@ const ServiciosGenerales = () => {
         </button>
         <button
           onClick={() => setSelectedZonaRest(null)}
-          className="w-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 py-3 rounded-xl font-bold flex items-center justify-center gap-2"
-        >
-          <X size={16} /> Cerrar
-        </button>
-      </div>
-    </>
-  )
-
-  const abrirMapaSalud = (zona: ZonaSaludItem) => {
-    if (zona.lat && zona.lng) {
-      window.open(
-        `https://www.google.com/maps/dir/?api=1&destination=${zona.lat},${zona.lng}`,
-        '_blank'
-      )
-    }
-    setSelectedZonaSalud(null)
-  }
-
-  const renderBottomSheetSalud = selectedZonaSalud && (
-    <>
-      <div
-        className="fixed inset-0 bg-black/50 z-[9999]"
-        onClick={() => setSelectedZonaSalud(null)}
-      />
-      <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 rounded-t-2xl p-4 z-[10000] max-w-md mx-auto shadow-2xl">
-        <div
-          className="w-12 h-1 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto mb-4 cursor-pointer"
-          onClick={() => setSelectedZonaSalud(null)}
-        />
-        <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2">
-          {selectedZonaSalud.name}
-        </h3>
-        <div className="space-y-2 mb-4 text-sm text-slate-600 dark:text-slate-300">
-          <p>📍 {selectedZonaSalud.referencia}</p>
-          {(() => {
-            const dist = getDistancias(selectedZonaSalud.lat ?? 0, selectedZonaSalud.lng ?? 0, userLocation, selectedZonaSalud.distancia_min ?? 5)
-            return (
-              <>
-                <p className="flex items-center gap-1.5">🚶 <span>Tiempo caminando:</span> <span className="font-semibold text-slate-800 dark:text-slate-100">{dist.walking}</span></p>
-                <p className="flex items-center gap-1.5">🚗 <span>Tiempo en auto:</span> <span className="font-semibold text-slate-800 dark:text-slate-100">{dist.driving}</span></p>
-              </>
-            )
-          })()}
-          {selectedZonaSalud.estimated_wait != null && (
-            <p className="text-sm text-slate-600 dark:text-slate-300">
-              ⏱️ Espera: {selectedZonaSalud.estimated_wait} min
-            </p>
-          )}
-          {selectedZonaSalud.saturation_level != null && (
-            <p className="text-sm text-slate-600 dark:text-slate-300">
-              📊 Posibilidad: {Math.round((1 - selectedZonaSalud.saturation_level) * 100)}%
-            </p>
-          )}
-          <p className="text-xs text-slate-500 dark:text-slate-300">
-            {formatUpdatedAt(healthData?.timestamp ? Date.parse(healthData.timestamp) : Date.now())}
-          </p>
-          <p className="text-xs text-slate-500 dark:text-slate-300">
-            {getConfianzaLabel(selectedZonaSalud.confidence)}
-          </p>
-        </div>
-        <button
-          onClick={() => abrirMapaSalud(selectedZonaSalud)}
-          className="w-full bg-primary text-white py-3 rounded-xl font-bold mb-2 transition-transform active:scale-95 flex items-center justify-center gap-2"
-        >
-          <MapIcon size={18} />
-          Iniciar ruta
-        </button>
-        <button
-          onClick={() => setSelectedZonaSalud(null)}
           className="w-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 py-3 rounded-xl font-bold flex items-center justify-center gap-2"
         >
           <X size={16} /> Cerrar
@@ -713,127 +627,6 @@ const ServiciosGenerales = () => {
         )}
 
         {renderBottomSheetRest}
-      </div>
-    )
-  }
-
-  if (isSalud && healthLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        <Header title="Salud" showBack onBack={() => setSubtipoActivo(null)} />
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-slate-500">Cargando recomendaciones...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (isSalud && healthError) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        <Header title="Salud" showBack onBack={() => setSubtipoActivo(null)} />
-        <div className="flex-1 p-4 flex flex-col items-center justify-center space-y-4">
-          <p className="text-danger font-bold">Error al cargar</p>
-          <p className="text-sm text-slate-500 text-center">{healthError}</p>
-          <button
-            onClick={refreshHealth}
-            className="bg-primary text-white px-6 py-2 rounded-lg font-bold"
-          >
-            Reintentar
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  if (isSalud && modoHealth === 'sin_solucion') {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        <Header title="Salud" showBack onBack={() => setSubtipoActivo(null)} />
-
-        <div className="flex-1 p-4 space-y-4">
-          <div className="bg-danger text-white p-6 rounded-xl text-center">
-            <p className="text-xl font-bold">🏥 Todos los puestos de salud están colapsados</p>
-            <p className="text-sm mt-2 opacity-90">Tiempos de espera y acceso elevados</p>
-          </div>
-
-          {healthItems.length > 0 && (
-            <div className="mt-3 space-y-2">
-              <p className="text-xs text-red-500 text-center">
-                ⚠️ Disponibilidad muy baja — podés no encontrar lugar
-              </p>
-              {healthItems.slice(0, 2).map(zona => {
-                const dist = getDistancias(zona.lat ?? 0, zona.lng ?? 0, userLocation, zona.distancia_min ?? 5)
-                return (
-                  <button
-                    key={zona.zone_id}
-                    onClick={() => setSelectedZonaSalud(zona)}
-                    className="w-full p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-left"
-                  >
-                    <span className="font-bold text-gray-900 dark:text-gray-100">{zona.name}</span>
-                    <span className={`ml-2 px-2 py-1 rounded text-xs font-bold ${getEstadoStyles(zona.estado)}`}>
-                      {getEstadoLabel(zona.estado)}
-                    </span>
-                    <p className="text-xs text-gray-500 dark:text-gray-300 mt-1 flex flex-wrap gap-x-2">
-                      <span>🚶 {dist.walking}</span>
-                      <span>🚗 {dist.driving}</span>
-                      {zona.estimated_wait != null && <span>⏱️ {zona.estimated_wait} min</span>}
-                      {zona.saturation_level != null && <span>📊 {Math.round((1 - zona.saturation_level) * 100)}% de posibilidad</span>}
-                    </p>
-                  </button>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
-        {renderBottomSheetSalud}
-      </div>
-    )
-  }
-
-  if (isSalud) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        <Header title="Salud" showBack onBack={() => setSubtipoActivo(null)} />
-
-        <div className="flex-1 p-4 overflow-y-auto space-y-4">
-          <InteractiveMap
-            puntos={healthItems
-              .filter(z => z.lat && z.lng)
-              .map(z => ({
-                id: z.zone_id,
-                nombre: z.name,
-                lat: z.lat!,
-                lng: z.lng!,
-                referencia: z.referencia,
-                tipo: 'salud',
-                originalData: z
-              }))}
-            onSelectPunto={(p) => setSelectedZonaSalud(p as ZonaSaludItem)}
-            onUserLocationUpdate={() => {}}
-          />
-
-          <ZonaCardsList
-            items={healthItems}
-            icon="🏥"
-            label="puestos de salud disponibles"
-            userLocation={userLocation}
-            onSelect={(z) => setSelectedZonaSalud(z)}
-          />
-        </div>
-
-        {!userLocation && mostrarGpsModal && (
-          <GpsModal
-            onActivate={() => {
-              requestLocation()
-              setMostrarGpsModal(false)
-            }}
-            onClose={() => setMostrarGpsModal(false)}
-          />
-        )}
-
-        {renderBottomSheetSalud}
       </div>
     )
   }

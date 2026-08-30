@@ -21,7 +21,6 @@ export const DEFAULTS_POR_SUBTIPO: Record<string, number> = {
   banos: 5,
   hidratacion: 3,
   descanso: 15,
-  salud: 10,
   foodtruck: 20,
   comida_al_paso: 15,
   penas: 45,
