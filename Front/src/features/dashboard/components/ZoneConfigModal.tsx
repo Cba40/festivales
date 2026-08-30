@@ -223,7 +223,9 @@ export function ZoneConfigModal({ zone, onClose }: Props) {
                     {subtiposLoading ? 'Cargando subtipos…' : 'Sin subtipo'}
                   </option>
                   {subtipos.map((s) => (
-                    <option key={s.id} value={s.slug}>{s.name}</option>
+                    <option key={s.id} value={s.slug}>
+                      {s.slug === 'salud' ? 'Cajeros' : s.name}
+                    </option>
                   ))}
                 </select>
               )}
