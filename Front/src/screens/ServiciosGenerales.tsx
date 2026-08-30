@@ -2,7 +2,7 @@
 import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/Header'
 import { InteractiveMap } from '@/components/InteractiveMap'
-import { X, Bath, Droplets, Armchair, HeartPulse, Map as MapIcon } from 'lucide-react'
+import { X, Bath, Droplets, Armchair, HeartPulse, CreditCard, Map as MapIcon } from 'lucide-react'
 import { formatUpdatedAt } from '@/utils/formatTime'
 import { getDistancias } from '@/utils/geo'
 import { useAppStore } from '@/core/state/store'
@@ -17,12 +17,14 @@ import { useBathroomRecommendations, type ZonaSanitaryItem } from '@/services/ba
 import { useRestRecommendations, type ZonaRestItem } from '@/services/restProduct'
 import { useHealthRecommendations, type ZonaSaludItem } from '@/services/healthProduct'
 import { useHydrationRecommendations, type ZonaHidratacionItem } from '@/services/hydrationProduct'
+import { useCajeros } from '@/services/cajerosProduct'
 
 const opciones = [
   { icon: Bath, label: 'Baños', subtipo: 'banos', colorScheme: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' },
   { icon: Droplets, label: 'Agua', subtipo: 'hidratacion', colorScheme: 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400' },
   { icon: Armchair, label: 'Descanso', subtipo: 'descanso', colorScheme: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400' },
-  { icon: HeartPulse, label: 'Salud', subtipo: 'salud', colorScheme: 'bg-danger/10 dark:bg-danger/20 text-danger' }
+  { icon: HeartPulse, label: 'Salud', subtipo: 'salud', colorScheme: 'bg-danger/10 dark:bg-danger/20 text-danger' },
+  { icon: CreditCard, label: 'Cajeros', subtipo: 'cajeros', colorScheme: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300' }
 ]
 
 
@@ -43,11 +45,13 @@ const ServiciosGenerales = () => {
   const [selectedZonaRest, setSelectedZonaRest] = useState<ZonaRestItem | null>(null)
   const [selectedZonaSalud, setSelectedZonaSalud] = useState<ZonaSaludItem | null>(null)
   const [selectedZonaHidratacion, setSelectedZonaHidratacion] = useState<ZonaHidratacionItem | null>(null)
+  const [selectedCajero, setSelectedCajero] = useState<CajeroItem | null>(null)
 
   const isBanos = subtipoActivo === 'banos'
   const isDescanso = subtipoActivo === 'descanso'
   const isSalud = subtipoActivo === 'salud'
   const isHidratacion = subtipoActivo === 'hidratacion'
+  const isCajeros = subtipoActivo === 'cajeros'
 
   const { data: bathroomData, loading, error, refresh } = useBathroomRecommendations()
   const {
@@ -68,6 +72,12 @@ const ServiciosGenerales = () => {
     error: hydrationError,
     refresh: refreshHydration,
   } = useHydrationRecommendations()
+  const {
+    data: cajeros,
+    loading: cajerosLoading,
+    error: cajerosError,
+    refresh: refreshCajeros,
+  } = useCajeros()
 
   useEffect(() => {
     if (isBanos) refresh()
@@ -84,6 +94,10 @@ const ServiciosGenerales = () => {
   useEffect(() => {
     if (isHidratacion) refreshHydration()
   }, [isHidratacion, refreshHydration])
+
+  useEffect(() => {
+    if (isCajeros) refreshCajeros()
+  }, [isCajeros, refreshCajeros])
 
   const bathrooms = bathroomData?.zonas ?? []
   const modoBathroom = bathroomData?.mode ?? 'informar'
@@ -296,6 +310,59 @@ const ServiciosGenerales = () => {
         </button>
         <button
           onClick={() => setSelectedZonaHidratacion(null)}
+          className="w-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 py-3 rounded-xl font-bold flex items-center justify-center gap-2"
+        >
+          <X size={16} /> Cerrar
+        </button>
+      </div>
+    </>
+  )
+
+  const abrirMapaCajero = (cajero: CajeroItem) => {
+    if (cajero.lat && cajero.lng) {
+      window.open(
+        `https://www.google.com/maps/dir/?api=1&destination=${cajero.lat},${cajero.lng}`,
+        '_blank'
+      )
+    }
+    setSelectedCajero(null)
+  }
+
+  const renderBottomSheetCajero = selectedCajero && (
+    <>
+      <div
+        className="fixed inset-0 bg-black/50 z-[9999]"
+        onClick={() => setSelectedCajero(null)}
+      />
+      <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 rounded-t-2xl p-4 z-[10000] max-w-md mx-auto shadow-2xl">
+        <div
+          className="w-12 h-1 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto mb-4 cursor-pointer"
+          onClick={() => setSelectedCajero(null)}
+        />
+        <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2">
+          {selectedCajero.name}
+        </h3>
+        <div className="space-y-2 mb-4 text-sm text-slate-600 dark:text-slate-300">
+          {selectedCajero.referencia && <p>📍 {selectedCajero.referencia}</p>}
+          {(() => {
+            const dist = getDistancias(selectedCajero.lat ?? 0, selectedCajero.lng ?? 0, userLocation, 5)
+            return (
+              <>
+                <p className="flex items-center gap-1.5">🚶 <span>Tiempo caminando:</span> <span className="font-semibold text-slate-800 dark:text-slate-100">{dist.walking}</span></p>
+                <p className="flex items-center gap-1.5">🚗 <span>Tiempo en auto:</span> <span className="font-semibold text-slate-800 dark:text-slate-100">{dist.driving}</span></p>
+              </>
+            )
+          })()}
+        </div>
+        <button
+          onClick={() => abrirMapaCajero(selectedCajero)}
+          className="w-full bg-primary text-white py-3 rounded-xl font-bold mb-2 transition-transform active:scale-95 flex items-center justify-center gap-2"
+        >
+          <MapIcon size={18} />
+          Cómo llegar
+        </button>
+        <button
+          onClick={() => setSelectedCajero(null)}
           className="w-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 py-3 rounded-xl font-bold flex items-center justify-center gap-2"
         >
           <X size={16} /> Cerrar
@@ -888,6 +955,94 @@ const ServiciosGenerales = () => {
         )}
 
         {renderBottomSheetHidratacion}
+      </div>
+    )
+  }
+
+  if (isCajeros && cajerosLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
+        <Header title="Cajeros" showBack onBack={() => setSubtipoActivo(null)} />
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-slate-500">Cargando cajeros...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (isCajeros && cajerosError) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
+        <Header title="Cajeros" showBack onBack={() => setSubtipoActivo(null)} />
+        <div className="flex-1 p-4 flex flex-col items-center justify-center space-y-4">
+          <p className="text-danger font-bold">Error al cargar</p>
+          <p className="text-sm text-slate-500 text-center">{cajerosError}</p>
+          <button
+            onClick={refreshCajeros}
+            className="bg-primary text-white px-6 py-2 rounded-lg font-bold"
+          >
+            Reintentar
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (isCajeros && cajeros.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
+        <Header title="Cajeros" showBack onBack={() => setSubtipoActivo(null)} />
+        <div className="flex-1 p-4 flex items-center justify-center">
+          <p className="text-sm text-slate-500 text-center">
+            No hay cajeros registrados en esta zona
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  if (isCajeros) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
+        <Header title="Cajeros" showBack onBack={() => setSubtipoActivo(null)} />
+
+        <div className="flex-1 p-4 overflow-y-auto space-y-4">
+          <InteractiveMap
+            puntos={cajeros
+              .filter(z => z.lat && z.lng)
+              .map(z => ({
+                id: z.zone_id,
+                nombre: z.name,
+                lat: z.lat!,
+                lng: z.lng!,
+                referencia: z.referencia,
+                tipo: 'cajeros',
+                originalData: z
+              }))}
+            onSelectPunto={(p) => setSelectedCajero(p as CajeroItem)}
+            onUserLocationUpdate={() => {}}
+          />
+
+          <ZonaCardsList
+            items={cajeros}
+            icon="💳"
+            label="cajeros disponibles"
+            userLocation={userLocation}
+            onSelect={(z) => setSelectedCajero(z)}
+          />
+        </div>
+
+        {!userLocation && mostrarGpsModal && (
+          <GpsModal
+            onActivate={() => {
+              requestLocation()
+              setMostrarGpsModal(false)
+            }}
+            onClose={() => setMostrarGpsModal(false)}
+          />
+        )}
+
+        {renderBottomSheetCajero}
       </div>
     )
   }

@@ -83,6 +83,10 @@ export const InteractiveMap = <T,>({
         emoji = '🏥'
         color = 'bg-emerald-500 shadow-emerald-500/50'
         break
+      case 'cajeros':
+        emoji = '💳'
+        color = 'bg-slate-500 shadow-slate-500/50'
+        break
       case 'emergencia':
         emoji = '🏥'
         color = 'bg-red-500 shadow-red-500/50'

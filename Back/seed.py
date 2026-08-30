@@ -300,6 +300,16 @@ ZONES_DATA = [
         "x": 55,
         "y": 70,
     },
+    {
+        "name": "Cajero Automático - Entrada Principal",
+        "type": "servicios",
+        "capacity": 1,
+        "latitude": -30.976000,
+        "longitude": -64.091500,
+        "subtipo": "cajeros",
+        "x": 30,
+        "y": 35,
+    },
 ]
 
 
