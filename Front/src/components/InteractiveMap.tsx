@@ -80,7 +80,7 @@ export const InteractiveMap = <T,>({
         color = 'bg-purple-500 shadow-purple-500/50'
         break
       case 'salud':
-        emoji = '🏧'
+        emoji = '🏥'
         color = 'bg-emerald-500 shadow-emerald-500/50'
         break
       case 'emergencia':

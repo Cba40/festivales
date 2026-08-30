@@ -227,9 +227,7 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
                 {subtiposLoading ? 'Cargando subtipos…' : 'Seleccioná un subtipo (opcional)'}
               </option>
               {subtipos.map((s) => (
-                <option key={s.id} value={s.slug}>
-                  {s.slug === 'salud' ? 'Cajeros' : s.name}
-                </option>
+                <option key={s.id} value={s.slug}>{s.name}</option>
               ))}
             </select>
           )}
