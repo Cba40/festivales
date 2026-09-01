@@ -20,7 +20,6 @@ from app.crud import (
     create_operational_profile,
     create_zone_behavior,
     get_operational_event,
-    list_active_by_event_day,
     list_events_by_event_day,
     list_phases_by_profile,
     list_phases_by_event_day,
@@ -267,6 +266,9 @@ class TestOperationalEventModifierCRUD:
 @pytest.mark.asyncio
 class TestOperationalEventCRUD:
 
+    @pytest.mark.skip(
+        reason="CRUD V1 (RFC): list_active_by_event_day legacy eliminado con start_min/end_min"
+    )
     async def test_list_active_by_event_day_filters_correctly(
         self, async_session: AsyncSession, clean_tables,
     ):

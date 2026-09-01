@@ -27,7 +27,7 @@ EffectType = Literal[
 ]
 
 
-def _validate_effect(effect_type, effect_value):
+def validate_effect(effect_type, effect_value):
     if effect_value is None and effect_type in ("reduccion_capacidad", "aumento_demanda"):
         raise ValueError(f"effect_value is required for {effect_type}")
     if effect_type == "reduccion_capacidad" and not (1 <= effect_value <= 100):
@@ -60,7 +60,7 @@ class OperationalEventCreate(BaseModel):
 
     @model_validator(mode="after")
     def check_effect(self) -> "OperationalEventCreate":
-        _validate_effect(self.effect_type, self.effect_value)
+        validate_effect(self.effect_type, self.effect_value)
         return self
 
 
@@ -87,7 +87,7 @@ class OperationalEventUpdate(BaseModel):
     @model_validator(mode="after")
     def check_effect(self) -> "OperationalEventUpdate":
         if self.effect_type is not None:
-            _validate_effect(self.effect_type, self.effect_value)
+            validate_effect(self.effect_type, self.effect_value)
         return self
 
 

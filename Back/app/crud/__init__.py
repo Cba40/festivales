@@ -22,11 +22,11 @@ from app.crud.zone_behavior import (
 )
 from app.crud.operational_event import (
     create as create_operational_event,
-    get_by_id as get_operational_event,
-    list_by_event_day as list_events_by_event_day,
-    list_active_by_event_day,
-    update as update_operational_event,
+    deactivate as deactivate_operational_event,
     delete as delete_operational_event,
+    get as get_operational_event,
+    list_by_event_day as list_events_by_event_day,
+    update as update_operational_event,
 )
 from app.crud.operational_event_modifier import (
     create as create_operational_event_modifier,
@@ -70,8 +70,8 @@ __all__ = [
     "create_operational_event",
     "get_operational_event",
     "list_events_by_event_day",
-    "list_active_by_event_day",
     "update_operational_event",
+    "deactivate_operational_event",
     "delete_operational_event",
     "create_operational_event_modifier",
     "get_operational_event_modifier",
