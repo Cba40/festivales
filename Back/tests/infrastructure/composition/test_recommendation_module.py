@@ -202,6 +202,8 @@ def _mock_full_flow_session() -> AsyncMock:
             _scalar_one_result(ed_row),
             _scalar_one_result(attendance_row),
             _scalars_result(phase_rows),
+            # operational_events (OperationalEventAdapter): sin eventos activos.
+            _scalars_result([]),
             # ETAPA 4 — queries adicionales de ParkingModule (puente Parking):
             _scalars_result(zone_type_rows),
             _one_result(ref_row),

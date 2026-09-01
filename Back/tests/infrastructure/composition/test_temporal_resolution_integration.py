@@ -205,6 +205,8 @@ def _mock_session(*, module: str, active: bool) -> AsyncMock:
             effects += [
                 _scalar_one_result(attendance_row),
                 _scalars_result(phase_rows),
+                # operational_events (OperationalEventAdapter): sin eventos activos.
+                _scalars_result([]),
             ]
     elif module == "recommendation":
         effects = [
@@ -218,6 +220,8 @@ def _mock_session(*, module: str, active: bool) -> AsyncMock:
             effects += [
                 _scalar_one_result(attendance_row),
                 _scalars_result(phase_rows),
+                # operational_events (OperationalEventAdapter): sin eventos activos.
+                _scalars_result([]),
                 # ParkingModule (puente ETAPA 4):
                 _scalars_result(zone_type_rows),
                 _one_result(ref_row),

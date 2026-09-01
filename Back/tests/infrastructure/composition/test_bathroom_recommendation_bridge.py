@@ -359,6 +359,8 @@ def _mock_bridge_session(*, bathroom_request: bool) -> AsyncMock:
         _scalar_one_result(ed_row),
         _scalar_one_result(attendance_row),
         _scalars_result(phase_rows),
+        # operational_events (OperationalEventAdapter): sin eventos activos.
+        _scalars_result([]),
     ]
     if bathroom_request:
         effects += [

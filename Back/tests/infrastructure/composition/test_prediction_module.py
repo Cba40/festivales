@@ -192,6 +192,8 @@ def _mock_full_flow_session(
     if attendance_level_id is not None:
         execute_calls.append(_scalar_one_result(attendance_row))
     execute_calls.append(_scalars_result(phase_rows))
+    # operational_events (OperationalEventAdapter): sin eventos activos.
+    execute_calls.append(_scalars_result([]))
 
     session.execute = AsyncMock(side_effect=execute_calls)
     return session

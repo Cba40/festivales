@@ -38,7 +38,6 @@ from src.domain.entities.zone import Zone
 from src.domain.entities.zone_behavior import FlowRestriction, ZoneBehavior
 from src.domain.ports import (
     EventDayRepository,
-    OperationalEventRepository,
     PredictionRepository,
 )
 from src.domain.recommendation.mobility_context import MobilityContext
@@ -61,6 +60,9 @@ from src.infrastructure.composition.food_module import (
     FOOD_ZONE_TYPE,
     FoodModule,
     merge_food_into_prediction,
+)
+from src.infrastructure.composition.adapters.operational_event_adapter import (
+    OperationalEventAdapter,
 )
 from src.infrastructure.composition.prediction_module import _resolve_zone_type_id
 
@@ -319,13 +321,6 @@ class _PreloadedEventDayRepository(EventDayRepository):
         return None
 
 
-class _EmptyOperationalEventRepository(OperationalEventRepository):
-    async def find_active_by_timestamp(
-        self, timestamp: datetime,
-    ) -> Sequence[OperationalEvent]:
-        return []
-
-
 class _CapturePredictionRepository(PredictionRepository):
     def __init__(self) -> None:
         self.saved_prediction: TerritorialPrediction | None = None
@@ -395,7 +390,7 @@ class RecommendationModule:
 
         engine = ContextEngine()
         event_day_repo = _PreloadedEventDayRepository(event_day)
-        event_repo = _EmptyOperationalEventRepository()
+        event_repo = OperationalEventAdapter(self._db)
         prediction_repo = _CapturePredictionRepository()
 
         generate_prediction = GeneratePrediction(

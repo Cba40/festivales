@@ -32,7 +32,6 @@ from src.application.context_engine.stage1_context_resolution import (
 from src.application.use_cases.generate_prediction import GeneratePrediction
 from src.application.use_cases.get_prediction import GetTerritorialPrediction
 from src.domain.entities.attendance_level import AttendanceLevel
-from src.domain.entities.operational_event import OperationalEvent
 from src.domain.entities.event_day import EventDay
 from src.domain.entities.event_day_phase import EventDayPhase
 from src.domain.entities.operational_phase import OperationalPhase
@@ -40,10 +39,12 @@ from src.domain.entities.zone import Zone
 from src.domain.entities.zone_behavior import FlowRestriction, ZoneBehavior
 from src.domain.ports import (
     EventDayRepository,
-    OperationalEventRepository,
     PredictionRepository,
 )
 from src.domain.value_objects.territorial_prediction import TerritorialPrediction
+from src.infrastructure.composition.adapters.operational_event_adapter import (
+    OperationalEventAdapter,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -379,13 +380,6 @@ class _PreloadedEventDayRepository(EventDayRepository):
         return None
 
 
-class _EmptyOperationalEventRepository(OperationalEventRepository):
-    async def find_active_by_timestamp(
-        self, timestamp: datetime,
-    ) -> Sequence[OperationalEvent]:
-        return []
-
-
 class _CapturePredictionRepository(PredictionRepository):
     def __init__(self) -> None:
         self.saved: TerritorialPrediction | None = None
@@ -469,7 +463,7 @@ class PredictionModule:
 
         engine = ContextEngine()
         event_day_repo = _PreloadedEventDayRepository(event_day)
-        event_repo = _EmptyOperationalEventRepository()
+        event_repo = OperationalEventAdapter(self._db)
         prediction_repo = _ReturnSavedPredictionRepository()
 
         generate_prediction = GeneratePrediction(

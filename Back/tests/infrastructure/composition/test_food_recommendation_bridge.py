@@ -369,6 +369,8 @@ def _mock_bridge_session(*, food_request: bool) -> AsyncMock:
             return _scalars_result(behavior_rows)
         if "zone_types" in sql:
             return _scalars_result(zone_type_rows)
+        if "operational_events" in sql:
+            return _scalars_result([])
         if "events" in sql:
             return _one_result(ref_row)
         if "service_configs" in sql:
