@@ -51,7 +51,7 @@ export const AdminMapSelector = ({ lat, lng, onChangeLocation, showMarker = true
     } else {
       setPosition([defaultLat, defaultLng])
     }
-  }, [lat, lng, hasCoords])
+  }, [lat, lng, hasCoords, defaultLat, defaultLng])
 
   const markerRef = useRef<L.Marker | null>(null)
 
