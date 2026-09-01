@@ -73,12 +73,28 @@ export function useOperationalEventMutations() {
     []
   );
 
-  const finalize = useCallback(
+  const deactivate = useCallback(
     async (id: string): Promise<OperationalEventDTO | null> => {
-      return update(id, { is_active: false });
+      setSaving(true);
+      setError(null);
+      try {
+        await apiClient.patch(endpoints.operationalEvents.deactivate(id));
+        const { data } = await apiClient.get<OperationalEventDTO>(
+          endpoints.operationalEvents.byId(id)
+        );
+        return data;
+      } catch (err: unknown) {
+        const msg =
+          (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+          (err instanceof Error ? err.message : 'Error al finalizar evento');
+        setError(msg);
+        return null;
+      } finally {
+        setSaving(false);
+      }
     },
-    [update]
+    []
   );
 
-  return { create, update, remove, finalize, saving, error };
+  return { create, update, remove, deactivate, saving, error };
 }

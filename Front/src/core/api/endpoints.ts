@@ -75,6 +75,7 @@ export const endpoints = {
     list: (eventDayId: string) => `/operational-events/by-event-day/${eventDayId}`,
     byId: (id: string) => `/operational-events/${id}`,
     create: `/operational-events/`,
+    deactivate: (id: string) => `/operational-events/${id}/deactivate`,
   },
   products: {
     parking: (eventId: string) =>

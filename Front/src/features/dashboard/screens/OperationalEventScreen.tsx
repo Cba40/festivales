@@ -1,9 +1,14 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useOperationalEvents } from '../hooks/useOperationalEvents';
 import { useOperationalEventMutations } from '../hooks/useOperationalEventMutations';
 import { useEventDays } from '../hooks/useEventDays';
 import { FlowRestrictionSection } from '../components/FlowRestrictionSection';
-import type { OperationalEventDTO, OperationalEventCreatePayload, OperationalEventUpdatePayload } from '../types';
+import type {
+  OperationalEventDTO,
+  OperationalEventCreatePayload,
+  OperationalEventUpdatePayload,
+  OperationalEffectType,
+} from '../types';
 
 const DEFAULT_EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 
@@ -35,27 +40,106 @@ const EVENT_TYPE_ICONS: Record<string, string> = {
   corte_energia: '💡',
 };
 
+const EFFECT_TYPE_LABELS: Record<OperationalEffectType, string> = {
+  reduccion_capacidad: 'Reducción de capacidad',
+  cierre_total: 'Cierre total',
+  aumento_demanda: 'Aumento de demanda',
+  incidente_sin_impacto: 'Incidente sin impacto',
+};
+
+function toLocalDateTimeInput(d: Date): string {
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function isoToLocalDateTimeInput(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return toLocalDateTimeInput(d);
+}
+
+function localDateTimeToIso(value: string): string | null {
+  if (!value) return null;
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+function isExpired(endTimestamp: string): boolean {
+  return Date.now() >= new Date(endTimestamp).getTime();
+}
+
+function formatTimestamp(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString('es-AR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return iso;
+  }
+}
+
+function validateEffectValue(
+  effectType: OperationalEffectType,
+  value: string,
+): boolean {
+  if (effectType === 'reduccion_capacidad' || effectType === 'aumento_demanda') {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return false;
+    if (effectType === 'reduccion_capacidad') return n >= 1 && n <= 100;
+    return n >= 1;
+  }
+  return true;
+}
+
+function validateTemporal(
+  startStr: string,
+  endStr: string,
+): boolean {
+  const s = new Date(startStr);
+  const e = new Date(endStr);
+  if (isNaN(s.getTime()) || isNaN(e.getTime())) return false;
+  return e > s;
+}
+
 interface EventFormData {
   event_type: string;
   description: string;
   zone_id: string;
-  start_min: string;
-  end_min: string;
+  effect_type: string;
+  effect_value: string;
+  is_incident: boolean;
+  start_timestamp: string;
+  end_timestamp: string;
 }
 
 const emptyForm: EventFormData = {
   event_type: '',
   description: '',
   zone_id: '',
-  start_min: '0',
-  end_min: '',
+  effect_type: '',
+  effect_value: '',
+  is_incident: false,
+  start_timestamp: '',
+  end_timestamp: '',
 };
 
-function formatMinutos(min: number): string {
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+function getStatus(
+  event: OperationalEventDTO,
+): 'Activo' | 'Finalizado' | 'Expirado' {
+  if (!event.is_active) return 'Finalizado';
+  if (isExpired(event.end_timestamp)) return 'Expirado';
+  return 'Activo';
 }
+
+const STATUS_CLASSES: Record<string, string> = {
+  Activo: 'text-xs font-bold uppercase text-red-600 bg-red-100 px-2 py-0.5 rounded-full animate-pulse',
+  Finalizado: 'text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full',
+  Expirado: 'text-xs font-bold uppercase text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full',
+};
 
 function EventCard({
   event,
@@ -70,10 +154,14 @@ function EventCard({
   onDelete: (id: string) => void;
   saving: boolean;
 }) {
+  const status = getStatus(event);
+  const expired = isExpired(event.end_timestamp);
+  const lock = expired;
+
   return (
     <div
       className={`rounded-xl border-2 p-4 transition-all ${
-        event.is_active
+        event.is_active && !expired
           ? 'border-red-300 bg-red-50 shadow-md'
           : 'border-slate-200 bg-white opacity-70'
       }`}
@@ -88,27 +176,43 @@ function EventCard({
               <span className="font-bold text-slate-800">
                 {EVENT_TYPE_LABELS[event.event_type] ?? event.event_type}
               </span>
-              {event.is_active && (
-                <span className="text-xs font-bold uppercase text-red-600 bg-red-100 px-2 py-0.5 rounded-full animate-pulse">
-                  Activo
-                </span>
-              )}
-              {!event.is_active && (
-                <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-                  Finalizado
+              <span className={STATUS_CLASSES[status]}>{status}</span>
+              {event.is_incident && (
+                <span className="text-xs font-bold uppercase text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">
+                  Incidente
                 </span>
               )}
             </div>
-            <p className="text-sm text-slate-600 mt-1 break-words">{event.description}</p>
+
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 text-xs text-slate-500">
+              <span className="font-medium text-slate-600">
+                {EFFECT_TYPE_LABELS[event.effect_type] ?? event.effect_type}
+              </span>
+              {event.effect_value !== null && (
+                <span className="text-slate-700 font-semibold">
+                  {event.effect_type === 'reduccion_capacidad'
+                    ? `-${event.effect_value}%`
+                    : event.effect_type === 'aumento_demanda'
+                      ? `+${event.effect_value} pers.`
+                      : event.effect_value}
+                </span>
+              )}
+            </div>
+
+            {event.description && (
+              <p className="text-sm text-slate-600 mt-1 break-words">{event.description}</p>
+            )}
+
             <div className="flex items-center gap-4 mt-2 text-xs text-slate-500">
-              <span>Inicio: {formatMinutos(event.start_min)}</span>
-              {event.end_min !== null && <span>Fin: {formatMinutos(event.end_min)}</span>}
+              <span>Inicio: {formatTimestamp(event.start_timestamp)}</span>
+              <span>Fin: {formatTimestamp(event.end_timestamp)}</span>
               {event.zone_id && <span>Zona: {event.zone_id}</span>}
             </div>
           </div>
         </div>
+
         <div className="flex items-center gap-1 flex-shrink-0">
-          {event.is_active && (
+          {event.is_active && !expired && (
             <button
               onClick={() => onFinalize(event.id)}
               disabled={saving}
@@ -119,14 +223,15 @@ function EventCard({
           )}
           <button
             onClick={() => onEdit(event)}
-            className="text-xs font-medium px-2.5 py-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600"
+            disabled={lock}
+            className="text-xs font-medium px-2.5 py-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Editar
           </button>
           <button
             onClick={() => onDelete(event.id)}
-            disabled={saving}
-            className="text-xs font-medium px-2.5 py-1.5 rounded bg-red-100 hover:bg-red-200 text-red-600 disabled:opacity-50"
+            disabled={saving || lock}
+            className="text-xs font-medium px-2.5 py-1.5 rounded bg-red-100 hover:bg-red-200 text-red-600 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Eliminar
           </button>
@@ -150,39 +255,74 @@ function EventFormModal({
   saving: boolean;
 }) {
   const [form, setForm] = useState<EventFormData>(initial);
-  const isEditing = !!initial.event_type && initial.event_type !== '';
+  const isEditing = !!initial.zone_id && initial.zone_id !== '';
+  const isEditingMode = isEditing && initial.event_type !== '';
+
+  const effectType = form.effect_type as OperationalEffectType | '';
+  const needsValue = effectType === 'reduccion_capacidad' || effectType === 'aumento_demanda';
+
+  const temporalOk = form.start_timestamp && form.end_timestamp
+    ? validateTemporal(form.start_timestamp, form.end_timestamp)
+    : false;
+
+  const effectValueOk = needsValue
+    ? validateEffectValue(effectType, form.effect_value)
+    : true;
+
+  const canSubmit =
+    !saving &&
+    !!form.event_type &&
+    !!form.zone_id.trim() &&
+    !!form.effect_type &&
+    !!form.start_timestamp &&
+    !!form.end_timestamp &&
+    temporalOk &&
+    effectValueOk;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.event_type || !form.description.trim()) return;
-    const payload: OperationalEventCreatePayload | OperationalEventUpdatePayload = isEditing
-      ? {
-          event_type: form.event_type as OperationalEventCreatePayload['event_type'],
-          description: form.description,
-          zone_id: form.zone_id || null,
-          start_min: parseInt(form.start_min) || 0,
-          end_min: form.end_min ? parseInt(form.end_min) : null,
-        }
-      : {
-          event_day_id: eventDayId,
-          event_type: form.event_type as OperationalEventCreatePayload['event_type'],
-          description: form.description,
-          zone_id: form.zone_id || null,
-          start_min: parseInt(form.start_min) || 0,
-          end_min: form.end_min ? parseInt(form.end_min) : null,
-        };
-    onSave(payload);
+    if (!canSubmit) return;
+
+    const startIso = localDateTimeToIso(form.start_timestamp)!;
+    const endIso = localDateTimeToIso(form.end_timestamp)!;
+
+    if (isEditingMode) {
+      const payload: OperationalEventUpdatePayload = {
+        event_type: form.event_type as OperationalEventUpdatePayload['event_type'],
+        description: form.description.trim() || null,
+        effect_type: form.effect_type as OperationalEffectType,
+        effect_value: needsValue ? Math.round(Number(form.effect_value)) : null,
+        is_incident: form.is_incident,
+        start_timestamp: startIso,
+        end_timestamp: endIso,
+      };
+      onSave(payload);
+    } else {
+      const payload: OperationalEventCreatePayload = {
+        event_day_id: eventDayId,
+        zone_id: form.zone_id.trim(),
+        event_type: form.event_type as OperationalEventCreatePayload['event_type'],
+        description: form.description.trim() || null,
+        effect_type: form.effect_type as OperationalEffectType,
+        effect_value: needsValue ? Math.round(Number(form.effect_value)) : null,
+        is_incident: form.is_incident,
+        start_timestamp: startIso,
+        end_timestamp: endIso,
+      };
+      onSave(payload);
+    }
   };
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
         <h2 className="text-lg font-bold text-slate-800 mb-4">
-          {isEditing ? 'Editar Evento' : 'Nuevo Evento Operativo'}
+          {isEditingMode ? 'Editar Evento' : 'Nuevo Evento Operativo'}
         </h2>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Tipo de evento */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de evento</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de evento *</label>
             <select
               value={form.event_type}
               onChange={(e) => setForm((f) => ({ ...f, event_type: e.target.value }))}
@@ -196,60 +336,135 @@ function EventFormModal({
             </select>
           </div>
 
+          {/* Zona */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Zona *</label>
+            <input
+              type="text"
+              value={form.zone_id}
+              onChange={(e) => setForm((f) => ({ ...f, zone_id: e.target.value }))}
+              readOnly={isEditingMode}
+              required
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 read-only:bg-slate-50 read-only:cursor-not-allowed"
+              placeholder="ID de la zona"
+            />
+          </div>
+
+          {/* Effect type */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de efecto *</label>
+            <select
+              value={form.effect_type}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, effect_type: e.target.value, effect_value: '' }))
+              }
+              required
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Seleccionar...</option>
+              {Object.entries(EFFECT_TYPE_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Effect value — conditional */}
+          {needsValue && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                {effectType === 'reduccion_capacidad'
+                  ? 'Porcentaje de reducción (1-100)% *'
+                  : 'Personas adicionales (≥ 1) *'}
+              </label>
+              <input
+                type="number"
+                value={form.effect_value}
+                onChange={(e) => setForm((f) => ({ ...f, effect_value: e.target.value }))}
+                min={effectType === 'reduccion_capacidad' ? 1 : 1}
+                max={effectType === 'reduccion_capacidad' ? 100 : undefined}
+                required
+                className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  form.effect_value && !effectValueOk
+                    ? 'border-red-400 bg-red-50'
+                    : 'border-slate-300'
+                }`}
+                placeholder={effectType === 'reduccion_capacidad' ? '1-100' : '≥ 1'}
+              />
+              {form.effect_value && !effectValueOk && (
+                <p className="text-xs text-red-500 mt-1">
+                  {effectType === 'reduccion_capacidad'
+                    ? 'Debe estar entre 1 y 100'
+                    : 'Debe ser al menos 1'}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Is incident toggle */}
+          <div className="flex items-center gap-3 py-1">
+            <input
+              type="checkbox"
+              id="is_incident"
+              checked={form.is_incident}
+              onChange={(e) => setForm((f) => ({ ...f, is_incident: e.target.checked }))}
+              className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            />
+            <label htmlFor="is_incident" className="text-sm font-medium text-slate-700 select-none cursor-pointer">
+              ¿Es un incidente operativo?
+            </label>
+          </div>
+
+          {/* Datetime pickers */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Fecha y hora inicio *</label>
+              <input
+                type="datetime-local"
+                value={form.start_timestamp}
+                onChange={(e) => setForm((f) => ({ ...f, start_timestamp: e.target.value }))}
+                required
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Fecha y hora fin *</label>
+              <input
+                type="datetime-local"
+                value={form.end_timestamp}
+                onChange={(e) => setForm((f) => ({ ...f, end_timestamp: e.target.value }))}
+                required
+                className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  form.start_timestamp && form.end_timestamp && !temporalOk
+                    ? 'border-red-400 bg-red-50'
+                    : 'border-slate-300'
+                }`}
+              />
+              {form.start_timestamp && form.end_timestamp && !temporalOk && (
+                <p className="text-xs text-red-500 mt-1">La fecha fin debe ser posterior al inicio</p>
+              )}
+            </div>
+          </div>
+
+          {/* Description (optional) */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Descripción</label>
             <textarea
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              required
               rows={3}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Describí el evento..."
+              placeholder="Detalles del evento (opcional)..."
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Inicio (min)</label>
-              <input
-                type="number"
-                value={form.start_min}
-                onChange={(e) => setForm((f) => ({ ...f, start_min: e.target.value }))}
-                required
-                min={0}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Fin (min, opcional)</label>
-              <input
-                type="number"
-                value={form.end_min}
-                onChange={(e) => setForm((f) => ({ ...f, end_min: e.target.value }))}
-                min={0}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Zona (ID, opcional)</label>
-            <input
-              type="text"
-              value={form.zone_id}
-              onChange={(e) => setForm((f) => ({ ...f, zone_id: e.target.value }))}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="ID de la zona afectada"
-            />
-          </div>
-
+          {/* Actions */}
           <div className="flex gap-3 pt-2">
             <button
               type="submit"
-              disabled={saving || !form.event_type || !form.description.trim()}
+              disabled={!canSubmit}
               className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg text-sm disabled:opacity-50"
             >
-              {saving ? 'Guardando...' : isEditing ? 'Guardar Cambios' : 'Registrar Evento'}
+              {saving ? 'Guardando...' : isEditingMode ? 'Guardar Cambios' : 'Registrar Evento'}
             </button>
             <button
               type="button"
@@ -270,7 +485,7 @@ export function OperationalEventScreen() {
   const { eventDays, loading: loadingDays } = useEventDays(DEFAULT_EVENT_ID);
   const [selectedDayId, setSelectedDayId] = useState<string | null>(null);
   const { events, loading, error, refresh } = useOperationalEvents(selectedDayId);
-  const { create, update, remove, finalize, saving, error: mutationError } = useOperationalEventMutations();
+  const { create, update, remove, deactivate, saving, error: mutationError } = useOperationalEventMutations();
   const [showForm, setShowForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState<OperationalEventDTO | null>(null);
   const [showFinalized, setShowFinalized] = useState(false);
@@ -282,16 +497,24 @@ export function OperationalEventScreen() {
     }
   }, [eventDays, selectedDayId]);
 
-  const activeEvents = events.filter((e) => e.is_active);
-  const finalizedEvents = events.filter((e) => !e.is_active);
+  const activeEvents = useMemo(
+    () => events.filter((e) => e.is_active && !isExpired(e.end_timestamp)),
+    [events],
+  );
+  const expiredEvents = useMemo(
+    () => events.filter((e) => e.is_active && isExpired(e.end_timestamp)),
+    [events],
+  );
+  const finalizedEvents = useMemo(
+    () => events.filter((e) => !e.is_active),
+    [events],
+  );
 
   const handleSave = useCallback(
     async (payload: OperationalEventCreatePayload | OperationalEventUpdatePayload) => {
       let result;
       if (editingEvent) {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { event_day_id, ...rest } = payload as OperationalEventCreatePayload;
-        result = await update(editingEvent.id, rest);
+        result = await update(editingEvent.id, payload as OperationalEventUpdatePayload);
       } else {
         result = await create(payload as OperationalEventCreatePayload);
       }
@@ -301,7 +524,7 @@ export function OperationalEventScreen() {
         refresh();
       }
     },
-    [editingEvent, create, update, refresh]
+    [editingEvent, create, update, refresh],
   );
 
   const handleEdit = useCallback((event: OperationalEventDTO) => {
@@ -309,12 +532,12 @@ export function OperationalEventScreen() {
     setShowForm(true);
   }, []);
 
-  const handleFinalize = useCallback(
+  const handleDeactivate = useCallback(
     async (id: string) => {
-      const result = await finalize(id);
+      const result = await deactivate(id);
       if (result) refresh();
     },
-    [finalize, refresh]
+    [deactivate, refresh],
   );
 
   const handleDelete = useCallback(
@@ -322,7 +545,7 @@ export function OperationalEventScreen() {
       const ok = await remove(id);
       if (ok) refresh();
     },
-    [remove, refresh]
+    [remove, refresh],
   );
 
   const openCreateForm = useCallback(() => {
@@ -338,10 +561,13 @@ export function OperationalEventScreen() {
   const formInitial: EventFormData = editingEvent
     ? {
         event_type: editingEvent.event_type,
-        description: editingEvent.description,
-        zone_id: editingEvent.zone_id ?? '',
-        start_min: editingEvent.start_min.toString(),
-        end_min: editingEvent.end_min !== null ? editingEvent.end_min.toString() : '',
+        description: editingEvent.description ?? '',
+        zone_id: editingEvent.zone_id,
+        effect_type: editingEvent.effect_type,
+        effect_value: editingEvent.effect_value?.toString() ?? '',
+        is_incident: editingEvent.is_incident,
+        start_timestamp: isoToLocalDateTimeInput(editingEvent.start_timestamp),
+        end_timestamp: isoToLocalDateTimeInput(editingEvent.end_timestamp),
       }
     : emptyForm;
 
@@ -400,103 +626,126 @@ export function OperationalEventScreen() {
 
         {activeSection === 'events' ? (
           <>
-        {error && (
-          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-700">
-            {error}
-          </div>
-        )}
-
-        {/* EventDay selector */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-slate-700 mb-1">Jornada</label>
-          <select
-            value={selectedDayId ?? ''}
-            onChange={(e) => setSelectedDayId(e.target.value || null)}
-            disabled={loadingDays}
-            className="w-full max-w-xs px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-          >
-            <option value="">Seleccionar jornada...</option>
-            {eventDays.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.date} — {d.day_of_week}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {!selectedDayId ? (
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-10 text-center text-slate-500">
-            Seleccioná una jornada para ver sus eventos operativos.
-          </div>
-        ) : loading ? (
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-10 text-center text-slate-500">
-            Cargando eventos...
-          </div>
-        ) : (
-          <>
-            {/* Active events */}
-            <section className="mb-8">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
-                  Eventos Activos
-                  <span className="text-sm font-normal text-slate-500">({activeEvents.length})</span>
-                </h2>
+            {error && (
+              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-700">
+                {error}
               </div>
-              {activeEvents.length === 0 ? (
-                <div className="bg-white rounded-xl border-2 border-dashed border-slate-200 p-8 text-center text-slate-400">
-                  No hay eventos activos en esta jornada.
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {activeEvents.map((event) => (
-                    <EventCard
-                      key={event.id}
-                      event={event}
-                      onFinalize={handleFinalize}
-                      onEdit={handleEdit}
-                      onDelete={handleDelete}
-                      saving={saving}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
+            )}
 
-            {/* Finalized events */}
-            <section>
-              <button
-                onClick={() => setShowFinalized((v) => !v)}
-                className="flex items-center justify-between w-full text-left"
+            {/* EventDay selector */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-slate-700 mb-1">Jornada</label>
+              <select
+                value={selectedDayId ?? ''}
+                onChange={(e) => setSelectedDayId(e.target.value || null)}
+                disabled={loadingDays}
+                className="w-full max-w-xs px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
               >
-                <h2 className="text-lg font-bold text-slate-600">
-                  Eventos Finalizados ({finalizedEvents.length})
-                </h2>
-                <span className="text-slate-400 text-lg">{showFinalized ? '▼' : '▶'}</span>
-              </button>
-              {showFinalized && (
-                <div className="mt-3 space-y-2">
-                  {finalizedEvents.length === 0 ? (
-                    <div className="bg-white rounded-xl border border-slate-200 p-6 text-center text-slate-400 text-sm">
-                      No hay eventos finalizados.
+                <option value="">Seleccionar jornada...</option>
+                {eventDays.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.date} — {d.day_of_week}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {!selectedDayId ? (
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-10 text-center text-slate-500">
+                Seleccioná una jornada para ver sus eventos operativos.
+              </div>
+            ) : loading ? (
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-10 text-center text-slate-500">
+                Cargando eventos...
+              </div>
+            ) : (
+              <>
+                {/* Active events */}
+                <section className="mb-8">
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
+                      Eventos Activos
+                      <span className="text-sm font-normal text-slate-500">({activeEvents.length})</span>
+                    </h2>
+                  </div>
+                  {activeEvents.length === 0 ? (
+                    <div className="bg-white rounded-xl border-2 border-dashed border-slate-200 p-8 text-center text-slate-400">
+                      No hay eventos activos en esta jornada.
                     </div>
                   ) : (
-                    finalizedEvents.map((event) => (
-                      <EventCard
-                        key={event.id}
-                        event={event}
-                        onFinalize={handleFinalize}
-                        onEdit={handleEdit}
-                        onDelete={handleDelete}
-                        saving={saving}
-                      />
-                    ))
+                    <div className="space-y-3">
+                      {activeEvents.map((event) => (
+                        <EventCard
+                          key={event.id}
+                          event={event}
+                          onFinalize={handleDeactivate}
+                          onEdit={handleEdit}
+                          onDelete={handleDelete}
+                          saving={saving}
+                        />
+                      ))}
+                    </div>
                   )}
-                </div>
-              )}
-            </section>
-          </>
-        )}
+                </section>
+
+                {/* Expired events */}
+                {expiredEvents.length > 0 && (
+                  <section className="mb-8">
+                    <h2 className="text-lg font-bold text-amber-600 flex items-center gap-2 mb-3">
+                      <span className="w-2.5 h-2.5 bg-amber-500 rounded-full" />
+                      Eventos Expirados
+                      <span className="text-sm font-normal text-slate-500">({expiredEvents.length})</span>
+                    </h2>
+                    <div className="space-y-3">
+                      {expiredEvents.map((event) => (
+                        <EventCard
+                          key={event.id}
+                          event={event}
+                          onFinalize={handleDeactivate}
+                          onEdit={handleEdit}
+                          onDelete={handleDelete}
+                          saving={saving}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {/* Finalized events */}
+                <section>
+                  <button
+                    onClick={() => setShowFinalized((v) => !v)}
+                    className="flex items-center justify-between w-full text-left"
+                  >
+                    <h2 className="text-lg font-bold text-slate-600">
+                      Eventos Finalizados ({finalizedEvents.length})
+                    </h2>
+                    <span className="text-slate-400 text-lg">{showFinalized ? '▼' : '▶'}</span>
+                  </button>
+                  {showFinalized && (
+                    <div className="mt-3 space-y-2">
+                      {finalizedEvents.length === 0 ? (
+                        <div className="bg-white rounded-xl border border-slate-200 p-6 text-center text-slate-400 text-sm">
+                          No hay eventos finalizados.
+                        </div>
+                      ) : (
+                        finalizedEvents.map((event) => (
+                          <EventCard
+                            key={event.id}
+                            event={event}
+                            onFinalize={handleDeactivate}
+                            onEdit={handleEdit}
+                            onDelete={handleDelete}
+                            saving={saving}
+                          />
+                        ))
+                      )}
+                    </div>
+                  )}
+                </section>
+              </>
+            )}
           </>
         ) : (
           <FlowRestrictionSection />

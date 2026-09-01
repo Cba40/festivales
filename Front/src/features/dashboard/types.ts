@@ -167,14 +167,23 @@ export type OperationalEventType =
   | 'apertura_extraordinaria' | 'incidente_operativo' | 'fin_espectaculo'
   | 'corte_energia';
 
+export type OperationalEffectType =
+  | 'reduccion_capacidad'
+  | 'cierre_total'
+  | 'aumento_demanda'
+  | 'incidente_sin_impacto';
+
 export interface OperationalEventDTO {
   id: string;
   event_day_id: string;
+  zone_id: string;
   event_type: OperationalEventType;
-  description: string;
-  zone_id: string | null;
-  start_min: number;
-  end_min: number | null;
+  description: string | null;
+  effect_type: OperationalEffectType;
+  effect_value: number | null;
+  is_incident: boolean;
+  start_timestamp: string;
+  end_timestamp: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -182,21 +191,24 @@ export interface OperationalEventDTO {
 
 export interface OperationalEventCreatePayload {
   event_day_id: string;
+  zone_id: string;
   event_type: OperationalEventType;
-  description: string;
-  zone_id?: string | null;
-  start_min: number;
-  end_min?: number | null;
-  is_active?: boolean;
+  description?: string | null;
+  effect_type: OperationalEffectType;
+  effect_value?: number | null;
+  is_incident?: boolean;
+  start_timestamp: string;
+  end_timestamp: string;
 }
 
 export interface OperationalEventUpdatePayload {
   event_type?: OperationalEventType;
-  description?: string;
-  zone_id?: string | null;
-  start_min?: number;
-  end_min?: number | null;
-  is_active?: boolean;
+  description?: string | null;
+  effect_type?: OperationalEffectType;
+  effect_value?: number | null;
+  is_incident?: boolean;
+  start_timestamp?: string;
+  end_timestamp?: string;
 }
 
 export interface RecommendationConfigDTO {
