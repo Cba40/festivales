@@ -56,6 +56,8 @@ def _event_row(
     end_min: int = 840,
     is_active: bool = True,
     is_incident: bool = False,
+    latitude=None,
+    longitude=None,
 ) -> SimpleNamespace:
     start = datetime(2026, 7, 15, 0, 0, tzinfo=AR).replace(hour=12, minute=0)
     return SimpleNamespace(
@@ -70,6 +72,8 @@ def _event_row(
         start_timestamp=start.replace(hour=start_min // 60, minute=start_min % 60),
         end_timestamp=start.replace(hour=end_min // 60, minute=end_min % 60),
         is_active=is_active,
+        latitude=latitude,
+        longitude=longitude,
     )
 
 
@@ -512,6 +516,73 @@ class TestOperationalEventAdapter:
 
         events = await adapter.find_active_by_timestamp(TS)
         assert [e.impact_value for e in events] == [-100, 100]
+
+    async def test_multiple_events_same_zone_accumulate(self) -> None:
+        event_rows = [
+            _event_row(
+                "eeeeeeee-0000-0000-0000-000000000071",
+                ZONE_A,
+                "reduccion_capacidad",
+                50,
+            ),
+            _event_row(
+                "eeeeeeee-0000-0000-0000-000000000072",
+                ZONE_A,
+                "aumento_demanda",
+                30,
+            ),
+        ]
+        adapter = OperationalEventAdapter(
+            _make_session(
+                event_rows,
+                zone_rows=_default_zone_rows(),
+                zone_type_rows=_default_zone_type_rows(),
+                day_phase_rows=_default_day_phase_rows(),
+                behavior_rows=_default_behavior_rows(),
+            )
+        )
+
+        events = await adapter.find_active_by_timestamp(TS)
+
+        assert len(events) == 2
+        assert [e.target_zone_id for e in events] == [UUID(ZONE_A), UUID(ZONE_A)]
+        assert [e.impact_value for e in events] == [-25, 30]
+        assert sum(e.impact_value for e in events) == 5
+
+    async def test_latitude_longitude_do_not_affect_calculation(self) -> None:
+        coordenadas = (-31.4201, -64.1888)
+        event_rows = [
+            _event_row(
+                "eeeeeeee-0000-0000-0000-000000000081",
+                ZONE_A,
+                "reduccion_capacidad",
+                40,
+                latitude=coordenadas[0],
+                longitude=coordenadas[1],
+            ),
+            _event_row(
+                "eeeeeeee-0000-0000-0000-000000000082",
+                ZONE_A,
+                "reduccion_capacidad",
+                40,
+                latitude=None,
+                longitude=None,
+            ),
+        ]
+        adapter = OperationalEventAdapter(
+            _make_session(
+                event_rows,
+                zone_rows=_default_zone_rows(),
+                zone_type_rows=_default_zone_type_rows(),
+                day_phase_rows=_default_day_phase_rows(),
+                behavior_rows=_default_behavior_rows(),
+            )
+        )
+
+        events = await adapter.find_active_by_timestamp(TS)
+
+        assert len(events) == 2
+        assert [e.impact_value for e in events] == [-20, -20]
 
     async def test_save_raises_not_implemented(self) -> None:
         adapter = OperationalEventAdapter(_make_session([]))
