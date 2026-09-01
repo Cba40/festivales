@@ -14,6 +14,7 @@ from app.schemas.operational_event import (
     OperationalEventUpdate,
 )
 from app.schemas.operational_event import validate_effect
+from src.infrastructure.persistence.models.prediction import PredictionModel
 
 
 def _now() -> datetime:
@@ -22,6 +23,18 @@ def _now() -> datetime:
 
 def _is_expired(db_obj: OperationalEvent, now: datetime) -> bool:
     return now >= db_obj.end_timestamp
+
+
+async def _was_used_by_engine(db: AsyncSession, db_obj: OperationalEvent) -> bool:
+    stmt = (
+        select(PredictionModel.id)
+        .where(
+            PredictionModel.timestamp >= db_obj.start_timestamp,
+            PredictionModel.timestamp < db_obj.end_timestamp,
+        )
+        .limit(1)
+    )
+    return await db.scalar(stmt) is not None
 
 
 async def create(db: AsyncSession, data: OperationalEventCreate) -> OperationalEvent:
@@ -123,10 +136,15 @@ async def delete(db: AsyncSession, event_id: UUID) -> None:
             status_code=status.HTTP_404_NOT_FOUND,
             detail="OperationalEvent not found",
         )
-    if _is_expired(db_obj, _now()):
+    if await _was_used_by_engine(db, db_obj):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Cannot delete event that has been used by the prediction engine",
+        )
+    if _is_expired(db_obj, _now()):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete expired event",
         )
 
     await db.delete(db_obj)

@@ -49,15 +49,23 @@ CREATE TABLE operational_events (
     start_timestamp TIMESTAMPTZ NOT NULL,
     end_timestamp TIMESTAMPTZ NOT NULL,
     is_active BOOLEAN NOT NULL DEFAULT true,
+    latitude NUMERIC(10,8),
+    longitude NUMERIC(11,8),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT ck_operational_events_temporal CHECK (end_timestamp > start_timestamp),
+    CONSTRAINT ck_operational_events_latitude CHECK (latitude IS NULL OR (latitude BETWEEN -90 AND 90)),
+    CONSTRAINT ck_operational_events_longitude CHECK (longitude IS NULL OR (longitude BETWEEN -180 AND 180)),
     CONSTRAINT ck_operational_events_effect_value CHECK (
         (effect_type = 'reduccion_capacidad' AND effect_value IS NOT NULL AND effect_value BETWEEN 1 AND 100) OR
         (effect_type = 'cierre_total' AND effect_value IS NULL) OR
         (effect_type = 'aumento_demanda' AND effect_value IS NOT NULL AND effect_value >= 1) OR
         (effect_type = 'incidente_sin_impacto' AND effect_value IS NULL)
     )
+);
+CREATE TABLE predictions (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    timestamp TIMESTAMPTZ NOT NULL UNIQUE
 );
 """
 
@@ -129,6 +137,14 @@ async def _crear(env, overrides=None) -> dict:
     return response.json()
 
 
+async def _marcar_usado_por_motor(env, timestamp: str) -> None:
+    await env.session.execute(
+        text("INSERT INTO predictions (timestamp) VALUES (:ts)"),
+        {"ts": timestamp},
+    )
+    await env.session.commit()
+
+
 class TestAuthentication:
 
     async def test_401_no_auth(self, oe_env) -> None:
@@ -162,6 +178,30 @@ class TestCreate:
         body = await _crear(oe_env, {"effect_type": "incidente_sin_impacto", "effect_value": None})
         assert body["effect_type"] == "incidente_sin_impacto"
         assert body["effect_value"] is None
+
+    async def test_create_with_coordinates(self, oe_env) -> None:
+        body = await _crear(oe_env, {
+            "latitude": -31.4201,
+            "longitude": -64.1888,
+        })
+        assert body["latitude"] == -31.4201
+        assert body["longitude"] == -64.1888
+
+    async def test_create_rejects_invalid_latitude(self, oe_env) -> None:
+        response = await oe_env.client.post(
+            "/api/operational-events/",
+            json=_valid_body({"latitude": 91.0}),
+            headers=_auth_headers(),
+        )
+        assert response.status_code == 422
+
+    async def test_create_rejects_invalid_longitude(self, oe_env) -> None:
+        response = await oe_env.client.post(
+            "/api/operational-events/",
+            json=_valid_body({"longitude": -181.0}),
+            headers=_auth_headers(),
+        )
+        assert response.status_code == 422
 
     async def test_create_rejects_invalid_effect_value(self, oe_env) -> None:
         response = await oe_env.client.post(
@@ -244,6 +284,15 @@ class TestUpdate:
         )
         assert response.status_code == 400
 
+    async def test_update_rejects_invalid_timestamps(self, oe_env) -> None:
+        creado = await _crear(oe_env)
+        response = await oe_env.client.put(
+            f"/api/operational-events/{creado['id']}",
+            json={"start_timestamp": FUTURE_END, "end_timestamp": FUTURE_START},
+            headers=_auth_headers(),
+        )
+        assert response.status_code == 422
+
 
 class TestDeactivate:
 
@@ -292,6 +341,14 @@ class TestDelete:
             "start_timestamp": PAST_START,
             "end_timestamp": PAST_END,
         })
+        response = await oe_env.client.delete(
+            f"/api/operational-events/{creado['id']}", headers=_auth_headers(),
+        )
+        assert response.status_code == 400
+
+    async def test_delete_rejects_event_used_by_engine(self, oe_env) -> None:
+        creado = await _crear(oe_env)
+        await _marcar_usado_por_motor(oe_env, "2027-01-15T21:00:00+00:00")
         response = await oe_env.client.delete(
             f"/api/operational-events/{creado['id']}", headers=_auth_headers(),
         )
