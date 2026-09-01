@@ -33,24 +33,25 @@ interface AdminMapSelectorProps {
   lat?: number
   lng?: number
   onChangeLocation: (lat: number, lng: number) => void
+  showMarker?: boolean
 }
 
-export const AdminMapSelector = ({ lat, lng, onChangeLocation }: AdminMapSelectorProps) => {
-  // Coordenadas por defecto (Jesús María)
+export const AdminMapSelector = ({ lat, lng, onChangeLocation, showMarker = true }: AdminMapSelectorProps) => {
   const defaultLat = -30.975
   const defaultLng = -64.090
+  const hasCoords = lat != null && lng != null
 
-  const [position, setPosition] = useState<[number, number]>([
-    lat || defaultLat,
-    lng || defaultLng,
-  ])
+  const [position, setPosition] = useState<[number, number]>(
+    hasCoords ? [lat, lng] : [defaultLat, defaultLng],
+  )
 
-  // Sincronizar posición si cambian los props externos
   useEffect(() => {
-    if (lat && lng && (lat !== position[0] || lng !== position[1])) {
+    if (hasCoords) {
       setPosition([lat, lng])
+    } else {
+      setPosition([defaultLat, defaultLng])
     }
-  }, [lat, lng])
+  }, [lat, lng, hasCoords])
 
   const markerRef = useRef<L.Marker | null>(null)
 
@@ -93,13 +94,15 @@ export const AdminMapSelector = ({ lat, lng, onChangeLocation }: AdminMapSelecto
 
           <MapEventsHandler onMapClick={handleMapClick} />
 
-          <Marker
-            draggable={true}
-            eventHandlers={eventHandlers}
-            position={position}
-            icon={adminIcon}
-            ref={markerRef}
-          />
+          {showMarker && hasCoords && (
+            <Marker
+              draggable={true}
+              eventHandlers={eventHandlers}
+              position={position}
+              icon={adminIcon}
+              ref={markerRef}
+            />
+          )}
         </MapContainer>
       </div>
 

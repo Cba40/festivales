@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { apiClient } from '@/core/api/client';
 import { endpoints } from '@/core/api/endpoints';
+import { AdminMapSelector } from '@/components/AdminMapSelector';
 import { useOperationalEvents } from '../hooks/useOperationalEvents';
 import { useOperationalEventMutations } from '../hooks/useOperationalEventMutations';
 import { useEventDays } from '../hooks/useEventDays';
@@ -542,48 +543,33 @@ function EventFormModal({
             </div>
           </div>
 
-          {/* Coordenadas opcionales */}
+          {/* Ubicación en mapa (opcional) */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
               Ubicación física del hecho (opcional)
             </label>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">Latitud (-90 a 90)</label>
-                <input
-                  type="number"
-                  step="any"
-                  value={form.latitude}
-                  onChange={(e) => setForm((f) => ({ ...f, latitude: e.target.value }))}
-                  className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    form.latitude && !validateCoordinate(form.latitude, -90, 90)
-                      ? 'border-red-400 bg-red-50'
-                      : 'border-slate-300'
-                  }`}
-                  placeholder="Ej: -31.4201"
-                />
+            <div className="relative">
+              <AdminMapSelector
+                lat={form.latitude ? Number(form.latitude) : undefined}
+                lng={form.longitude ? Number(form.longitude) : undefined}
+                onChangeLocation={(lat, lng) => {
+                  const clampLat = Math.max(-90, Math.min(90, lat));
+                  const clampLng = Math.max(-180, Math.min(180, lng));
+                  setForm(f => ({ ...f, latitude: clampLat.toString(), longitude: clampLng.toString() }));
+                }}
+                showMarker
+              />
+              <div className="absolute inset-0 flex items-end gap-2 pt-2">
+                <button type="button" onClick={() => setForm(f => ({ ...f, latitude: '', longitude: '' }))} className="text-xs text-amber-600 hover:text-amber-700 font-medium">
+                  🗑️ Limpiar ubicación
+                </button>
               </div>
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">Longitud (-180 a 180)</label>
-                <input
-                  type="number"
-                  step="any"
-                  value={form.longitude}
-                  onChange={(e) => setForm((f) => ({ ...f, longitude: e.target.value }))}
-                  className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    form.longitude && !validateCoordinate(form.longitude, -180, 180)
-                      ? 'border-red-400 bg-red-50'
-                      : 'border-slate-300'
-                  }`}
-                  placeholder="Ej: -64.1888"
-                />
-              </div>
+              {(form.latitude && form.longitude) && (
+                <p className="text-xs text-slate-500 mt-1">
+                  Lat: {form.latitude}, Lng: {form.longitude}
+                </p>
+              )}
             </div>
-            {!coordsOk && (
-              <p className="text-xs text-red-500 mt-1">
-                Latitud debe estar entre -90 y 90; longitud entre -180 y 180.
-              </p>
-            )}
           </div>
 
           {/* Description (optional) */}
