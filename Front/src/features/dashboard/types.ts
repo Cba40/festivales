@@ -173,6 +173,8 @@ export interface OperationalEventDTO {
   start_timestamp: string;
   end_timestamp: string;
   is_active: boolean;
+  latitude?: number | null;
+  longitude?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -187,6 +189,8 @@ export interface OperationalEventCreatePayload {
   is_incident?: boolean;
   start_timestamp: string;
   end_timestamp: string;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export interface OperationalEventUpdatePayload {
@@ -197,6 +201,8 @@ export interface OperationalEventUpdatePayload {
   is_incident?: boolean;
   start_timestamp?: string;
   end_timestamp?: string;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export interface RecommendationConfigDTO {

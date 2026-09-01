@@ -1,4 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
+import { apiClient } from '@/core/api/client';
+import { endpoints } from '@/core/api/endpoints';
 import { useOperationalEvents } from '../hooks/useOperationalEvents';
 import { useOperationalEventMutations } from '../hooks/useOperationalEventMutations';
 import { useEventDays } from '../hooks/useEventDays';
@@ -11,6 +13,12 @@ import type {
 } from '../types';
 
 const DEFAULT_EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
+
+interface ZoneOption {
+  id: string;
+  name: string;
+  type: string;
+}
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
   accidente: 'Accidente',
@@ -105,6 +113,12 @@ function validateTemporal(
   return e > s;
 }
 
+function validateCoordinate(value: string, min: number, max: number): boolean {
+  if (value.trim() === '') return true;
+  const n = Number(value);
+  return Number.isFinite(n) && n >= min && n <= max;
+}
+
 interface EventFormData {
   event_type: string;
   description: string;
@@ -114,6 +128,8 @@ interface EventFormData {
   is_incident: boolean;
   start_timestamp: string;
   end_timestamp: string;
+  latitude: string;
+  longitude: string;
 }
 
 const emptyForm: EventFormData = {
@@ -125,6 +141,8 @@ const emptyForm: EventFormData = {
   is_incident: false,
   start_timestamp: '',
   end_timestamp: '',
+  latitude: '',
+  longitude: '',
 };
 
 function getStatus(
@@ -147,12 +165,14 @@ function EventCard({
   onEdit,
   onDelete,
   saving,
+  zoneName,
 }: {
   event: OperationalEventDTO;
   onFinalize: (id: string) => void;
   onEdit: (e: OperationalEventDTO) => void;
   onDelete: (id: string) => void;
   saving: boolean;
+  zoneName?: string;
 }) {
   const status = getStatus(event);
   const expired = isExpired(event.end_timestamp);
@@ -206,8 +226,13 @@ function EventCard({
             <div className="flex items-center gap-4 mt-2 text-xs text-slate-500">
               <span>Inicio: {formatTimestamp(event.start_timestamp)}</span>
               <span>Fin: {formatTimestamp(event.end_timestamp)}</span>
-              {event.zone_id && <span>Zona: {event.zone_id}</span>}
+              {event.zone_id && <span>Zona: {zoneName ?? event.zone_id}</span>}
             </div>
+            {event.latitude != null && event.longitude != null && (
+              <div className="text-xs text-slate-400 mt-0.5">
+                Ubicación: {event.latitude}, {event.longitude}
+              </div>
+            )}
           </div>
         </div>
 
@@ -244,19 +269,41 @@ function EventCard({
 function EventFormModal({
   initial,
   eventDayId,
+  zones,
   onSave,
   onClose,
   saving,
 }: {
   initial: EventFormData;
   eventDayId: string;
+  zones: ZoneOption[];
   onSave: (payload: OperationalEventCreatePayload | OperationalEventUpdatePayload) => void;
   onClose: () => void;
   saving: boolean;
 }) {
   const [form, setForm] = useState<EventFormData>(initial);
+  const [zoneQuery, setZoneQuery] = useState('');
+  const [zoneOpen, setZoneOpen] = useState(false);
   const isEditing = !!initial.zone_id && initial.zone_id !== '';
   const isEditingMode = isEditing && initial.event_type !== '';
+
+  const displayedZone = zones.find((z) => z.id === form.zone_id);
+
+  useEffect(() => {
+    if (isEditingMode && !zoneQuery && displayedZone) {
+      setZoneQuery(displayedZone.name);
+    }
+  }, [isEditingMode, zoneQuery, displayedZone]);
+
+  const filteredZones = zones
+    .filter((z) => z.name.toLowerCase().includes(zoneQuery.trim().toLowerCase()))
+    .slice(0, 8);
+
+  const handleZoneSelect = (zone: ZoneOption) => {
+    setForm((f) => ({ ...f, zone_id: zone.id }));
+    setZoneQuery(zone.name);
+    setZoneOpen(false);
+  };
 
   const effectType = form.effect_type as OperationalEffectType | '';
   const needsValue = effectType === 'reduccion_capacidad' || effectType === 'aumento_demanda';
@@ -269,6 +316,10 @@ function EventFormModal({
     ? validateEffectValue(effectType, form.effect_value)
     : true;
 
+  const coordsOk =
+    validateCoordinate(form.latitude, -90, 90) &&
+    validateCoordinate(form.longitude, -180, 180);
+
   const canSubmit =
     !saving &&
     !!form.event_type &&
@@ -277,7 +328,8 @@ function EventFormModal({
     !!form.start_timestamp &&
     !!form.end_timestamp &&
     temporalOk &&
-    effectValueOk;
+    effectValueOk &&
+    coordsOk;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -285,6 +337,8 @@ function EventFormModal({
 
     const startIso = localDateTimeToIso(form.start_timestamp)!;
     const endIso = localDateTimeToIso(form.end_timestamp)!;
+    const latitude = form.latitude.trim() === '' ? null : Number(form.latitude);
+    const longitude = form.longitude.trim() === '' ? null : Number(form.longitude);
 
     if (isEditingMode) {
       const payload: OperationalEventUpdatePayload = {
@@ -295,6 +349,8 @@ function EventFormModal({
         is_incident: form.is_incident,
         start_timestamp: startIso,
         end_timestamp: endIso,
+        latitude,
+        longitude,
       };
       onSave(payload);
     } else {
@@ -308,6 +364,8 @@ function EventFormModal({
         is_incident: form.is_incident,
         start_timestamp: startIso,
         end_timestamp: endIso,
+        latitude,
+        longitude,
       };
       onSave(payload);
     }
@@ -336,18 +394,57 @@ function EventFormModal({
             </select>
           </div>
 
-          {/* Zona */}
+          {/* Zona — búsqueda y selección por nombre */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Zona *</label>
-            <input
-              type="text"
-              value={form.zone_id}
-              onChange={(e) => setForm((f) => ({ ...f, zone_id: e.target.value }))}
-              readOnly={isEditingMode}
-              required
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 read-only:bg-slate-50 read-only:cursor-not-allowed"
-              placeholder="ID de la zona"
-            />
+            <div className="relative">
+              <input
+                type="text"
+                value={zoneQuery}
+                onChange={(e) => {
+                  setZoneQuery(e.target.value);
+                  setZoneOpen(true);
+                  if (!isEditingMode) {
+                    setForm((f) => ({ ...f, zone_id: '' }));
+                  }
+                }}
+                onFocus={() => setZoneOpen(true)}
+                onBlur={() => setTimeout(() => setZoneOpen(false), 120)}
+                readOnly={isEditingMode}
+                required
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 read-only:bg-slate-50 read-only:cursor-not-allowed"
+                placeholder="Buscar zona por nombre (ej: Estacionamiento Norte, Baños Sector A)..."
+              />
+              {zoneOpen && !isEditingMode && filteredZones.length > 0 && (
+                <ul className="absolute z-10 mt-1 w-full max-h-56 overflow-auto bg-white border border-slate-200 rounded-lg shadow-xl divide-y divide-slate-100">
+                  {filteredZones.map((z) => (
+                    <li key={z.id}>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => handleZoneSelect(z)}
+                        className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-blue-50"
+                      >
+                        <span className="font-medium">{z.name}</span>
+                        {z.type && (
+                          <span className="ml-2 text-xs text-slate-400">
+                            {EVENT_TYPE_ICONS[z.type] ?? ''} {z.type}
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {zoneOpen && !isEditingMode && zones.length === 0 && zoneQuery.trim() !== '' && (
+                <div className="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-xl px-3 py-2 text-sm text-slate-500">
+                  Sin coincidencias. No se pudieron cargar las zonas disponibles.
+                </div>
+              )}
+            </div>
+            {form.zone_id && displayedZone && (
+              <p className="text-xs text-slate-500 mt-1">Zona seleccionada: {displayedZone.name}</p>
+            )}
           </div>
 
           {/* Effect type */}
@@ -445,6 +542,50 @@ function EventFormModal({
             </div>
           </div>
 
+          {/* Coordenadas opcionales */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Ubicación física del hecho (opcional)
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Latitud (-90 a 90)</label>
+                <input
+                  type="number"
+                  step="any"
+                  value={form.latitude}
+                  onChange={(e) => setForm((f) => ({ ...f, latitude: e.target.value }))}
+                  className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    form.latitude && !validateCoordinate(form.latitude, -90, 90)
+                      ? 'border-red-400 bg-red-50'
+                      : 'border-slate-300'
+                  }`}
+                  placeholder="Ej: -31.4201"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Longitud (-180 a 180)</label>
+                <input
+                  type="number"
+                  step="any"
+                  value={form.longitude}
+                  onChange={(e) => setForm((f) => ({ ...f, longitude: e.target.value }))}
+                  className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    form.longitude && !validateCoordinate(form.longitude, -180, 180)
+                      ? 'border-red-400 bg-red-50'
+                      : 'border-slate-300'
+                  }`}
+                  placeholder="Ej: -64.1888"
+                />
+              </div>
+            </div>
+            {!coordsOk && (
+              <p className="text-xs text-red-500 mt-1">
+                Latitud debe estar entre -90 y 90; longitud entre -180 y 180.
+              </p>
+            )}
+          </div>
+
           {/* Description (optional) */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Descripción</label>
@@ -490,6 +631,26 @@ export function OperationalEventScreen() {
   const [editingEvent, setEditingEvent] = useState<OperationalEventDTO | null>(null);
   const [showFinalized, setShowFinalized] = useState(false);
   const [activeSection, setActiveSection] = useState<'events' | 'restriction'>('events');
+  const [zones, setZones] = useState<ZoneOption[]>([]);
+
+  const loadZones = useCallback(async () => {
+    try {
+      const res = await apiClient.get<ZoneOption[]>(endpoints.zones.list(DEFAULT_EVENT_ID));
+      setZones(res.data.filter((z) => z && z.id && z.name));
+    } catch {
+      setZones([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadZones();
+  }, [loadZones]);
+
+  const zoneNameById = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const z of zones) map[z.id] = z.name;
+    return map;
+  }, [zones]);
 
   useEffect(() => {
     if (eventDays.length > 0 && !selectedDayId) {
@@ -568,6 +729,8 @@ export function OperationalEventScreen() {
         is_incident: editingEvent.is_incident,
         start_timestamp: isoToLocalDateTimeInput(editingEvent.start_timestamp),
         end_timestamp: isoToLocalDateTimeInput(editingEvent.end_timestamp),
+        latitude: editingEvent.latitude?.toString() ?? '',
+        longitude: editingEvent.longitude?.toString() ?? '',
       }
     : emptyForm;
 
@@ -679,6 +842,7 @@ export function OperationalEventScreen() {
                         <EventCard
                           key={event.id}
                           event={event}
+                          zoneName={zoneNameById[event.zone_id]}
                           onFinalize={handleDeactivate}
                           onEdit={handleEdit}
                           onDelete={handleDelete}
@@ -702,6 +866,7 @@ export function OperationalEventScreen() {
                         <EventCard
                           key={event.id}
                           event={event}
+                          zoneName={zoneNameById[event.zone_id]}
                           onFinalize={handleDeactivate}
                           onEdit={handleEdit}
                           onDelete={handleDelete}
@@ -734,6 +899,7 @@ export function OperationalEventScreen() {
                           <EventCard
                             key={event.id}
                             event={event}
+                            zoneName={zoneNameById[event.zone_id]}
                             onFinalize={handleDeactivate}
                             onEdit={handleEdit}
                             onDelete={handleDelete}
@@ -756,6 +922,7 @@ export function OperationalEventScreen() {
         <EventFormModal
           initial={formInitial}
           eventDayId={selectedDayId}
+          zones={zones}
           onSave={handleSave}
           onClose={closeForm}
           saving={saving}
