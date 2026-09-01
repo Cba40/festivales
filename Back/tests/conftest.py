@@ -19,8 +19,6 @@ from app.db.session import Base, get_db
 from app.main import app
 from app.models.event import Event
 from app.models.event_day import EventDay
-from app.models.incident import Incident
-from app.models.incident_impact import IncidentImpact
 from app.models.zone import Zone
 from app.models.zone_type import ZoneType
 

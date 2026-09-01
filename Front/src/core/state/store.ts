@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Zone, Incident } from '@/features/dashboard/types';
+import type { Zone } from '@/features/dashboard/types';
 
 // ============================================
 // STORE GLOBAL — Zustand
@@ -31,7 +31,6 @@ interface AppState {
 
   // Data
   zones: Zone[];
-  incidents: Incident[];
 
   // User location (GPS)
   userLocation: [number, number] | null;
@@ -47,11 +46,6 @@ interface AppState {
   addZone: (zone: Zone) => void;
   removeZone: (id: string) => void;
   updateZoneConfig: (id: string, updates: Partial<Zone>) => void;
-
-  // Actions — Incidents
-  setIncidents: (incidents: Incident[]) => void;
-  addIncident: (incident: Incident) => void;
-  updateIncident: (id: string, updates: Partial<Incident>) => void;
 
   // Actions — Location
   setUserLocation: (loc: [number, number] | null) => void;
@@ -73,7 +67,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   logout: () => {
     localStorage.removeItem('auth_token');
-    set({ auth: { token: null, isAuthenticated: false }, zones: [], incidents: [] });
+    set({ auth: { token: null, isAuthenticated: false }, zones: [] });
   },
 
   // User location
@@ -101,8 +95,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       status: 'activa'
     }
   ],
-  incidents: [],
-
   // Zone mutations
   setZones: (zones) => set({ zones }),
 
@@ -185,19 +177,4 @@ export const useAppStore = create<AppState>((set, get) => ({
       );
     });
   },
-
-  // Incident mutations
-  setIncidents: (incidents) => set({ incidents }),
-
-  addIncident: (incident) =>
-    set((state) => ({
-      incidents: [incident, ...state.incidents],
-    })),
-
-  updateIncident: (id, updates) =>
-    set((state) => ({
-      incidents: state.incidents.map((inc) =>
-        inc.id === id ? { ...inc, ...updates } : inc
-      ),
-    })),
 }));

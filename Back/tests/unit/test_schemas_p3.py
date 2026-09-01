@@ -10,7 +10,6 @@ from pydantic import ValidationError
 
 from app.schemas.event_day import EventDayCreate, EventDayUpdate
 from app.schemas.operational_event import OperationalEventCreate
-from app.schemas.operational_event_modifier import EVENT_TYPE_LITERAL
 from app.schemas.territorial_prediction import TerritorialPrediction, ZonePrediction
 from app.schemas.zone_behavior import ZoneBehaviorCreate
 

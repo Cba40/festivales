@@ -28,6 +28,5 @@ class Event(Base):
 
     zones = relationship("Zone", back_populates="event", lazy="selectin")
     points = relationship("Point", back_populates="event", lazy="selectin")
-    incidents = relationship("Incident", back_populates="event", lazy="selectin")
     event_days = relationship("EventDay", back_populates="event", lazy="selectin")
     attendance_levels = relationship("AttendanceLevel", back_populates="event", lazy="selectin")

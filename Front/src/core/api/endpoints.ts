@@ -13,10 +13,6 @@ export const endpoints = {
     updateConfig: (eventId: string, id: string) => `/events/${eventId}/zones/${id}/config`,
     delete: (eventId: string, id: string) => `/events/${eventId}/zones/${id}`,
   },
-  incidents: {
-    list: (eventId: string) => `/events/${eventId}/incidents`,
-    create: (eventId: string) => `/events/${eventId}/incidents`,
-  },
   eventDays: {
     list: (eventId: string) => `/events/${eventId}/event-days`,
     today: (eventId: string) => `/events/${eventId}/event-days/today`,

@@ -15,7 +15,6 @@ from app.crud import (
     create_event_day,
     create_event_day_phase,
     create_operational_event,
-    create_operational_event_modifier,
     create_operational_phase,
     create_operational_profile,
     create_zone_behavior,
@@ -34,7 +33,6 @@ from app.schemas.event_day import EventDayCreate, EventDayUpdate
 from app.services.zone_behavior_sync import sync_zone_behaviors
 from app.schemas.event_day_phase import EventDayPhaseUpdate
 from app.schemas.operational_event import OperationalEventCreate
-from app.schemas.operational_event_modifier import OperationalEventModifierCreate
 from app.schemas.operational_phase import OperationalPhaseCreate
 from app.schemas.operational_profile import OperationalProfileCreate
 from app.schemas.zone_behavior import ZoneBehaviorCreate
@@ -227,40 +225,6 @@ class TestZoneBehaviorCRUD:
                 ),
             )
         assert "not found" in str(exc_info.value).lower()
-
-
-@pytest.mark.asyncio
-class TestOperationalEventModifierCRUD:
-
-    async def test_operational_event_modifier_uniqueness(
-        self, async_session: AsyncSession, seed_zone_types, clean_tables,
-    ):
-        """§13: Crear dos modificadores con mismo (event_type, zone_type_id) → ValueError."""
-        zt_id = "zt-estacionamiento"
-
-        await create_operational_event_modifier(
-            async_session,
-            OperationalEventModifierCreate(
-                event_type="tormenta",
-                zone_type_id=zt_id,
-                saturation_multiplier=1.5,
-                availability_multiplier=0.8,
-                priority_modifier=0.3,
-            ),
-        )
-
-        with pytest.raises(ValueError) as exc_info:
-            await create_operational_event_modifier(
-                async_session,
-                OperationalEventModifierCreate(
-                    event_type="tormenta",
-                    zone_type_id=zt_id,
-                    saturation_multiplier=2.0,
-                    availability_multiplier=1.0,
-                    priority_modifier=0.0,
-                ),
-            )
-        assert "already exists" in str(exc_info.value)
 
 
 @pytest.mark.asyncio

@@ -4,7 +4,6 @@ import { useAppStore } from '../../../core/state/store';
 
 export function DashboardScreen() {
   const zones = useAppStore((state) => state.zones);
-  const incidents = useAppStore((state) => state.incidents);
   const navigate = useNavigate();
   const logout = useAppStore((state) => state.logout);
 
@@ -43,42 +42,13 @@ export function DashboardScreen() {
         </div>
       </header>
 
-      <main className="p-6 max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
+      <main className="p-6 max-w-4xl mx-auto">
         <section>
           <h2 className="text-lg font-semibold text-slate-700 mb-4">Estado de Zonas</h2>
           <div className="space-y-4 max-h-[calc(100vh-150px)] overflow-y-auto pr-2">
             {zones.map((zone) => (
               <ZoneStatusCard key={zone.id} zone={zone} />
             ))}
-          </div>
-        </section>
-
-        <section>
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold text-slate-700">Incidentes Activos</h2>
-            <button
-              onClick={() => navigate('/dashboard/report')}
-              className="bg-red-600 hover:bg-red-700 text-white py-1 px-4 rounded text-sm font-medium"
-            >
-              Reportar
-            </button>
-          </div>
-          <div className="space-y-4">
-            {incidents.filter(i => i.status !== 'resuelto').map((incident) => (
-              <div key={incident.id} className="bg-white p-4 rounded-lg shadow-sm border border-l-4 border-l-red-500">
-                <div className="flex justify-between mb-2">
-                  <span className="text-xs font-bold uppercase text-red-600">{incident.type}</span>
-                  <span className="text-xs text-slate-500">{new Date(incident.createdAt).toLocaleTimeString()}</span>
-                </div>
-                <p className="text-sm text-slate-700">{incident.description}</p>
-                <div className="mt-2 text-xs text-slate-500 font-medium">
-                  Severidad: {incident.severity}
-                </div>
-              </div>
-            ))}
-            {incidents.length === 0 && (
-              <p className="text-sm text-slate-500 italic">No hay incidentes activos.</p>
-            )}
           </div>
         </section>
       </main>

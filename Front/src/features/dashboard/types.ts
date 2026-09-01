@@ -1,7 +1,5 @@
 export type SaturationLevel = 'bajo' | 'medio' | 'alto' | 'colapsado';
 export type StatusLevel = 'activa' | 'restringida' | 'cerrada';
-export type SeverityLevel = 'baja' | 'media' | 'alta';
-export type IncidentStatus = 'abierto' | 'en_progreso' | 'resuelto';
 
 export interface Zone {
   id: string;
@@ -51,16 +49,6 @@ export interface EventDTO {
 export interface EventReferencePointPayload {
   reference_point_latitude?: number;
   reference_point_longitude?: number;
-}
-
-export interface Incident {
-  id: string;
-  type: string;
-  severity: SeverityLevel;
-  description: string;
-  status: IncidentStatus;
-  createdAt: string;
-  zoneId?: string;
 }
 
 export interface AttendanceLevelDTO {

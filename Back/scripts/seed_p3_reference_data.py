@@ -1,5 +1,5 @@
 """
-Seed de referencia P3.0 — OperationalPhases, ZoneBehaviors y OperationalEventModifiers.
+Seed de referencia P3.0 — OperationalPhases y ZoneBehaviors.
 
 EJECUTAR DESPUÉS de: alembic upgrade head + seed_p3_migration.py
 IDEMPOTENTE: puede ejecutarse múltiples veces sin error ni duplicados.
@@ -9,7 +9,6 @@ Uso:
     python scripts/seed_p3_reference_data.py
 """
 import os
-import uuid
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -89,17 +88,6 @@ DISPERSION_FACTORS: dict[str, tuple[float, float, float, float]] = {
     "seguridad": (1.5, 0.7, 1.8, 0.9),
 }
 
-# ═══════════════════════════════════════════════════════════════
-# MODIFICADORES DE REFERENCIA (§11)
-# ═══════════════════════════════════════════════════════════════
-# Cada tupla: (event_type, zone_type_slug or None, sat_mult, avail_mult, priority_mod)
-
-REFERENCE_MODIFIERS: list[tuple[str, str | None, float, float, float]] = [
-    ("fin_espectaculo", "estacionamiento", 0.2, 3.0, 0.0),
-    ("fin_espectaculo", "gastronomia", 2.5, 0.4, 0.3),
-    ("tormenta", None, 1.5, 0.8, 0.3),
-]
-
 
 # ═══════════════════════════════════════════════════════════════
 
@@ -116,8 +104,6 @@ async def main() -> None:
         "phases_existing": 0,
         "behaviors_created": 0,
         "behaviors_existing": 0,
-        "modifiers_created": 0,
-        "modifiers_existing": 0,
     }
 
     async with engine.begin() as conn:
@@ -241,47 +227,12 @@ async def main() -> None:
                 else:
                     stats["behaviors_existing"] += 1
 
-        # ── PASO 5: Insertar OperationalEventModifiers ───────
-        for event_type, zone_slug, sat_mult, avail_mult, prio_mod in REFERENCE_MODIFIERS:
-            zt_id = zone_types_by_slug.get(zone_slug) if zone_slug else None
-
-            result = await conn.execute(
-                text("""
-                    INSERT INTO operational_event_modifiers
-                        (id, event_type, zone_type_id,
-                         saturation_multiplier, availability_multiplier, priority_modifier)
-                    SELECT
-                        :mod_id, :event_type, :zone_type_id,
-                        :saturation_multiplier, :availability_multiplier, :priority_modifier
-                    WHERE NOT EXISTS (
-                        SELECT 1 FROM operational_event_modifiers
-                        WHERE event_type = :event_type
-                          AND zone_type_id IS NOT DISTINCT FROM :zone_type_id
-                    )
-                """),
-                {
-                    "mod_id": uuid.uuid4(),
-                    "event_type": event_type,
-                    "zone_type_id": zt_id,
-                    "saturation_multiplier": sat_mult,
-                    "availability_multiplier": avail_mult,
-                    "priority_modifier": prio_mod,
-                },
-            )
-            count = result.rowcount
-            if count:
-                stats["modifiers_created"] += count
-            else:
-                stats["modifiers_existing"] += 1
-
     await engine.dispose()
 
     print(f"Fases creadas: {stats['phases_created']}")
     print(f"Fases ya existentes: {stats['phases_existing']}")
     print(f"Comportamientos creados: {stats['behaviors_created']}")
     print(f"Comportamientos ya existentes: {stats['behaviors_existing']}")
-    print(f"Modificadores creados: {stats['modifiers_created']}")
-    print(f"Modificadores ya existentes: {stats['modifiers_existing']}")
     print("✅ Seed de referencia completado.")
 
 

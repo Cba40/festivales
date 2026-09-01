@@ -28,13 +28,6 @@ from app.crud.operational_event import (
     list_by_event_day as list_events_by_event_day,
     update as update_operational_event,
 )
-from app.crud.operational_event_modifier import (
-    create as create_operational_event_modifier,
-    get_by_id as get_operational_event_modifier,
-    list_by_event_type,
-    update as update_operational_event_modifier,
-    delete as delete_operational_event_modifier,
-)
 from app.crud.event_day import (
     create as create_event_day,
     get_by_id as get_event_day,
@@ -73,11 +66,6 @@ __all__ = [
     "update_operational_event",
     "deactivate_operational_event",
     "delete_operational_event",
-    "create_operational_event_modifier",
-    "get_operational_event_modifier",
-    "list_by_event_type",
-    "update_operational_event_modifier",
-    "delete_operational_event_modifier",
     "create_event_day",
     "get_event_day",
     "list_by_event",

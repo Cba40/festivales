@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { useAppStore } from '../../../core/state/store';
 import { apiClient } from '../../../core/api/client';
 import { endpoints } from '../../../core/api/endpoints';
-import type { Zone, Incident } from '../types';
+import type { Zone } from '../types';
 
 const DEFAULT_EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 
@@ -32,16 +32,6 @@ interface ApiZone {
   transporte: string | null;
   capacidad_estimada: number | null;
   es_embudo: boolean | null;
-}
-
-interface ApiIncident {
-  id: string;
-  type: string;
-  severity: string;
-  description: string;
-  status: string;
-  zone_id: string | null;
-  created_at: string;
 }
 
 function mapZone(api: ApiZone): Zone {
@@ -74,23 +64,9 @@ function mapZone(api: ApiZone): Zone {
   };
 }
 
-function mapIncident(api: ApiIncident): Incident {
-  return {
-    id: api.id,
-    type: api.type,
-    severity: api.severity as Incident['severity'],
-    description: api.description,
-    status: api.status as Incident['status'],
-    createdAt: api.created_at,
-    zoneId: api.zone_id ?? undefined,
-  };
-}
-
 export function useDashboardSync(eventId: string = DEFAULT_EVENT_ID) {
   const setZones = useAppStore((state) => state.setZones);
-  const setIncidents = useAppStore((state) => state.setIncidents);
   const zones = useAppStore((state) => state.zones);
-  const incidents = useAppStore((state) => state.incidents);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -98,12 +74,8 @@ export function useDashboardSync(eventId: string = DEFAULT_EVENT_ID) {
     setLoading(true);
     setError(null);
     try {
-      const [zonesRes, incidentsRes] = await Promise.all([
-        apiClient.get<ApiZone[]>(endpoints.zones.list(eventId)),
-        apiClient.get<ApiIncident[]>(endpoints.incidents.list(eventId)),
-      ]);
+      const zonesRes = await apiClient.get<ApiZone[]>(endpoints.zones.list(eventId));
       setZones(zonesRes.data.map(mapZone));
-      setIncidents(incidentsRes.data.map(mapIncident));
     } catch (err) {
       const msg =
         (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
@@ -112,7 +84,7 @@ export function useDashboardSync(eventId: string = DEFAULT_EVENT_ID) {
     } finally {
       setLoading(false);
     }
-  }, [eventId, setZones, setIncidents]);
+  }, [eventId, setZones]);
 
-  return { zones, incidents, loading, error, refresh };
+  return { zones, loading, error, refresh };
 }
