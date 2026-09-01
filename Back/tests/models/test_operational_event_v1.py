@@ -24,6 +24,8 @@ VALID_DATA = {
     "is_incident": True,
     "start_timestamp": datetime(2026, 8, 30, 20, 0, tzinfo=timezone.utc),
     "end_timestamp": datetime(2026, 8, 30, 22, 0, tzinfo=timezone.utc),
+    "latitude": -31.4201,
+    "longitude": -64.1888,
 }
 
 
@@ -49,6 +51,7 @@ class TestOperationalEventSchema:
             "id", "event_day_id", "zone_id", "event_type", "description",
             "effect_type", "effect_value", "is_incident",
             "start_timestamp", "end_timestamp", "is_active",
+            "latitude", "longitude",
             "created_at", "updated_at",
         ):
             assert name in cols
@@ -67,6 +70,25 @@ class TestOperationalEventSchema:
         assert cols["effect_value"].nullable is True
         assert cols["description"].nullable is True
         assert cols["zone_id"].nullable is False
+
+    def test_geolocation_columns_nullability_and_type(self) -> None:
+        cols = OperationalEvent.__table__.columns
+        assert cols["latitude"].nullable is True
+        assert cols["longitude"].nullable is True
+        assert cols["latitude"].type.precision == 10
+        assert cols["latitude"].type.scale == 8
+        assert cols["longitude"].type.precision == 11
+        assert cols["longitude"].type.scale == 8
+
+    def test_geolocation_check_constraints(self) -> None:
+        checks = {
+            c.name: c for c in OperationalEvent.__table__.constraints
+            if isinstance(c, CheckConstraint)
+        }
+        assert "ck_operational_events_latitude" in checks
+        assert "latitude IS NULL OR (latitude BETWEEN -90 AND 90)" in checks["ck_operational_events_latitude"].sqltext.text
+        assert "ck_operational_events_longitude" in checks
+        assert "longitude IS NULL OR (longitude BETWEEN -180 AND 180)" in checks["ck_operational_events_longitude"].sqltext.text
 
     def test_timestamp_columns_have_timezone(self) -> None:
         cols = OperationalEvent.__table__.columns
@@ -185,6 +207,59 @@ class TestOperationalEventPersistence:
                 db_session.flush()
             db_session.rollback()
 
+    @pytest.mark.parametrize("latitude,expected_ok", [
+        (45.5, True),
+        (-90, True),
+        (90, True),
+        (91, False),
+        (-91, False),
+        (None, True),
+    ])
+    def test_latitude_constraint(
+        self, db_session, sample_event_day,
+        latitude, expected_ok: bool,
+    ) -> None:
+        event = OperationalEvent(**make_event(latitude=latitude))
+        db_session.add(event)
+        if expected_ok:
+            db_session.flush()
+            assert event.latitude == latitude
+        else:
+            with pytest.raises(IntegrityError):
+                db_session.flush()
+            db_session.rollback()
+
+    @pytest.mark.parametrize("longitude,expected_ok", [
+        (120.5, True),
+        (-180, True),
+        (180, True),
+        (181, False),
+        (-181, False),
+        (None, True),
+    ])
+    def test_longitude_constraint(
+        self, db_session, sample_event_day,
+        longitude, expected_ok: bool,
+    ) -> None:
+        event = OperationalEvent(**make_event(longitude=longitude))
+        db_session.add(event)
+        if expected_ok:
+            db_session.flush()
+            assert event.longitude == longitude
+        else:
+            with pytest.raises(IntegrityError):
+                db_session.flush()
+            db_session.rollback()
+
+    def test_persists_coordinates(
+        self, db_session, sample_event_day,
+    ) -> None:
+        event = OperationalEvent(**make_event())
+        db_session.add(event)
+        db_session.flush()
+        assert event.latitude == -31.4201
+        assert event.longitude == -64.1888
+
 
 class TestOperationalEventSchemas:
     """Validación Pydantic."""
@@ -239,6 +314,37 @@ class TestOperationalEventSchemas:
         with pytest.raises(ValueError):
             OperationalEventUpdate(effect_type="reduccion_capacidad", effect_value=0)
 
+    @pytest.mark.parametrize("latitude", [45.5, -90.0, 90.0, None])
+    def test_create_accepts_valid_latitude(self, latitude) -> None:
+        schema = OperationalEventCreate(**make_event(latitude=latitude))
+        assert schema.latitude == latitude
+
+    @pytest.mark.parametrize("latitude", [91.0, -91.0])
+    def test_create_rejects_out_of_range_latitude(self, latitude) -> None:
+        with pytest.raises(ValueError):
+            OperationalEventCreate(**make_event(latitude=latitude))
+
+    @pytest.mark.parametrize("longitude", [120.5, -180.0, 180.0, None])
+    def test_create_accepts_valid_longitude(self, longitude) -> None:
+        schema = OperationalEventCreate(**make_event(longitude=longitude))
+        assert schema.longitude == longitude
+
+    @pytest.mark.parametrize("longitude", [181.0, -181.0])
+    def test_create_rejects_out_of_range_longitude(self, longitude) -> None:
+        with pytest.raises(ValueError):
+            OperationalEventCreate(**make_event(longitude=longitude))
+
+    def test_update_accepts_coordinates(self) -> None:
+        schema = OperationalEventUpdate(latitude=45.5, longitude=-64.1888)
+        assert schema.latitude == 45.5
+        assert schema.longitude == -64.1888
+
+    def test_update_rejects_out_of_range_coordinates(self) -> None:
+        with pytest.raises(ValueError):
+            OperationalEventUpdate(latitude=95.0)
+        with pytest.raises(ValueError):
+            OperationalEventUpdate(longitude=200.0)
+
     def test_response_from_attributes(self, db_session, sample_event_day) -> None:
         event = OperationalEvent(**make_event())
         db_session.add(event)
@@ -246,6 +352,8 @@ class TestOperationalEventSchemas:
         response = OperationalEventResponse.model_validate(event)
         assert response.id == event.id
         assert response.effect_type == "reduccion_capacidad"
+        assert response.latitude == event.latitude
+        assert response.longitude == event.longitude
 
 
 VALID_EVENT_TYPES: list = list(EventType.__args__)

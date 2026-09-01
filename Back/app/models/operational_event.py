@@ -1,8 +1,9 @@
 """OperationalEvent: Hechos reales ocurridos durante una jornada."""
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, func, text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, Numeric, String, Text, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -54,6 +55,8 @@ class OperationalEvent(Base):
     start_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     end_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    latitude: Mapped[Decimal | None] = mapped_column(Numeric(10, 8), nullable=True)
+    longitude: Mapped[Decimal | None] = mapped_column(Numeric(11, 8), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
@@ -68,6 +71,14 @@ class OperationalEvent(Base):
             "(effect_type = 'aumento_demanda' AND effect_value IS NOT NULL AND effect_value >= 1) OR "
             "(effect_type = 'incidente_sin_impacto' AND effect_value IS NULL)",
             name="ck_operational_events_effect_value",
+        ),
+        CheckConstraint(
+            "latitude IS NULL OR (latitude BETWEEN -90 AND 90)",
+            name="ck_operational_events_latitude",
+        ),
+        CheckConstraint(
+            "longitude IS NULL OR (longitude BETWEEN -180 AND 180)",
+            name="ck_operational_events_longitude",
         ),
         Index("ix_operational_events_event_day_id", "event_day_id"),
         Index("ix_operational_events_zone_id", "zone_id"),

@@ -51,6 +51,8 @@ class OperationalEventCreate(BaseModel):
     is_incident: bool = False
     start_timestamp: datetime
     end_timestamp: datetime
+    latitude: Optional[float] = Field(default=None, ge=-90, le=90)
+    longitude: Optional[float] = Field(default=None, ge=-180, le=180)
 
     @model_validator(mode="after")
     def check_temporal(self) -> "OperationalEventCreate":
@@ -73,6 +75,8 @@ class OperationalEventUpdate(BaseModel):
     is_incident: Optional[bool] = None
     start_timestamp: Optional[datetime] = None
     end_timestamp: Optional[datetime] = None
+    latitude: Optional[float] = Field(default=None, ge=-90, le=90)
+    longitude: Optional[float] = Field(default=None, ge=-180, le=180)
 
     @model_validator(mode="after")
     def check_temporal(self) -> "OperationalEventUpdate":
@@ -106,5 +110,7 @@ class OperationalEventResponse(BaseModel):
     start_timestamp: datetime
     end_timestamp: datetime
     is_active: bool
+    latitude: Optional[float]
+    longitude: Optional[float]
     created_at: datetime
     updated_at: datetime
