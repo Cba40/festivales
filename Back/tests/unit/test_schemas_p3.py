@@ -45,16 +45,20 @@ def test_operational_event_literal_rejects_invalid():
 
 
 def test_operational_event_end_min_gt_start_min():
-    """§13: OperationalEventCreate rechaza end_min <= start_min."""
+    """§13: OperationalEventCreate rechaza end_timestamp <= start_timestamp (V1)."""
+    from datetime import datetime, timezone
+
     with pytest.raises(ValidationError) as exc_info:
         OperationalEventCreate(
             event_day_id=str(uuid.uuid4()),
+            zone_id=str(uuid.uuid4()),
             event_type="tormenta",
             description="test",
-            start_min=100,
-            end_min=50,
+            effect_type="cierre_total",
+            start_timestamp=datetime(2026, 8, 30, 22, 0, tzinfo=timezone.utc),
+            end_timestamp=datetime(2026, 8, 30, 20, 0, tzinfo=timezone.utc),
         )
-    assert "end_min must be greater than start_min" in str(exc_info.value)
+    assert "end_timestamp must be greater than start_timestamp" in str(exc_info.value)
 
 
 def test_event_day_create_operational_end_gt_start():
