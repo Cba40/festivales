@@ -124,6 +124,10 @@ class OperationalEventAdapter(OperationalEventRepository):
     async def find_active_by_timestamp(
         self, timestamp: datetime,
     ) -> Sequence[OperationalEvent]:
+        # LOG TEMPORAL 1: Ver el timestamp de consulta y su zona horaria
+        print(f"🔍 DEBUG ADAPTER: timestamp de consulta = {timestamp} | tzinfo = {getattr(timestamp, 'tzinfo', 'NAIVE')}")
+        
+        # Consulta a la BD (mantén la lógica actual intacta por ahora)
         rows = (
             await self._db.execute(
                 select(OperationalEventORM).where(
@@ -133,6 +137,14 @@ class OperationalEventAdapter(OperationalEventRepository):
                 )
             )
         ).scalars().all()
+        
+        # LOG TEMPORAL 2: Ver qué devolvió la BD y sus zonas horarias
+        print(f"🔍 DEBUG ADAPTER: Filas encontradas en BD = {len(rows)}")
+        for r in rows:
+            print(f"  📌 ROW: id={r.id}, zone_id={r.zone_id}, effect={r.effect_type}, value={r.effect_value}")
+            print(f"     start={r.start_timestamp} (tzinfo={getattr(r.start_timestamp, 'tzinfo', 'NAIVE')})")
+            print(f"     end={r.end_timestamp} (tzinfo={getattr(r.end_timestamp, 'tzinfo', 'NAIVE')})")
+        
         if not rows:
             return []
         return await self._build_domain_events(rows, timestamp)
