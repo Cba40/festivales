@@ -549,17 +549,15 @@ function EventFormModal({
               Ubicación física del hecho (opcional)
             </label>
             <div className="relative">
-              <AdminMapSelector
-                lat={form.latitude ? Number(form.latitude) : undefined}
-                lng={form.longitude ? Number(form.longitude) : undefined}
-                onChangeLocation={(lat, lng) => {
-                  const clampLat = Math.max(-90, Math.min(90, lat));
-                  const clampLng = Math.max(-180, Math.min(180, lng));
-                  setForm(f => ({ ...f, latitude: clampLat.toString(), longitude: clampLng.toString() }));
+<AdminMapSelector
+                lat={form.latitude !== '' ? Number(form.latitude) : undefined}
+                lng={form.longitude !== '' ? Number(form.longitude) : undefined}
+                onChangeLocation={(newLat, newLng) => {
+                  setForm(f => ({ ...f, latitude: String(newLat), longitude: String(newLng) }));
                 }}
                 showMarker={true}
               />
-              <div className="absolute inset-0 flex items-end gap-2 pt-2">
+              <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setForm(f => ({ ...f, latitude: '', longitude: '' }))} className="text-xs text-amber-600 hover:text-amber-700 font-medium">
                   🗑️ Limpiar ubicación
                 </button>
@@ -569,7 +567,7 @@ function EventFormModal({
                   Lat: {form.latitude}, Lng: {form.longitude}
                 </p>
               )}
-            </div>
+</div>
           </div>
 
           {/* Description (optional) */}
