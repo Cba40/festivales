@@ -308,15 +308,49 @@ def derive_parking_zone_state(
     if is_closed:
         occupancy_ratio = 1.0
         free_ratio = 0.0
-        free_spaces = 0.0
+        effective_free = 0.0
         source_occupied = float(zone.capacity)
+        free_spaces = 0.0
     else:
+        base_occupied = float(occupied)
         source_occupied = float(
-            base_state.projected_density if base_state is not None else occupied
+            base_state.projected_density if base_state is not None else base_occupied
         )
-        occupancy_ratio, free_ratio, free_spaces = resolved_model.indices(
-            source_occupied, zone.capacity
-        )
+
+        # Lógica híbrida refinada (RFC §10.2 + interpretación semántica):
+        if source_occupied < base_occupied:
+            # Reducción de capacidad: la capacidad efectiva se reduce proporcionalmente
+            # a la caída de la densidad proyectada.
+            if base_occupied > 0:
+                capacity_ratio = max(0.0, source_occupied / base_occupied)
+            else:
+                capacity_ratio = 1.0  # Fallback si no hay ocupación base
+
+            effective_capacity = float(zone.capacity) * capacity_ratio
+            effective_occupied = min(effective_capacity, base_occupied)
+            effective_free = max(0.0, effective_capacity - effective_occupied)
+
+            # Si la capacidad efectiva es 0, la saturación es 100% (zona cerrada)
+            if effective_capacity == 0.0:
+                occupancy_ratio = 1.0
+            else:
+                occupancy_ratio = effective_occupied / float(zone.capacity)
+        else:
+            # Aumento de demanda (o sin impacto): la ocupación aumenta, capacidad se mantiene
+            effective_occupied = min(float(zone.capacity), source_occupied)
+            effective_free = max(0.0, float(zone.capacity) - effective_occupied)
+            occupancy_ratio = effective_occupied / float(zone.capacity)
+
+        free_ratio = effective_free / float(zone.capacity)
+        free_spaces = effective_free
+
+    print(
+        f"🔍 HÍBRIDO parking zone={zone.id} is_closed={is_closed} "
+        f"occupied={occupied:.1f} base_occupied={base_occupied if not is_closed else 0.0:.1f} "
+        f"source_occupied={source_occupied:.1f} capacity={zone.capacity} "
+        f"effective_free={effective_free:.1f} occupancy_ratio={occupancy_ratio:.3f} "
+        f"free_spaces={free_spaces:.1f}"
+    )
 
     metrics = {
         "parking_id": str(zone.id),
@@ -334,7 +368,7 @@ def derive_parking_zone_state(
         operational_state=(
             base_state.operational_state if base_state is not None else "NORMAL"
         ),
-        availability=int(round(free_spaces)),
+        availability=int(round(effective_free)),
         saturation_level=float(occupancy_ratio),
         estimated_wait=None,
         confidence=None,

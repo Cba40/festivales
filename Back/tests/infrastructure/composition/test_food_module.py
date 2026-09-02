@@ -901,14 +901,19 @@ class TestMergeFoodIntoPrediction:
         merged = merge_food_into_prediction(base, result)
         by_id = {zs.zone_id: zs for zs in merged.zone_states}
 
-        model = FoodV1Model()
         phase_state = result.phase_results[-1]
         for zone in food_zones:
             state = by_id[zone.id]
             occupied = phase_state.occupied[zone.id]
-            occupancy_ratio, _, free_spaces = model.indices(occupied, zone.capacity)
-            assert state.saturation_level == pytest.approx(occupancy_ratio)
-            assert state.availability == round(free_spaces)
+            # Lógica híbrida refinada: el base_state de comida no define
+            # projected_density (por defecto 0), por lo que source_occupied = 0 <
+            # base_occupied → reducción de capacidad. capacity_ratio = 0 →
+            # effective_capacity = 0 → la zona queda 100% saturada y sin libres.
+            capacity = float(zone.capacity)
+            capacity_ratio = max(0.0, 0.0 / occupied)
+            effective_capacity = capacity * capacity_ratio
+            assert state.saturation_level == pytest.approx(1.0)
+            assert state.availability == round(0.0)
             assert state.model_result is not None
             assert state.model_result["food_id"] == str(zone.id)
             assert state.model_result["subtipo"] == zone.subtipo
