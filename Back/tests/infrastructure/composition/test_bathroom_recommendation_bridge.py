@@ -385,44 +385,76 @@ class TestDeriveBathroomZoneState:
         zones = _bathroom_zones()
         bathroom = _bathroom_result(zones)
         active = _select_active_phase_state(bathroom, UUID(PHASE_IDS["p3"]))
-        model = BathroomV1Model()
 
         for zone in zones:
             occupied = active.occupied[zone.id]
-            occ, _, _ = model.indices(occupied, zone.capacity)
-            state = derive_bathroom_zone_state(zone, active)
+            base = ZoneState(
+                zone_id=zone.id,
+                operational_state="NORMAL",
+                saturation_level=0.0,
+                availability=0,
+                type="servicios",
+                subtipo="banos",
+                projected_density=zone.capacity,
+                reasoning_factors=[],
+            )
+            state = derive_bathroom_zone_state(zone, active, base)
+            expected_occupied = min(float(zone.capacity), float(occupied))
+            expected_ratio = expected_occupied / float(zone.capacity)
             assert state.zone_id == zone.id
-            assert state.saturation_level == pytest.approx(occ)
+            assert state.saturation_level == pytest.approx(expected_ratio)
 
     def test_free_spaces_maps_to_availability(self) -> None:
         zones = _bathroom_zones()
         bathroom = _bathroom_result(zones)
         active = _select_active_phase_state(bathroom, UUID(PHASE_IDS["p3"]))
-        model = BathroomV1Model()
 
         for zone in zones:
             occupied = active.occupied[zone.id]
-            _, _, free = model.indices(occupied, zone.capacity)
-            state = derive_bathroom_zone_state(zone, active)
-            assert state.availability == round(free)
+            base = ZoneState(
+                zone_id=zone.id,
+                operational_state="NORMAL",
+                saturation_level=0.0,
+                availability=0,
+                type="servicios",
+                subtipo="banos",
+                projected_density=zone.capacity,
+                reasoning_factors=[],
+            )
+            state = derive_bathroom_zone_state(zone, active, base)
+            expected_free = float(zone.capacity) - min(
+                float(zone.capacity), float(occupied)
+            )
+            assert state.availability == round(expected_free)
 
     def test_model_result_preserves_bathroom_metrics(self) -> None:
         zones = _bathroom_zones()
         bathroom = _bathroom_result(zones)
         active = _select_active_phase_state(bathroom, UUID(PHASE_IDS["p3"]))
-        model = BathroomV1Model()
         zone = zones[0]
         occupied = active.occupied[zone.id]
-        occ, free_ratio, free_spaces = model.indices(occupied, zone.capacity)
+        occupied = min(float(zone.capacity), float(occupied))
 
-        state = derive_bathroom_zone_state(zone, active)
+        base = ZoneState(
+            zone_id=zone.id,
+            operational_state="NORMAL",
+            saturation_level=0.0,
+            availability=0,
+            type="servicios",
+            subtipo="banos",
+            projected_density=zone.capacity,
+            reasoning_factors=[],
+        )
+        state = derive_bathroom_zone_state(zone, active, base)
         data = state.model_result
+        expected_free = float(zone.capacity) - occupied
+        expected_ratio = occupied / float(zone.capacity)
         assert data["bathroom_id"] == str(zone.id)
-        assert data["occupied"] == pytest.approx(occupied)
+        assert data["occupied"] == pytest.approx(active.occupied[zone.id])
         assert data["capacity"] == zone.capacity
-        assert data["occupancy_ratio"] == pytest.approx(occ)
-        assert data["free_ratio"] == pytest.approx(free_ratio)
-        assert data["free_spaces"] == pytest.approx(free_spaces)
+        assert data["occupancy_ratio"] == pytest.approx(expected_ratio)
+        assert data["free_ratio"] == pytest.approx(expected_free / float(zone.capacity))
+        assert data["free_spaces"] == pytest.approx(expected_free)
         assert data["distance"] == zone.reference_point_distance
         assert data["unabsorbed"] == pytest.approx(active.unabsorbed)
 

@@ -334,31 +334,21 @@ def derive_bathroom_zone_state(
             base_state.projected_density if base_state is not None else base_occupied
         )
 
-        # Lógica híbrida refinada (RFC §10.2 + interpretación semántica):
-        if source_occupied < base_occupied:
-            # Reducción de capacidad: la capacidad efectiva se reduce proporcionalmente
-            # a la caída de la densidad proyectada.
-            if base_occupied > 0:
-                capacity_ratio = max(0.0, source_occupied / base_occupied)
-            else:
-                capacity_ratio = 1.0  # Fallback si no hay ocupación base
+        # Fórmula correcta para baños (RFC §10.2 + Ley de Little):
+        # projected_density YA incluye el impacto, por lo que representa
+        # la CAPACIDAD EFECTIVA post-impacto (no la ocupación).
+        # La ocupación real viene del V1 (Ley de Little: personas concurrentes).
+        # Disponibilidad = capacidad efectiva - ocupación real.
+        capacity_efectiva = max(0.0, source_occupied)
+        effective_occupied = min(capacity_efectiva, base_occupied)
+        effective_free = max(0.0, capacity_efectiva - effective_occupied)
 
-            effective_capacity = float(zone.capacity) * capacity_ratio
-            effective_occupied = min(effective_capacity, base_occupied)
-            effective_free = max(0.0, effective_capacity - effective_occupied)
-
-            # Si la capacidad efectiva es 0, la saturación es 100% (zona cerrada)
-            if effective_capacity == 0.0:
-                occupancy_ratio = 1.0
-            else:
-                occupancy_ratio = effective_occupied / float(zone.capacity)
+        if capacity_efectiva == 0.0:
+            occupancy_ratio = 1.0  # Zona cerrada (reducción 100%)
         else:
-            # Aumento de demanda (o sin impacto): la ocupación aumenta, capacidad se mantiene
-            effective_occupied = min(float(zone.capacity), source_occupied)
-            effective_free = max(0.0, float(zone.capacity) - effective_occupied)
-            occupancy_ratio = effective_occupied / float(zone.capacity)
+            occupancy_ratio = effective_occupied / capacity_efectiva
 
-        free_ratio = effective_free / float(zone.capacity)
+        free_ratio = effective_free / capacity_efectiva if capacity_efectiva > 0 else 0.0
         free_spaces = effective_free
 
     print(
@@ -368,6 +358,25 @@ def derive_bathroom_zone_state(
         f"effective_free={effective_free:.1f} occupancy_ratio={occupancy_ratio:.3f} "
         f"free_spaces={free_spaces:.1f}"
     )
+
+    # 🔍 DEBUG EXCLUSIVO BAÑOS: Auditoría de la anomalía de disponibilidad
+    if not is_closed:
+        print("=" * 80)
+        print("🚻 DEBUG BAÑOS: Anomalía de Disponibilidad")
+        print(f"Zona: {zone.name} (ID: {zone.id})")
+        print(f"1. Capacidad base de la zona (zone.capacity): {zone.capacity}")
+        print(f"2. Ocupación cruda del modelo V1 (phase_state.occupied): {occupied}")
+        print(f"3. Densidad proyectada del Context Engine (base_state.projected_density): {base_state.projected_density if base_state else 'None'}")
+        print(f"4. source_occupied (usado para híbrido): {source_occupied}")
+        print(f"5. base_occupied (usado para híbrido): {base_occupied}")
+        print(f"6. ¿Es reducción? (source < base): {source_occupied < base_occupied}")
+        if source_occupied < base_occupied:
+            print(f"   -> capacity_ratio calculado: {source_occupied / base_occupied if base_occupied > 0 else 0.0}")
+            print(f"   -> capacity_efectiva resultante: {capacity_efectiva}")
+        print(f"7. effective_occupied final: {effective_occupied}")
+        print(f"8. effective_free final (baños disponibles): {effective_free}")
+        print(f"9. occupancy_ratio (saturación mostrada): {occupancy_ratio:.4f} ({occupancy_ratio*100:.1f}%)")
+        print("=" * 80)
 
     metrics = {
         "bathroom_id": str(zone.id),
