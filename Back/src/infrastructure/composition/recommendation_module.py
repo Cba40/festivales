@@ -350,6 +350,62 @@ class RecommendationModule:
     def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
+    async def _enrich_with_operational_context(
+        self,
+        recommendations: list[ZoneRecommendation],
+        event_repo,
+        timestamp: datetime,
+    ) -> list[ZoneRecommendation]:
+        """Anexa el contexto operativo (RFC §10.2) a cada recomendación.
+
+        Para las zonas afectadas por un evento operativo activo, añade un
+        mensaje accionable con el tiempo de normalización determinístico
+        (`end_timestamp - now`). Los eventos traen timestamps UTC; se convierten
+        a hora local de Argentina antes de calcular el delta.
+        """
+        if not recommendations:
+            return recommendations
+
+        active_events = await event_repo.find_active_by_timestamp(timestamp)
+        if not active_events:
+            return recommendations
+
+        impacted_zones: dict[UUID, list[object]] = {}
+        for event in active_events:
+            impacted_zones.setdefault(event.target_zone_id, []).append(event)
+
+        now = timestamp.astimezone(LOCAL_TZ)
+        enriched: list[ZoneRecommendation] = []
+        for rec in recommendations:
+            events_for_zone = impacted_zones.get(rec.zone_id, [])
+            reasoning = list(rec.reasoning)
+            if events_for_zone:
+                max_end = max(
+                    e.end_timestamp.astimezone(LOCAL_TZ) for e in events_for_zone
+                )
+                remaining_min = max(0, int(
+                    (max_end - now).total_seconds() // 60
+                ))
+                has_impact = any(e.impact_value != 0 for e in events_for_zone)
+                if has_impact:
+                    reasoning.append(
+                        f"Capacidad reducida por evento operativo. "
+                        f"Se estima normalización en ~{remaining_min} minutos."
+                    )
+                if any(e.is_incident for e in events_for_zone):
+                    incident_msg = "Incidente activo en zona. "
+                    if not any(m.startswith("Incidente") for m in reasoning):
+                        reasoning.append(f"{incident_msg}Se estima normalización en ~{remaining_min} minutos.")
+            enriched.append(
+                ZoneRecommendation(
+                    zone_id=rec.zone_id,
+                    score=rec.score,
+                    reasoning=reasoning,
+                    is_nearest=rec.is_nearest,
+                )
+            )
+        return enriched
+
     async def execute(
         self,
         *,
@@ -466,6 +522,10 @@ class RecommendationModule:
             requested_action=requested_action,
             limit=limit,
             zone_coordinates=zone_coordinates,
+        )
+
+        recommendations = await self._enrich_with_operational_context(
+            recommendations, event_repo, local_ts
         )
 
         return recommendations, combined

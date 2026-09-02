@@ -310,12 +310,35 @@ def derive_bathroom_zone_state(
     """
     resolved_model = model if model is not None else BathroomV1Model()
     occupied = phase_state.occupied.get(zone.id, 0.0)
-    occupancy_ratio, free_ratio, free_spaces = resolved_model.indices(
-        occupied, zone.capacity
+
+    # Eventos imprevistos (RFC §10.2): la fuente de verdad de la ocupación
+    # proyectada afectada por eventos es `projected_density` del Context Engine
+    # (= capacity × density_factor + accumulated_impact). Baños V1 modela la
+    # ocupación físico-operativa pero ignora los eventos operativos; por ello
+    # los índices expuestos al usuario se derivan desde `projected_density`
+    # (mismas unidades que capacity) en lugar de `occupied` del V1. La
+    # `occupied` del V1 se conserva en `model_result` como métrica del modelo.
+    is_closed = (
+        base_state is not None
+        and base_state.operational_state == "CLOSED"
     )
+    if is_closed:
+        occupancy_ratio = 1.0
+        free_ratio = 0.0
+        free_spaces = 0.0
+        source_occupied = float(zone.capacity)
+    else:
+        source_occupied = float(
+            base_state.projected_density if base_state is not None else occupied
+        )
+        occupancy_ratio, free_ratio, free_spaces = resolved_model.indices(
+            source_occupied, zone.capacity
+        )
+
     metrics = {
         "bathroom_id": str(zone.id),
         "occupied": occupied,
+        "source_occupied": source_occupied,
         "capacity": zone.capacity,
         "occupancy_ratio": occupancy_ratio,
         "free_ratio": free_ratio,
@@ -328,8 +351,8 @@ def derive_bathroom_zone_state(
         operational_state=(
             base_state.operational_state if base_state is not None else "NORMAL"
         ),
-        availability=round(free_spaces),
-        saturation_level=occupancy_ratio,
+        availability=int(round(free_spaces)),
+        saturation_level=float(occupancy_ratio),
         estimated_wait=None,
         confidence=None,
         reasoning_factors=(
@@ -341,7 +364,7 @@ def derive_bathroom_zone_state(
         type=zone.type,
         subtipo=zone.subtipo,
         projected_density=(
-            base_state.projected_density if base_state is not None else 0
+            int(base_state.projected_density) if base_state is not None else 0
         ),
         model_result=metrics,
     )

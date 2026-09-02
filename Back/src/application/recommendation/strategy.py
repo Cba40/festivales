@@ -309,6 +309,15 @@ class WeightedScoringStrategy:
         for zone, score in scored_zones:
             reasons: list[str] = []
 
+            # Contexto operativo del Context Engine (RFC §10.2): los factores
+            # de razonamiento ya incluyen el impacto de eventos imprevistos
+            # ("Impacto de evento operativo: -N" e "Incidente activo en zona").
+            # Se propagan a la razón de la recomendación para que el usuario
+            # vea el contexto actualizado (densidad proyectada afectada).
+            for factor in zone.reasoning_factors:
+                if factor not in reasons:
+                    reasons.append(factor)
+
             if (
                 zone.saturation_level is not None
                 and zone.saturation_level < config.low_density_reasoning_threshold
