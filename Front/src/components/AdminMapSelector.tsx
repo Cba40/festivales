@@ -1,7 +1,17 @@
 import 'leaflet/dist/leaflet.css'
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
+import markerIcon from 'leaflet/dist/images/marker-icon.png'
+import markerShadow from 'leaflet/dist/images/marker-shadow.png'
+
+;(L.Icon.Default.prototype as Record<string, unknown>)._getIconUrl = undefined
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: markerIcon2x,
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
+})
 
 // Icono personalizado para el marcador del administrador
 const adminIcon = L.divIcon({
@@ -39,7 +49,7 @@ interface AdminMapSelectorProps {
 export const AdminMapSelector = ({ lat, lng, onChangeLocation, showMarker = true }: AdminMapSelectorProps) => {
   const defaultLat = -30.975
   const defaultLng = -64.090
-  const hasCoords = lat != null && lng != null
+  const hasCoords = lat != null && lng != null && !isNaN(lat) && !isNaN(lng)
 
   const [position, setPosition] = useState<[number, number]>(
     hasCoords ? [lat, lng] : [defaultLat, defaultLng],
@@ -54,20 +64,6 @@ export const AdminMapSelector = ({ lat, lng, onChangeLocation, showMarker = true
   }, [lat, lng, hasCoords, defaultLat, defaultLng])
 
   const markerRef = useRef<L.Marker | null>(null)
-
-  const eventHandlers = useMemo(
-    () => ({
-      dragend() {
-        const marker = markerRef.current
-        if (marker != null) {
-          const latLng = marker.getLatLng()
-          setPosition([latLng.lat, latLng.lng])
-          onChangeLocation(latLng.lat, latLng.lng)
-        }
-      },
-    }),
-    [onChangeLocation]
-  )
 
   const handleMapClick = (clickLat: number, clickLng: number) => {
     setPosition([clickLat, clickLng])
@@ -95,14 +91,20 @@ export const AdminMapSelector = ({ lat, lng, onChangeLocation, showMarker = true
           <MapEventsHandler onMapClick={handleMapClick} />
 
           {showMarker && hasCoords && (
-            <Marker
-              draggable={true}
-              eventHandlers={eventHandlers}
-              position={position}
-              icon={adminIcon}
-              ref={markerRef}
-            />
-          )}
+          <Marker
+            draggable={true}
+            position={position}
+            eventHandlers={{
+              dragend: (e) => {
+                const marker = e.target;
+                const { lat, lng } = marker.getLatLng();
+                onChangeLocation(lat, lng);
+              },
+            }}
+            icon={adminIcon}
+            ref={markerRef}
+          />
+        )}
         </MapContainer>
       </div>
 

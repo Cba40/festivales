@@ -557,7 +557,7 @@ function EventFormModal({
                   const clampLng = Math.max(-180, Math.min(180, lng));
                   setForm(f => ({ ...f, latitude: clampLat.toString(), longitude: clampLng.toString() }));
                 }}
-                showMarker
+                showMarker={true}
               />
               <div className="absolute inset-0 flex items-end gap-2 pt-2">
                 <button type="button" onClick={() => setForm(f => ({ ...f, latitude: '', longitude: '' }))} className="text-xs text-amber-600 hover:text-amber-700 font-medium">
