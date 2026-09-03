@@ -52,7 +52,7 @@ class WeightedScoringStrategy:
         )
 
         if requested_action.type == PARKING_TYPE:
-            return self._select_three_options(
+            return self._select_four_options(
                 viable, user_context, mobility_context, config, zone_coordinates
             )
 
@@ -128,7 +128,7 @@ class WeightedScoringStrategy:
         ]
 
     @staticmethod
-    def _select_three_options(
+    def _select_four_options(
         viable_zones: list[ZoneState],
         user_context: UserContext,
         mobility_context: MobilityContext,
@@ -152,7 +152,7 @@ class WeightedScoringStrategy:
         for zone, _fr in candidates:
             print(
                 f"   zone_id={zone.zone_id} saturation={zone.saturation_level:.3f} "
-                f"availability={zone.availability} distance={zone.model_result.get('distance') if zone.model_result else 'N/A'}"
+                f"availability={zone.availability} distance_ref={zone.model_result.get('distance') if zone.model_result else 'N/A'}"
             )
 
         available = [
@@ -174,79 +174,122 @@ class WeightedScoringStrategy:
             print(
                 f"     EXCLUIDA: zone_id={zone.zone_id} saturation={zone.saturation_level:.3f}"
             )
-        available.sort(key=lambda t: (-t[1], str(t[0].zone_id)))
 
-        option1 = available[0] if len(available) >= 1 else None
-        option2 = available[1] if len(available) >= 2 else None
-
-        chosen_ids = {option1[0].zone_id} if option1 is not None else set()
-        if option2 is not None:
-            chosen_ids.add(option2[0].zone_id)
-
-        option3: tuple[ZoneState, float] | None = None
-        if (
+        has_user_gps = (
             zone_coordinates is not None
             and mobility_context.latitude is not None
             and mobility_context.longitude is not None
-        ):
-            candidates_with_distance: list[tuple[ZoneState, float]] = []
-            for zone, _free_ratio in available:
-                if zone.zone_id in chosen_ids:
-                    continue
-                coords = zone_coordinates.get(zone.zone_id)
-                if coords is None:
-                    continue
-                distance = WeightedScoringStrategy._calculate_distance(
-                    mobility_context.latitude,
-                    mobility_context.longitude,
-                    coords[0],
-                    coords[1],
-                )
-                candidates_with_distance.append((zone, distance))
-            candidates_with_distance.sort(
-                key=lambda t: (t[1], str(t[0].zone_id))
-            )
-            if candidates_with_distance:
-                option3 = candidates_with_distance[0]
+        )
 
-        recommendations: list[ZoneRecommendation] = []
+        def _dist_to_user(zone: ZoneState) -> float | None:
+            if not has_user_gps:
+                return None
+            coords = zone_coordinates.get(zone.zone_id)
+            if coords is None:
+                return None
+            return WeightedScoringStrategy._calculate_distance(
+                mobility_context.latitude,
+                mobility_context.longitude,
+                coords[0],
+                coords[1],
+            )
+
+        def _dist_to_reference(zone: ZoneState) -> float | None:
+            if zone.model_result is None:
+                return None
+            d = zone.model_result.get("distance")
+            return float(d) if d is not None else None
+
+        zd = ZoneRecommendation
+
+        # Opción 1: mayor disponibilidad (free_ratio más alto)
+        option1 = max(available, key=lambda t: (t[1], str(t[0].zone_id))) if available else None
 
         if option1 is not None:
-            zone, _free_ratio = option1
-            score = WeightedScoringStrategy._calculate_scores(
-                [zone], user_context, mobility_context, config
-            )[0][1]
-            contextual_reasoning = WeightedScoringStrategy._generate_reasoning(
-                [(zone, score)], mobility_context, config
-            )[0][2]
-            recommendations.append(
-                ZoneRecommendation(
-                    zone_id=zone.zone_id,
-                    score=score,
-                    reasoning=["Más lugares libres"] + contextual_reasoning,
-                    is_nearest=False,
-                )
-            )
+            option2: tuple[ZoneState, float] | None
+            chosen_ids = {option1[0].zone_id}
+            rest = [t for t in available if t[0].zone_id not in chosen_ids]
 
-        if option2 is not None:
-            zone, _free_ratio = option2
-            score = WeightedScoringStrategy._calculate_scores(
-                [zone], user_context, mobility_context, config
-            )[0][1]
-            contextual_reasoning = WeightedScoringStrategy._generate_reasoning(
-                [(zone, score)], mobility_context, config
-            )[0][2]
-            recommendations.append(
-                ZoneRecommendation(
-                    zone_id=zone.zone_id,
-                    score=score,
-                    reasoning=["Segunda opción con más lugares"] + contextual_reasoning,
-                    is_nearest=False,
-                )
-            )
+            # Opción 2: mejor balance disponibilidad/distancia al usuario.
+            # score = free_ratio * (1000 / max(dist_to_user, 100)) para normalizar.
+            if has_user_gps:
+                def _balance_key(t: tuple[ZoneState, float]) -> tuple[float, str]:
+                    zone, fr = t
+                    d = _dist_to_user(zone)
+                    balance = fr * (1000.0 / (max(d, 100.0) if d is not None else 1000.0))
+                    return (balance, str(zone.zone_id))
+                option2 = max(rest, key=_balance_key) if rest else None
+            else:
+                # Sin GPS de usuario: segunda mayor disponibilidad como fallback.
+                option2 = max(rest, key=lambda t: (t[1], str(t[0].zone_id))) if rest else None
 
-        if option3 is not None:
-            zone, _distance = option3
+            if option2 is not None:
+                chosen_ids.add(option2[0].zone_id)
+            rest2 = [t for t in available if t[0].zone_id not in chosen_ids]
+
+            # Opción 3: más cercana al usuario con free_ratio > 0.20
+            option3: tuple[ZoneState, float] | None = None
+            if has_user_gps:
+                candidates_3 = [
+                    (z, fr) for z, fr in rest2
+                    if fr > 0.20 and _dist_to_user(z) is not None
+                ]
+                if candidates_3:
+                    option3 = min(
+                        candidates_3, key=lambda t: (_dist_to_user(t[0]), str(t[0].zone_id))
+                    )
+                    chosen_ids.add(option3[0].zone_id)
+
+            # Opción 4: más cercana al epicentro con free_ratio > 0.20
+            option4: tuple[ZoneState, float] | None = None
+            rest3 = [t for t in rest2 if t[0].zone_id not in chosen_ids]
+            candidates_4 = [
+                (z, fr) for z, fr in rest3
+                if fr > 0.20 and _dist_to_reference(z) is not None
+            ]
+            if candidates_4:
+                option4 = min(
+                    candidates_4, key=lambda t: (_dist_to_reference(t[0]), str(t[0].zone_id))
+                )
+
+            print("🔍 SELECCIÓN 4 ZONAS:")
+            print(
+                f"   Opción 1 (mayor disponibilidad): {option1[0].zone_id} free_ratio={option1[1]:.2f}"
+            )
+            if option2 is not None:
+                print(
+                    f"   Opción 2 (balance): {option2[0].zone_id} free_ratio={option2[1]:.2f} "
+                    f"dist_user={_dist_to_user(option2[0]) if option2[0] else 'N/A'}"
+                )
+            if option3 is not None:
+                print(
+                    f"   Opción 3 (más cercana al usuario): {option3[0].zone_id} "
+                    f"dist_user={_dist_to_user(option3[0]):.0f}m"
+                )
+            if option4 is not None:
+                print(
+                    f"   Opción 4 (más cercana al epicentro): {option4[0].zone_id} "
+                    f"dist_ref={_dist_to_reference(option4[0]):.0f}m"
+                )
+
+            selected = [option1, option2, option3, option4]
+        else:
+            selected = []
+
+        selected = [s for s in selected if s is not None]
+
+        print(
+            f"🔍 SCORING AUDITORÍA: {len(selected)} zonas seleccionadas para parking"
+        )
+
+        recommendations: list[ZoneRecommendation] = []
+        labels: list[str] = [
+            "Mejor opción con más lugares libres",
+            "Mejor balance de disponibilidad y cercanía",
+            "Más cerca de vos",
+            "Cerca del epicentro del evento",
+        ]
+        for i, (zone, _fr) in enumerate(selected):
             score = WeightedScoringStrategy._calculate_scores(
                 [zone], user_context, mobility_context, config
             )[0][1]
@@ -257,13 +300,12 @@ class WeightedScoringStrategy:
                 ZoneRecommendation(
                     zone_id=zone.zone_id,
                     score=score,
-                    reasoning=["Más cerca de vos"] + contextual_reasoning,
-                    is_nearest=True,
+                    reasoning=[labels[i]] + contextual_reasoning,
+                    is_nearest=(i == 2),
                 )
             )
 
         print(
-            f"🔍 SCORING AUDITORÍA: {len(recommendations)} zonas seleccionadas para parking\n"
             f"   Top: {[(r.zone_id, round(r.score,3)) for r in recommendations]}"
         )
 

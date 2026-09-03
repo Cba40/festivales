@@ -46,7 +46,7 @@ export function useParkingRecommendations() {
       const params: Record<string, unknown> = {
         speed: 1.5,
         accessibility_required: false,
-        limit: 3,
+        limit: 4,
         current_zone_id: currentZoneId || undefined,
         user_id: '00000000-0000-0000-0000-000000000000',
         access_level: 'STANDARD',

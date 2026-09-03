@@ -38,6 +38,7 @@ const Estacionar = () => {
   const principal = zonas[0]
   const alternativa = zonas[1]
   const terceraOpcion = zonas[2]
+  const cuartaOpcion = zonas[3]
 
   const abrirMapa = (zona: ZonaEstacionamientoItem) => {
     if (zona.lat && zona.lng) {
@@ -222,7 +223,7 @@ const Estacionar = () => {
   }
 
   const esTresOpciones = modo === 'guiar' || modo === 'asistir'
-  const listaRestante = esTresOpciones ? zonas.slice(3) : zonas.slice(1)
+  const listaRestante = esTresOpciones ? zonas.slice(4) : zonas.slice(1)
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
@@ -327,6 +328,28 @@ const Estacionar = () => {
                   <p className="text-sm text-slate-600 dark:text-slate-300 flex gap-3">
                     <span>🚗 {dist.driving}</span>
                     {terceraOpcion.saturation_level != null && <span>📊 {Math.round((1 - terceraOpcion.saturation_level) * 100)}% de posibilidad</span>}
+                  </p>
+                )
+              })()}
+            </div>
+          </button>
+        )}
+
+        {esTresOpciones && cuartaOpcion && (
+          <button onClick={() => setSelectedZona(cuartaOpcion)} className="w-full">
+            <div className="bg-white dark:bg-slate-800 border-2 border-emerald-400 dark:border-emerald-500 p-4 rounded-xl text-left">
+              <p className="font-bold text-slate-800 dark:text-slate-100">
+                {cuartaOpcion.name}
+              </p>
+              <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">
+                📍 {cuartaOpcion.referencia}
+              </p>
+              {(() => {
+                const dist = getDistancias(cuartaOpcion.lat ?? 0, cuartaOpcion.lng ?? 0, userLocation, cuartaOpcion.distancia_min ?? 5)
+                return (
+                  <p className="text-sm text-slate-600 dark:text-slate-300 flex gap-3">
+                    <span>🚗 {dist.driving}</span>
+                    {cuartaOpcion.saturation_level != null && <span>📊 {Math.round((1 - cuartaOpcion.saturation_level) * 100)}% de posibilidad</span>}
                   </p>
                 )
               })()}

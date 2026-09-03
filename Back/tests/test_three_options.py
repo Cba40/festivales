@@ -178,7 +178,12 @@ class TestThreeParkingOptions:
 
         zone_ids = [r.zone_id for r in result]
         assert len(zone_ids) == len(set(zone_ids))
-        assert zone_ids[2] == UUID("a0000000-0000-0000-0000-000000000001")
+        # a es la más cercana al usuario (lat 0.002): entra como opción 2
+        # (mejor balance disponibilidad/cercanía). El orden es [b, a, c].
+        assert zone_ids[0] == UUID("b0000000-0000-0000-0000-000000000002")
+        assert zone_ids[1] == UUID("a0000000-0000-0000-0000-000000000001")
+        assert zone_ids[2] == UUID("c0000000-0000-0000-0000-000000000003")
+        assert "Mejor balance de disponibilidad y cercanía" in result[1].reasoning
         assert "Más cerca de vos" in result[2].reasoning
 
 
