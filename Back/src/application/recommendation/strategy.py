@@ -51,7 +51,7 @@ class WeightedScoringStrategy:
             zone_states, requested_action, mobility_context, config
         )
 
-        if requested_action.type == PARKING_TYPE:
+        if requested_action.type == PARKING_TYPE or requested_action.type == "comida":
             return self._select_four_options(
                 viable, user_context, mobility_context, config, zone_coordinates
             )

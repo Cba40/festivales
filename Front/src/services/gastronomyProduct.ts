@@ -44,21 +44,23 @@ export function useGastronomyRecommendations() {
     setLoading(true)
     setError(null)
     try {
+      const params = {
+        speed: 1.5,
+        accessibility_required: false,
+        limit: 4,
+        current_zone_id: currentZoneId || undefined,
+        user_id: '00000000-0000-0000-0000-000000000000',
+        access_level: 'STANDARD',
+        ...(userLocation
+          ? { latitude: userLocation[0], longitude: userLocation[1] }
+          : {}),
+      }
+      console.log('🔍 FRONTEND FOOD AUDITORÍA: Enviando request al backend')
+      console.log('   userLocation:', userLocation)
+      console.log('   params:', params)
       const { data: res } = await apiClient.get<GastronomyRecommendationResponse>(
         endpoints.products.gastronomy(EVENT_ID),
-        {
-          params: {
-            speed: 1.5,
-            accessibility_required: false,
-            limit: 10,
-            current_zone_id: currentZoneId || undefined,
-            user_id: '00000000-0000-0000-0000-000000000000',
-            access_level: 'STANDARD',
-            ...(userLocation
-              ? { latitude: userLocation[0], longitude: userLocation[1] }
-              : {}),
-          },
-        }
+        { params },
       )
       setData(res)
     } catch (err: any) {

@@ -31,10 +31,16 @@ const ServiciosComer = () => {
 
   const zonas = data?.zonas ?? []
 
+  console.log('🔍 FRONTEND FOOD UI AUDITORÍA: Componente de comidas montado')
+  console.log('   userLocation:', userLocation)
+  console.log('   zonas recibidas:', zonas?.length)
+
   const modo = data?.mode ?? 'informar'
 
   const principal = zonas[0]
   const alternativa = zonas[1]
+  const terceraOpcion = zonas[2]
+  const cuartaOpcion = zonas[3]
 
   const abrirMapa = (zona: ZonaGastronomicaItem) => {
     if (zona.lat && zona.lng) {
@@ -218,7 +224,7 @@ const ServiciosComer = () => {
   }
 
   const listaRestante =
-    modo === 'guiar' || modo === 'asistir' ? zonas.slice(2) : zonas.slice(1)
+    modo === 'guiar' || modo === 'asistir' ? zonas.slice(4) : zonas.slice(1)
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
@@ -276,6 +282,45 @@ const ServiciosComer = () => {
                   <span>🚶 {dist.walking}</span>
                   <span>🚗 {dist.driving}</span>
                   <span>⏱️ {alternativa.estimated_wait} min</span>
+                </p>
+              </div>
+            </button>
+          )
+        })()}
+
+        {(modo === 'guiar' || modo === 'asistir') && terceraOpcion && (() => {
+          const dist = getDistancias(terceraOpcion.lat ?? 0, terceraOpcion.lng ?? 0, userLocation, terceraOpcion.distancia_min ?? 5)
+          return (
+            <button onClick={() => setSelectedZona(terceraOpcion)} className="w-full">
+              <div className="bg-white dark:bg-slate-800 border-2 border-blue-400 dark:border-blue-500 p-4 rounded-xl text-left">
+                <p className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                  <span>{terceraOpcion.name}</span>
+                  <NearestBadge visible={terceraOpcion.is_nearest} />
+                </p>
+                <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">📍 {terceraOpcion.referencia}</p>
+                <p className="text-sm text-slate-600 dark:text-slate-300 flex gap-3">
+                  <span>🚶 {dist.walking}</span>
+                  <span>🚗 {dist.driving}</span>
+                  <span>⏱️ {terceraOpcion.estimated_wait} min</span>
+                </p>
+              </div>
+            </button>
+          )
+        })()}
+
+        {(modo === 'guiar' || modo === 'asistir') && cuartaOpcion && (() => {
+          const dist = getDistancias(cuartaOpcion.lat ?? 0, cuartaOpcion.lng ?? 0, userLocation, cuartaOpcion.distancia_min ?? 5)
+          return (
+            <button onClick={() => setSelectedZona(cuartaOpcion)} className="w-full">
+              <div className="bg-white dark:bg-slate-800 border-2 border-emerald-400 dark:border-emerald-500 p-4 rounded-xl text-left">
+                <p className="font-bold text-slate-800 dark:text-slate-100">
+                  {cuartaOpcion.name}
+                </p>
+                <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">📍 {cuartaOpcion.referencia}</p>
+                <p className="text-sm text-slate-600 dark:text-slate-300 flex gap-3">
+                  <span>🚶 {dist.walking}</span>
+                  <span>🚗 {dist.driving}</span>
+                  <span>⏱️ {cuartaOpcion.estimated_wait} min</span>
                 </p>
               </div>
             </button>
