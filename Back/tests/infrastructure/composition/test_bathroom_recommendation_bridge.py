@@ -387,7 +387,6 @@ class TestDeriveBathroomZoneState:
         active = _select_active_phase_state(bathroom, UUID(PHASE_IDS["p3"]))
 
         for zone in zones:
-            occupied = active.occupied[zone.id]
             base = ZoneState(
                 zone_id=zone.id,
                 operational_state="NORMAL",
@@ -395,12 +394,12 @@ class TestDeriveBathroomZoneState:
                 availability=0,
                 type="servicios",
                 subtipo="banos",
-                projected_density=zone.capacity,
+                projected_density=int(zone.capacity * 0.3),
                 reasoning_factors=[],
             )
             state = derive_bathroom_zone_state(zone, active, base)
-            expected_occupied = min(float(zone.capacity), float(occupied))
-            expected_ratio = expected_occupied / float(zone.capacity)
+            # SIN EVENTO: occupancy = source_occupied / capacity = 0.3
+            expected_ratio = 0.3
             assert state.zone_id == zone.id
             assert state.saturation_level == pytest.approx(expected_ratio)
 
@@ -410,7 +409,6 @@ class TestDeriveBathroomZoneState:
         active = _select_active_phase_state(bathroom, UUID(PHASE_IDS["p3"]))
 
         for zone in zones:
-            occupied = active.occupied[zone.id]
             base = ZoneState(
                 zone_id=zone.id,
                 operational_state="NORMAL",
@@ -418,13 +416,12 @@ class TestDeriveBathroomZoneState:
                 availability=0,
                 type="servicios",
                 subtipo="banos",
-                projected_density=zone.capacity,
+                projected_density=int(zone.capacity * 0.3),
                 reasoning_factors=[],
             )
             state = derive_bathroom_zone_state(zone, active, base)
-            expected_free = float(zone.capacity) - min(
-                float(zone.capacity), float(occupied)
-            )
+            # SIN EVENTO: free = capacity - (capacity * 0.3) = capacity * 0.7
+            expected_free = float(zone.capacity) * 0.7
             assert state.availability == round(expected_free)
 
     def test_model_result_preserves_bathroom_metrics(self) -> None:
@@ -432,8 +429,6 @@ class TestDeriveBathroomZoneState:
         bathroom = _bathroom_result(zones)
         active = _select_active_phase_state(bathroom, UUID(PHASE_IDS["p3"]))
         zone = zones[0]
-        occupied = active.occupied[zone.id]
-        occupied = min(float(zone.capacity), float(occupied))
 
         base = ZoneState(
             zone_id=zone.id,
@@ -442,18 +437,19 @@ class TestDeriveBathroomZoneState:
             availability=0,
             type="servicios",
             subtipo="banos",
-            projected_density=zone.capacity,
+            projected_density=int(zone.capacity * 0.3),
             reasoning_factors=[],
         )
         state = derive_bathroom_zone_state(zone, active, base)
         data = state.model_result
-        expected_free = float(zone.capacity) - occupied
-        expected_ratio = occupied / float(zone.capacity)
+        # SIN EVENTO: occupancy = source/capacity = 0.3, free = capacity * 0.7
+        expected_ratio = 0.3
+        expected_free = float(zone.capacity) * 0.7
         assert data["bathroom_id"] == str(zone.id)
         assert data["occupied"] == pytest.approx(active.occupied[zone.id])
         assert data["capacity"] == zone.capacity
         assert data["occupancy_ratio"] == pytest.approx(expected_ratio)
-        assert data["free_ratio"] == pytest.approx(expected_free / float(zone.capacity))
+        assert data["free_ratio"] == pytest.approx(0.7)
         assert data["free_spaces"] == pytest.approx(expected_free)
         assert data["distance"] == zone.reference_point_distance
         assert data["unabsorbed"] == pytest.approx(active.unabsorbed)

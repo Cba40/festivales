@@ -399,21 +399,31 @@ def derive_food_zone_state(
             base_state.projected_density if base_state is not None else base_occupied
         )
 
-        # Fórmula correcta para comida (RFC §10.2 + modelo de stock exponencial):
-        # projected_density YA incluye el impacto, por lo que representa
-        # la CAPACIDAD EFECTIVA post-impacto (no la ocupación).
-        # La ocupación real viene del V1 (comensales simultáneos).
-        # Disponibilidad = capacidad efectiva - ocupación real.
-        capacity_efectiva = max(0.0, source_occupied)
-        effective_occupied = min(capacity_efectiva, base_occupied)
-        effective_free = max(0.0, capacity_efectiva - effective_occupied)
+        # Detectar si hay un evento imprevisto activo
+        has_event = (
+            base_state is not None
+            and any("Impacto de evento operativo" in f for f in base_state.reasoning_factors)
+        )
 
-        if capacity_efectiva == 0.0:
-            occupancy_ratio = 1.0  # Zona cerrada (reducción 100%)
+        if has_event:
+            # CON EVENTO: usar projected_density como capacidad efectiva
+            # (el impacto ya redujo/aumentó la densidad proyectada)
+            capacity_efectiva = max(0.0, source_occupied)
+            effective_occupied = min(capacity_efectiva, base_occupied)
+            effective_free = max(0.0, capacity_efectiva - effective_occupied)
+
+            if capacity_efectiva == 0.0:
+                occupancy_ratio = 1.0  # Zona cerrada
+            else:
+                occupancy_ratio = effective_occupied / capacity_efectiva
         else:
-            occupancy_ratio = effective_occupied / capacity_efectiva
+            # SIN EVENTO: usar la lógica original del RFC §10.2
+            # projected_density es la ocupación esperada, capacity es la capacidad real
+            effective_occupied = min(float(zone.capacity), source_occupied)
+            effective_free = max(0.0, float(zone.capacity) - effective_occupied)
+            occupancy_ratio = effective_occupied / float(zone.capacity)
 
-        free_ratio = effective_free / capacity_efectiva if capacity_efectiva > 0 else 0.0
+        free_ratio = effective_free / float(zone.capacity)
         free_spaces = effective_free
 
     print(

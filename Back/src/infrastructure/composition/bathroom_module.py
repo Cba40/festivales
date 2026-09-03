@@ -334,21 +334,31 @@ def derive_bathroom_zone_state(
             base_state.projected_density if base_state is not None else base_occupied
         )
 
-        # Fórmula correcta para baños (RFC §10.2 + Ley de Little):
-        # projected_density YA incluye el impacto, por lo que representa
-        # la CAPACIDAD EFECTIVA post-impacto (no la ocupación).
-        # La ocupación real viene del V1 (Ley de Little: personas concurrentes).
-        # Disponibilidad = capacidad efectiva - ocupación real.
-        capacity_efectiva = max(0.0, source_occupied)
-        effective_occupied = min(capacity_efectiva, base_occupied)
-        effective_free = max(0.0, capacity_efectiva - effective_occupied)
+        # Detectar si hay un evento imprevisto activo
+        has_event = (
+            base_state is not None
+            and any("Impacto de evento operativo" in f for f in base_state.reasoning_factors)
+        )
 
-        if capacity_efectiva == 0.0:
-            occupancy_ratio = 1.0  # Zona cerrada (reducción 100%)
+        if has_event:
+            # CON EVENTO: usar projected_density como capacidad efectiva
+            # (el impacto ya redujo/aumentó la densidad proyectada)
+            capacity_efectiva = max(0.0, source_occupied)
+            effective_occupied = min(capacity_efectiva, base_occupied)
+            effective_free = max(0.0, capacity_efectiva - effective_occupied)
+
+            if capacity_efectiva == 0.0:
+                occupancy_ratio = 1.0  # Zona cerrada
+            else:
+                occupancy_ratio = effective_occupied / capacity_efectiva
         else:
-            occupancy_ratio = effective_occupied / capacity_efectiva
+            # SIN EVENTO: usar la lógica original del RFC §10.2
+            # projected_density es la ocupación esperada, capacity es la capacidad real
+            effective_occupied = min(float(zone.capacity), source_occupied)
+            effective_free = max(0.0, float(zone.capacity) - effective_occupied)
+            occupancy_ratio = effective_occupied / float(zone.capacity)
 
-        free_ratio = effective_free / capacity_efectiva if capacity_efectiva > 0 else 0.0
+        free_ratio = effective_free / float(zone.capacity)
         free_spaces = effective_free
 
     print(
@@ -369,10 +379,11 @@ def derive_bathroom_zone_state(
         print(f"3. Densidad proyectada del Context Engine (base_state.projected_density): {base_state.projected_density if base_state else 'None'}")
         print(f"4. source_occupied (usado para híbrido): {source_occupied}")
         print(f"5. base_occupied (usado para híbrido): {base_occupied}")
-        print(f"6. ¿Es reducción? (source < base): {source_occupied < base_occupied}")
-        if source_occupied < base_occupied:
-            print(f"   -> capacity_ratio calculado: {source_occupied / base_occupied if base_occupied > 0 else 0.0}")
+        print(f"6. has_event (evento imprevisto activo): {has_event}")
+        if has_event:
             print(f"   -> capacity_efectiva resultante: {capacity_efectiva}")
+        else:
+            print(f"   -> SIN EVENTO: se usa capacity real {zone.capacity} y source como ocupación")
         print(f"7. effective_occupied final: {effective_occupied}")
         print(f"8. effective_free final (baños disponibles): {effective_free}")
         print(f"9. occupancy_ratio (saturación mostrada): {occupancy_ratio:.4f} ({occupancy_ratio*100:.1f}%)")

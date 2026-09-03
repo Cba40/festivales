@@ -898,13 +898,13 @@ class TestMergeFoodIntoPrediction:
         base = self._base_prediction(food_zones, last_phase_id)
         result = self._food_result(food_zones, last_phase_id)
 
-        # Actualizar base para que tenga projected_density = capacity (sin evento),
-        # reflejando el uso real: projected_density = capacity × density_factor
-        # con density_factor = 1.0 cuando no hay impacto.
+        # Actualizar base para que tenga projected_density = capacity × 0.3 (sin
+        # evento, density_factor=0.3), reflejando el uso real: una zona sin impacto
+        # con demanda moderada muestra baja ocupación, NO aparecer colapsada.
         for zs in base.zone_states:
             for zone in food_zones:
                 if zs.zone_id == zone.id:
-                    zs._projected_density = zone.capacity
+                    zs._projected_density = int(zone.capacity * 0.3)
                     break
 
         merged = merge_food_into_prediction(base, result)
@@ -913,16 +913,11 @@ class TestMergeFoodIntoPrediction:
         phase_state = result.phase_results[-1]
         for zone in food_zones:
             state = by_id[zone.id]
-            occupied = phase_state.occupied[zone.id]
 
-            # Con projected_density = capacity, la fórmula da:
-            # capacity_efectiva = capacity
-            # effective_occupied = min(capacity, occupied) = occupied
-            # effective_free = capacity - occupied
-            # occupancy_ratio = occupied / capacity
-            expected_occupied = min(float(zone.capacity), float(occupied))
-            expected_free = float(zone.capacity) - expected_occupied
-            expected_ratio = expected_occupied / float(zone.capacity)
+            # SIN EVENTO: occupancy = source_occupied / capacity = 0.3,
+            # free = capacity * 0.7
+            expected_ratio = 0.3
+            expected_free = float(zone.capacity) * 0.7
 
             assert state.saturation_level == pytest.approx(expected_ratio)
             assert state.availability == round(expected_free)

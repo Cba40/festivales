@@ -317,26 +317,26 @@ def derive_parking_zone_state(
             base_state.projected_density if base_state is not None else base_occupied
         )
 
-        # Lógica híbrida refinada (RFC §10.2 + interpretación semántica):
-        if source_occupied < base_occupied:
-            # Reducción de capacidad: la capacidad efectiva se reduce proporcionalmente
-            # a la caída de la densidad proyectada.
-            if base_occupied > 0:
-                capacity_ratio = max(0.0, source_occupied / base_occupied)
-            else:
-                capacity_ratio = 1.0  # Fallback si no hay ocupación base
+        # Detectar si hay un evento imprevisto activo
+        has_event = (
+            base_state is not None
+            and any("Impacto de evento operativo" in f for f in base_state.reasoning_factors)
+        )
 
-            effective_capacity = float(zone.capacity) * capacity_ratio
-            effective_occupied = min(effective_capacity, base_occupied)
-            effective_free = max(0.0, effective_capacity - effective_occupied)
+        if has_event:
+            # CON EVENTO: usar projected_density como capacidad efectiva
+            # (el impacto ya redujo/aumentó la densidad proyectada)
+            capacity_efectiva = max(0.0, source_occupied)
+            effective_occupied = min(capacity_efectiva, base_occupied)
+            effective_free = max(0.0, capacity_efectiva - effective_occupied)
 
-            # Si la capacidad efectiva es 0, la saturación es 100% (zona cerrada)
-            if effective_capacity == 0.0:
-                occupancy_ratio = 1.0
+            if capacity_efectiva == 0.0:
+                occupancy_ratio = 1.0  # Zona cerrada
             else:
-                occupancy_ratio = effective_occupied / float(zone.capacity)
+                occupancy_ratio = effective_occupied / capacity_efectiva
         else:
-            # Aumento de demanda (o sin impacto): la ocupación aumenta, capacidad se mantiene
+            # SIN EVENTO: usar la lógica original del RFC §10.2
+            # projected_density es la ocupación esperada, capacity es la capacidad real
             effective_occupied = min(float(zone.capacity), source_occupied)
             effective_free = max(0.0, float(zone.capacity) - effective_occupied)
             occupancy_ratio = effective_occupied / float(zone.capacity)
