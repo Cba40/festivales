@@ -398,8 +398,8 @@ class TestDeriveBathroomZoneState:
                 reasoning_factors=[],
             )
             state = derive_bathroom_zone_state(zone, active, base)
-            # SIN EVENTO: occupancy = source_occupied / capacity = 0.3
-            expected_ratio = 0.3
+            # SIN EVENTO: occupancy = v1_occupied / capacity
+            expected_ratio = active.occupied[zone.id] / zone.capacity
             assert state.zone_id == zone.id
             assert state.saturation_level == pytest.approx(expected_ratio)
 
@@ -420,8 +420,8 @@ class TestDeriveBathroomZoneState:
                 reasoning_factors=[],
             )
             state = derive_bathroom_zone_state(zone, active, base)
-            # SIN EVENTO: free = capacity - (capacity * 0.3) = capacity * 0.7
-            expected_free = float(zone.capacity) * 0.7
+            # SIN EVENTO: free = capacity - v1_occupied
+            expected_free = float(zone.capacity) - active.occupied[zone.id]
             assert state.availability == round(expected_free)
 
     def test_model_result_preserves_bathroom_metrics(self) -> None:
@@ -442,14 +442,14 @@ class TestDeriveBathroomZoneState:
         )
         state = derive_bathroom_zone_state(zone, active, base)
         data = state.model_result
-        # SIN EVENTO: occupancy = source/capacity = 0.3, free = capacity * 0.7
-        expected_ratio = 0.3
-        expected_free = float(zone.capacity) * 0.7
+        # SIN EVENTO: occupancy = v1_occupied / capacity, free = capacity - v1_occupied
+        expected_ratio = active.occupied[zone.id] / zone.capacity
+        expected_free = float(zone.capacity) - active.occupied[zone.id]
         assert data["bathroom_id"] == str(zone.id)
         assert data["occupied"] == pytest.approx(active.occupied[zone.id])
         assert data["capacity"] == zone.capacity
         assert data["occupancy_ratio"] == pytest.approx(expected_ratio)
-        assert data["free_ratio"] == pytest.approx(0.7)
+        assert data["free_ratio"] == pytest.approx(1.0 - expected_ratio)
         assert data["free_spaces"] == pytest.approx(expected_free)
         assert data["distance"] == zone.reference_point_distance
         assert data["unabsorbed"] == pytest.approx(active.unabsorbed)

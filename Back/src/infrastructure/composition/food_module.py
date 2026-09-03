@@ -417,9 +417,11 @@ def derive_food_zone_state(
             else:
                 occupancy_ratio = effective_occupied / capacity_efectiva
         else:
-            # SIN EVENTO: usar la lógica original del RFC §10.2
-            # projected_density es la ocupación esperada, capacity es la capacidad real
-            effective_occupied = min(float(zone.capacity), source_occupied)
+            # SIN EVENTO: usar el modelo V1 para ocupación real
+            # v1_occupied representa la ocupación calculada por el modelo
+            # especializado (Ley de Little para baños, flujo vehicular para parking,
+            # stock exponencial para comida)
+            effective_occupied = min(float(zone.capacity), base_occupied)
             effective_free = max(0.0, float(zone.capacity) - effective_occupied)
             occupancy_ratio = effective_occupied / float(zone.capacity)
 

@@ -914,10 +914,9 @@ class TestMergeFoodIntoPrediction:
         for zone in food_zones:
             state = by_id[zone.id]
 
-            # SIN EVENTO: occupancy = source_occupied / capacity = 0.3,
-            # free = capacity * 0.7
-            expected_ratio = 0.3
-            expected_free = float(zone.capacity) * 0.7
+            # SIN EVENTO: occupancy = v1_occupied / capacity, free = capacity - v1_occupied
+            expected_ratio = phase_state.occupied[zone.id] / zone.capacity
+            expected_free = float(zone.capacity) - phase_state.occupied[zone.id]
 
             assert state.saturation_level == pytest.approx(expected_ratio)
             assert state.availability == round(expected_free)
