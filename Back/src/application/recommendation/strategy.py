@@ -146,11 +146,34 @@ class WeightedScoringStrategy:
             free_ratio = 1.0 - zone.saturation_level
             candidates.append((zone, free_ratio))
 
+        print(
+            f"🔍 RECOMMENDATION AUDITORÍA: Evaluando {len(candidates)} zonas candidatas para parking"
+        )
+        for zone, _fr in candidates:
+            print(
+                f"   zone_id={zone.zone_id} saturation={zone.saturation_level:.3f} "
+                f"availability={zone.availability} distance={zone.model_result.get('distance') if zone.model_result else 'N/A'}"
+            )
+
         available = [
             (zone, free_ratio)
             for zone, free_ratio in candidates
             if free_ratio > config.min_availability_threshold
         ]
+        excluded = [
+            (zone, free_ratio)
+            for zone, free_ratio in candidates
+            if free_ratio <= config.min_availability_threshold
+        ]
+        print(
+            f"🔍 THRESHOLD AUDITORÍA: min_availability_threshold={config.min_availability_threshold}"
+        )
+        print(f"   Zonas que pasan el filtro: {len(available)}")
+        print(f"   Zonas excluidas por threshold: {len(excluded)}")
+        for zone, _fr in excluded:
+            print(
+                f"     EXCLUIDA: zone_id={zone.zone_id} saturation={zone.saturation_level:.3f}"
+            )
         available.sort(key=lambda t: (-t[1], str(t[0].zone_id)))
 
         option1 = available[0] if len(available) >= 1 else None
@@ -238,6 +261,11 @@ class WeightedScoringStrategy:
                     is_nearest=True,
                 )
             )
+
+        print(
+            f"🔍 SCORING AUDITORÍA: {len(recommendations)} zonas seleccionadas para parking\n"
+            f"   Top: {[(r.zone_id, round(r.score,3)) for r in recommendations]}"
+        )
 
         return recommendations
 
