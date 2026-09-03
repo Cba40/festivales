@@ -898,6 +898,15 @@ class TestMergeFoodIntoPrediction:
         base = self._base_prediction(food_zones, last_phase_id)
         result = self._food_result(food_zones, last_phase_id)
 
+        # Actualizar base para que tenga projected_density = capacity (sin evento),
+        # reflejando el uso real: projected_density = capacity × density_factor
+        # con density_factor = 1.0 cuando no hay impacto.
+        for zs in base.zone_states:
+            for zone in food_zones:
+                if zs.zone_id == zone.id:
+                    zs._projected_density = zone.capacity
+                    break
+
         merged = merge_food_into_prediction(base, result)
         by_id = {zs.zone_id: zs for zs in merged.zone_states}
 
@@ -905,15 +914,18 @@ class TestMergeFoodIntoPrediction:
         for zone in food_zones:
             state = by_id[zone.id]
             occupied = phase_state.occupied[zone.id]
-            # Lógica híbrida refinada: el base_state de comida no define
-            # projected_density (por defecto 0), por lo que source_occupied = 0 <
-            # base_occupied → reducción de capacidad. capacity_ratio = 0 →
-            # effective_capacity = 0 → la zona queda 100% saturada y sin libres.
-            capacity = float(zone.capacity)
-            capacity_ratio = max(0.0, 0.0 / occupied)
-            effective_capacity = capacity * capacity_ratio
-            assert state.saturation_level == pytest.approx(1.0)
-            assert state.availability == round(0.0)
+
+            # Con projected_density = capacity, la fórmula da:
+            # capacity_efectiva = capacity
+            # effective_occupied = min(capacity, occupied) = occupied
+            # effective_free = capacity - occupied
+            # occupancy_ratio = occupied / capacity
+            expected_occupied = min(float(zone.capacity), float(occupied))
+            expected_free = float(zone.capacity) - expected_occupied
+            expected_ratio = expected_occupied / float(zone.capacity)
+
+            assert state.saturation_level == pytest.approx(expected_ratio)
+            assert state.availability == round(expected_free)
             assert state.model_result is not None
             assert state.model_result["food_id"] == str(zone.id)
             assert state.model_result["subtipo"] == zone.subtipo

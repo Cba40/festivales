@@ -399,31 +399,21 @@ def derive_food_zone_state(
             base_state.projected_density if base_state is not None else base_occupied
         )
 
-        # Lógica híbrida refinada (RFC §10.2 + interpretación semántica):
-        if source_occupied < base_occupied:
-            # Reducción de capacidad: la capacidad efectiva se reduce proporcionalmente
-            # a la caída de la densidad proyectada.
-            if base_occupied > 0:
-                capacity_ratio = max(0.0, source_occupied / base_occupied)
-            else:
-                capacity_ratio = 1.0  # Fallback si no hay ocupación base
+        # Fórmula correcta para comida (RFC §10.2 + modelo de stock exponencial):
+        # projected_density YA incluye el impacto, por lo que representa
+        # la CAPACIDAD EFECTIVA post-impacto (no la ocupación).
+        # La ocupación real viene del V1 (comensales simultáneos).
+        # Disponibilidad = capacidad efectiva - ocupación real.
+        capacity_efectiva = max(0.0, source_occupied)
+        effective_occupied = min(capacity_efectiva, base_occupied)
+        effective_free = max(0.0, capacity_efectiva - effective_occupied)
 
-            effective_capacity = float(zone.capacity) * capacity_ratio
-            effective_occupied = min(effective_capacity, base_occupied)
-            effective_free = max(0.0, effective_capacity - effective_occupied)
-
-            # Si la capacidad efectiva es 0, la saturación es 100% (zona cerrada)
-            if effective_capacity == 0.0:
-                occupancy_ratio = 1.0
-            else:
-                occupancy_ratio = effective_occupied / float(zone.capacity)
+        if capacity_efectiva == 0.0:
+            occupancy_ratio = 1.0  # Zona cerrada (reducción 100%)
         else:
-            # Aumento de demanda (o sin impacto): la ocupación aumenta, capacidad se mantiene
-            effective_occupied = min(float(zone.capacity), source_occupied)
-            effective_free = max(0.0, float(zone.capacity) - effective_occupied)
-            occupancy_ratio = effective_occupied / float(zone.capacity)
+            occupancy_ratio = effective_occupied / capacity_efectiva
 
-        free_ratio = effective_free / float(zone.capacity)
+        free_ratio = effective_free / capacity_efectiva if capacity_efectiva > 0 else 0.0
         free_spaces = effective_free
 
     print(
