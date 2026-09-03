@@ -429,6 +429,33 @@ class FoodV1Model:
                 d_effective,
             )
             occupied = self.distribute(prev_occupied, zones, temporal.stock)
+            max_zone_occ = max(occupied.values()) if occupied else 0.0
+            max_zone_cap = max((z.capacity for z in zones), default=1)
+            print(
+                f"🔍 FOOD V1 AUDITORÍA (fase {index}): "
+                f"horario={phase.start_min}-{phase.end_min}min "
+                f"intensity={intensity} "
+                f"max_people={max_people} "
+                f"p_expected(llegadas)={expected:.0f} "
+                f"service_capacity(fase)={service_capacity:.0f} "
+                f"D_eff_h={d_effective:.3f} "
+                f"Δh={delta_hours:.2f}"
+            )
+            print(
+                f"   r(retention)={temporal.retention:.3f} "
+                f"remain={temporal.remain:.0f} "
+                f"entries={temporal.entries:.0f} "
+                f"contribution={temporal.contribution:.0f} "
+                f"stock_sistema(Ot)={temporal.stock:.0f} "
+                f"max_zone_occ={max_zone_occ:.0f}/{max_zone_cap} "
+                f"({max_zone_occ/max_zone_cap*100:.0f}%)"
+            )
+            for z in zones:
+                occ = occupied.get(z.id, 0.0)
+                print(
+                    f"     ZONA {z.name}: occ={occ:.0f}/{z.capacity} "
+                    f"({occ/z.capacity*100:.1f}%)"
+                )
             results.append(
                 FoodPhaseState(
                     index=index,
