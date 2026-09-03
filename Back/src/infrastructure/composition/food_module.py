@@ -383,44 +383,45 @@ def derive_food_zone_state(
     # los índices expuestos al usuario se derivan desde `projected_density`
     # (mismas unidades que capacity) en lugar de `occupied` del V1. La
     # `occupied` del V1 se conserva en `model_result` como métrica del modelo.
+    # ===== INICIALIZACIÓN DE VARIABLES (siempre definidas) =====
+    # Valores por defecto para el caso CLOSED (se sobrescriben en el else)
+    capacity_efectiva = 0.0
+    effective_occupied = float(zone.capacity)
+    effective_free = 0.0
+    occupancy_ratio = 1.0
+    free_ratio = 0.0
+    free_spaces = 0.0
+    source_occupied = float(zone.capacity)
+    base_occupied = float(occupied)
+
     is_closed = (
         base_state is not None
         and base_state.operational_state == "CLOSED"
     )
-    if is_closed:
-        occupancy_ratio = 1.0
-        free_ratio = 0.0
-        effective_free = 0.0
-        source_occupied = float(zone.capacity)
-        free_spaces = 0.0
-    else:
+
+    has_event = (
+        base_state is not None
+        and any("Impacto de evento operativo" in f for f in base_state.reasoning_factors)
+    )
+
+    if not is_closed:
         base_occupied = float(occupied)
         source_occupied = float(
             base_state.projected_density if base_state is not None else base_occupied
         )
 
-        # Detectar si hay un evento imprevisto activo
-        has_event = (
-            base_state is not None
-            and any("Impacto de evento operativo" in f for f in base_state.reasoning_factors)
-        )
-
         if has_event:
             # CON EVENTO: usar projected_density como capacidad efectiva
-            # (el impacto ya redujo/aumentó la densidad proyectada)
             capacity_efectiva = max(0.0, source_occupied)
             effective_occupied = min(capacity_efectiva, base_occupied)
             effective_free = max(0.0, capacity_efectiva - effective_occupied)
 
             if capacity_efectiva == 0.0:
-                occupancy_ratio = 1.0  # Zona cerrada
+                occupancy_ratio = 1.0
             else:
                 occupancy_ratio = effective_occupied / capacity_efectiva
         else:
             # SIN EVENTO: usar el modelo V1 para ocupación real
-            # v1_occupied representa la ocupación calculada por el modelo
-            # especializado (Ley de Little para baños, flujo vehicular para parking,
-            # stock exponencial para comida)
             effective_occupied = min(float(zone.capacity), base_occupied)
             effective_free = max(0.0, float(zone.capacity) - effective_occupied)
             occupancy_ratio = effective_occupied / float(zone.capacity)
@@ -428,16 +429,14 @@ def derive_food_zone_state(
         free_ratio = effective_free / float(zone.capacity)
         free_spaces = effective_free
 
-    print(
-        f"🔍 FOOD: zone={zone.name} cap={zone.capacity} "
-        f"v1_occupied={occupied:.1f} "
-        f"projected_density={base_state.projected_density if base_state else 'None'} "
-        f"source_occupied={source_occupied:.1f} "
-        f"has_event={has_event} "
-        f"effective_occupied={effective_occupied:.1f} "
-        f"effective_free={effective_free:.1f} "
-        f"occupancy_ratio={occupancy_ratio:.3f}"
-    )
+    # ===== LOGS DE AUDITORÍA (todas las variables garantizadas) =====
+    print(f"🔍 FOOD AUDITORÍA: zone={zone.name} id={zone.id}")
+    print(f"   capacity={zone.capacity} v1_occupied={occupied:.1f}")
+    print(f"   projected_density={base_state.projected_density if base_state else 'None'}")
+    print(f"   has_event={has_event} is_closed={is_closed}")
+    print(f"   capacity_efectiva={capacity_efectiva:.1f}")
+    print(f"   effective_occupied={effective_occupied:.1f} effective_free={effective_free:.1f}")
+    print(f"   occupancy_ratio={occupancy_ratio:.3f} free_ratio={free_ratio:.3f}")
 
     metrics = {
         "food_id": str(zone.id),
