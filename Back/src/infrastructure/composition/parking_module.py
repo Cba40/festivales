@@ -345,11 +345,14 @@ def derive_parking_zone_state(
         free_spaces = effective_free
 
     print(
-        f"🔍 HÍBRIDO parking zone={zone.id} is_closed={is_closed} "
-        f"occupied={occupied:.1f} base_occupied={base_occupied if not is_closed else 0.0:.1f} "
-        f"source_occupied={source_occupied:.1f} capacity={zone.capacity} "
-        f"effective_free={effective_free:.1f} occupancy_ratio={occupancy_ratio:.3f} "
-        f"free_spaces={free_spaces:.1f}"
+        f"🔍 PARKING: zone={zone.name} cap={zone.capacity} "
+        f"v1_occupied={occupied:.1f} "
+        f"projected_density={base_state.projected_density if base_state else 'None'} "
+        f"source_occupied={source_occupied:.1f} "
+        f"has_event={has_event} "
+        f"effective_occupied={effective_occupied:.1f} "
+        f"effective_free={effective_free:.1f} "
+        f"occupancy_ratio={occupancy_ratio:.3f}"
     )
 
     metrics = {
