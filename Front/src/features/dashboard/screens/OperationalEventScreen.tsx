@@ -655,6 +655,27 @@ export function OperationalEventScreen() {
     [events],
   );
 
+  useEffect(() => {
+    if (!events.length) return;
+    const syncExpired = async () => {
+      const now = Date.now();
+      const expired = events.filter(
+        (e) => e.is_active && new Date(e.end_timestamp).getTime() < now,
+      );
+      for (const ev of expired) {
+        try {
+          await apiClient.patch(endpoints.operationalEvents.deactivate(ev.id));
+        } catch {
+          /* ignore — will retry next cycle */
+        }
+      }
+      if (expired.length) refresh();
+    };
+    syncExpired();
+    const id = setInterval(syncExpired, 60_000);
+    return () => clearInterval(id);
+  }, [events, refresh]);
+
   const handleSave = useCallback(
     async (payload: OperationalEventCreatePayload | OperationalEventUpdatePayload) => {
       let result;

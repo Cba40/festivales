@@ -25,7 +25,7 @@ from datetime import date, datetime
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.event_day import EventDay as EventDayORM
@@ -144,9 +144,26 @@ class OperationalEventAdapter(OperationalEventRepository):
             print(f"  📌 ROW: id={r.id}, zone_id={r.zone_id}, effect={r.effect_type}, value={r.effect_value}")
             print(f"     start={r.start_timestamp} (tzinfo={getattr(r.start_timestamp, 'tzinfo', 'NAIVE')})")
             print(f"     end={r.end_timestamp} (tzinfo={getattr(r.end_timestamp, 'tzinfo', 'NAIVE')})")
-        
+
         if not rows:
             return []
+
+        stale_result = await self._db.execute(
+            select(OperationalEventORM.id).where(
+                OperationalEventORM.is_active.is_(True),
+                OperationalEventORM.end_timestamp <= timestamp,
+            )
+        )
+        expired_ids = [r for (r,) in stale_result.all()]
+        if expired_ids:
+            await self._db.execute(
+                update(OperationalEventORM)
+                .where(OperationalEventORM.id.in_(expired_ids))
+                .values(is_active=False)
+            )
+            await self._db.commit()
+            print(f"🔍 AUTO-EXPIRACIÓN: {len(expired_ids)} eventos actualizados a is_active=False")
+
         return await self._build_domain_events(rows, timestamp)
 
     async def save(self, event: OperationalEvent) -> OperationalEvent:

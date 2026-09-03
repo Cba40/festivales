@@ -310,7 +310,7 @@ class TestDeactivate:
         assert verificado.status_code == 200
         assert verificado.json()["is_active"] is False
 
-    async def test_deactivate_rejects_expired_event(self, oe_env) -> None:
+    async def test_deactivate_expired_event_succeeds(self, oe_env) -> None:
         creado = await _crear(oe_env, {
             "start_timestamp": PAST_START,
             "end_timestamp": PAST_END,
@@ -319,7 +319,12 @@ class TestDeactivate:
             f"/api/operational-events/{creado['id']}/deactivate",
             headers=_auth_headers(),
         )
-        assert response.status_code == 400
+        assert response.status_code == 204
+        verificado = await oe_env.client.get(
+            f"/api/operational-events/{creado['id']}", headers=_auth_headers(),
+        )
+        assert verificado.status_code == 200
+        assert verificado.json()["is_active"] is False
 
 
 class TestDelete:

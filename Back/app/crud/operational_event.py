@@ -114,12 +114,6 @@ async def deactivate(db: AsyncSession, event_id: UUID) -> OperationalEvent:
             status_code=status.HTTP_404_NOT_FOUND,
             detail="OperationalEvent not found",
         )
-    if _is_expired(db_obj, _now()):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot deactivate expired event",
-        )
-
     db_obj.is_active = False
     db_obj.updated_at = _now()
 
