@@ -305,6 +305,14 @@ def derive_parking_zone_state(
         base_state is not None
         and base_state.operational_state == "CLOSED"
     )
+
+    # Definir has_event ANTES de cualquier print que lo use (asegura que
+    # siempre exista, incluso en el camino is_closed).
+    has_event = (
+        base_state is not None
+        and any("Impacto de evento operativo" in f for f in base_state.reasoning_factors)
+    )
+
     if is_closed:
         occupancy_ratio = 1.0
         free_ratio = 0.0
@@ -315,12 +323,6 @@ def derive_parking_zone_state(
         base_occupied = float(occupied)
         source_occupied = float(
             base_state.projected_density if base_state is not None else base_occupied
-        )
-
-        # Detectar si hay un evento imprevisto activo
-        has_event = (
-            base_state is not None
-            and any("Impacto de evento operativo" in f for f in base_state.reasoning_factors)
         )
 
         if has_event:
