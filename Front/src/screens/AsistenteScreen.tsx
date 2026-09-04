@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { 
   UtensilsCrossed, Car, Bath, Armchair, Trees, 
-  Send, Trash2, AlertTriangle, Bus, LogOut, Info, RefreshCw, Compass
+  Send, Trash2, AlertTriangle, Bus, LogOut, Info, Compass
 } from 'lucide-react';
 import { useAppStore } from '@/core/state/store';
 import axios from 'axios';
@@ -69,10 +69,10 @@ const AsistenteScreen = () => {
           }))
         );
       } catch (e) {
-        initializeGreeting(wasFallback);
+        initializeGreeting();
       }
     } else {
-      initializeGreeting(wasFallback);
+      initializeGreeting();
     }
   }, []);
 
@@ -88,10 +88,8 @@ const AsistenteScreen = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
-  const initializeGreeting = (isFallbackMode: boolean) => {
-    const greetingText = isFallbackMode
-      ? '¡Hola! Soy CBAi, tu asistente de pruebas (cba-4-0). Estoy listo para ayudarte con consultas generales sobre nuestros servicios. ¿En qué te puedo ayudar hoy?'
-      : '¡Hola! Soy CBAi, el asistente virtual del Festival de Jesús María 2026. Te puedo ayudar a encontrar estacionamientos, baños, paradas de transporte, lugares para comer, salidas y hospedajes del festival. ¿En qué te puedo ayudar?';
+  const initializeGreeting = () => {
+    const greetingText = '¡Hola! Soy CBAi, el asistente virtual del Festival de Jesús María 2026. Te puedo ayudar a encontrar estacionamientos, baños, paradas de transporte, lugares para comer, salidas y hospedajes del festival. ¿En qué te puedo ayudar?';
 
     setMessages([
       {
@@ -105,7 +103,7 @@ const AsistenteScreen = () => {
 
   const handleClearChat = () => {
     localStorage.removeItem(STORAGE_KEY);
-    initializeGreeting(usingFallback);
+    initializeGreeting();
   };
 
   const sendMessageToBot = async (textToSend: string, forceFallback = false) => {
@@ -161,7 +159,7 @@ const AsistenteScreen = () => {
         const systemNotice: Message = {
           id: 'sys-' + Math.random().toString(36).substring(2, 11),
           role: 'bot',
-          text: '⚠️ El tenant "festival-jesus-maria" no se encuentra activo en producción. Redirigiendo la consulta automáticamente al asistente de pruebas (cba-4-0)...',
+          text: '⚠️ El tenant "festival-jesus-maria" no se encuentra activo en producción. Redirigiendo la consulta automáticamente al asistente de respaldo...',
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, systemNotice]);
@@ -247,29 +245,6 @@ const AsistenteScreen = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col h-screen overflow-hidden">
       <Header title="Asistente rápido" showBack onBack={() => navigate('/')} />
-
-      {/* Alerta de fallback activa para testing local/desarrollo */}
-      {usingFallback && (
-        <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-xs text-amber-700 dark:text-amber-400 flex items-center justify-between gap-3 shadow-inner">
-          <div className="flex items-center gap-2">
-            <AlertTriangle size={14} className="flex-shrink-0 text-amber-500" />
-            <span className="font-medium leading-tight">
-              Modo Test: Usando mente de pruebas (cba-4-0). Ejecuta el sembrado en producción para activar la mente del festival.
-            </span>
-          </div>
-          <button 
-            onClick={() => {
-              setUsingFallback(false);
-              localStorage.removeItem(FALLBACK_KEY);
-              handleClearChat();
-            }}
-            className="flex items-center gap-1 bg-amber-500/20 hover:bg-amber-500/30 px-2 py-1 rounded-md text-[10px] uppercase font-bold tracking-wider transition-colors"
-            title="Reintentar tenant original"
-          >
-            <RefreshCw size={10} /> Reintentar
-          </button>
-        </div>
-      )}
 
       {/* Indicador de estado de ubicación GPS */}
       {userLocation && (

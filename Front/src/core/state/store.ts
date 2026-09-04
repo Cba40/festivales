@@ -78,23 +78,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   })(),
   locationPermissionDenied: false,
 
-  // Inicializar con un baño random por defecto para pruebas de mapa offline
-  zones: [
-    {
-      id: 'svc-b-random',
-      name: 'Baño Random de Prueba',
-      type: 'servicios',
-      subtipo: 'banos',
-      lat: -30.976,
-      lng: -64.090,
-      referencia: 'Al lado del escenario principal',
-      distancia_min: 3,
-      capacity: 10,
-      availableCapacity: 10,
-      saturation: 'bajo',
-      status: 'activa'
-    }
-  ],
+  // Inicializar con zonas vacías; el backend las puebla dinámicamente
+  zones: [],
   // Zone mutations
   setZones: (zones) => set({ zones }),
 

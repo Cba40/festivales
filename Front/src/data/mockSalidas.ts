@@ -1,7 +1,7 @@
-import { getModo, getUmbralContexto, type Estado } from '@/utils/decisionEngine'
+import { getModo, getUmbralContexto } from '@/utils/decisionEngine'
 import { calcularScore } from '@/utils/decisionEngine'
 import { getHoraEvento } from '@/utils/contextoEvento'
-import { type ZonaSalida } from '@/data/eventoData'
+import { type ZonaSalida } from '@/data/mappers'
 
 
 const CONGESTION_PENALIZATION = {
@@ -10,83 +10,6 @@ const CONGESTION_PENALIZATION = {
   alto: 4,
   colapsado: 6
 }
-
-const now = Date.now()
-
-export const zonasSalida: ZonaSalida[] = [
-  {
-    id: 'salida-norte',
-    nombre: 'Salida Norte',
-    tipo: 'salida' as const,
-    transporte: 'auto' as const,
-    lat: -30.973313,
-    lng: -64.088529,
-    referencia: 'Terminal de Ómnibus',
-    distancia_min: 6,
-    estado: 'medio' as const,
-    capacidad_estimada: 200,
-    espera_min: 3,
-    updatedAt: now - 2 * 60000
-  },
-  {
-    id: 'salida-sur',
-    nombre: 'Salida Sur',
-    tipo: 'salida' as const,
-    transporte: 'transporte' as const,
-    lat: -30.985337,
-    lng: -64.094209,
-    referencia: 'Predio Ferial',
-    distancia_min: 10,
-    estado: 'bajo' as const,
-    capacidad_estimada: 500,
-    espera_min: 2,
-    updatedAt: now - 2 * 60000
-  },
-  {
-    id: 'salida-este',
-    nombre: 'Salida Este',
-    tipo: 'salida' as const,
-    transporte: 'peatonal' as const,
-    lat: -30.981249,
-    lng: -64.075000,
-    referencia: 'Av. Colón y Costanera',
-    distancia_min: 8,
-    estado: 'bajo' as const,
-    capacidad_estimada: 300,
-    es_embudo: false,
-    espera_min: 1,
-    updatedAt: now - 2 * 60000
-  },
-  {
-    id: 'salida-oeste',
-    nombre: 'Salida Oeste',
-    tipo: 'salida' as const,
-    transporte: 'auto' as const,
-    lat: -30.981249,
-    lng: -64.099398,
-    referencia: 'Parque Autódromo',
-    distancia_min: 12,
-    estado: 'alto' as const,
-    capacidad_estimada: 150,
-    espera_min: 5,
-    updatedAt: now - 2 * 60000
-  },
-  {
-    id: 'salida-centro',
-    nombre: 'Salida Centro',
-    tipo: 'salida' as const,
-    transporte: 'peatonal' as const,
-    lat: -30.978107,
-    lng: -64.094779,
-    referencia: 'Plaza Principal / Iglesia',
-    distancia_min: 3,
-    estado: 'colapsado' as const,
-    capacidad_estimada: 100,
-    es_embudo: true,
-    espera_min: 0,
-    updatedAt: now - 2 * 60000
-  }
-]
 
 export const calcularScoreSalida = (
   zona: ZonaSalida,
@@ -178,55 +101,4 @@ export const getModoSalida = (zonas: ZonaSalida[], tipo: 'auto' | 'transporte' |
   }
 
   return modoCalculado
-}
-
-// ============================================
-// ⚠️ SOLO PARA TESTING FASE 3A — BORRAR DESPUÉS
-// ============================================
-export const escenariosTestSalida = {
-  medio: [
-    {
-      id: 'test-1',
-      nombre: 'Salida Test Medio',
-      tipo: 'auto' as const,
-      estado: 'medio' as const,
-      distancia_min: 8,
-      espera_estimada_min: 5,
-      referencia: 'Test',
-      lat: -30.9785,
-      lng: -64.0950,
-      timestamp: 'test',
-      updatedAt: Date.now()
-    }
-  ],
-  alto: [
-    {
-      id: 'test-2',
-      nombre: 'Salida Test Alto',
-      tipo: 'auto' as const,
-      estado: 'alto' as const,
-      distancia_min: 10,
-      espera_estimada_min: 8,
-      referencia: 'Test',
-      lat: -30.9785,
-      lng: -64.0950,
-      timestamp: 'test',
-      updatedAt: Date.now()
-    }
-  ],
-  colapsado: [
-    {
-      id: 'test-3',
-      nombre: 'Salida Test Colapsado',
-      tipo: 'auto' as const,
-      estado: 'colapsado' as const,
-      distancia_min: 12,
-      espera_estimada_min: 15,
-      referencia: 'Test',
-      lat: -30.9785,
-      lng: -64.0950,
-      timestamp: 'test',
-      updatedAt: Date.now()
-    }
-  ]
 }

@@ -1,8 +1,5 @@
-import { eventoData } from '@/data/eventoData'
 import type { ZonaEstacionamiento, ZonaSalida } from './mappers'
-import { mapZonesToEstacionamiento, mapZonesToSalidas } from './mappers'
 import { getSalidasOrdenadas } from './mockSalidas'
-import { getZonasOrdenadas } from './mockZones'
 import { getHoraEvento } from '@/utils/contextoEvento'
 import { getFaseActual } from '@/utils/fases'
 import { getEventoConfig, fases as getFases } from '@/config/eventoConfig'
@@ -31,32 +28,53 @@ export interface ResultadoInferencia {
   }
 }
 
+const calcularScoreEstacionamiento = (z: ZonaEstacionamiento): number => {
+  const penalizacionEstado = {
+    bajo: 0,
+    medio: 5,
+    alto: 15,
+    colapsado: 30
+  }
+
+  return (
+    z.distancia_min * 1.5 +
+    (100 - z.disponibilidad) * 1.0 +
+    penalizacionEstado[z.estado]
+  )
+}
+
+const getZonasOrdenadas = (zonas: ZonaEstacionamiento[]) => {
+  return [...zonas].sort(
+    (a, b) => calcularScoreEstacionamiento(a) - calcularScoreEstacionamiento(b)
+  )
+}
+
 const getZonaConMejorScore = (zonas?: ZonaEstacionamiento[]) => {
-  const data = zonas ?? eventoData.estacionamiento
+  const data = zonas ?? []
   const ordenadas = getZonasOrdenadas(data)
   return ordenadas.find(z => z.estado !== 'colapsado')
 }
 
 const getZonaAlternativa = (zonas?: ZonaEstacionamiento[]) => {
-  const data = zonas ?? eventoData.estacionamiento
+  const data = zonas ?? []
   const ordenadas = getZonasOrdenadas(data).filter(z => z.estado !== 'colapsado')
   return ordenadas[1]
 }
 
 const getSalidaConMenorCongestion = (salidas?: ZonaSalida[]) => {
-  const data = salidas ?? eventoData.salidas
+  const data = salidas ?? []
   const ordenadas = getSalidasOrdenadas(data, 'auto')
   return ordenadas.find(z => z.estado !== 'colapsado')
 }
 
 const getSalidaAlternativa = (salidas?: ZonaSalida[]) => {
-  const data = salidas ?? eventoData.salidas
+  const data = salidas ?? []
   const ordenadas = getSalidasOrdenadas(data, 'auto').filter(z => z.estado !== 'colapsado')
   return ordenadas[1]
 }
 
 const getZonaLejana = (zonas?: ZonaEstacionamiento[]) => {
-  const data = zonas ?? eventoData.estacionamiento
+  const data = zonas ?? []
   const ordenadas = getZonasOrdenadas(data)
   return ordenadas[ordenadas.length - 1]
 }
