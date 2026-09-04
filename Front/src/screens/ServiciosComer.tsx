@@ -224,7 +224,7 @@ const ServiciosComer = () => {
   }
 
   const listaRestante =
-    modo === 'guiar' || modo === 'asistir' ? zonas.slice(4) : zonas.slice(1)
+    modo === 'guiar' || modo === 'asistir' ? zonas.slice(4) : zonas
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">

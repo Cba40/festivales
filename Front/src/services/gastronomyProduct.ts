@@ -47,7 +47,7 @@ export function useGastronomyRecommendations() {
       const params = {
         speed: 1.5,
         accessibility_required: false,
-        limit: 4,
+        limit: 6,
         current_zone_id: currentZoneId || undefined,
         user_id: '00000000-0000-0000-0000-000000000000',
         access_level: 'STANDARD',
