@@ -146,17 +146,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     const distance = Math.sqrt(dLat * dLat + dLng * dLng)
 
     if (distance < 50) {
-      console.log("🔍 REAL-TIME UPDATE: movimiento <50m, ignorado")
-      console.log("   currentPosition:", coords);
-      console.log("   prevPosition:", prev);
-      console.log("   distanceM:", Math.round(distance));
       return
     }
 
-    console.log("🔍 REAL-TIME UPDATE: movimiento >=50m, actualizando")
-    console.log("   currentPosition:", coords);
-    console.log("   prevPosition:", prev);
-    console.log("   distanceM:", Math.round(distance));
     set({ userLocation: coords })
     localStorage.setItem('last_location', JSON.stringify(coords))
   },
@@ -171,15 +163,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const loc: [number, number] = [pos.coords.latitude, pos.coords.longitude];
-          console.log("🔍 GEOLOCATION HOOK:")
-          console.log("   userPosition:", loc);
-          console.log("   accuracy:", pos.coords.accuracy);
           set({ locationPermissionDenied: false });
           get().setUserLocation(loc);
           resolve(true);
         },
         (err) => {
-          console.log("🔍 GEOLOCATION HOOK: error", err.code, err.message);
           if (err.code === err.PERMISSION_DENIED) {
             set({ locationPermissionDenied: true });
           }

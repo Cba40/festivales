@@ -1,7 +1,6 @@
 """Tests for the corrections applied after the implementation audit."""
 from __future__ import annotations
 
-import logging
 from datetime import datetime
 from unittest.mock import AsyncMock, patch
 from uuid import UUID
@@ -220,10 +219,11 @@ class TestReasoning:
 
 
 class TestMissingSaturationLevel:
-    def test_zone_without_saturation_logs_warning_and_is_excluded(
+    def test_zone_without_saturation_uses_proxy_ratio_and_is_included(
         self,
-        caplog: pytest.LogCaptureFixture,
     ) -> None:
+        # P3.0 §5.4: sin saturation_level el servicio usa el proxy de
+        # disponibilidad en lugar de excluir la zona.
         a = _parking_zone("a0000000-0000-0000-0000-000000000001", 0.3)
         b = _parking_zone("b0000000-0000-0000-0000-000000000002", None)
         coords = _coords(
@@ -231,13 +231,10 @@ class TestMissingSaturationLevel:
             ("b0000000-0000-0000-0000-000000000002", 0.02),
         )
 
-        with caplog.at_level(logging.WARNING):
-            result = _evaluate([a, b], coords)
+        result = _evaluate([a, b], coords)
 
-        assert len(result) == 1
-        assert result[0].zone_id == UUID("a0000000-0000-0000-0000-000000000001")
-        assert any(
-            "saturation_level" in record.message
-            and record.levelname == "WARNING"
-            for record in caplog.records
-        )
+        assert len(result) == 2
+        assert {r.zone_id for r in result} == {
+            UUID("a0000000-0000-0000-0000-000000000001"),
+            UUID("b0000000-0000-0000-0000-000000000002"),
+        }

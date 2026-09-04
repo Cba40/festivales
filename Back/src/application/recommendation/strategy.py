@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import math
 from collections.abc import Mapping
 from typing import Protocol, runtime_checkable
@@ -16,8 +15,6 @@ from src.domain.value_objects.territorial_prediction import TerritorialPredictio
 from src.domain.value_objects.zone_state import ZoneState
 
 PARKING_TYPE = "estacionamiento"
-
-logger = logging.getLogger(__name__)
 
 
 @runtime_checkable
