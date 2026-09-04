@@ -137,13 +137,27 @@ class WeightedScoringStrategy:
     ) -> list[ZoneRecommendation]:
         candidates: list[tuple[ZoneState, float]] = []
         for zone in viable_zones:
-            if zone.saturation_level is None:
-                logger.warning(
-                    "Zona de estacionamiento %s excluida: saturation_level ausente",
-                    zone.zone_id,
+            if zone.saturation_level is not None:
+                free_ratio = 1.0 - zone.saturation_level
+            else:
+                # P3.0 §5.4: sin señal de saturación (modelo especializado), usar
+                # projected_density como proxy de densidad. Genérico: vale para
+                # comida, hidratación, descanso, etc. `capacity` no vive en
+                # ZoneState, se intenta desde model_result; si no se puede
+                # computar el proxy, se asume zona operativa (free_ratio=0.9).
+                capacity = (
+                    zone.model_result.get("capacity")
+                    if zone.model_result is not None
+                    else None
                 )
-                continue
-            free_ratio = 1.0 - zone.saturation_level
+                if (
+                    zone.projected_density is not None
+                    and capacity
+                    and capacity > 0
+                ):
+                    free_ratio = 1.0 - min(zone.projected_density / capacity, 1.0)
+                else:
+                    free_ratio = 0.9
             candidates.append((zone, free_ratio))
 
         print(
@@ -151,10 +165,9 @@ class WeightedScoringStrategy:
         )
         for zone, _fr in candidates:
             print(
-                f"   zone_id={zone.zone_id} saturation={zone.saturation_level:.3f} "
+                f"   zone_id={zone.zone_id} saturation={zone.saturation_level!r} "
                 f"availability={zone.availability} distance_ref={zone.model_result.get('distance') if zone.model_result else 'N/A'}"
             )
-
         available = [
             (zone, free_ratio)
             for zone, free_ratio in candidates
@@ -172,7 +185,7 @@ class WeightedScoringStrategy:
         print(f"   Zonas excluidas por threshold: {len(excluded)}")
         for zone, _fr in excluded:
             print(
-                f"     EXCLUIDA: zone_id={zone.zone_id} saturation={zone.saturation_level:.3f}"
+                f"     EXCLUIDA: zone_id={zone.zone_id} saturation={zone.saturation_level!r}"
             )
 
         has_user_gps = (
