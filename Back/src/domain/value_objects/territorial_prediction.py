@@ -14,11 +14,13 @@ class TerritorialPrediction:
         zone_states: Sequence[ZoneState],
         active_phase_id: UUID,
         active_event_day_phase_id: UUID,
+        event_day_id: UUID | None = None,
     ) -> None:
         self._timestamp = timestamp
         self._zone_states = list(zone_states)
         self._active_phase_id = active_phase_id
         self._active_event_day_phase_id = active_event_day_phase_id
+        self._event_day_id = event_day_id
 
     @property
     def timestamp(self) -> datetime:
@@ -36,11 +38,16 @@ class TerritorialPrediction:
     def active_event_day_phase_id(self) -> UUID:
         return self._active_event_day_phase_id
 
+    @property
+    def event_day_id(self) -> UUID | None:
+        return self._event_day_id
+
     def __repr__(self) -> str:
         return (
             f"TerritorialPrediction("
             f"timestamp={self._timestamp!r}, "
             f"zone_states_count={len(self._zone_states)}, "
             f"active_phase_id={self._active_phase_id!r}, "
-            f"active_event_day_phase_id={self._active_event_day_phase_id!r})"
+            f"active_event_day_phase_id={self._active_event_day_phase_id!r}, "
+            f"event_day_id={self._event_day_id!r})"
         )

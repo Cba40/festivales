@@ -436,4 +436,5 @@ def merge_bathroom_into_prediction(
         zone_states=combined_states,
         active_phase_id=prediction.active_phase_id,
         active_event_day_phase_id=prediction.active_event_day_phase_id,
+        event_day_id=prediction.event_day_id,
     )

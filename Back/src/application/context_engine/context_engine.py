@@ -95,6 +95,7 @@ class ContextEngine:
             active_operational_phase,
             active_event_day_phase,
             timestamp,
+            event_day_id=event_day.id,
         )
 
         return prediction

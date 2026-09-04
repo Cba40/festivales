@@ -36,10 +36,7 @@ from src.domain.entities.event_day_phase import EventDayPhase
 from src.domain.entities.operational_phase import OperationalPhase
 from src.domain.entities.zone import Zone
 from src.domain.entities.zone_behavior import FlowRestriction, ZoneBehavior
-from src.domain.ports import (
-    EventDayRepository,
-    PredictionRepository,
-)
+from src.domain.ports import EventDayRepository
 from src.domain.recommendation.mobility_context import MobilityContext
 from src.domain.recommendation.requested_action import RequestedAction
 from src.domain.recommendation.user_context import UserContext
@@ -60,6 +57,7 @@ from src.infrastructure.composition.adapters.operational_event_adapter import (
     OperationalEventAdapter,
 )
 from src.infrastructure.composition.prediction_module import _resolve_zone_type_id
+from src.infrastructure.persistence.repositories import SQLPredictionRepository
 
 
 # ---------------------------------------------------------------------------
@@ -316,20 +314,6 @@ class _PreloadedEventDayRepository(EventDayRepository):
         return None
 
 
-class _CapturePredictionRepository(PredictionRepository):
-    def __init__(self) -> None:
-        self.saved_prediction: TerritorialPrediction | None = None
-
-    async def save(self, prediction: TerritorialPrediction) -> TerritorialPrediction:
-        self.saved_prediction = prediction
-        return prediction
-
-    async def find_by_timestamp(
-        self, timestamp: datetime,
-    ) -> TerritorialPrediction | None:
-        return None
-
-
 # ---------------------------------------------------------------------------
 # Public composition root
 # ---------------------------------------------------------------------------
@@ -442,7 +426,7 @@ class RecommendationModule:
         engine = ContextEngine()
         event_day_repo = _PreloadedEventDayRepository(event_day)
         event_repo = OperationalEventAdapter(self._db)
-        prediction_repo = _CapturePredictionRepository()
+        prediction_repo = SQLPredictionRepository(self._db)
 
         generate_prediction = GeneratePrediction(
             engine=engine,

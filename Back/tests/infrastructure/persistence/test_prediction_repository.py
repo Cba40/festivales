@@ -17,6 +17,7 @@ C_UUID = UUID("33333333-3333-3333-3333-333333333333")
 
 def _make_prediction(
     timestamp: datetime | None = None,
+    event_day_id: UUID | None = None,
 ) -> TerritorialPrediction:
     zone_states = [
         ZoneState(
@@ -45,15 +46,18 @@ def _make_prediction(
         zone_states=zone_states,
         active_phase_id=C_UUID,
         active_event_day_phase_id=A_UUID,
+        event_day_id=event_day_id,
     )
 
 
 def _make_prediction_model(
     timestamp: datetime | None = None,
+    event_day_id: str = "11111111-1111-1111-1111-111111111111",
 ) -> PredictionModel:
     model = PredictionModel(
         id=uuid4(),
         timestamp=timestamp or datetime(2026, 7, 10, 10, 0, 0),
+        event_day_id=event_day_id,
         active_phase_id=C_UUID,
         active_event_day_phase_id=A_UUID,
         zone_states_data=[
@@ -113,18 +117,19 @@ class TestSQLPredictionRepositorySave:
         assert isinstance(result, TerritorialPrediction)
         assert isinstance(result.zone_states[0], ZoneState)
 
-    async def test_save_never_calls_commit(self) -> None:
+    async def test_save_calls_commit(self) -> None:
         session = AsyncMock()
         session.add = MagicMock()
         session.flush = AsyncMock()
         session.refresh = AsyncMock()
+        session.commit = AsyncMock()
 
         prediction = _make_prediction()
         repo = SQLPredictionRepository(session)
 
         await repo.save(prediction)
 
-        session.commit.assert_not_called()
+        session.commit.assert_awaited_once()
 
     async def test_save_never_calls_rollback(self) -> None:
         session = AsyncMock()

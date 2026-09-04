@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,6 +26,7 @@ class SQLPredictionRepository(PredictionRepository):
         model = prediction_to_model(prediction)
         self._session.add(model)
         await self._session.flush()
+        await self._session.commit()
         await self._session.refresh(model)
         return prediction_to_domain(model)
 
@@ -41,3 +43,16 @@ class SQLPredictionRepository(PredictionRepository):
         if model is None:
             return None
         return prediction_to_domain(model)
+
+    async def find_by_event_day(
+        self,
+        event_day_id: UUID,
+    ) -> list[TerritorialPrediction]:
+        stmt = (
+            select(PredictionModel)
+            .where(PredictionModel.event_day_id == str(event_day_id))
+            .order_by(PredictionModel.timestamp)
+        )
+        result = await self._session.execute(stmt)
+        models = result.scalars().all()
+        return [prediction_to_domain(model) for model in models]

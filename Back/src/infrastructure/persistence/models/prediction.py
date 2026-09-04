@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import JSON, UniqueConstraint, func
+from sqlalchemy import JSON, ForeignKey, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.infrastructure.db.base import Base
@@ -14,6 +14,9 @@ class PredictionModel(Base):
 
     id: Mapped[UUID] = mapped_column(primary_key=True, server_default=func.gen_random_uuid())
     timestamp: Mapped[datetime] = mapped_column(nullable=False, unique=True)
+    event_day_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("event_days.id"), nullable=False, index=True
+    )
     active_phase_id: Mapped[UUID] = mapped_column(nullable=False)
     active_event_day_phase_id: Mapped[UUID] = mapped_column(nullable=False)
     zone_states_data: Mapped[dict] = mapped_column(JSON, nullable=False)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Protocol
+from uuid import UUID
 
 from src.domain.value_objects.territorial_prediction import TerritorialPrediction
 
@@ -14,4 +15,10 @@ class PredictionRepository(Protocol):
         self,
         timestamp: datetime,
     ) -> TerritorialPrediction | None:
+        ...
+
+    async def find_by_event_day(
+        self,
+        event_day_id: UUID,
+    ) -> list[TerritorialPrediction]:
         ...
