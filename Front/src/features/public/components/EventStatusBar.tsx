@@ -61,7 +61,10 @@ export function EventStatusBar({ autoRefreshMs = 30000 }: EventStatusBarProps) {
   }
 
   const zones = data.zone_states;
-  const avgSaturation = zones.reduce((sum, z) => sum + z.saturation_level, 0) / zones.length;
+  const zonesWithSaturation = zones.filter(z => z.saturation_level != null);
+  const avgSaturation = zonesWithSaturation.length > 0
+    ? zonesWithSaturation.reduce((sum, z) => sum + z.saturation_level, 0) / zonesWithSaturation.length
+    : 0;
   const restrictedZones = zones.filter(z => z.active_restriction !== 'OPEN').length;
   const saturationPct = Math.round(avgSaturation * 100);
   const barColor = saturationPct > 75 ? 'bg-red-500' : saturationPct > 50 ? 'bg-amber-500' : 'bg-emerald-500';

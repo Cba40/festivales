@@ -56,11 +56,6 @@ from src.infrastructure.composition.bathroom_module import (
     BathroomModule,
     merge_bathroom_into_prediction,
 )
-from src.infrastructure.composition.food_module import (
-    FOOD_ZONE_TYPE,
-    FoodModule,
-    merge_food_into_prediction,
-)
 from src.infrastructure.composition.adapters.operational_event_adapter import (
     OperationalEventAdapter,
 )
@@ -491,18 +486,6 @@ class RecommendationModule:
                 event_id=event_id,
             )
             combined = merge_bathroom_into_prediction(combined, bathroom_result)
-
-        # ETAPA 4 — puente Food V1 → ZoneState → TerritorialPrediction.
-        # Mismo patrón que Parking V1 y Baños V1: el Context Engine NO procesa
-        # zonas gastronómicas; el puente se ejecuta desde la composición y
-        # fusiona la predicción antes del scoring. Solo se activa para acciones
-        # de comida (type == "comida", todos los subtipos).
-        if requested_action.type == FOOD_ZONE_TYPE:
-            food_result = await FoodModule(self._db).execute(
-                timestamp=local_ts,
-                event_id=event_id,
-            )
-            combined = merge_food_into_prediction(combined, food_result)
 
         zone_coordinates: dict[UUID, tuple[float, float]] | None = None
         if (
