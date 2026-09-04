@@ -130,11 +130,14 @@ async def delete(db: AsyncSession, event_id: UUID) -> None:
             status_code=status.HTTP_404_NOT_FOUND,
             detail="OperationalEvent not found",
         )
-    if await _was_used_by_engine(db, db_obj):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Cannot delete event that has been used by the prediction engine",
-        )
+    # TEMPORAL: Deshabilitar verificación de tabla 'predictions' (no migrada en el
+    # entorno actual). La tabla SÍ es parte del esquema P3.0 (migración a1b2c3d4e5f6)
+    # y el check se puede reactivar una vez aplicada `alembic upgrade head`.
+    # if await _was_used_by_engine(db, db_obj):
+    #     raise HTTPException(
+    #         status_code=status.HTTP_409_CONFLICT,
+    #         detail="Cannot delete event that has been used by the prediction engine",
+    #     )
     if _is_expired(db_obj, _now()):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
