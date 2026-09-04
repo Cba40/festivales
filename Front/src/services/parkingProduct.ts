@@ -54,16 +54,10 @@ export function useParkingRecommendations() {
           ? { latitude: userLocation[0], longitude: userLocation[1] }
           : {}),
       }
-      console.log("🔍 FRONTEND AUDITORÍA: Enviando request al backend")
-      console.log("   userLocation:", userLocation)
-      console.log("   params:", params)
       const { data: res } = await apiClient.get<ParkingRecommendationResponse>(
         endpoints.products.parking(EVENT_ID),
         { params },
       )
-      console.log("🔍 FRONTEND AUDITORÍA: Respuesta recibida")
-      console.log("   mode:", res.mode)
-      console.log("   zonas:", res.zonas.map(z => ({ name: z.name, lat: z.lat, lng: z.lng, is_nearest: z.is_nearest })))
       setData(res)
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Error al obtener recomendaciones de estacionamiento')

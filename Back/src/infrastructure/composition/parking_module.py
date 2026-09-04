@@ -347,15 +347,6 @@ def derive_parking_zone_state(
         free_ratio = effective_free / float(zone.capacity)
         free_spaces = effective_free
 
-    # ===== LOGS DE AUDITORÍA (todas las variables garantizadas) =====
-    print(f"🔍 PARKING AUDITORÍA: zone={zone.name} id={zone.id}")
-    print(f"   capacity={zone.capacity} v1_occupied={occupied:.1f}")
-    print(f"   projected_density={base_state.projected_density if base_state else 'None'}")
-    print(f"   has_event={has_event} is_closed={is_closed}")
-    print(f"   capacity_efectiva={capacity_efectiva:.1f}")
-    print(f"   effective_occupied={effective_occupied:.1f} effective_free={effective_free:.1f}")
-    print(f"   occupancy_ratio={occupancy_ratio:.3f} free_ratio={free_ratio:.3f}")
-
     metrics = {
         "parking_id": str(zone.id),
         "occupied": occupied,

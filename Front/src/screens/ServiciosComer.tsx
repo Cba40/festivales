@@ -31,10 +31,6 @@ const ServiciosComer = () => {
 
   const zonas = data?.zonas ?? []
 
-  console.log('🔍 FRONTEND FOOD UI AUDITORÍA: Componente de comidas montado')
-  console.log('   userLocation:', userLocation)
-  console.log('   zonas recibidas:', zonas?.length)
-
   const modo = data?.mode ?? 'informar'
 
   const principal = zonas[0]

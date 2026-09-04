@@ -363,37 +363,6 @@ def derive_bathroom_zone_state(
         free_ratio = effective_free / float(zone.capacity)
         free_spaces = effective_free
 
-    print(
-        f"🔍 BAÑOS: zone={zone.name} cap={zone.capacity} "
-        f"v1_occupied={occupied:.1f} "
-        f"projected_density={base_state.projected_density if base_state else 'None'} "
-        f"source_occupied={source_occupied:.1f} "
-        f"has_event={has_event} "
-        f"effective_occupied={effective_occupied:.1f} "
-        f"effective_free={effective_free:.1f} "
-        f"occupancy_ratio={occupancy_ratio:.3f}"
-    )
-
-    # 🔍 DEBUG EXCLUSIVO BAÑOS: Auditoría de la anomalía de disponibilidad
-    if not is_closed:
-        print("=" * 80)
-        print("🚻 DEBUG BAÑOS: Anomalía de Disponibilidad")
-        print(f"Zona: {zone.name} (ID: {zone.id})")
-        print(f"1. Capacidad base de la zona (zone.capacity): {zone.capacity}")
-        print(f"2. Ocupación cruda del modelo V1 (phase_state.occupied): {occupied}")
-        print(f"3. Densidad proyectada del Context Engine (base_state.projected_density): {base_state.projected_density if base_state else 'None'}")
-        print(f"4. source_occupied (usado para híbrido): {source_occupied}")
-        print(f"5. base_occupied (usado para híbrido): {base_occupied}")
-        print(f"6. has_event (evento imprevisto activo): {has_event}")
-        if has_event:
-            print(f"   -> capacity_efectiva resultante: {capacity_efectiva}")
-        else:
-            print(f"   -> SIN EVENTO: se usa capacity real {zone.capacity} y source como ocupación")
-        print(f"7. effective_occupied final: {effective_occupied}")
-        print(f"8. effective_free final (baños disponibles): {effective_free}")
-        print(f"9. occupancy_ratio (saturación mostrada): {occupancy_ratio:.4f} ({occupancy_ratio*100:.1f}%)")
-        print("=" * 80)
-
     metrics = {
         "bathroom_id": str(zone.id),
         "occupied": occupied,

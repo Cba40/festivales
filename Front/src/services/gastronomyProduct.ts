@@ -55,9 +55,6 @@ export function useGastronomyRecommendations() {
           ? { latitude: userLocation[0], longitude: userLocation[1] }
           : {}),
       }
-      console.log('🔍 FRONTEND FOOD AUDITORÍA: Enviando request al backend')
-      console.log('   userLocation:', userLocation)
-      console.log('   params:', params)
       const { data: res } = await apiClient.get<GastronomyRecommendationResponse>(
         endpoints.products.gastronomy(EVENT_ID),
         { params },

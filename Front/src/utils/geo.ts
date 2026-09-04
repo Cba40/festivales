@@ -20,9 +20,6 @@ export const getDistancias = (
   fallbackMin: number
 ) => {
   if (!userLoc || !puntoLat || !puntoLng) {
-    console.log("🔍 DISTANCE CALCULATION: sin userLoc o punto, usando fallback")
-    console.log("   from(userLoc):", userLoc)
-    console.log("   to:", puntoLat, puntoLng)
     return {
       walking: `${fallbackMin} min`,
       driving: `${Math.max(1, Math.round(fallbackMin / 3))} min`
@@ -31,10 +28,6 @@ export const getDistancias = (
 
   const [userLat, userLng] = userLoc
   const km = haversine(userLat, userLng, puntoLat, puntoLng)
-  console.log("🔍 DISTANCE CALCULATION:")
-  console.log("   from(userGPS):", userLat, userLng)
-  console.log("   to:", puntoLat, puntoLng)
-  console.log("   distanceKm:", km)
 
   // Caminando: ~5 km/h promedio en entorno urbano/congestionado
   const kmWalking = km * URBAN_FACTOR

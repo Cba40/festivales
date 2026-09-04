@@ -124,10 +124,6 @@ class OperationalEventAdapter(OperationalEventRepository):
     async def find_active_by_timestamp(
         self, timestamp: datetime,
     ) -> Sequence[OperationalEvent]:
-        # LOG TEMPORAL 1: Ver el timestamp de consulta y su zona horaria
-        print(f"🔍 DEBUG ADAPTER: timestamp de consulta = {timestamp} | tzinfo = {getattr(timestamp, 'tzinfo', 'NAIVE')}")
-        
-        # Consulta a la BD (mantén la lógica actual intacta por ahora)
         rows = (
             await self._db.execute(
                 select(OperationalEventORM).where(
@@ -137,13 +133,6 @@ class OperationalEventAdapter(OperationalEventRepository):
                 )
             )
         ).scalars().all()
-        
-        # LOG TEMPORAL 2: Ver qué devolvió la BD y sus zonas horarias
-        print(f"🔍 DEBUG ADAPTER: Filas encontradas en BD = {len(rows)}")
-        for r in rows:
-            print(f"  📌 ROW: id={r.id}, zone_id={r.zone_id}, effect={r.effect_type}, value={r.effect_value}")
-            print(f"     start={r.start_timestamp} (tzinfo={getattr(r.start_timestamp, 'tzinfo', 'NAIVE')})")
-            print(f"     end={r.end_timestamp} (tzinfo={getattr(r.end_timestamp, 'tzinfo', 'NAIVE')})")
 
         if not rows:
             return []
@@ -162,7 +151,6 @@ class OperationalEventAdapter(OperationalEventRepository):
                 .values(is_active=False)
             )
             await self._db.commit()
-            print(f"🔍 AUTO-EXPIRACIÓN: {len(expired_ids)} eventos actualizados a is_active=False")
 
         return await self._build_domain_events(rows, timestamp)
 
@@ -196,10 +184,7 @@ class OperationalEventAdapter(OperationalEventRepository):
             )
             if event is not None:
                 events.append(event)
-            else:
-                print(f"🔍 _build: evento {row.id} descartado (None)")
-        
-        print(f"🔍 _build: {len(events)} de {len(rows)} eventos construidos exitosamente")
+
         return events
 
     async def _load_zones(
@@ -285,23 +270,16 @@ class OperationalEventAdapter(OperationalEventRepository):
         behaviors: dict[tuple[str, UUID | None], float],
     ) -> OperationalEvent | None:
         if not row.zone_id:
-            print(f"🔍 DESCARTE 1: zone_id es None para evento {row.id}")
             return None
         zone = zones.get(str(row.zone_id))
         if zone is None:
-            print(f"🔍 DESCARTE 2: zona {row.zone_id} no encontrada en zones. Zonas disponibles: {list(zones.keys())}")
             return None
-        
         zt_id = resolve_zone_type_id(type_map, zone.type, zone.subtipo)
         if zt_id is None:
-            print(f"🔍 DESCARTE 3: zone_type no resuelto para type='{zone.type}' subtipo='{zone.subtipo}'. Type map: {list(type_map.keys())}")
             return None
-        
         event_day_date = day_dates.get(str(row.event_day_id))
         if event_day_date is None:
-            print(f"🔍 DESCARTE 4: event_day_date no encontrado para event_day_id={row.event_day_id}. Fechas disponibles: {list(day_dates.keys())}")
             return None
-        
         current_min = minutes_in_local_day(event_day_date, timestamp)
         phase_id = resolve_active_phase_id(
             day_phases.get(str(row.event_day_id), []),
@@ -312,8 +290,6 @@ class OperationalEventAdapter(OperationalEventRepository):
         impact = clamp_impact(
             compute_impact(row.effect_type, row.effect_value, zone.capacity, density)
         )
-        
-        print(f"🔍 ÉXITO: evento {row.id} → zone={row.zone_id}, capacity={zone.capacity}, density={density}, impact={impact}, phase_id={phase_id}, current_min={current_min}")
         
         return OperationalEvent(
             id=UUID(str(row.id)) if row.id else None,

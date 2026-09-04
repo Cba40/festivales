@@ -160,33 +160,11 @@ class WeightedScoringStrategy:
                     free_ratio = 0.9
             candidates.append((zone, free_ratio))
 
-        print(
-            f"🔍 RECOMMENDATION AUDITORÍA: Evaluando {len(candidates)} zonas candidatas para parking"
-        )
-        for zone, _fr in candidates:
-            print(
-                f"   zone_id={zone.zone_id} saturation={zone.saturation_level!r} "
-                f"availability={zone.availability} distance_ref={zone.model_result.get('distance') if zone.model_result else 'N/A'}"
-            )
         available = [
             (zone, free_ratio)
             for zone, free_ratio in candidates
             if free_ratio > config.min_availability_threshold
         ]
-        excluded = [
-            (zone, free_ratio)
-            for zone, free_ratio in candidates
-            if free_ratio <= config.min_availability_threshold
-        ]
-        print(
-            f"🔍 THRESHOLD AUDITORÍA: min_availability_threshold={config.min_availability_threshold}"
-        )
-        print(f"   Zonas que pasan el filtro: {len(available)}")
-        print(f"   Zonas excluidas por threshold: {len(excluded)}")
-        for zone, _fr in excluded:
-            print(
-                f"     EXCLUIDA: zone_id={zone.zone_id} saturation={zone.saturation_level!r}"
-            )
 
         has_user_gps = (
             zone_coordinates is not None
@@ -265,35 +243,11 @@ class WeightedScoringStrategy:
                     candidates_4, key=lambda t: (_dist_to_reference(t[0]), str(t[0].zone_id))
                 )
 
-            print("🔍 SELECCIÓN 4 ZONAS:")
-            print(
-                f"   Opción 1 (mayor disponibilidad): {option1[0].zone_id} free_ratio={option1[1]:.2f}"
-            )
-            if option2 is not None:
-                print(
-                    f"   Opción 2 (balance): {option2[0].zone_id} free_ratio={option2[1]:.2f} "
-                    f"dist_user={_dist_to_user(option2[0]) if option2[0] else 'N/A'}"
-                )
-            if option3 is not None:
-                print(
-                    f"   Opción 3 (más cercana al usuario): {option3[0].zone_id} "
-                    f"dist_user={_dist_to_user(option3[0]):.0f}m"
-                )
-            if option4 is not None:
-                print(
-                    f"   Opción 4 (más cercana al epicentro): {option4[0].zone_id} "
-                    f"dist_ref={_dist_to_reference(option4[0]):.0f}m"
-                )
-
             selected = [option1, option2, option3, option4]
         else:
             selected = []
 
         selected = [s for s in selected if s is not None]
-
-        print(
-            f"🔍 SCORING AUDITORÍA: {len(selected)} zonas seleccionadas para parking"
-        )
 
         recommendations: list[ZoneRecommendation] = []
         labels: list[str] = [
@@ -317,10 +271,6 @@ class WeightedScoringStrategy:
                     is_nearest=(i == 2),
                 )
             )
-
-        print(
-            f"   Top: {[(r.zone_id, round(r.score,3)) for r in recommendations]}"
-        )
 
         return recommendations
 

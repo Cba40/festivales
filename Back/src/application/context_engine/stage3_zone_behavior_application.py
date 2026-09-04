@@ -41,13 +41,6 @@ def apply_zone_behaviors(
         if projected_density < 0:
             projected_density = 0
 
-        print(
-            f"🔍 STAGE3: zone={zone.id} cap={zone.capacity} "
-            f"density_factor={behavior.density_factor} "
-            f"accumulated_impact={accumulated_impact} "
-            f"projected_density={projected_density}"
-        )
-
         active_restriction = behavior.flow_restriction
         if accumulated_impact <= -100:
             active_restriction = FlowRestriction.CLOSED

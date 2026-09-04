@@ -25,9 +25,6 @@ const Estacionar = () => {
   const requestLocation = useAppStore(s => s.requestLocation)
 
   useEffect(() => {
-    console.log("🔍 FRONTEND AUDITORÍA: Componente de parking montado")
-    console.log("   userLocation:", userLocation)
-    console.log("   currentZoneId:", useAppStore.getState().zones[0]?.id)
     refresh()
   }, [refresh, userLocation])
 
