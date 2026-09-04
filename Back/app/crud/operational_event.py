@@ -48,7 +48,10 @@ async def create(db: AsyncSession, data: OperationalEventCreate) -> OperationalE
     if not zone_exists:
         raise ValueError(f"Zone with id '{data.zone_id}' not found")
 
-    db_obj = OperationalEvent(**data.model_dump())
+    payload = data.model_dump()
+    if payload.get("event_type") == "incidente_operativo":
+        payload["is_incident"] = True
+    db_obj = OperationalEvent(**payload)
     db.add(db_obj)
     await db.flush()
     await db.commit()
@@ -87,6 +90,10 @@ async def update(
         )
 
     update_data = data.model_dump(exclude_unset=True)
+
+    new_event_type = update_data.get("event_type", db_obj.event_type)
+    if new_event_type == "incidente_operativo":
+        update_data["is_incident"] = True
 
     new_start = update_data.get("start_timestamp", db_obj.start_timestamp)
     new_end = update_data.get("end_timestamp", db_obj.end_timestamp)

@@ -179,6 +179,26 @@ class TestCreate:
         assert body["effect_type"] == "incidente_sin_impacto"
         assert body["effect_value"] is None
 
+    async def test_create_incidente_operativo_forces_is_incident_true(self, oe_env) -> None:
+        body = await _crear(oe_env, {
+            "event_type": "incidente_operativo",
+            "effect_type": "incidente_sin_impacto",
+            "effect_value": None,
+            "is_incident": False,
+        })
+        assert body["event_type"] == "incidente_operativo"
+        assert body["is_incident"] is True
+
+    async def test_create_other_type_respects_is_incident_false(self, oe_env) -> None:
+        body = await _crear(oe_env, {
+            "event_type": "accidente",
+            "effect_type": "incidente_sin_impacto",
+            "effect_value": None,
+            "is_incident": False,
+        })
+        assert body["event_type"] == "accidente"
+        assert body["is_incident"] is False
+
     async def test_create_with_coordinates(self, oe_env) -> None:
         body = await _crear(oe_env, {
             "latitude": -31.4201,
@@ -271,6 +291,27 @@ class TestUpdate:
         )
         assert response.status_code == 200
         assert response.json()["description"] == "Descripción nueva"
+
+    async def test_update_to_incidente_operativo_forces_is_incident_true(self, oe_env) -> None:
+        creado = await _crear(oe_env, {
+            "event_type": "tormenta",
+            "effect_type": "incidente_sin_impacto",
+            "effect_value": None,
+            "is_incident": False,
+        })
+        assert creado["is_incident"] is False
+        response = await oe_env.client.put(
+            f"/api/operational-events/{creado['id']}",
+            json={
+                "event_type": "incidente_operativo",
+                "effect_type": "incidente_sin_impacto",
+                "effect_value": None,
+            },
+            headers=_auth_headers(),
+        )
+        assert response.status_code == 200
+        assert response.json()["event_type"] == "incidente_operativo"
+        assert response.json()["is_incident"] is True
 
     async def test_update_rejects_expired_event(self, oe_env) -> None:
         creado = await _crear(oe_env, {
