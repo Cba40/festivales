@@ -32,7 +32,7 @@ def upgrade() -> None:
     # ── 2. Agregar FK a predictions ───────────────────────────────────
     op.add_column(
         "predictions",
-        sa.Column("knowledge_model_version_id", sa.String(36), sa.ForeignKey("knowledge_model_versions.id"), nullable=True),
+        sa.Column("knowledge_model_version_id", UUID(as_uuid=True), sa.ForeignKey("knowledge_model_versions.id"), nullable=True),
     )
     op.create_index(
         "ix_predictions_km_version", "predictions", ["knowledge_model_version_id"]

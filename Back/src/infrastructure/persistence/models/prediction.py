@@ -4,6 +4,7 @@ from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import INTEGER, JSON, ForeignKey, String, UniqueConstraint, func
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.infrastructure.db.base import Base
@@ -17,8 +18,8 @@ class PredictionModel(Base):
     event_day_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("event_days.id"), nullable=False, index=True
     )
-    knowledge_model_version_id: Mapped[str | None] = mapped_column(
-        String(36), ForeignKey("knowledge_model_versions.id"), nullable=True
+    knowledge_model_version_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("knowledge_model_versions.id"), nullable=True
     )
     active_phase_id: Mapped[UUID] = mapped_column(nullable=False)
     active_event_day_phase_id: Mapped[UUID] = mapped_column(nullable=False)

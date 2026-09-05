@@ -56,23 +56,21 @@ def _zone_state_from_dict(data: dict) -> ZoneState:
 
 def prediction_to_domain(model: PredictionModel) -> TerritorialPrediction:
     zone_states = [_zone_state_from_dict(item) for item in model.zone_states_data]
-    event_day_id = UUID(model.event_day_id) if model.event_day_id is not None and isinstance(model.event_day_id, str) else None
-    km_version_id = UUID(model.knowledge_model_version_id) if model.knowledge_model_version_id is not None and isinstance(model.knowledge_model_version_id, str) else None
     return TerritorialPrediction(
         timestamp=model.timestamp,
         zone_states=zone_states,
         active_phase_id=model.active_phase_id,
         active_event_day_phase_id=model.active_event_day_phase_id,
-        event_day_id=event_day_id,
-        knowledge_model_version_id=km_version_id,
+        event_day_id=model.event_day_id,
+        knowledge_model_version_id=model.knowledge_model_version_id,
     )
 
 
 def prediction_to_model(entity: TerritorialPrediction) -> PredictionModel:
     return PredictionModel(
         timestamp=entity.timestamp,
-        event_day_id=str(entity.event_day_id) if entity.event_day_id is not None else None,
-        knowledge_model_version_id=str(entity.knowledge_model_version_id) if entity.knowledge_model_version_id is not None else None,
+        event_day_id=entity.event_day_id,
+        knowledge_model_version_id=entity.knowledge_model_version_id,
         active_phase_id=entity.active_phase_id,
         active_event_day_phase_id=entity.active_event_day_phase_id,
         zone_states_data=[
