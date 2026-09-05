@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import date
 
 from sqlalchemy import select
@@ -30,6 +31,12 @@ class SQLEventDayRepository(EventDayRepository):
         if model is None:
             return None
         return event_day_to_domain(model)
+
+    async def find_all(self) -> Sequence[EventDay]:
+        stmt = select(EventDayModel).options(selectinload(EventDayModel.phases))
+        result = await self._session.execute(stmt)
+        models = result.scalars().all()
+        return [event_day_to_domain(m) for m in models]
 
     async def save(self, event_day: EventDay) -> EventDay:
         existing = await self._session.get(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Protocol
 from uuid import UUID
 
@@ -12,4 +13,7 @@ class ZoneBehaviorRepository(Protocol):
         zone_type_id: UUID,
         operational_phase_id: UUID,
     ) -> ZoneBehavior | None:
+        ...
+
+    async def find_all(self) -> Sequence[ZoneBehavior]:
         ...

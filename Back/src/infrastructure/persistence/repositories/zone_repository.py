@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from uuid import UUID
 
 from sqlalchemy import select
@@ -22,6 +23,12 @@ class SQLZoneRepository(ZoneRepository):
         if model is None:
             return None
         return zone_to_domain(model)
+
+    async def find_all(self) -> Sequence[Zone]:
+        stmt = select(ZoneModel)
+        result = await self._session.execute(stmt)
+        models = result.scalars().all()
+        return [zone_to_domain(m) for m in models]
 
     async def save(self, zone: Zone) -> Zone:
         existing = await self._session.get(ZoneModel, zone.id)
