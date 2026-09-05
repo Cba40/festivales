@@ -52,6 +52,7 @@ class ContextEngine:
         attendance_level: AttendanceLevel | None,
         event_day: EventDay,
         events: Sequence[OperationalEvent],
+        knowledge_model_version_id: UUID | None = None,
     ) -> TerritorialPrediction:
         active_event_day_phase, active_operational_phase = resolve_contextual_phase(
             event_day,
@@ -96,6 +97,7 @@ class ContextEngine:
             active_event_day_phase,
             timestamp,
             event_day_id=event_day.id,
+            knowledge_model_version_id=knowledge_model_version_id,
         )
 
         return prediction

@@ -29,8 +29,12 @@ from src.application.context_engine.stage1_context_resolution import (
     LOCAL_TZ,
     resolve_active_event_day,
 )
-from src.application.use_cases.generate_prediction import GeneratePrediction
-from src.application.use_cases.get_prediction import GetTerritorialPrediction
+from src.application.knowledge_model.snapshot_service import KnowledgeModelSnapshotService
+from src.infrastructure.persistence.repositories.zone_type_repository import SQLZoneTypeRepository
+from src.infrastructure.persistence.repositories.attendance_level_repository import SQLAttendanceLevelRepository
+from src.infrastructure.persistence.repositories.operational_phase_repository import SQLOperationalPhaseRepository
+from src.infrastructure.persistence.repositories.event_day_phase_repository import SQLEventDayPhaseRepository
+from src.infrastructure.persistence.repositories.knowledge_model_version_repository import SQLKnowledgeModelVersionRepository
 from src.domain.entities.attendance_level import AttendanceLevel
 from src.domain.entities.event_day import EventDay
 from src.domain.entities.event_day_phase import EventDayPhase
@@ -428,6 +432,28 @@ class PredictionModule:
             self._db,
             [p.operational_phase_id for p in event_day.phases],
         )
+
+        # 🆕 Obtener versión actual del Knowledge Model
+        zone_repo = SQLZoneRepository(self._db)
+        zone_behavior_repo = SQLZoneBehaviorRepository(self._db)
+        zone_type_repo = SQLZoneTypeRepository(self._db)
+        attendance_level_repo = SQLAttendanceLevelRepository(self._db)
+        operational_phase_repo = SQLOperationalPhaseRepository(self._db)
+        event_day_repo = SQLEventDayRepository(self._db)
+        event_day_phase_repo = SQLEventDayPhaseRepository(self._db)
+        km_version_repo = SQLKnowledgeModelVersionRepository(self._db)
+        snapshot_service = KnowledgeModelSnapshotService(
+            zone_repo=zone_repo,
+            zone_behavior_repo=zone_behavior_repo,
+            zone_type_repo=zone_type_repo,
+            attendance_level_repo=attendance_level_repo,
+            operational_phase_repo=operational_phase_repo,
+            event_day_repo=event_day_repo,
+            event_day_phase_repo=event_day_phase_repo,
+            km_version_repo=km_version_repo,
+        )
+        km_version = await snapshot_service.get_or_create_current_version()
+        knowledge_model_version_id = km_version.id
 
         engine = ContextEngine()
         event_day_repo = _PreloadedEventDayRepository(event_day)

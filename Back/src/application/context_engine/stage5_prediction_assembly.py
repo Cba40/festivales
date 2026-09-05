@@ -16,6 +16,7 @@ def assemble_prediction(
     active_event_day_phase: EventDayPhase,
     timestamp: datetime,
     event_day_id: UUID | None = None,
+    knowledge_model_version_id: UUID | None = None,
 ) -> TerritorialPrediction:
     return TerritorialPrediction(
         timestamp=timestamp,
@@ -23,4 +24,5 @@ def assemble_prediction(
         active_phase_id=active_operational_phase.id,
         active_event_day_phase_id=active_event_day_phase.id,
         event_day_id=event_day_id,
+        knowledge_model_version_id=knowledge_model_version_id,
     )
