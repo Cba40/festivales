@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import verify_token
-from app.crud.operational_observation import (
+from app.crud import (
     create_operational_observation,
     get_operational_observation,
     list_operational_observations,
