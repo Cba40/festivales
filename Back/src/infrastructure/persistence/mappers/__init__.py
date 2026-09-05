@@ -16,6 +16,10 @@ from src.infrastructure.persistence.mappers.operational_event_mapper import (
     operational_event_to_domain,
     operational_event_to_model,
 )
+from src.infrastructure.persistence.mappers.operational_observation_mapper import (
+    operational_observation_to_domain,
+    operational_observation_to_model,
+)
 from src.infrastructure.persistence.mappers.operational_phase_mapper import (
     operational_phase_to_domain,
     operational_phase_to_model,
@@ -50,6 +54,8 @@ __all__ = [
     "event_day_phase_to_model",
     "operational_event_to_domain",
     "operational_event_to_model",
+    "operational_observation_to_domain",
+    "operational_observation_to_model",
     "operational_phase_to_domain",
     "operational_phase_to_model",
     "operational_profile_to_domain",

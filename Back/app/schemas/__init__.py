@@ -10,6 +10,7 @@ from app.schemas.operational_profile import OperationalProfileCreate, Operationa
 from app.schemas.operational_phase import OperationalPhaseCreate, OperationalPhaseUpdate, OperationalPhaseResponse
 from app.schemas.zone_behavior import ZoneBehaviorCreate, ZoneBehaviorUpdate, ZoneBehaviorResponse
 from app.schemas.operational_event import OperationalEventCreate, OperationalEventUpdate, OperationalEventResponse
+from app.schemas.operational_observation import OperationalObservationCreate, OperationalObservationResponse
 from app.schemas.territorial_prediction import ZonePrediction, TerritorialPrediction
 
 __all__ = [
@@ -25,5 +26,6 @@ __all__ = [
     "OperationalPhaseCreate", "OperationalPhaseUpdate", "OperationalPhaseResponse",
     "ZoneBehaviorCreate", "ZoneBehaviorUpdate", "ZoneBehaviorResponse",
     "OperationalEventCreate", "OperationalEventUpdate", "OperationalEventResponse",
+    "OperationalObservationCreate", "OperationalObservationResponse",
     "ZonePrediction", "TerritorialPrediction",
 ]

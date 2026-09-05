@@ -4,6 +4,9 @@ from src.domain.ports.event_day_repository import EventDayRepository
 from src.domain.ports.operational_event_repository import (
     OperationalEventRepository,
 )
+from src.domain.ports.operational_observation_repository import (
+    OperationalObservationRepository,
+)
 from src.domain.ports.operational_profile_repository import (
     OperationalProfileRepository,
 )
@@ -14,6 +17,7 @@ from src.domain.ports.zone_repository import ZoneRepository
 __all__ = [
     "EventDayRepository",
     "OperationalEventRepository",
+    "OperationalObservationRepository",
     "OperationalProfileRepository",
     "PredictionRepository",
     "ZoneBehaviorRepository",

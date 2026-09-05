@@ -4,6 +4,9 @@ from src.infrastructure.persistence.models.attendance_level import AttendanceLev
 from src.infrastructure.persistence.models.event_day import EventDayModel
 from src.infrastructure.persistence.models.event_day_phase import EventDayPhaseModel
 from src.infrastructure.persistence.models.operational_event import OperationalEventModel
+from src.infrastructure.persistence.models.operational_observation import (
+    OperationalObservationModel,
+)
 from src.infrastructure.persistence.models.operational_phase import OperationalPhaseModel
 from src.infrastructure.persistence.models.operational_profile import OperationalProfileModel
 from src.infrastructure.persistence.models.prediction import PredictionModel
@@ -16,6 +19,7 @@ __all__ = [
     "EventDayModel",
     "EventDayPhaseModel",
     "OperationalEventModel",
+    "OperationalObservationModel",
     "OperationalPhaseModel",
     "OperationalProfileModel",
     "PredictionModel",

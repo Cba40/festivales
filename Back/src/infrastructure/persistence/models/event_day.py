@@ -7,6 +7,7 @@ from sqlalchemy import CheckConstraint, Float, ForeignKey, Integer, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.infrastructure.db.base import Base
+from src.infrastructure.persistence.models.operational_observation import OperationalObservationModel
 
 
 class EventDayModel(Base):
@@ -31,3 +32,4 @@ class EventDayModel(Base):
     operational_profile: Mapped["OperationalProfileModel"] = relationship(back_populates="event_days")
     attendance_level: Mapped["AttendanceLevelModel"] = relationship()
     phases: Mapped[list["EventDayPhaseModel"]] = relationship(back_populates="event_day")
+    operational_observations: Mapped[list["OperationalObservationModel"]] = relationship(back_populates="event_day")

@@ -9,6 +9,7 @@ from app.models.operational_profile import OperationalProfile
 from app.models.operational_phase import OperationalPhase
 from app.models.zone_behavior import ZoneBehavior
 from app.models.operational_event import OperationalEvent
+from app.models.operational_observation import OperationalObservation
 from app.models.motor_config import RecommendationConfigModel, Stage4ConfigModel
 from app.models.service_config import ServiceConfig
 from app.models.exit_destination import ExitDestination
@@ -32,6 +33,7 @@ __all__ = [
     "OperationalPhase",
     "ZoneBehavior",
     "OperationalEvent",
+    "OperationalObservation",
     "RecommendationConfigModel",
     "Stage4ConfigModel",
     "ServiceConfig",

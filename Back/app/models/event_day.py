@@ -47,6 +47,9 @@ class EventDay(Base):
     operational_events: Mapped[list["OperationalEvent"]] = relationship(
         back_populates="event_day", cascade="all, delete-orphan",
     )
+    operational_observations: Mapped[list["OperationalObservation"]] = relationship(
+        back_populates="event_day", cascade="all, delete-orphan",
+    )
 
     __table_args__ = (
         UniqueConstraint("event_id", "date", name="uq_event_day_event_date"),

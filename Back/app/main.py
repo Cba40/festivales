@@ -16,6 +16,7 @@ from app.api.routes.operational_profiles import router as operational_profiles_r
 from app.api.routes.operational_phases import router as operational_phases_router
 from app.api.routes.zone_behaviors import router as zone_behaviors_router
 from app.api.routes.operational_events import router as operational_events_router
+from app.api.routes.operational_observations import router as operational_observations_router
 from app.api.routes.predictions import router as predictions_router
 from app.api.routes.recommendations import router as recommendations_router
 from app.api.routes.parking import router as parking_router
@@ -61,6 +62,7 @@ app.include_router(operational_profiles_router, prefix="/api")
 app.include_router(operational_phases_router, prefix="/api")
 app.include_router(zone_behaviors_router, prefix="/api")
 app.include_router(operational_events_router, prefix="/api")
+app.include_router(operational_observations_router, prefix="/api")
 app.include_router(predictions_router)
 app.include_router(recommendations_router)
 app.include_router(parking_router)
