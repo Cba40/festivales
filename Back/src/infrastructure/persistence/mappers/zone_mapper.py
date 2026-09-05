@@ -8,8 +8,11 @@ def zone_to_domain(model: ZoneModel) -> Zone:
     return Zone(
         id=model.id,
         name=model.name,
-        zone_type_id=model.zone_type_id,
+        zone_type_id=None,  # Not in root chain schema
         capacity=model.capacity,
+        type=model.type,
+        subtipo=None,  # Root chain has 'type' and 'saturation'/'status', not subtipo in same way
+        available_capacity=model.available_capacity,
     )
 
 
@@ -17,6 +20,7 @@ def zone_to_model(entity: Zone) -> ZoneModel:
     return ZoneModel(
         id=entity.id,
         name=entity.name,
-        zone_type_id=entity.zone_type_id,
+        # zone_type_id not in root chain schema
         capacity=entity.capacity,
+        # type, saturation, status, etc. would need to be set
     )
