@@ -30,6 +30,9 @@ from src.application.context_engine.stage1_context_resolution import (
     resolve_active_event_day,
 )
 from src.application.knowledge_model.snapshot_service import KnowledgeModelSnapshotService
+from src.infrastructure.persistence.repositories.zone_repository import SQLZoneRepository
+from src.infrastructure.persistence.repositories.zone_behavior_repository import SQLZoneBehaviorRepository
+from src.infrastructure.persistence.repositories.event_day_repository import SQLEventDayRepository
 from src.infrastructure.persistence.repositories.zone_type_repository import SQLZoneTypeRepository
 from src.infrastructure.persistence.repositories.attendance_level_repository import SQLAttendanceLevelRepository
 from src.infrastructure.persistence.repositories.operational_phase_repository import SQLOperationalPhaseRepository
