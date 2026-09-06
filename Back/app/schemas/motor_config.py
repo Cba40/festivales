@@ -12,6 +12,7 @@ class RecommendationConfigRead(BaseModel):
     vip_bonus: float = Field(ge=0.0, le=1.0)
     staff_bonus: float = Field(ge=0.0, le=1.0)
     mobility_penalty: float = Field(ge=0.0, le=1.0)
+    density_deviation_threshold: float = Field(ge=0.0, le=1.0, default=0.2)
     created_at: datetime
     updated_at: datetime
 
@@ -23,6 +24,7 @@ class RecommendationConfigUpdate(BaseModel):
     vip_bonus: float | None = Field(default=None, ge=0.0, le=1.0)
     staff_bonus: float | None = Field(default=None, ge=0.0, le=1.0)
     mobility_penalty: float | None = Field(default=None, ge=0.0, le=1.0)
+    density_deviation_threshold: float | None = Field(default=None, ge=0.0, le=1.0)
 
 
 class Stage4ConfigRead(BaseModel):

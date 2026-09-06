@@ -26,6 +26,7 @@ class RecommendationConfigModel(Base):
     vip_bonus: Mapped[float] = mapped_column(Float, nullable=False, default=0.1)
     staff_bonus: Mapped[float] = mapped_column(Float, nullable=False, default=0.2)
     mobility_penalty: Mapped[float] = mapped_column(Float, nullable=False, default=0.15)
+    density_deviation_threshold: Mapped[float] = mapped_column(Float, nullable=False, server_default='0.2')
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 

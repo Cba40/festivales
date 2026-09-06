@@ -51,6 +51,7 @@ async def update_recommendation_config(
         vip_bonus=float(config.vip_bonus),
         staff_bonus=float(config.staff_bonus),
         mobility_penalty=float(config.mobility_penalty),
+        density_deviation_threshold=float(config.density_deviation_threshold),
     )
     configure_recommendation(motor_cfg)
     return config
