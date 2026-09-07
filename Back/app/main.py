@@ -36,6 +36,7 @@ from app.api.routes.emergency_admin import router as emergency_admin_router
 from app.api.routes.emergency_protocol import router as emergency_protocol_router
 from app.api.routes.emergency_protocol_admin import router as emergency_protocol_admin_router
 from app.api.routes.emergency_protocol_resource import router as emergency_protocol_resource_router
+from app.api.routes.operational_observations import router as operational_observations_router
 
 app = FastAPI(title="Territorial MVP", version="0.1.0")
 
@@ -81,6 +82,7 @@ app.include_router(emergency_admin_router)
 app.include_router(emergency_protocol_router)
 app.include_router(emergency_protocol_admin_router)
 app.include_router(emergency_protocol_resource_router)
+app.include_router(operational_observations_router, prefix="/api")
 
 
 @app.get("/health")

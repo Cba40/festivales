@@ -28,6 +28,14 @@ from src.infrastructure.persistence.mappers.prediction_mapper import (
     prediction_to_domain,
     prediction_to_model,
 )
+from src.infrastructure.persistence.mappers.knowledge_model_version_mapper import (
+    km_version_to_domain,
+    km_version_to_model,
+)
+from src.infrastructure.persistence.mappers.operational_observation_mapper import (
+    observation_to_domain,
+    observation_to_model,
+)
 from src.infrastructure.persistence.mappers.zone_behavior_mapper import (
     zone_behavior_to_domain,
     zone_behavior_to_model,
@@ -56,6 +64,10 @@ __all__ = [
     "operational_profile_to_model",
     "prediction_to_domain",
     "prediction_to_model",
+    "km_version_to_domain",
+    "km_version_to_model",
+    "observation_to_domain",
+    "observation_to_model",
     "zone_behavior_to_domain",
     "zone_behavior_to_model",
     "zone_to_domain",
