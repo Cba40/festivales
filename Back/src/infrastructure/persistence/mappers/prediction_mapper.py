@@ -61,12 +61,16 @@ def prediction_to_domain(model: PredictionModel) -> TerritorialPrediction:
         zone_states=zone_states,
         active_phase_id=model.active_phase_id,
         active_event_day_phase_id=model.active_event_day_phase_id,
+        event_day_id=str(model.event_day_id) if model.event_day_id else None,
+        knowledge_model_version_id=model.knowledge_model_version_id,
     )
 
 
 def prediction_to_model(entity: TerritorialPrediction) -> PredictionModel:
     return PredictionModel(
         timestamp=entity.timestamp,
+        event_day_id=entity.event_day_id,
+        knowledge_model_version_id=entity.knowledge_model_version_id,
         active_phase_id=entity.active_phase_id,
         active_event_day_phase_id=entity.active_event_day_phase_id,
         zone_states_data=[
