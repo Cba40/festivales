@@ -36,6 +36,14 @@ from src.infrastructure.persistence.mappers.operational_observation_mapper impor
     observation_to_domain,
     observation_to_model,
 )
+from src.infrastructure.persistence.mappers.configuration_recommendation_mapper import (
+    configuration_recommendation_to_domain,
+    configuration_recommendation_to_model,
+)
+from src.infrastructure.persistence.mappers.recommendation_audit_entry_mapper import (
+    recommendation_audit_entry_to_domain,
+    recommendation_audit_entry_to_model,
+)
 from src.infrastructure.persistence.mappers.zone_behavior_mapper import (
     zone_behavior_to_domain,
     zone_behavior_to_model,
@@ -74,4 +82,8 @@ __all__ = [
     "zone_to_model",
     "zone_type_to_domain",
     "zone_type_to_model",
+    "configuration_recommendation_to_domain",
+    "configuration_recommendation_to_model",
+    "recommendation_audit_entry_to_domain",
+    "recommendation_audit_entry_to_model",
 ]
