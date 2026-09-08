@@ -8,7 +8,7 @@ from __future__ import annotations
 import math
 from collections.abc import Sequence
 from datetime import date, datetime
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,6 +36,9 @@ from src.domain.entities.event_day_phase import EventDayPhase
 from src.domain.entities.operational_phase import OperationalPhase
 from src.domain.entities.zone import Zone
 from src.domain.entities.zone_behavior import FlowRestriction, ZoneBehavior
+from src.domain.entities.zone_recommendation import (
+    ZoneRecommendation as ZoneRecommendationEntity,
+)
 from src.domain.ports import (
     EventDayRepository,
     PredictionRepository,
@@ -60,6 +63,9 @@ from src.infrastructure.composition.adapters.operational_event_adapter import (
     OperationalEventAdapter,
 )
 from src.infrastructure.composition.prediction_module import _resolve_zone_type_id
+from src.infrastructure.persistence.repositories.zone_recommendation_repository import (
+    SQLZoneRecommendationRepository,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -510,5 +516,28 @@ class RecommendationModule:
         recommendations = await self._enrich_with_operational_context(
             recommendations, event_repo, local_ts
         )
+
+        zone_recommendation_repo = SQLZoneRecommendationRepository(self._db)
+        domain_recommendations = [
+            ZoneRecommendationEntity(
+                id=uuid4(),
+                event_day_id=str(event_day.id),
+                timestamp=combined.timestamp,
+                zone_id=str(rec.zone_id),
+                recommendation_type=requested_action.action_type.value,
+                score=rec.score,
+                ranking=index + 1,
+                reasoning=list(rec.reasoning),
+                is_nearest=rec.is_nearest,
+                metadata={
+                    "event_id": event_id,
+                    "user_id": str(user_context.user_id),
+                    "requested_action_type": requested_action.type,
+                    "requested_action_subtipo": requested_action.subtipo,
+                },
+            )
+            for index, rec in enumerate(recommendations)
+        ]
+        await zone_recommendation_repo.save_batch(domain_recommendations)
 
         return recommendations, combined

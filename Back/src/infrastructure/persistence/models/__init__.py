@@ -12,6 +12,7 @@ from src.infrastructure.persistence.models.prediction import PredictionModel
 from src.infrastructure.persistence.models.zone import ZoneModel
 from src.infrastructure.persistence.models.zone_behavior import ZoneBehaviorModel
 from src.infrastructure.persistence.models.zone_type import ZoneTypeModel
+from src.infrastructure.persistence.models.zone_recommendation import ZoneRecommendationModel
 
 __all__ = [
     "AttendanceLevelModel",
@@ -25,5 +26,6 @@ __all__ = [
     "PredictionModel",
     "ZoneBehaviorModel",
     "ZoneModel",
+    "ZoneRecommendationModel",
     "ZoneTypeModel",
 ]

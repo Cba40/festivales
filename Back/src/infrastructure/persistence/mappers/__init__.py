@@ -56,6 +56,10 @@ from src.infrastructure.persistence.mappers.zone_type_mapper import (
     zone_type_to_domain,
     zone_type_to_model,
 )
+from src.infrastructure.persistence.mappers.zone_recommendation_mapper import (
+    zone_recommendation_to_domain,
+    zone_recommendation_to_model,
+)
 
 __all__ = [
     "attendance_level_to_domain",
@@ -86,4 +90,6 @@ __all__ = [
     "configuration_recommendation_to_model",
     "recommendation_audit_entry_to_domain",
     "recommendation_audit_entry_to_model",
+    "zone_recommendation_to_domain",
+    "zone_recommendation_to_model",
 ]
