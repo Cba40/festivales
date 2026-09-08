@@ -54,7 +54,7 @@ export function ObservationsScreen() {
   const [observedDensity, setObservedDensity] = useState('');
   const [observerId, setObserverId] = useState('');
   const [source, setSource] = useState('manual');
-  const [metadata, setMetadata] = useState('');
+  const [notas, setNotas] = useState('');
   const [formMessage, setFormMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -109,14 +109,9 @@ export function ObservationsScreen() {
       return;
     }
 
-    let metadataJson: Record<string, unknown> | undefined;
-    if (metadata.trim() !== '') {
-      try {
-        metadataJson = JSON.parse(metadata) as Record<string, unknown>;
-      } catch {
-        setFormError('Metadata debe ser un JSON válido.');
-        return;
-      }
+    let metadataPayload: Record<string, unknown> | undefined;
+    if (notas.trim() !== '') {
+      metadataPayload = { notas: notas.trim() };
     }
 
     setFormMessage(null);
@@ -129,17 +124,17 @@ export function ObservationsScreen() {
       observed_density: density,
       observer_id: observerId.trim() !== '' ? observerId.trim() : undefined,
       source,
-      ...(metadataJson ? { metadata: metadataJson } : {}),
+      ...(metadataPayload ? { metadata: metadataPayload } : {}),
     });
 
     if (result) {
       setFormMessage('Observación registrada correctamente.');
       setObservedDensity('');
       setObserverId('');
-      setMetadata('');
+      setNotas('');
       setTimestamp(new Date().toISOString().slice(0, 16));
     }
-  }, [eventDayId, zoneId, timestamp, observedDensity, observerId, source, metadata, createObservation]);
+  }, [eventDayId, zoneId, timestamp, observedDensity, observerId, source, notas, createObservation]);
 
   return (
     <main className="max-w-5xl mx-auto space-y-6">
@@ -240,16 +235,19 @@ export function ObservationsScreen() {
             </label>
           </div>
 
-          <label className="block text-sm">
-            <span className="text-slate-700 font-medium">Metadata (JSON, opcional)</span>
-            <textarea
-              value={metadata}
-              onChange={(e) => setMetadata(e.target.value)}
-              placeholder='{"observador": "brigada-1"}'
-              rows={2}
-              className="mt-1 w-full px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Notas adicionales (opcional)
+            </label>
+            <input
+              type="text"
+              value={notas}
+              onChange={(e) => setNotas(e.target.value)}
+              placeholder="Ej: Zona con mucha afluencia por evento cercano"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              disabled={isSubmitting}
             />
-          </label>
+          </div>
 
           {formError && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{formError}</div>
