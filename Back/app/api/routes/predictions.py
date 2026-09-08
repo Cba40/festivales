@@ -165,6 +165,11 @@ async def _build_prediction_response(
         )
     return {
         "timestamp": prediction.timestamp.isoformat(),
+        "knowledge_model_version_id": (
+            str(prediction.knowledge_model_version_id)
+            if prediction.knowledge_model_version_id is not None
+            else None
+        ),
         "active_phase_id": str(prediction.active_phase_id),
         "active_event_day_phase_id": str(prediction.active_event_day_phase_id),
         "zone_states": [

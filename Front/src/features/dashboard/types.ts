@@ -212,6 +212,7 @@ export interface RecommendationConfigDTO {
   vip_bonus: number;
   staff_bonus: number;
   mobility_penalty: number;
+  density_deviation_threshold: number;
   created_at: string;
   updated_at: string;
 }
@@ -223,6 +224,7 @@ export interface RecommendationConfigUpdatePayload {
   vip_bonus?: number;
   staff_bonus?: number;
   mobility_penalty?: number;
+  density_deviation_threshold?: number;
 }
 
 export interface Stage4ConfigDTO {

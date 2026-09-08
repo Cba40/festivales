@@ -216,6 +216,7 @@ export function MotorConfigScreen() {
               <SliderField label="Bonus VIP" value={draftRec.vip_bonus} onChange={(v) => handleRecChange('vip_bonus', v)} min={0} max={1} step={0.05} disabled={saving} />
               <SliderField label="Bonus Staff" value={draftRec.staff_bonus} onChange={(v) => handleRecChange('staff_bonus', v)} min={0} max={1} step={0.05} disabled={saving} />
               <SliderField label="Penalización por movilidad" value={draftRec.mobility_penalty} onChange={(v) => handleRecChange('mobility_penalty', v)} min={0} max={1} step={0.05} disabled={saving} />
+              <SliderField label="Umbral de desviación de densidad" value={draftRec.density_deviation_threshold} onChange={(v) => handleRecChange('density_deviation_threshold', v)} min={0} max={1} step={0.01} disabled={saving} />
               <div className="pt-2">
                 <button
                   onClick={handleSaveRec}

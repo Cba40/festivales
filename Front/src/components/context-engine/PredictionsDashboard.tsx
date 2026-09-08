@@ -75,6 +75,21 @@ export function PredictionsDashboard({ eventId, autoRefreshMs = 15000 }: Predict
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-slate-800">Predicciones del motor</h2>
         <div className="flex items-center gap-2">
+          {data && (
+            <span
+              className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                data.knowledge_model_version_id
+                  ? 'bg-indigo-50 text-indigo-600 border border-indigo-200'
+                  : 'bg-slate-100 text-slate-500 border border-slate-200'
+              }`}
+              title="Versión del modelo de conocimiento usado para esta predicción"
+            >
+              <RefreshCw className="w-3 h-3" />
+              KM {data.knowledge_model_version_id
+                ? data.knowledge_model_version_id.slice(0, 8)
+                : 'Sin versión'}
+            </span>
+          )}
           <label className="flex items-center gap-1.5 text-xs text-slate-500 cursor-pointer">
             <input
               type="checkbox"

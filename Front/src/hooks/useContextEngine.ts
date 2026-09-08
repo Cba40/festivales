@@ -51,6 +51,7 @@ export interface ZoneStateItem {
 
 export interface TerritorialPredictionResponse {
   timestamp: string;
+  knowledge_model_version_id: string | null;
   active_phase_id: string;
   active_event_day_phase_id: string;
   zone_states: ZoneStateItem[];
