@@ -29,6 +29,7 @@ from src.application.context_engine.stage1_context_resolution import (
     LOCAL_TZ,
     resolve_active_event_day,
 )
+from src.application.knowledge_model.snapshot_service import KnowledgeModelSnapshotService
 from src.application.use_cases.generate_prediction import GeneratePrediction
 from src.application.use_cases.get_prediction import GetTerritorialPrediction
 from src.domain.entities.attendance_level import AttendanceLevel
@@ -44,6 +45,9 @@ from src.domain.ports import (
 from src.domain.value_objects.territorial_prediction import TerritorialPrediction
 from src.infrastructure.composition.adapters.operational_event_adapter import (
     OperationalEventAdapter,
+)
+from src.infrastructure.persistence.repositories.knowledge_model_version_repository import (
+    SQLKnowledgeModelVersionRepository,
 )
 
 
@@ -461,6 +465,12 @@ class PredictionModule:
             [p.operational_phase_id for p in event_day.phases],
         )
 
+        snapshot_service = KnowledgeModelSnapshotService(
+            repository=SQLKnowledgeModelVersionRepository(self._db),
+        )
+        snapshot = await snapshot_service.capture_current_snapshot(self._db)
+        km_version = await snapshot_service.get_or_create_version(self._db, snapshot)
+
         engine = ContextEngine()
         event_day_repo = _PreloadedEventDayRepository(event_day)
         event_repo = OperationalEventAdapter(self._db)
@@ -483,6 +493,7 @@ class PredictionModule:
             zone_behaviors=zone_behaviors,
             attendance_level=attendance_level,
             operational_phases=operational_phases,
+            knowledge_model_version_id=km_version.id,
         )
 
         return prediction

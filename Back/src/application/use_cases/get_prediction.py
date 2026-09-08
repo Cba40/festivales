@@ -29,15 +29,22 @@ class GetTerritorialPrediction:
         zone_behaviors: Mapping[tuple[UUID, UUID], ZoneBehavior],
         attendance_level: AttendanceLevel | None,
         operational_phases: Mapping[UUID, OperationalPhase],
+        knowledge_model_version_id: UUID | None = None,
     ) -> TerritorialPrediction:
         existing = await self._prediction_repo.find_by_timestamp(timestamp)
         if existing is not None:
             return existing
 
-        return await self._generate_prediction.execute(
-            timestamp=timestamp,
-            zones=zones,
-            zone_behaviors=zone_behaviors,
-            attendance_level=attendance_level,
-            operational_phases=operational_phases,
-        )
+        generate_kwargs: dict = {
+            "timestamp": timestamp,
+            "zones": zones,
+            "zone_behaviors": zone_behaviors,
+            "attendance_level": attendance_level,
+            "operational_phases": operational_phases,
+        }
+        if knowledge_model_version_id is not None:
+            generate_kwargs["knowledge_model_version_id"] = (
+                knowledge_model_version_id
+            )
+
+        return await self._generate_prediction.execute(**generate_kwargs)

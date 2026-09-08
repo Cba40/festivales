@@ -43,6 +43,7 @@ class GeneratePrediction:
         zone_behaviors: Mapping[tuple[UUID, UUID], ZoneBehavior],
         attendance_level: AttendanceLevel | None,
         operational_phases: Mapping[UUID, OperationalPhase],
+        knowledge_model_version_id: UUID | None = None,
     ) -> TerritorialPrediction:
         event_day = await resolve_active_event_day(
             timestamp,
@@ -57,15 +58,19 @@ class GeneratePrediction:
             timestamp,
         )
 
-        prediction = self._engine.predict(
-            timestamp=timestamp,
-            zones=zones,
-            zone_behaviors=zone_behaviors,
-            operational_phases=operational_phases,
-            attendance_level=attendance_level,
-            event_day=event_day,
-            events=events,
-        )
+        engine_kwargs: dict = {
+            "timestamp": timestamp,
+            "zones": zones,
+            "zone_behaviors": zone_behaviors,
+            "operational_phases": operational_phases,
+            "attendance_level": attendance_level,
+            "event_day": event_day,
+            "events": events,
+        }
+        if knowledge_model_version_id is not None:
+            engine_kwargs["knowledge_model_version_id"] = knowledge_model_version_id
+
+        prediction = self._engine.predict(**engine_kwargs)
 
         prediction = await self._prediction_repo.save(prediction)
 
