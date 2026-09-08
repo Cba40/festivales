@@ -73,6 +73,9 @@ export const endpoints = {
     create: `/operational-events/`,
     deactivate: (id: string) => `/operational-events/${id}/deactivate`,
   },
+  operationalObservations: {
+    list: '/operational-observations/',
+  },
   products: {
     parking: (eventId: string) =>
       `/events/${eventId}/products/parking`,

@@ -285,3 +285,25 @@ export interface ServiceConfigFilters {
   subtipo?: string;
   event_day_id?: string;
 }
+
+export interface OperationalObservationDTO {
+  id: string;
+  event_day_id: string;
+  zone_id: string;
+  timestamp: string;
+  observed_density: number;
+  observer_id: string | null;
+  source: string;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface OperationalObservationCreatePayload {
+  event_day_id: string;
+  zone_id: string;
+  timestamp: string;
+  observed_density: number;
+  observer_id?: string;
+  source?: string;
+  metadata?: Record<string, unknown>;
+}
