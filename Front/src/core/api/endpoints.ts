@@ -76,6 +76,14 @@ export const endpoints = {
   operationalObservations: {
     list: '/operational-observations/',
   },
+  analytics: {
+    metricsStatus: '/analytics/metrics-status',
+    recommendations: (status?: string) =>
+      `/analytics/recommendations${status ? `?status=${status}` : ''}`,
+    resolveRecommendation: (id: string) => `/analytics/recommendations/${id}/resolve`,
+    auditLog: (recommendationId: string) =>
+      `/analytics/audit-log?recommendation_id=${recommendationId}`,
+  },
   products: {
     parking: (eventId: string) =>
       `/events/${eventId}/products/parking`,

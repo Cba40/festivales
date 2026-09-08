@@ -307,3 +307,34 @@ export interface OperationalObservationCreatePayload {
   source?: string;
   metadata?: Record<string, unknown>;
 }
+
+export interface MetricsStatusDTO {
+  density_deviation: string;
+  incident_frequency: string;
+  phase_transition_latency: string;
+  zone_behavior_adherence: string;
+}
+
+export interface ConfigurationRecommendationDTO {
+  id: string;
+  target_entity_type: string;
+  target_entity_id: string | null;
+  proposed_change: string;
+  recommendation_type: string;
+  supporting_metrics: Record<string, unknown> | null;
+  historic_trace: Record<string, unknown> | null;
+  recommendation_confidence: number;
+  status: 'pending_review' | 'approved' | 'rejected';
+  generated_at: string;
+  resolved_by: string | null;
+  resolved_at: string | null;
+}
+
+export interface AuditLogEntryDTO {
+  id: string;
+  recommendation_id: string;
+  action: string;
+  timestamp: string;
+  operator_id: string | null;
+  justification: string | null;
+}

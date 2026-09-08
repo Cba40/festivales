@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 
@@ -34,7 +36,105 @@ from uuid import UUID
 from datetime import datetime
 
 
+class MetricsStatusResponse(BaseModel):
+    density_deviation: str
+    incident_frequency: str
+    phase_transition_latency: str
+    zone_behavior_adherence: str
+
+
 router = APIRouter(prefix="/api/analytics", tags=["analytics"])
+
+
+async def _get_metrics_status(session: AsyncSession) -> MetricsStatusResponse:
+    from sqlalchemy import text
+
+    async def _count(table: str, where: str = "") -> tuple[bool, int]:
+        sql = f"SELECT COUNT(*) FROM {table}" + (f" WHERE {where}" if where else "")
+        try:
+            result = await session.execute(text(sql))
+            return True, int(result.scalar_one())
+        except Exception:
+            return False, 0
+
+    # 1. Desviación de Densidad: predictions + operational_observations
+    pred_ok, pred_count = await _count("predictions")
+    obs_ok, obs_count = await _count("operational_observations")
+    if not pred_ok or not obs_ok:
+        density_status = (
+            "BLOQUEADA — la tabla predictions o operational_observations no existe en la BD."
+        )
+    elif obs_count == 0:
+        density_status = "BLOQUEADA — 0 observaciones reales de densidad para contrastar"
+    elif pred_count == 0:
+        density_status = "BLOQUEADA — no hay predicciones históricas de densidad para contrastar"
+    else:
+        density_status = (
+            f"HABILITADA — {obs_count} observaciones de densidad reales "
+            f"para contrastar contra {pred_count} predicciones"
+        )
+
+    # 2. Frecuencia de Incidentes: operational_events con is_incident=true
+    events_ok, events_count = await _count("operational_events")
+    if not events_ok:
+        incident_status = "LIMITADA — la tabla operational_events no existe en la BD."
+    elif events_count == 0:
+        incident_status = "LIMITADA — 0 eventos registrados sobre los que calcular la frecuencia"
+    else:
+        _, incidents_count = await _count("operational_events", "is_incident = true")
+        if incidents_count == 0:
+            incident_status = f"LIMITADA — solo {events_count} eventos, 0 incidents reales"
+        else:
+            incident_status = (
+                f"HABILITADA — {events_count} eventos con "
+                f"{incidents_count} incidents reales"
+            )
+
+    # 3. Latencia de Transición de Fases: siempre bloqueada por RFC-006
+    latency_status = (
+        "BLOQUEADA — no existe actualmente una fuente de observación de transición "
+        "de fase definida. No se modifica operational_events en esta fase."
+    )
+
+    # 4. Adherencia a ZoneBehavior: operational_observations + zone_behaviors
+    obs2_ok, obs2_count = await _count("operational_observations")
+    behaviors_ok, behaviors_count = await _count("zone_behaviors")
+    if not obs2_ok:
+        adherence_status = "BLOQUEADA — requiere la tabla operational_observations (ausente)."
+    elif not behaviors_ok:
+        adherence_status = "BLOQUEADA — requiere la tabla zone_behaviors (ausente)."
+    elif obs2_count == 0:
+        adherence_status = (
+            "BLOQUEADA — requiere operational_observations (actualmente 0 registros)."
+        )
+    elif behaviors_count == 0:
+        adherence_status = (
+            "BLOQUEADA — requiere reference en zone_behaviors (actualmente 0 registros)."
+        )
+    else:
+        adherence_status = (
+            f"HABILITADA — {obs2_count} observaciones para contrastar contra "
+            f"{behaviors_count} ZoneBehavior de referencia"
+        )
+
+    return MetricsStatusResponse(
+        density_deviation=density_status,
+        incident_frequency=incident_status,
+        phase_transition_latency=latency_status,
+        zone_behavior_adherence=adherence_status,
+    )
+
+
+@router.get(
+    "/metrics-status",
+    response_model=MetricsStatusResponse,
+)
+async def get_metrics_status(
+    db: AsyncSession = Depends(get_async_db),
+):
+    """Endpoint de estado de métricas RFC-006 §5 (solo lectura)."""
+    async with async_session_maker() as session:
+        return await _get_metrics_status(session)
 
 
 async def _get_workflow_service(session: AsyncSession):
@@ -137,13 +237,11 @@ async def list_recommendations(
                 target_entity_type=m.target_entity_type,
                 target_entity_id=m.target_entity_id,
                 proposed_change=m.proposed_change or "",
-                recommendation_type=(
-                    type(m.recommendation_type).__name__ if m.recommendation_type else None
-                ),
+                recommendation_type=m.recommendation_type if m.recommendation_type else None,
                 supporting_metrics=m.supporting_metrics,
                 historic_trace=m.historic_trace,
                 recommendation_confidence=m.recommendation_confidence,
-                status=type(m.status).__name__ if m.status else "pending_review",
+                status=m.status if m.status else "pending_review",
                 generated_at=m.generated_at,
                 km_version_analyzed=m.km_version_analyzed,
                 algorithm_version=m.algorithm_version,
@@ -186,13 +284,11 @@ async def get_recommendation(
             target_entity_type=model.target_entity_type,
             target_entity_id=model.target_entity_id,
             proposed_change=model.proposed_change or "",
-            recommendation_type=(
-                type(model.recommendation_type).__name__ if model.recommendation_type else None
-            ),
+            recommendation_type=model.recommendation_type if model.recommendation_type else None,
             supporting_metrics=model.supporting_metrics,
             historic_trace=model.historic_trace,
             recommendation_confidence=model.recommendation_confidence,
-            status=type(model.status).__name__ if model.status else "pending_review",
+            status=model.status if model.status else "pending_review",
             generated_at=model.generated_at,
             km_version_analyzed=model.km_version_analyzed,
             algorithm_version=model.algorithm_version,
@@ -257,13 +353,13 @@ async def resolve_recommendation(
             target_entity_type=model.target_entity_type,
             target_entity_id=model.target_entity_id,
             proposed_change=model.proposed_change or "",
-            recommendation_type=type(model.recommendation_type).__name__
+            recommendation_type=model.recommendation_type
             if model.recommendation_type
             else None,
             supporting_metrics=model.supporting_metrics,
             historic_trace=model.historic_trace,
             recommendation_confidence=model.recommendation_confidence,
-            status=type(model.status).__name__ if model.status else "pending_review",
+            status=model.status if model.status else "pending_review",
             generated_at=model.generated_at,
             km_version_analyzed=model.km_version_analyzed,
             algorithm_version=model.algorithm_version,

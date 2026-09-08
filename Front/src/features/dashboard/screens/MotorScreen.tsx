@@ -2,13 +2,15 @@ import { useState } from 'react';
 import { MotorConfigScreen } from './MotorConfigScreen';
 import { EventConfigPage } from '../../../pages/EventConfigPage';
 import { ObservationsScreen } from './ObservationsScreen';
+import { AnalyticsScreen } from './AnalyticsScreen';
 
-type Section = 'config' | 'predictions' | 'observations';
+type Section = 'config' | 'predictions' | 'observations' | 'analytics';
 
 const SECTIONS: { key: Section; label: string }[] = [
   { key: 'config', label: 'Configuración' },
   { key: 'predictions', label: 'Predicciones' },
   { key: 'observations', label: 'Observaciones' },
+  { key: 'analytics', label: 'Analytics' },
 ];
 
 export function MotorScreen() {
@@ -39,6 +41,7 @@ export function MotorScreen() {
         {activeSection === 'config' && <MotorConfigScreen />}
         {activeSection === 'predictions' && <EventConfigPage />}
         {activeSection === 'observations' && <ObservationsScreen />}
+        {activeSection === 'analytics' && <AnalyticsScreen />}
       </main>
     </div>
   );
