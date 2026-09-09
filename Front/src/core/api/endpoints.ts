@@ -77,7 +77,6 @@ export const endpoints = {
     list: '/operational-observations/',
   },
   analytics: {
-    metricsStatus: '/analytics/metrics-status',
     recommendations: (status?: string) =>
       `/analytics/recommendations${status ? `?status=${status}` : ''}`,
     resolveRecommendation: (id: string) => `/analytics/recommendations/${id}/resolve`,

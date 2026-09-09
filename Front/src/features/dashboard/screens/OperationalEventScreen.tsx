@@ -6,6 +6,7 @@ import { useOperationalEvents } from '../hooks/useOperationalEvents';
 import { useOperationalEventMutations } from '../hooks/useOperationalEventMutations';
 import { useEventDays } from '../hooks/useEventDays';
 import { FlowRestrictionSection } from '../components/FlowRestrictionSection';
+import { DashboardHeader } from '../components/DashboardHeader';
 import type {
   OperationalEventDTO,
   OperationalEventCreatePayload,
@@ -741,27 +742,29 @@ export function OperationalEventScreen() {
 
   return (
     <div className="min-h-screen bg-slate-50 w-full">
-      <header className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center">
-        <h1 className="text-xl font-bold text-slate-800">Eventos Operativos</h1>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={refresh}
-            disabled={loading}
-            className="text-sm px-3 py-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium"
-          >
-            {loading ? 'Cargando...' : 'Actualizar'}
-          </button>
-          <button
-            onClick={openCreateForm}
-            disabled={activeSection !== 'events'}
-            className="bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow-sm disabled:opacity-50"
-          >
-            + Nuevo Evento
-          </button>
-        </div>
-      </header>
+      <DashboardHeader
+        title="Incidentes Operativos"
+        actions={
+          <div className="flex items-center gap-3">
+            <button
+              onClick={refresh}
+              disabled={loading}
+              className="text-sm px-3 py-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium"
+            >
+              {loading ? 'Cargando...' : 'Actualizar'}
+            </button>
+            <button
+              onClick={openCreateForm}
+              disabled={activeSection !== 'events'}
+              className="bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow-sm disabled:opacity-50"
+            >
+              + Nuevo Evento
+            </button>
+          </div>
+        }
+      />
 
-      <main className="p-6 max-w-4xl mx-auto">
+      <main className="p-4 sm:p-6 max-w-4xl mx-auto">
         {/* Sub-tabs */}
         <div className="flex gap-2 mb-6">
           <button

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { EventDayScreen } from './EventDayScreen';
 import { AttendanceLevelScreen } from './AttendanceLevelScreen';
+import { DashboardHeader } from '../components/DashboardHeader';
 
 type Section = 'days' | 'attendance';
 
@@ -14,26 +15,24 @@ export function EventConfigScreen() {
 
   return (
     <div className="min-h-screen bg-slate-50 w-full">
-      <header className="bg-white border-b border-slate-200 px-6 py-4">
-        <h1 className="text-xl font-bold text-slate-800">Configuración del Evento</h1>
-        <div className="flex gap-2 mt-3">
-          {SECTIONS.map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setActiveSection(key)}
-              className={`text-sm font-medium px-4 py-2 rounded-lg transition-colors ${
-                activeSection === key
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </header>
+      <DashboardHeader title="Jornadas y Fases" />
+      <div className="flex flex-wrap gap-2 px-4 sm:px-6 py-3">
+        {SECTIONS.map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setActiveSection(key)}
+            className={`text-sm font-medium px-4 py-2 rounded-lg transition-colors ${
+              activeSection === key
+                ? 'bg-indigo-600 text-white'
+                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
-      <main className="p-6">
+      <main className="p-4 sm:p-6">
         {activeSection === 'days' && <EventDayScreen />}
         {activeSection === 'attendance' && <AttendanceLevelScreen />}
       </main>

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAppStore } from '../../../core/state/store';
+import { DashboardHeader } from '../components/DashboardHeader';
 
 interface QuickAction {
   icon: LucideIcon;
@@ -109,47 +110,47 @@ export function DashboardScreen() {
 
   return (
     <div className="min-h-screen bg-slate-50 w-full">
-      <header className="bg-white border-b border-slate-200 px-6 py-4 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold text-slate-800">Centro de Comando</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Operación Territorial</p>
-        </div>
-        <nav className="flex flex-wrap gap-2">
-          <button
-            onClick={() => navigate('/dashboard/event-config')}
-            className="text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"
-          >
-            Jornadas y Fases
-          </button>
-          <button
-            onClick={() => navigate('/dashboard/infrastructure')}
-            className="text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"
-          >
-            Gestión de Zonas
-          </button>
-          <button
-            onClick={() => navigate('/dashboard/operational-events')}
-            className="text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"
-          >
-            Registrar Incidente
-          </button>
-          <button
-            onClick={() => navigate('/dashboard/motor')}
-            className="text-sm bg-purple-600 hover:bg-purple-700 text-white py-2 px-3 rounded-lg transition-colors"
-          >
-            Motor y Análisis
-          </button>
-          <button
-            onClick={handleLogout}
-            type="button"
-            className="text-sm bg-red-600 hover:bg-red-700 text-white py-2 px-3 rounded-lg transition-colors"
-          >
-            Cerrar Sesión
-          </button>
-        </nav>
-      </header>
+      <DashboardHeader
+        title="Centro de Comando"
+        subtitle="Operación Territorial"
+        actions={
+          <nav className="flex flex-wrap gap-2">
+            <button
+              onClick={() => navigate('/dashboard/event-config')}
+              className="text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"
+            >
+              Jornadas y Fases
+            </button>
+            <button
+              onClick={() => navigate('/dashboard/infrastructure')}
+              className="text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"
+            >
+              Gestión de Zonas
+            </button>
+            <button
+              onClick={() => navigate('/dashboard/operational-events')}
+              className="text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"
+            >
+              Registrar Incidente
+            </button>
+            <button
+              onClick={() => navigate('/dashboard/motor')}
+              className="text-sm bg-purple-600 hover:bg-purple-700 text-white py-2 px-3 rounded-lg transition-colors"
+            >
+              Motor y Análisis
+            </button>
+            <button
+              onClick={handleLogout}
+              type="button"
+              className="text-sm bg-red-600 hover:bg-red-700 text-white py-2 px-3 rounded-lg transition-colors"
+            >
+              Cerrar Sesión
+            </button>
+          </nav>
+        }
+      />
 
-      <main className="p-6 max-w-5xl mx-auto space-y-8">
+      <main className="p-4 sm:p-6 max-w-5xl mx-auto space-y-8">
         <section>
           <h2 className="text-lg font-semibold text-slate-700 mb-4">Acciones Rápidas</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

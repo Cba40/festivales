@@ -4,34 +4,7 @@ import { endpoints } from '../core/api/endpoints';
 import type {
   AuditLogEntryDTO,
   ConfigurationRecommendationDTO,
-  MetricsStatusDTO,
 } from '../features/dashboard/types';
-
-export function useMetricsStatus() {
-  const [metrics, setMetrics] = useState<MetricsStatusDTO | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchMetrics = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const { data } = await apiClient.get<MetricsStatusDTO>(
-        endpoints.analytics.metricsStatus
-      );
-      setMetrics(data);
-    } catch (err: unknown) {
-      setError(
-        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
-          (err instanceof Error ? err.message : 'Error al cargar el estado de métricas')
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  return { metrics, isLoading, error, fetchMetrics };
-}
 
 export function useRecommendations(statusFilter?: 'pending_review' | 'approved' | 'rejected') {
   const [recommendations, setRecommendations] = useState<ConfigurationRecommendationDTO[]>([]);

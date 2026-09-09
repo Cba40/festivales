@@ -2,41 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { RefreshCw, X } from 'lucide-react';
 import {
   useAuditLog,
-  useMetricsStatus,
   useRecommendations,
   useResolveRecommendation,
 } from '@/hooks/useAnalytics';
 import type { ConfigurationRecommendationDTO } from '@/features/dashboard/types';
-
-interface MetricCardProps {
-  title: string;
-  status: string;
-}
-
-function getStatusBadge(status: string): { label: string; className: string } {
-  if (status.startsWith('HABILITADA')) {
-    return { label: 'HABILITADA', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
-  }
-  if (status.startsWith('LIMITADA')) {
-    return { label: 'LIMITADA', className: 'bg-amber-50 text-amber-700 border-amber-200' };
-  }
-  return { label: 'BLOQUEADA', className: 'bg-red-50 text-red-700 border-red-200' };
-}
-
-function MetricCard({ title, status }: MetricCardProps) {
-  const badge = getStatusBadge(status);
-  return (
-    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-2">
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
-        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${badge.className}`}>
-          {badge.label}
-        </span>
-      </div>
-      <p className="text-xs text-slate-600 leading-relaxed">{status}</p>
-    </div>
-  );
-}
 
 function formatDate(value: string | null): string {
   if (!value) return '—';
@@ -227,7 +196,6 @@ function RecDetailModal({ recommendation, onClose, onResolved }: RecDetailModalP
 }
 
 export function AnalyticsScreen() {
-  const { metrics, isLoading: metricsLoading, error: metricsError, fetchMetrics } = useMetricsStatus();
   const {
     recommendations,
     isLoading: recsLoading,
@@ -241,9 +209,8 @@ export function AnalyticsScreen() {
   const selectedRec = recommendations.find((r) => r.id === selectedId) ?? null;
 
   useEffect(() => {
-    fetchMetrics();
     fetchRecommendations();
-  }, [fetchMetrics, fetchRecommendations]);
+  }, [fetchRecommendations]);
 
   useEffect(() => {
     if (selectedId) fetchAuditLog(selectedId);
@@ -259,41 +226,20 @@ export function AnalyticsScreen() {
       <div className="flex justify-end">
         <button
           onClick={() => {
-            fetchMetrics();
             fetchRecommendations();
             if (selectedId) fetchAuditLog(selectedId);
           }}
-          disabled={metricsLoading || recsLoading}
+          disabled={recsLoading}
           className="flex items-center gap-1 text-sm px-3 py-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium disabled:opacity-50"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${metricsLoading || recsLoading ? 'animate-spin' : ''}`} />
-          {metricsLoading || recsLoading ? 'Cargando...' : 'Actualizar'}
+          <RefreshCw className={`w-3.5 h-3.5 ${recsLoading ? 'animate-spin' : ''}`} />
+          {recsLoading ? 'Cargando...' : 'Actualizar'}
         </button>
       </div>
 
-      {metricsError && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{metricsError}</div>
-      )}
       {recsError && (
         <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{recsError}</div>
       )}
-
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold text-slate-800">Estado de Métricas (RFC-006 §5)</h2>
-        {!metrics && !metricsLoading && !metricsError && (
-          <div className="text-center py-8 text-slate-400 italic">Sin datos de métricas.</div>
-        )}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {metrics && (
-            <>
-              <MetricCard title="Desviación de Densidad" status={metrics.density_deviation} />
-              <MetricCard title="Frecuencia de Incidentes" status={metrics.incident_frequency} />
-              <MetricCard title="Latencia de Transición de Fases" status={metrics.phase_transition_latency} />
-              <MetricCard title="Adherencia a ZoneBehavior" status={metrics.zone_behavior_adherence} />
-            </>
-          )}
-        </div>
-      </section>
 
       <section className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
