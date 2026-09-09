@@ -28,7 +28,7 @@ const QUICK_ACTIONS: QuickAction[] = [
     description: 'Ingresar densidad o estado manual de una zona.',
     accent: 'text-indigo-600',
     iconBg: 'bg-indigo-50 border-indigo-100',
-    path: '/dashboard/motor',
+    path: '/dashboard/motor?tab=observations',
     hint: 'Ir a Motor › Observaciones',
   },
   {
@@ -45,7 +45,7 @@ const QUICK_ACTIONS: QuickAction[] = [
     description: 'Monitorear estado y saturación del territorio.',
     accent: 'text-emerald-600',
     iconBg: 'bg-emerald-50 border-emerald-100',
-    path: '/dashboard/motor',
+    path: '/dashboard/motor?tab=predictions',
     hint: 'Ir a Motor › Predicciones',
   },
   {
@@ -54,7 +54,7 @@ const QUICK_ACTIONS: QuickAction[] = [
     description: 'Revisar sugerencias de ajuste del motor.',
     accent: 'text-amber-600',
     iconBg: 'bg-amber-50 border-amber-100',
-    path: '/dashboard/motor',
+    path: '/dashboard/motor?tab=analytics',
     hint: 'Ir a Motor › Analytics',
   },
 ];

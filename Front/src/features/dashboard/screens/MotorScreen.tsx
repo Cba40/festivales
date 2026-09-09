@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { MotorConfigScreen } from './MotorConfigScreen';
 import { EventConfigPage } from '../../../pages/EventConfigPage';
 import { ObservationsScreen } from './ObservationsScreen';
@@ -13,8 +14,19 @@ const SECTIONS: { key: Section; label: string }[] = [
   { key: 'analytics', label: 'Analytics' },
 ];
 
+const SECTION_KEYS: Section[] = SECTIONS.map((s) => s.key);
+
 export function MotorScreen() {
-  const [activeSection, setActiveSection] = useState<Section>('config');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTab = searchParams.get('tab') as Section | null;
+  const [activeSection, setActiveSection] = useState<Section>(
+    requestedTab && SECTION_KEYS.includes(requestedTab) ? requestedTab : 'config',
+  );
+
+  const selectSection = (section: Section) => {
+    setActiveSection(section);
+    setSearchParams({ tab: section });
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 w-full">
@@ -24,7 +36,7 @@ export function MotorScreen() {
           {SECTIONS.map(({ key, label }) => (
             <button
               key={key}
-              onClick={() => setActiveSection(key)}
+              onClick={() => selectSection(key)}
               className={`text-sm font-medium px-4 py-2 rounded-lg transition-colors ${
                 activeSection === key
                   ? 'bg-purple-600 text-white'
