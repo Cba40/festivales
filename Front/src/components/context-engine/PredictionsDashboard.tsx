@@ -1,5 +1,22 @@
-import { useState, useEffect } from 'react';
-import { RefreshCw, Activity, Users, ShieldBan, Clock, Info } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import {
+  RefreshCw,
+  Activity,
+  Users,
+  ShieldBan,
+  Clock,
+  Info,
+  Search,
+  X,
+  LogOut,
+  Wrench,
+  Bus,
+  Car,
+  Utensils,
+  Hotel,
+  MapPin,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { EVENT_ID } from './constants';
 import { useTerritorialPrediction, useAutoRefresh } from '../../hooks/useContextEngine';
 import type { ZoneStateItem } from '../../hooks/useContextEngine';
@@ -38,6 +55,47 @@ function getSaturationBarColor(value: number): string {
   return 'bg-red-600';
 }
 
+const TYPE_LABELS: Record<string, string> = {
+  salida: 'Salidas',
+  servicios: 'Servicios',
+  transporte: 'Transporte',
+  estacionamiento: 'Estacionamientos',
+  comida: 'Gastronomía',
+  gastronomia: 'Gastronomía',
+  hospedaje: 'Alojamiento',
+};
+
+const TYPE_ICONS: Record<string, LucideIcon> = {
+  salida: LogOut,
+  servicios: Wrench,
+  transporte: Bus,
+  estacionamiento: Car,
+  comida: Utensils,
+  gastronomia: Utensils,
+  hospedaje: Hotel,
+};
+
+function getTypeLabel(type: string): string {
+  return TYPE_LABELS[type] ?? type.charAt(0).toUpperCase() + type.slice(1);
+}
+
+function getTypeIcon(type: string): LucideIcon {
+  return TYPE_ICONS[type] ?? MapPin;
+}
+
+function normalizeText(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+interface ZoneGroup {
+  type: string;
+  subtypes: string[];
+  items: ZoneStateItem[];
+}
+
 interface ZoneInfo {
   id: string;
   name: string;
@@ -55,6 +113,7 @@ export function PredictionsDashboard({ eventId, autoRefreshMs = 15000 }: Predict
   const { data, loading, error, refresh } = useTerritorialPrediction(eid);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [zonesById, setZonesById] = useState<Record<string, { name: string; type: string }>>({});
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     refresh();
@@ -81,6 +140,140 @@ export function PredictionsDashboard({ eventId, autoRefreshMs = 15000 }: Predict
   useAutoRefresh(refresh, autoRefreshMs, autoRefresh);
 
   const zoneStates: ZoneStateItem[] = data?.zone_states ?? [];
+
+  const filteredGroups: ZoneGroup[] = useMemo(() => {
+    const term = normalizeText(searchTerm.trim());
+    const visible = term
+      ? zoneStates.filter((zs) => {
+          const zona = zonesById[zs.zone_id];
+          const haystack = normalizeText(`${zona?.name ?? ''} ${zs.type} ${zs.subtipo ?? ''}`);
+          return haystack.includes(term);
+        })
+      : zoneStates;
+
+    const byType = new Map<string, ZoneStateItem[]>();
+    for (const zs of visible) {
+      const type = zs.type ?? 'desconocida';
+      const list = byType.get(type) ?? [];
+      list.push(zs);
+      byType.set(type, list);
+    }
+
+    const groups: ZoneGroup[] = [];
+    for (const [type, items] of byType) {
+      items.sort((a, b) => {
+        const nameA = (zonesById[a.zone_id]?.name ?? a.type).toLocaleLowerCase('es');
+        const nameB = (zonesById[b.zone_id]?.name ?? b.type).toLocaleLowerCase('es');
+        return nameA.localeCompare(nameB, 'es');
+      });
+      const subtypes = Array.from(
+        new Set(items.map((it) => it.subtipo).filter((s): s is string => Boolean(s))),
+      ).sort((a, b) => a.localeCompare(b, 'es'));
+      groups.push({ type, items, subtypes });
+    }
+
+    groups.sort((a, b) => getTypeLabel(a.type).localeCompare(getTypeLabel(b.type), 'es'));
+    return groups;
+  }, [zoneStates, zonesById, searchTerm]);
+
+  const renderZoneCard = (zs: ZoneStateItem) => {
+    const zona = zonesById[zs.zone_id];
+    const name = zona?.name || zs.type || 'Zona';
+    const typeLabel = zona?.type || zs.type || 'desconocida';
+    const statusStyle = getStateStyle(zs.operational_state);
+    const restriction = RESTRICTION_LABELS[zs.active_restriction] || zs.active_restriction;
+    const missingDetailedMetrics =
+      zs.saturation_level == null &&
+      zs.availability == null &&
+      zs.confidence == null &&
+      zs.estimated_wait == null;
+    return (
+      <div key={zs.zone_id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <span className="text-sm font-semibold text-slate-800">{name}</span>
+            <span className="ml-2 text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">{typeLabel}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {zs.active_restriction !== 'OPEN' && (
+              <span className="flex items-center gap-1 text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                <ShieldBan size={11} />
+                {restriction}
+              </span>
+            )}
+            <div className={`w-2.5 h-2.5 rounded-full ${statusStyle.color}`} />
+            <span className="text-xs font-medium text-slate-600">{statusStyle.label}</span>
+          </div>
+        </div>
+
+        {missingDetailedMetrics && (
+          <div className="mb-2">
+            <span
+              className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-full px-2 py-0.5"
+              title="El motor aún no ejecuta un modelo especializado que produzca saturación, disponibilidad y confianza para esta zona."
+            >
+              <Info size={11} />
+              Métricas detalladas pendientes de modelo especializado
+            </span>
+          </div>
+        )}
+
+        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden mb-3">
+          <div
+            className={`h-full rounded-full transition-all ${
+              zs.saturation_level != null ? getSaturationBarColor(zs.saturation_level) : 'bg-slate-200'
+            }`}
+            style={{
+              width: `${zs.saturation_level != null ? Math.min(zs.saturation_level * 100, 100) : 0}%`,
+            }}
+          />
+        </div>
+
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-slate-50 rounded-lg p-2 text-center">
+            <Activity className="w-3.5 h-3.5 text-slate-400 mx-auto mb-0.5" />
+            <div className="text-xs font-semibold text-slate-700">
+              {zs.saturation_level != null ? zs.saturation_level.toFixed(2) : NO_DATA}
+            </div>
+            <div className="text-[9px] text-slate-400">Saturación</div>
+          </div>
+          <div className="bg-slate-50 rounded-lg p-2 text-center">
+            <Users className="w-3.5 h-3.5 text-slate-400 mx-auto mb-0.5" />
+            <div className="text-xs font-semibold text-slate-700">
+              {zs.availability != null ? zs.availability : NO_DATA}
+            </div>
+            <div className="text-[9px] text-slate-400">Disponibilidad</div>
+          </div>
+          <div className="bg-slate-50 rounded-lg p-2 text-center">
+            <RefreshCw className="w-3.5 h-3.5 text-slate-400 mx-auto mb-0.5" />
+            <div className="text-xs font-semibold text-slate-700">
+              {zs.confidence != null ? zs.confidence.toFixed(2) : NO_DATA}
+            </div>
+            <div className="text-[9px] text-slate-400">Confianza</div>
+          </div>
+        </div>
+
+        <div className="mt-2 flex items-center gap-3 text-[10px] text-slate-400">
+          <span className="capitalize">Estado: {zs.operational_state.replace(/_/g, ' ')}</span>
+          <span className="flex items-center gap-1">
+            <Clock size={11} />
+            Espera: {zs.estimated_wait != null ? `${zs.estimated_wait} min` : NO_DATA}
+          </span>
+        </div>
+
+        {zs.reasoning_factors && zs.reasoning_factors.length > 0 && (
+          <details className="mt-2">
+            <summary className="text-[10px] text-slate-400 cursor-pointer hover:text-slate-600">Factores de decisión</summary>
+            <div className="mt-1 space-y-1">
+              {zs.reasoning_factors.map((f, i) => (
+                <div key={i} className="text-[10px] text-slate-500">• {f}</div>
+              ))}
+            </div>
+          </details>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -139,104 +332,56 @@ export function PredictionsDashboard({ eventId, autoRefreshMs = 15000 }: Predict
       {zoneStates.length > 0 && (
         <div className="space-y-2">
           <h3 className="text-sm font-semibold text-slate-700">Zonas ({zoneStates.length})</h3>
-          {zoneStates.map((zs) => {
-            const zona = zonesById[zs.zone_id];
-            const name = zona?.name || zs.type || 'Zona';
-            const typeLabel = zona?.type || zs.type || 'desconocida';
-            const statusStyle = getStateStyle(zs.operational_state);
-            const restriction = RESTRICTION_LABELS[zs.active_restriction] || zs.active_restriction;
-            const missingDetailedMetrics =
-              zs.saturation_level == null &&
-              zs.availability == null &&
-              zs.confidence == null &&
-              zs.estimated_wait == null;
-            return (
-              <div key={zs.zone_id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <span className="text-sm font-semibold text-slate-800">{name}</span>
-                    <span className="ml-2 text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">{typeLabel}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {zs.active_restriction !== 'OPEN' && (
-                      <span className="flex items-center gap-1 text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
-                        <ShieldBan size={11} />
-                        {restriction}
+
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Buscar zona por nombre..."
+              className="w-full pl-9 pr-9 py-2 text-sm rounded-lg border border-slate-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none bg-white"
+            />
+            {searchTerm.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                aria-label="Limpiar búsqueda"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          {filteredGroups.length === 0 ? (
+            <div className="text-center py-8 text-slate-400 italic">
+              No se encontraron zonas que coincidan con &quot;{searchTerm}&quot;.
+            </div>
+          ) : (
+            filteredGroups.map((group) => {
+              const Icon = getTypeIcon(group.type);
+              return (
+                <div key={group.type}>
+                  <div className="flex items-center justify-between mt-4 mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+                        <Icon className="w-4 h-4 text-indigo-500" />
+                        {getTypeLabel(group.type)}
                       </span>
+                      <span className="text-[10px] font-medium bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">
+                        {group.items.length} {group.items.length === 1 ? 'zona' : 'zonas'}
+                      </span>
+                    </div>
+                    {group.subtypes.length > 0 && (
+                      <span className="text-[10px] text-slate-400">{group.subtypes.join(' · ')}</span>
                     )}
-                    <div className={`w-2.5 h-2.5 rounded-full ${statusStyle.color}`} />
-                    <span className="text-xs font-medium text-slate-600">{statusStyle.label}</span>
                   </div>
+                  <div className="space-y-2">{group.items.map(renderZoneCard)}</div>
                 </div>
-
-                {missingDetailedMetrics && (
-                  <div className="mb-2">
-                    <span
-                      className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-full px-2 py-0.5"
-                      title="El motor aún no ejecuta un modelo especializado que produzca saturación, disponibilidad y confianza para esta zona."
-                    >
-                      <Info size={11} />
-                      Métricas detalladas pendientes de modelo especializado
-                    </span>
-                  </div>
-                )}
-
-                <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden mb-3">
-                  <div
-                    className={`h-full rounded-full transition-all ${
-                      zs.saturation_level != null ? getSaturationBarColor(zs.saturation_level) : 'bg-slate-200'
-                    }`}
-                    style={{
-                      width: `${zs.saturation_level != null ? Math.min(zs.saturation_level * 100, 100) : 0}%`,
-                    }}
-                  />
-                </div>
-
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-slate-50 rounded-lg p-2 text-center">
-                    <Activity className="w-3.5 h-3.5 text-slate-400 mx-auto mb-0.5" />
-                    <div className="text-xs font-semibold text-slate-700">
-                      {zs.saturation_level != null ? zs.saturation_level.toFixed(2) : NO_DATA}
-                    </div>
-                    <div className="text-[9px] text-slate-400">Saturación</div>
-                  </div>
-                  <div className="bg-slate-50 rounded-lg p-2 text-center">
-                    <Users className="w-3.5 h-3.5 text-slate-400 mx-auto mb-0.5" />
-                    <div className="text-xs font-semibold text-slate-700">
-                      {zs.availability != null ? zs.availability : NO_DATA}
-                    </div>
-                    <div className="text-[9px] text-slate-400">Disponibilidad</div>
-                  </div>
-                  <div className="bg-slate-50 rounded-lg p-2 text-center">
-                    <RefreshCw className="w-3.5 h-3.5 text-slate-400 mx-auto mb-0.5" />
-                    <div className="text-xs font-semibold text-slate-700">
-                      {zs.confidence != null ? zs.confidence.toFixed(2) : NO_DATA}
-                    </div>
-                    <div className="text-[9px] text-slate-400">Confianza</div>
-                  </div>
-                </div>
-
-                <div className="mt-2 flex items-center gap-3 text-[10px] text-slate-400">
-                  <span className="capitalize">Estado: {zs.operational_state.replace(/_/g, ' ')}</span>
-                  <span className="flex items-center gap-1">
-                    <Clock size={11} />
-                    Espera: {zs.estimated_wait != null ? `${zs.estimated_wait} min` : NO_DATA}
-                  </span>
-                </div>
-
-                {zs.reasoning_factors && zs.reasoning_factors.length > 0 && (
-                  <details className="mt-2">
-                    <summary className="text-[10px] text-slate-400 cursor-pointer hover:text-slate-600">Factores de decisión</summary>
-                    <div className="mt-1 space-y-1">
-                      {zs.reasoning_factors.map((f, i) => (
-                        <div key={i} className="text-[10px] text-slate-500">• {f}</div>
-                      ))}
-                    </div>
-                  </details>
-                )}
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       )}
     </div>
