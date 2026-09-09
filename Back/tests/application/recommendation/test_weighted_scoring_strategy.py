@@ -3,10 +3,7 @@ from uuid import UUID
 
 import pytest
 
-from src.application.recommendation.config import (
-    RecommendationConfig,
-    configure_recommendation,
-)
+from src.application.recommendation.config import RecommendationConfig
 from src.application.recommendation.strategy import WeightedScoringStrategy
 from src.domain.entities.zone_behavior import FlowRestriction
 from src.domain.recommendation.mobility_context import MobilityContext
@@ -19,12 +16,6 @@ from src.domain.recommendation.user_context import AccessLevel, UserContext
 from src.domain.recommendation.zone_recommendation import ZoneRecommendation
 from src.domain.value_objects.territorial_prediction import TerritorialPrediction
 from src.domain.value_objects.zone_state import ZoneState
-
-
-@pytest.fixture(autouse=True)
-def reset_config() -> None:
-    configure_recommendation(RecommendationConfig())
-    yield
 
 
 @pytest.fixture

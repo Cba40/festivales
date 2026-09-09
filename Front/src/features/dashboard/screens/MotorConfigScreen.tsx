@@ -2,13 +2,13 @@ import { useState, useCallback, useEffect } from 'react';
 import { useRecommendationConfig, useStage4Config, useMotorConfigMutations } from '../hooks/useMotorConfig';
 
 function SliderField({
-  label, value, onChange, min, max, step, disabled,
+  label, hint, value, onChange, min, max, step, disabled,
 }: {
-  label: string; value: number; onChange: (v: number) => void;
+  label: string; hint?: string; value: number; onChange: (v: number) => void;
   min: number; max: number; step: number; disabled: boolean;
 }) {
   return (
-    <div className="space-y-1">
+    <div className="space-y-1" title={hint}>
       <div className="flex justify-between text-sm">
         <span className="text-slate-700 font-medium">{label}</span>
         <span className="text-slate-500 font-mono tabular-nums">{value.toFixed(2)}</span>
@@ -19,15 +19,22 @@ function SliderField({
         onChange={(e) => onChange(parseFloat(e.target.value))}
         min={min} max={max} step={step}
         disabled={disabled}
+        title={hint}
+        aria-label={hint ? `${label}: ${hint}` : label}
         className="w-full accent-blue-600 disabled:opacity-50"
       />
       <div className="flex justify-between text-xs text-slate-400">
         <span>{min}</span>
         <span>{max}</span>
       </div>
+      {hint && (
+        <p className="text-xs text-slate-400 leading-snug">{hint}</p>
+      )}
     </div>
   );
 }
+
+const CONFIG_SAVED_MSG = '✅ Configuración aplicada correctamente. Se reflejará en la próxima predicción.';
 
 function ConfigSection({
   title, icon, children,
@@ -85,7 +92,7 @@ export function MotorConfigScreen() {
     setSuccessMsg(null);
     const result = await updateRecommendation(draftRec);
     if (result) {
-      setSuccessMsg('Configuración de recomendaciones guardada');
+      setSuccessMsg(CONFIG_SAVED_MSG);
       setDraftRec(null);
       refreshRec();
     }
@@ -96,7 +103,7 @@ export function MotorConfigScreen() {
     setSuccessMsg(null);
     const result = await updateStage4(draftStg);
     if (result) {
-      setSuccessMsg('Configuración Stage 4 guardada');
+      setSuccessMsg(CONFIG_SAVED_MSG);
       setDraftStg(null);
       refreshStg();
     }
@@ -128,12 +135,12 @@ export function MotorConfigScreen() {
             <p className="text-sm text-slate-400">Cargando...</p>
           ) : (
             <div className="space-y-5">
-              <SliderField label="Umbral de saturación baja" value={draftRec.low_density_saturation_threshold} onChange={(v) => handleRecChange('low_density_saturation_threshold', v)} min={0} max={1} step={0.05} disabled={saving} />
-              <SliderField label="Umbral de razonamiento baja densidad" value={draftRec.low_density_reasoning_threshold} onChange={(v) => handleRecChange('low_density_reasoning_threshold', v)} min={0} max={1} step={0.05} disabled={saving} />
-              <SliderField label="Penalización por zona regulada" value={draftRec.regulated_penalty} onChange={(v) => handleRecChange('regulated_penalty', v)} min={0} max={1} step={0.05} disabled={saving} />
-              <SliderField label="Bonus VIP" value={draftRec.vip_bonus} onChange={(v) => handleRecChange('vip_bonus', v)} min={0} max={1} step={0.05} disabled={saving} />
-              <SliderField label="Bonus Staff" value={draftRec.staff_bonus} onChange={(v) => handleRecChange('staff_bonus', v)} min={0} max={1} step={0.05} disabled={saving} />
-              <SliderField label="Penalización por movilidad" value={draftRec.mobility_penalty} onChange={(v) => handleRecChange('mobility_penalty', v)} min={0} max={1} step={0.05} disabled={saving} />
+              <SliderField label="Umbral de saturación baja" hint="Filtra zonas cuya saturación supere este nivel al buscar baja densidad." value={draftRec.low_density_saturation_threshold} onChange={(v) => handleRecChange('low_density_saturation_threshold', v)} min={0} max={1} step={0.05} disabled={saving} />
+              <SliderField label="Umbral de razonamiento baja densidad" hint="Muestra 'Baja densidad proyectada' si la saturación es menor a este umbral." value={draftRec.low_density_reasoning_threshold} onChange={(v) => handleRecChange('low_density_reasoning_threshold', v)} min={0} max={1} step={0.05} disabled={saving} />
+              <SliderField label="Penalización por zona regulada" hint="Penaliza el score de zonas con restricción REGULATED." value={draftRec.regulated_penalty} onChange={(v) => handleRecChange('regulated_penalty', v)} min={0} max={1} step={0.05} disabled={saving} />
+              <SliderField label="Bonus VIP" hint="Suma al score de los usuarios con acceso VIP." value={draftRec.vip_bonus} onChange={(v) => handleRecChange('vip_bonus', v)} min={0} max={1} step={0.05} disabled={saving} />
+              <SliderField label="Bonus Staff" hint="Suma al score de los usuarios con acceso STAFF." value={draftRec.staff_bonus} onChange={(v) => handleRecChange('staff_bonus', v)} min={0} max={1} step={0.05} disabled={saving} />
+              <SliderField label="Penalización por movilidad" hint="Penaliza el score cuando la zona no es la actual del usuario." value={draftRec.mobility_penalty} onChange={(v) => handleRecChange('mobility_penalty', v)} min={0} max={1} step={0.05} disabled={saving} />
               <div className="pt-2">
                 <button
                   onClick={handleSaveRec}
@@ -153,8 +160,8 @@ export function MotorConfigScreen() {
             <p className="text-sm text-slate-400">Cargando...</p>
           ) : (
             <div className="space-y-5">
-              <SliderField label="Umbral de saturación alta" value={draftStg.saturation_high_threshold} onChange={(v) => handleStgChange('saturation_high_threshold', v)} min={0} max={1} step={0.05} disabled={saving} />
-              <SliderField label="Umbral de saturación moderada" value={draftStg.saturation_moderate_threshold} onChange={(v) => handleStgChange('saturation_moderate_threshold', v)} min={0} max={1} step={0.05} disabled={saving} />
+              <SliderField label="Umbral de saturación alta" hint="Con densidad/capacidad ≥ este valor la zona se clasifica como alta demanda." value={draftStg.saturation_high_threshold} onChange={(v) => handleStgChange('saturation_high_threshold', v)} min={0} max={1} step={0.05} disabled={saving} />
+              <SliderField label="Umbral de saturación moderada" hint="Con densidad/capacidad ≥ este valor la zona se clasifica como demanda moderada." value={draftStg.saturation_moderate_threshold} onChange={(v) => handleStgChange('saturation_moderate_threshold', v)} min={0} max={1} step={0.05} disabled={saving} />
 
               <div className="pt-2">
                 <button

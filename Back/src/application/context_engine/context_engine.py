@@ -20,6 +20,7 @@ from src.application.context_engine.stage4_model_execution import (
 from src.application.context_engine.stage4_zone_state_derivation import (
     derive_zone_states,
 )
+from src.application.context_engine.stage4_config import Stage4Config
 from src.application.context_engine.stage5_prediction_assembly import (
     assemble_prediction,
 )
@@ -53,6 +54,7 @@ class ContextEngine:
         event_day: EventDay,
         events: Sequence[OperationalEvent],
         knowledge_model_version_id: UUID | None = None,
+        config: Stage4Config | None = None,
     ) -> TerritorialPrediction:
         active_event_day_phase, active_operational_phase = resolve_contextual_phase(
             event_day,
@@ -88,6 +90,7 @@ class ContextEngine:
             zones,
             events,
             evaluation_result,
+            config=config,
             model_results=model_results,
         )
 

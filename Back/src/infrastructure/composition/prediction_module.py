@@ -29,6 +29,7 @@ from src.application.context_engine.stage1_context_resolution import (
     LOCAL_TZ,
     resolve_active_event_day,
 )
+from src.application.context_engine.stage4_config import get_stage4_config
 from src.application.knowledge_model.snapshot_service import KnowledgeModelSnapshotService
 from src.application.use_cases.generate_prediction import GeneratePrediction
 from src.application.use_cases.get_prediction import GetTerritorialPrediction
@@ -455,6 +456,8 @@ class PredictionModule:
         snapshot = await snapshot_service.capture_current_snapshot(self._db)
         km_version = await snapshot_service.get_or_create_version(self._db, snapshot)
 
+        stage4_config = await get_stage4_config(self._db)
+
         engine = ContextEngine()
         event_day_repo = _PreloadedEventDayRepository(event_day)
         event_repo = OperationalEventAdapter(self._db)
@@ -478,6 +481,7 @@ class PredictionModule:
             attendance_level=attendance_level,
             operational_phases=operational_phases,
             knowledge_model_version_id=km_version.id,
+            config=stage4_config,
         )
 
         return prediction

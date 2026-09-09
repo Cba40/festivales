@@ -3,10 +3,7 @@ from uuid import UUID
 
 import pytest
 
-from src.application.recommendation.config import (
-    RecommendationConfig,
-    configure_recommendation,
-)
+from src.application.recommendation.config import RecommendationConfig
 from src.application.recommendation.exceptions import (
     RecommendationNotPossible,
     RecommendationServiceError,
@@ -51,12 +48,6 @@ class FakeStrategy:
             "config": config,
         }
         return list(self._return_value)
-
-
-@pytest.fixture(autouse=True)
-def reset_config() -> None:
-    configure_recommendation(RecommendationConfig())
-    yield
 
 
 @pytest.fixture

@@ -137,16 +137,15 @@ class TestPutRecommendationConfig:
         response = client.put(self.PUT_URL, json=payload, headers=auth_headers)
         assert response.status_code == 422
 
-    def test_calls_configure_recommendation(self, client, auth_headers, mock_async_db):
+    def test_updates_recommendation_config_row(self, client, auth_headers, mock_async_db):
         model = _as_model_attrs(DEFAULT_RECOMMENDATION_CONFIG)
         _mock_db_query(mock_async_db, model)
-        with patch("app.crud.motor_config.configure_recommendation") as mock_configure:
-            payload = {"low_density_saturation_threshold": 0.9}
-            response = client.put(self.PUT_URL, json=payload, headers=auth_headers)
+        payload = {"low_density_saturation_threshold": 0.9}
+        response = client.put(self.PUT_URL, json=payload, headers=auth_headers)
         assert response.status_code == 200
-        mock_configure.assert_called_once()
-        called_config = mock_configure.call_args[0][0]
-        assert called_config.low_density_saturation_threshold == 0.9
+        data = response.json()
+        assert data["low_density_saturation_threshold"] == 0.9
+        assert mock_async_db.commit.called
 
     def test_returns_401_without_auth(self, client):
         payload = {"low_density_saturation_threshold": 0.8}
@@ -188,16 +187,15 @@ class TestPutStage4Config:
         response = client.put(self.PUT_URL, json=payload, headers=auth_headers)
         assert response.status_code == 422
 
-    def test_calls_configure_stage4(self, client, auth_headers, mock_async_db):
+    def test_updates_stage4_config_row(self, client, auth_headers, mock_async_db):
         model = _as_model_attrs(DEFAULT_STAGE4_CONFIG)
         _mock_db_query(mock_async_db, model)
-        with patch("app.crud.motor_config.configure_stage4") as mock_configure:
-            payload = {"saturation_high_threshold": 0.85}
-            response = client.put(self.PUT_URL, json=payload, headers=auth_headers)
+        payload = {"saturation_high_threshold": 0.85}
+        response = client.put(self.PUT_URL, json=payload, headers=auth_headers)
         assert response.status_code == 200
-        mock_configure.assert_called_once()
-        called_config = mock_configure.call_args[0][0]
-        assert called_config.saturation_high_threshold == 0.85
+        data = response.json()
+        assert data["saturation_high_threshold"] == 0.85
+        assert mock_async_db.commit.called
 
     def test_returns_401_without_auth(self, client):
         payload = {"saturation_high_threshold": 0.95}

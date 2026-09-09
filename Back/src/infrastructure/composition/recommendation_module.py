@@ -28,6 +28,8 @@ from src.application.context_engine.stage1_context_resolution import (
     LOCAL_TZ,
     resolve_active_event_day,
 )
+from src.application.context_engine.stage4_config import get_stage4_config
+from src.application.recommendation.config import get_recommendation_config
 from src.application.recommendation.recommendation_service import RecommendationService
 from src.application.use_cases.generate_prediction import GeneratePrediction
 from src.domain.entities.attendance_level import AttendanceLevel
@@ -450,6 +452,9 @@ class RecommendationModule:
         event_repo = OperationalEventAdapter(self._db)
         prediction_repo = _CapturePredictionRepository()
 
+        stage4_config = await get_stage4_config(self._db)
+        recommendation_config = await get_recommendation_config(self._db)
+
         generate_prediction = GeneratePrediction(
             engine=engine,
             event_day_repo=event_day_repo,
@@ -464,6 +469,7 @@ class RecommendationModule:
             zone_behaviors=zone_behaviors,
             attendance_level=attendance_level,
             operational_phases=operational_phases,
+            config=stage4_config,
         )
 
         # ETAPA 4 — puente Parking V1 → ZoneState → TerritorialPrediction.
@@ -510,6 +516,7 @@ class RecommendationModule:
             mobility_context=mobility_context,
             requested_action=requested_action,
             limit=limit,
+            config=recommendation_config,
             zone_coordinates=zone_coordinates,
         )
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-
-_STAGE4_CONFIG: Stage4Config | None = None
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class Stage4Config:
@@ -22,13 +22,20 @@ class Stage4Config:
         return self._saturation_moderate_threshold
 
 
-def get_stage4_config() -> Stage4Config:
-    global _STAGE4_CONFIG
-    if _STAGE4_CONFIG is None:
-        _STAGE4_CONFIG = Stage4Config()
-    return _STAGE4_CONFIG
+async def get_stage4_config(db: AsyncSession) -> Stage4Config:
+    """Lee la configuración de Stage 4 desde la base de datos.
 
+    Consulta directa a `stage4_config` en cada request para garantizar
+    consistencia entre workers (sin singleton en memoria).
+    Si no existe registro, devuelve la instancia por defecto.
+    """
+    from app.models.motor_config import Stage4ConfigModel
 
-def configure_stage4(config: Stage4Config) -> None:
-    global _STAGE4_CONFIG
-    _STAGE4_CONFIG = config
+    result = await db.execute(select(Stage4ConfigModel).limit(1))
+    row = result.scalar_one_or_none()
+    if row is None:
+        return Stage4Config()
+    return Stage4Config(
+        saturation_high_threshold=float(row.saturation_high_threshold),
+        saturation_moderate_threshold=float(row.saturation_moderate_threshold),
+    )

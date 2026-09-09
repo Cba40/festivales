@@ -7,7 +7,7 @@ from src.application.context_engine.dto import (
     EventEvaluationResult,
     ZoneBehaviorApplicationResult,
 )
-from src.application.context_engine.stage4_config import Stage4Config, get_stage4_config
+from src.application.context_engine.stage4_config import Stage4Config
 from src.domain.entities.operational_event import OperationalEvent
 from src.domain.models.specialized_model import ModelSpecificResult
 from src.domain.entities.zone import Zone
@@ -23,7 +23,7 @@ def derive_zone_states(
     config: Stage4Config | None = None,
     model_results: Mapping[UUID, ModelSpecificResult] | None = None,
 ) -> list[ZoneState]:
-    resolved_config = config if config is not None else get_stage4_config()
+    resolved_config = config if config is not None else Stage4Config()
     resolved_model_results = (
         model_results if model_results is not None else {}
     )

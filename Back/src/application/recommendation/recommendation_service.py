@@ -3,10 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from uuid import UUID
 
-from src.application.recommendation.config import (
-    RecommendationConfig,
-    get_recommendation_config,
-)
+from src.application.recommendation.config import RecommendationConfig
 from src.application.recommendation.strategy import (
     RecommendationStrategy,
     WeightedScoringStrategy,
@@ -33,7 +30,9 @@ class RecommendationService:
         config: RecommendationConfig | None = None,
         zone_coordinates: Mapping[UUID, tuple[float, float]] | None = None,
     ) -> list[ZoneRecommendation]:
-        resolved_config = config if config is not None else get_recommendation_config()
+        resolved_config = (
+            config if config is not None else RecommendationConfig()
+        )
 
         if limit == 0:
             return []

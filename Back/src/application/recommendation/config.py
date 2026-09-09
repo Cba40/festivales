@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-_RECOMMENDATION_CONFIG: RecommendationConfig | None = None
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class RecommendationConfig:
@@ -51,13 +52,24 @@ class RecommendationConfig:
         return self._min_availability_threshold
 
 
-def get_recommendation_config() -> RecommendationConfig:
-    global _RECOMMENDATION_CONFIG
-    if _RECOMMENDATION_CONFIG is None:
-        _RECOMMENDATION_CONFIG = RecommendationConfig()
-    return _RECOMMENDATION_CONFIG
+async def get_recommendation_config(db: AsyncSession) -> RecommendationConfig:
+    """Lee la configuración de recomendaciones desde la base de datos.
 
+    Consulta directa a `recommendation_config` en cada request para
+    garantizar consistencia entre workers (sin singleton en memoria).
+    Si no existe registro, devuelve la instancia por defecto.
+    """
+    from app.models.motor_config import RecommendationConfigModel
 
-def configure_recommendation(config: RecommendationConfig) -> None:
-    global _RECOMMENDATION_CONFIG
-    _RECOMMENDATION_CONFIG = config
+    result = await db.execute(select(RecommendationConfigModel).limit(1))
+    row = result.scalar_one_or_none()
+    if row is None:
+        return RecommendationConfig()
+    return RecommendationConfig(
+        low_density_saturation_threshold=float(row.low_density_saturation_threshold),
+        low_density_reasoning_threshold=float(row.low_density_reasoning_threshold),
+        regulated_penalty=float(row.regulated_penalty),
+        vip_bonus=float(row.vip_bonus),
+        staff_bonus=float(row.staff_bonus),
+        mobility_penalty=float(row.mobility_penalty),
+    )

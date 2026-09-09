@@ -4,6 +4,7 @@ from collections.abc import Mapping, Sequence
 from datetime import datetime
 from uuid import UUID
 
+from src.application.context_engine.stage4_config import Stage4Config
 from src.application.use_cases.generate_prediction import GeneratePrediction
 from src.domain.entities.attendance_level import AttendanceLevel
 from src.domain.entities.operational_phase import OperationalPhase
@@ -30,6 +31,7 @@ class GetTerritorialPrediction:
         attendance_level: AttendanceLevel | None,
         operational_phases: Mapping[UUID, OperationalPhase],
         knowledge_model_version_id: UUID | None = None,
+        config: Stage4Config | None = None,
     ) -> TerritorialPrediction:
         existing = await self._prediction_repo.find_by_timestamp(timestamp)
         if existing is not None:
@@ -41,6 +43,7 @@ class GetTerritorialPrediction:
             "zone_behaviors": zone_behaviors,
             "attendance_level": attendance_level,
             "operational_phases": operational_phases,
+            "config": config,
         }
         if knowledge_model_version_id is not None:
             generate_kwargs["knowledge_model_version_id"] = (

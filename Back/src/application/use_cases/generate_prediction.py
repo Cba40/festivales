@@ -11,6 +11,7 @@ from src.application.context_engine.exceptions import (
 from src.application.context_engine.stage1_context_resolution import (
     resolve_active_event_day,
 )
+from src.application.context_engine.stage4_config import Stage4Config
 from src.domain.entities.attendance_level import AttendanceLevel
 from src.domain.entities.operational_phase import OperationalPhase
 from src.domain.entities.zone import Zone
@@ -44,6 +45,7 @@ class GeneratePrediction:
         attendance_level: AttendanceLevel | None,
         operational_phases: Mapping[UUID, OperationalPhase],
         knowledge_model_version_id: UUID | None = None,
+        config: Stage4Config | None = None,
     ) -> TerritorialPrediction:
         event_day = await resolve_active_event_day(
             timestamp,
@@ -66,6 +68,7 @@ class GeneratePrediction:
             "attendance_level": attendance_level,
             "event_day": event_day,
             "events": events,
+            "config": config,
         }
         if knowledge_model_version_id is not None:
             engine_kwargs["knowledge_model_version_id"] = knowledge_model_version_id

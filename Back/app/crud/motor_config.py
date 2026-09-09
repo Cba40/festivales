@@ -3,19 +3,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.motor_config import RecommendationConfigModel, Stage4ConfigModel
 from app.schemas.motor_config import RecommendationConfigUpdate, Stage4ConfigUpdate
-from src.application.context_engine.stage4_config import (
-    Stage4Config,
-    configure_stage4,
-)
-from src.application.recommendation.config import (
-    RecommendationConfig,
-    configure_recommendation,
-)
 
 # NOTA: El import directo app/crud/ → src/application/ es un acoplamiento temporal.
-# La propagación en memoria (configure_recommendation / configure_stage4) solo
-# afecta al worker actual. En despliegues multi-worker se requiere una estrategia
-# de sincronización futura (event bus, shared cache, polling desde DB).
+# La configuración del motor se lee desde la base de datos en cada request
+# (src.application.recommendation.config.get_recommendation_config y
+# src.application.context_engine.stage4_config.get_stage4_config), por lo que
+# no se propaga en memoria al escribir: los workers comparten los mismos valores.
 
 
 async def get_recommendation_config(
@@ -44,15 +37,6 @@ async def update_recommendation_config(
     await db.commit()
     await db.refresh(config)
 
-    motor_cfg = RecommendationConfig(
-        low_density_saturation_threshold=float(config.low_density_saturation_threshold),
-        low_density_reasoning_threshold=float(config.low_density_reasoning_threshold),
-        regulated_penalty=float(config.regulated_penalty),
-        vip_bonus=float(config.vip_bonus),
-        staff_bonus=float(config.staff_bonus),
-        mobility_penalty=float(config.mobility_penalty),
-    )
-    configure_recommendation(motor_cfg)
     return config
 
 
@@ -80,9 +64,4 @@ async def update_stage4_config(
     await db.commit()
     await db.refresh(config)
 
-    motor_cfg = Stage4Config(
-        saturation_high_threshold=float(config.saturation_high_threshold),
-        saturation_moderate_threshold=float(config.saturation_moderate_threshold),
-    )
-    configure_stage4(motor_cfg)
     return config
