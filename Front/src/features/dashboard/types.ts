@@ -212,7 +212,6 @@ export interface RecommendationConfigDTO {
   vip_bonus: number;
   staff_bonus: number;
   mobility_penalty: number;
-  density_deviation_threshold: number;
   created_at: string;
   updated_at: string;
 }
@@ -224,16 +223,11 @@ export interface RecommendationConfigUpdatePayload {
   vip_bonus?: number;
   staff_bonus?: number;
   mobility_penalty?: number;
-  density_deviation_threshold?: number;
 }
 
 export interface Stage4ConfigDTO {
   saturation_high_threshold: number;
   saturation_moderate_threshold: number;
-  confidence_no_events: number;
-  confidence_planned_events: number;
-  confidence_incident: number;
-  wait_time_mapping: number[][];
   created_at: string;
   updated_at: string;
 }
@@ -241,10 +235,6 @@ export interface Stage4ConfigDTO {
 export interface Stage4ConfigUpdatePayload {
   saturation_high_threshold?: number;
   saturation_moderate_threshold?: number;
-  confidence_no_events?: number;
-  confidence_planned_events?: number;
-  confidence_incident?: number;
-  wait_time_mapping?: number[][];
 }
 
 export interface EventDayCreatePayload {

@@ -7,7 +7,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import verify_token
 from app.db.session import get_async_db
 from app.models.attendance_level import AttendanceLevel
 from app.models.event import Event
@@ -188,17 +187,6 @@ async def _build_prediction_response(
             for zs in prediction.zone_states
         ],
     }
-
-
-@router.get("/prediction")
-async def predict(
-    event_id: str,
-    db: AsyncSession = Depends(get_async_db),
-    _=Depends(verify_token),
-):
-    """Endpoint protegido para Dashboard (operador)."""
-    timestamp = datetime.now(timezone.utc)
-    return await _build_prediction_response(db, event_id, timestamp)
 
 
 @router.get("/predictions")

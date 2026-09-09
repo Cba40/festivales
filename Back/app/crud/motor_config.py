@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.motor_config import RecommendationConfigModel, Stage4ConfigModel, _default_wait_mapping
+from app.models.motor_config import RecommendationConfigModel, Stage4ConfigModel
 from app.schemas.motor_config import RecommendationConfigUpdate, Stage4ConfigUpdate
 from src.application.context_engine.stage4_config import (
     Stage4Config,
@@ -51,7 +51,6 @@ async def update_recommendation_config(
         vip_bonus=float(config.vip_bonus),
         staff_bonus=float(config.staff_bonus),
         mobility_penalty=float(config.mobility_penalty),
-        density_deviation_threshold=float(config.density_deviation_threshold),
     )
     configure_recommendation(motor_cfg)
     return config
@@ -81,18 +80,9 @@ async def update_stage4_config(
     await db.commit()
     await db.refresh(config)
 
-    raw_mapping = config.wait_time_mapping or _default_wait_mapping()
-    mapping = [
-        (float(row[0]), float(row[1]), int(row[2]))
-        for row in raw_mapping
-    ]
     motor_cfg = Stage4Config(
         saturation_high_threshold=float(config.saturation_high_threshold),
         saturation_moderate_threshold=float(config.saturation_moderate_threshold),
-        confidence_no_events=float(config.confidence_no_events),
-        confidence_planned_events=float(config.confidence_planned_events),
-        confidence_incident=float(config.confidence_incident),
-        wait_time_mapping=mapping,
     )
     configure_stage4(motor_cfg)
     return config

@@ -81,16 +81,6 @@ def default_config() -> Stage4Config:
     return Stage4Config(
         saturation_high_threshold=0.9,
         saturation_moderate_threshold=0.5,
-        confidence_no_events=1.0,
-        confidence_planned_events=0.8,
-        confidence_incident=0.5,
-        wait_time_mapping=[
-            (0.0, 0.3, 0),
-            (0.3, 0.5, 5),
-            (0.5, 0.7, 10),
-            (0.7, 0.9, 15),
-            (0.9, 1.01, 20),
-        ],
     )
 
 

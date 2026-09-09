@@ -62,16 +62,6 @@ DEFAULT_RECOMMENDATION_CONFIG = {
 DEFAULT_STAGE4_CONFIG = {
     "saturation_high_threshold": 0.9,
     "saturation_moderate_threshold": 0.5,
-    "confidence_no_events": 1.0,
-    "confidence_planned_events": 0.8,
-    "confidence_incident": 0.5,
-    "wait_time_mapping": [
-        [0.0, 0.3, 0],
-        [0.3, 0.5, 5],
-        [0.5, 0.7, 10],
-        [0.7, 0.9, 15],
-        [0.9, 1.01, 20],
-    ],
     "created_at": NOW,
     "updated_at": NOW,
 }
@@ -175,8 +165,6 @@ class TestGetStage4Config:
         data = response.json()
         assert data["saturation_high_threshold"] == 0.9
         assert data["saturation_moderate_threshold"] == 0.5
-        assert len(data["wait_time_mapping"]) == 5
-        assert data["wait_time_mapping"][0] == [0.0, 0.3, 0]
 
     def test_returns_401_without_auth(self, client):
         response = client.get(self.GET_URL)
@@ -195,43 +183,8 @@ class TestPutStage4Config:
         data = response.json()
         assert data["saturation_high_threshold"] == 0.95
 
-    def test_updates_wait_time_mapping(self, client, auth_headers):
-        updated = {**DEFAULT_STAGE4_CONFIG, "wait_time_mapping": [[0.0, 0.2, 0], [0.2, 0.5, 5], [0.5, 1.0, 10]]}
-        with patch(f"{STAGE4_ROUTES}.crud_update_stage4_config", new_callable=AsyncMock) as mock_update:
-            mock_update.return_value = _as_model_attrs(updated)
-            payload = {"wait_time_mapping": [[0.0, 0.2, 0], [0.2, 0.5, 5], [0.5, 1.0, 10]]}
-            response = client.put(self.PUT_URL, json=payload, headers=auth_headers)
-        assert response.status_code == 200
-        data = response.json()
-        assert len(data["wait_time_mapping"]) == 3
-
     def test_rejects_threshold_gt_1(self, client, auth_headers):
         payload = {"saturation_high_threshold": 1.5}
-        response = client.put(self.PUT_URL, json=payload, headers=auth_headers)
-        assert response.status_code == 422
-
-    def test_rejects_invalid_wait_time_mapping_row_length(self, client, auth_headers):
-        payload = {"wait_time_mapping": [[0.0, 0.5]]}
-        response = client.put(self.PUT_URL, json=payload, headers=auth_headers)
-        assert response.status_code == 422
-
-    def test_rejects_wait_time_mapping_non_numeric(self, client, auth_headers):
-        payload = {"wait_time_mapping": [["a", 0.5, 0]]}
-        response = client.put(self.PUT_URL, json=payload, headers=auth_headers)
-        assert response.status_code == 422
-
-    def test_rejects_wait_time_mapping_high_lt_low(self, client, auth_headers):
-        payload = {"wait_time_mapping": [[0.5, 0.3, 5]]}
-        response = client.put(self.PUT_URL, json=payload, headers=auth_headers)
-        assert response.status_code == 422
-
-    def test_rejects_wait_time_mapping_empty(self, client, auth_headers):
-        payload = {"wait_time_mapping": []}
-        response = client.put(self.PUT_URL, json=payload, headers=auth_headers)
-        assert response.status_code == 422
-
-    def test_rejects_wait_time_mapping_negative_minutes(self, client, auth_headers):
-        payload = {"wait_time_mapping": [[0.0, 0.5, -1]]}
         response = client.put(self.PUT_URL, json=payload, headers=auth_headers)
         assert response.status_code == 422
 

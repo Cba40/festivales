@@ -53,19 +53,12 @@ class KnowledgeModelSnapshotService:
                 "vip_bonus": recommendation.vip_bonus,
                 "staff_bonus": recommendation.staff_bonus,
                 "mobility_penalty": recommendation.mobility_penalty,
-                "density_deviation_threshold": (
-                    recommendation.density_deviation_threshold
-                ),
             },
             "stage4_config": {
                 "saturation_high_threshold": stage4.saturation_high_threshold,
                 "saturation_moderate_threshold": (
                     stage4.saturation_moderate_threshold
                 ),
-                "confidence_no_events": stage4.confidence_no_events,
-                "confidence_planned_events": stage4.confidence_planned_events,
-                "confidence_incident": stage4.confidence_incident,
-                "wait_time_mapping": stage4.wait_time_mapping,
             },
             "zone_behaviors": [
                 {

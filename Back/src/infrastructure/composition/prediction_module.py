@@ -384,22 +384,6 @@ class _PreloadedEventDayRepository(EventDayRepository):
         return None
 
 
-class _CapturePredictionRepository(PredictionRepository):
-    def __init__(self) -> None:
-        self.saved: TerritorialPrediction | None = None
-
-    async def save(self, prediction: TerritorialPrediction) -> TerritorialPrediction:
-        self.saved = prediction
-        return prediction
-
-    async def find_by_timestamp(
-        self, timestamp: datetime,
-    ) -> TerritorialPrediction | None:
-        if self.saved is not None and self.saved.timestamp == timestamp:
-            return self.saved
-        return None
-
-
 class _ReturnSavedPredictionRepository(PredictionRepository):
     def __init__(self) -> None:
         self.saved: TerritorialPrediction | None = None

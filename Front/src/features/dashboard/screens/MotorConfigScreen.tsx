@@ -29,60 +29,6 @@ function SliderField({
   );
 }
 
-function WaitTimeRow({
-  row, index, onChange, onRemove, disabled,
-}: {
-  row: number[]; index: number;
-  onChange: (i: number, field: number, value: number) => void;
-  onRemove: (i: number) => void;
-  disabled: boolean;
-}) {
-  return (
-    <div className="flex items-center gap-2 text-sm">
-      <span className="text-slate-500 w-6">{index + 1}.</span>
-      <input
-        type="number"
-        value={row[0]}
-        onChange={(e) => onChange(index, 0, parseFloat(e.target.value) || 0)}
-        disabled={disabled}
-        className="w-20 px-2 py-1 border border-slate-300 rounded text-sm"
-        placeholder="Desde"
-        step={0.05}
-      />
-      <span className="text-slate-400">→</span>
-      <input
-        type="number"
-        value={row[1]}
-        onChange={(e) => onChange(index, 1, parseFloat(e.target.value) || 0)}
-        disabled={disabled}
-        className="w-20 px-2 py-1 border border-slate-300 rounded text-sm"
-        placeholder="Hasta"
-        step={0.05}
-      />
-      <span className="text-slate-400">=</span>
-      <input
-        type="number"
-        value={row[2]}
-        onChange={(e) => onChange(index, 2, parseInt(e.target.value) || 0)}
-        disabled={disabled}
-        className="w-20 px-2 py-1 border border-slate-300 rounded text-sm"
-        placeholder="Min"
-        step={1}
-      />
-      <span className="text-slate-500 text-xs">min</span>
-      {!disabled && (
-        <button
-          onClick={() => onRemove(index)}
-          className="text-red-500 hover:text-red-700 text-lg leading-none ml-1"
-          title="Eliminar fila"
-        >
-          ×
-        </button>
-      )}
-    </div>
-  );
-}
-
 function ConfigSection({
   title, icon, children,
 }: {
@@ -107,7 +53,7 @@ export function MotorConfigScreen() {
   const { updateRecommendation, updateStage4, saving, error } = useMotorConfigMutations();
 
   const [draftRec, setDraftRec] = useState<Record<string, number> | null>(null);
-  const [draftStg, setDraftStg] = useState<Record<string, number | number[][]> | null>(null);
+  const [draftStg, setDraftStg] = useState<Record<string, number> | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -122,7 +68,7 @@ export function MotorConfigScreen() {
     if (stgConfig && !draftStg) {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { created_at, updated_at, ...fields } = stgConfig;
-      setDraftStg(fields as unknown as Record<string, number | number[][]>);
+      setDraftStg(fields as Record<string, number>);
     }
   }, [stgConfig, draftStg]);
 
@@ -130,36 +76,8 @@ export function MotorConfigScreen() {
     setDraftRec((prev) => prev ? { ...prev, [field]: value } : prev);
   }, []);
 
-  const handleStgChange = useCallback((field: string, value: number | number[][]) => {
+  const handleStgChange = useCallback((field: string, value: number) => {
     setDraftStg((prev) => prev ? { ...prev, [field]: value } : prev);
-  }, []);
-
-  const handleWaitRowChange = useCallback((index: number, field: number, value: number) => {
-    setDraftStg((prev) => {
-      if (!prev) return prev;
-      const mapping = (prev.wait_time_mapping as number[][]) || [];
-      const updated = mapping.map((row, i) =>
-        i === index ? row.map((v, j) => j === field ? value : v) : row
-      );
-      return { ...prev, wait_time_mapping: updated };
-    });
-  }, []);
-
-  const handleAddWaitRow = useCallback(() => {
-    setDraftStg((prev) => {
-      if (!prev) return prev;
-      const mapping = (prev.wait_time_mapping as number[][]) || [];
-      const last = mapping.length > 0 ? mapping[mapping.length - 1][1] : 0;
-      return { ...prev, wait_time_mapping: [...mapping, [last, last + 0.2, 0]] };
-    });
-  }, []);
-
-  const handleRemoveWaitRow = useCallback((index: number) => {
-    setDraftStg((prev) => {
-      if (!prev) return prev;
-      const mapping = (prev.wait_time_mapping as number[][]) || [];
-      return { ...prev, wait_time_mapping: mapping.filter((_, i) => i !== index) };
-    });
   }, []);
 
   const handleSaveRec = useCallback(async () => {
@@ -176,7 +94,7 @@ export function MotorConfigScreen() {
   const handleSaveStg = useCallback(async () => {
     if (!draftStg) return;
     setSuccessMsg(null);
-    const result = await updateStage4(draftStg as Record<string, unknown>);
+    const result = await updateStage4(draftStg);
     if (result) {
       setSuccessMsg('Configuración Stage 4 guardada');
       setDraftStg(null);
@@ -216,7 +134,6 @@ export function MotorConfigScreen() {
               <SliderField label="Bonus VIP" value={draftRec.vip_bonus} onChange={(v) => handleRecChange('vip_bonus', v)} min={0} max={1} step={0.05} disabled={saving} />
               <SliderField label="Bonus Staff" value={draftRec.staff_bonus} onChange={(v) => handleRecChange('staff_bonus', v)} min={0} max={1} step={0.05} disabled={saving} />
               <SliderField label="Penalización por movilidad" value={draftRec.mobility_penalty} onChange={(v) => handleRecChange('mobility_penalty', v)} min={0} max={1} step={0.05} disabled={saving} />
-              <SliderField label="Umbral de desviación de densidad" value={draftRec.density_deviation_threshold} onChange={(v) => handleRecChange('density_deviation_threshold', v)} min={0} max={1} step={0.01} disabled={saving} />
               <div className="pt-2">
                 <button
                   onClick={handleSaveRec}
@@ -236,37 +153,8 @@ export function MotorConfigScreen() {
             <p className="text-sm text-slate-400">Cargando...</p>
           ) : (
             <div className="space-y-5">
-              <SliderField label="Umbral de saturación alta" value={draftStg.saturation_high_threshold as number} onChange={(v) => handleStgChange('saturation_high_threshold', v)} min={0} max={1} step={0.05} disabled={saving} />
-              <SliderField label="Umbral de saturación moderada" value={draftStg.saturation_moderate_threshold as number} onChange={(v) => handleStgChange('saturation_moderate_threshold', v)} min={0} max={1} step={0.05} disabled={saving} />
-              <SliderField label="Confianza (sin eventos)" value={draftStg.confidence_no_events as number} onChange={(v) => handleStgChange('confidence_no_events', v)} min={0} max={1} step={0.05} disabled={saving} />
-              <SliderField label="Confianza (eventos planificados)" value={draftStg.confidence_planned_events as number} onChange={(v) => handleStgChange('confidence_planned_events', v)} min={0} max={1} step={0.05} disabled={saving} />
-              <SliderField label="Confianza (incidente activo)" value={draftStg.confidence_incident as number} onChange={(v) => handleStgChange('confidence_incident', v)} min={0} max={1} step={0.05} disabled={saving} />
-
-              <div className="pt-2 border-t border-slate-200">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-semibold text-slate-700">Mapeo de tiempo de espera</h3>
-                  {!saving && (
-                    <button
-                      onClick={handleAddWaitRow}
-                      className="text-xs px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-600"
-                    >
-                      + Agregar rango
-                    </button>
-                  )}
-                </div>
-                <div className="space-y-1.5">
-                  {(draftStg.wait_time_mapping as number[][] || []).map((row, i) => (
-                    <WaitTimeRow
-                      key={i}
-                      row={row}
-                      index={i}
-                      onChange={handleWaitRowChange}
-                      onRemove={handleRemoveWaitRow}
-                      disabled={saving}
-                    />
-                  ))}
-                </div>
-              </div>
+              <SliderField label="Umbral de saturación alta" value={draftStg.saturation_high_threshold} onChange={(v) => handleStgChange('saturation_high_threshold', v)} min={0} max={1} step={0.05} disabled={saving} />
+              <SliderField label="Umbral de saturación moderada" value={draftStg.saturation_moderate_threshold} onChange={(v) => handleStgChange('saturation_moderate_threshold', v)} min={0} max={1} step={0.05} disabled={saving} />
 
               <div className="pt-2">
                 <button
