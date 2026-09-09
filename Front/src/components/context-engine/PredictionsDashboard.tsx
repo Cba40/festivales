@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { RefreshCw, Activity, Users, ShieldBan, Clock } from 'lucide-react';
+import { RefreshCw, Activity, Users, ShieldBan, Clock, Info } from 'lucide-react';
 import { EVENT_ID } from './constants';
 import { useTerritorialPrediction, useAutoRefresh } from '../../hooks/useContextEngine';
 import type { ZoneStateItem } from '../../hooks/useContextEngine';
@@ -12,18 +12,30 @@ const RESTRICTION_LABELS: Record<string, string> = {
   CLOSED: 'Cerrada',
 };
 
-function getSaturationColor(value: number): string {
+const NO_DATA = 'N/A';
+
+interface ZoneStateStyle {
+  label: string;
+  color: string;
+}
+
+const STATE_STYLES: Record<string, ZoneStateStyle> = {
+  LOW_DEMAND: { label: 'Baja', color: 'bg-emerald-500' },
+  MODERATE: { label: 'Media', color: 'bg-amber-500' },
+  HIGH_DEMAND: { label: 'Alta', color: 'bg-orange-500' },
+  CLOSED: { label: 'Colapsado', color: 'bg-red-600' },
+  REGULATED: { label: 'Regulada', color: 'bg-orange-500' },
+};
+
+function getStateStyle(state: string): ZoneStateStyle {
+  return STATE_STYLES[state] ?? { label: state.replace(/_/g, ' '), color: 'bg-slate-400' };
+}
+
+function getSaturationBarColor(value: number): string {
   if (value < 0.3) return 'bg-emerald-500';
   if (value < 0.6) return 'bg-amber-500';
   if (value < 0.8) return 'bg-orange-500';
   return 'bg-red-600';
-}
-
-function getSaturationLabel(value: number): string {
-  if (value < 0.3) return 'Baja';
-  if (value < 0.6) return 'Media';
-  if (value < 0.8) return 'Alta';
-  return 'Colapsado';
 }
 
 interface ZoneInfo {
@@ -131,8 +143,13 @@ export function PredictionsDashboard({ eventId, autoRefreshMs = 15000 }: Predict
             const zona = zonesById[zs.zone_id];
             const name = zona?.name || zs.type || 'Zona';
             const typeLabel = zona?.type || zs.type || 'desconocida';
-            const satVal = zs.saturation_level ?? 0;
+            const statusStyle = getStateStyle(zs.operational_state);
             const restriction = RESTRICTION_LABELS[zs.active_restriction] || zs.active_restriction;
+            const missingDetailedMetrics =
+              zs.saturation_level == null &&
+              zs.availability == null &&
+              zs.confidence == null &&
+              zs.estimated_wait == null;
             return (
               <div key={zs.zone_id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
                 <div className="flex items-center justify-between mb-3">
@@ -147,44 +164,64 @@ export function PredictionsDashboard({ eventId, autoRefreshMs = 15000 }: Predict
                         {restriction}
                       </span>
                     )}
-                    <div className={`w-2.5 h-2.5 rounded-full ${getSaturationColor(satVal)}`} />
-                    <span className="text-xs font-medium text-slate-600">{getSaturationLabel(satVal)}</span>
+                    <div className={`w-2.5 h-2.5 rounded-full ${statusStyle.color}`} />
+                    <span className="text-xs font-medium text-slate-600">{statusStyle.label}</span>
                   </div>
                 </div>
 
+                {missingDetailedMetrics && (
+                  <div className="mb-2">
+                    <span
+                      className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-full px-2 py-0.5"
+                      title="El motor aún no ejecuta un modelo especializado que produzca saturación, disponibilidad y confianza para esta zona."
+                    >
+                      <Info size={11} />
+                      Métricas detalladas pendientes de modelo especializado
+                    </span>
+                  </div>
+                )}
+
                 <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden mb-3">
                   <div
-                    className={`h-full rounded-full transition-all ${getSaturationColor(satVal)}`}
-                    style={{ width: `${Math.min(satVal * 100, 100)}%` }}
+                    className={`h-full rounded-full transition-all ${
+                      zs.saturation_level != null ? getSaturationBarColor(zs.saturation_level) : 'bg-slate-200'
+                    }`}
+                    style={{
+                      width: `${zs.saturation_level != null ? Math.min(zs.saturation_level * 100, 100) : 0}%`,
+                    }}
                   />
                 </div>
 
                 <div className="grid grid-cols-3 gap-3">
                   <div className="bg-slate-50 rounded-lg p-2 text-center">
                     <Activity className="w-3.5 h-3.5 text-slate-400 mx-auto mb-0.5" />
-                    <div className="text-xs font-semibold text-slate-700">{satVal.toFixed(2)}</div>
+                    <div className="text-xs font-semibold text-slate-700">
+                      {zs.saturation_level != null ? zs.saturation_level.toFixed(2) : NO_DATA}
+                    </div>
                     <div className="text-[9px] text-slate-400">Saturación</div>
                   </div>
                   <div className="bg-slate-50 rounded-lg p-2 text-center">
                     <Users className="w-3.5 h-3.5 text-slate-400 mx-auto mb-0.5" />
-                    <div className="text-xs font-semibold text-slate-700">{zs.availability ?? '—'}</div>
+                    <div className="text-xs font-semibold text-slate-700">
+                      {zs.availability != null ? zs.availability : NO_DATA}
+                    </div>
                     <div className="text-[9px] text-slate-400">Disponibilidad</div>
                   </div>
                   <div className="bg-slate-50 rounded-lg p-2 text-center">
                     <RefreshCw className="w-3.5 h-3.5 text-slate-400 mx-auto mb-0.5" />
-                    <div className="text-xs font-semibold text-slate-700">{(zs.confidence ?? 0).toFixed(2)}</div>
+                    <div className="text-xs font-semibold text-slate-700">
+                      {zs.confidence != null ? zs.confidence.toFixed(2) : NO_DATA}
+                    </div>
                     <div className="text-[9px] text-slate-400">Confianza</div>
                   </div>
                 </div>
 
                 <div className="mt-2 flex items-center gap-3 text-[10px] text-slate-400">
                   <span className="capitalize">Estado: {zs.operational_state.replace(/_/g, ' ')}</span>
-                  {(zs.estimated_wait ?? 0) > 0 && (
-                    <span className="flex items-center gap-1">
-                      <Clock size={11} />
-                      Espera: {zs.estimated_wait} min
-                    </span>
-                  )}
+                  <span className="flex items-center gap-1">
+                    <Clock size={11} />
+                    Espera: {zs.estimated_wait != null ? `${zs.estimated_wait} min` : NO_DATA}
+                  </span>
                 </div>
 
                 {zs.reasoning_factors && zs.reasoning_factors.length > 0 && (
