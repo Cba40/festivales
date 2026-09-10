@@ -194,6 +194,7 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
+          autoFocus
           placeholder="Ej: Estacionamiento Este"
           className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
         />

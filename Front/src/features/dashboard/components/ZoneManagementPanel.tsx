@@ -6,7 +6,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { useAppStore } from '../../../core/state/store';
 import { useZoneConfigMutations } from '../hooks/useZoneConfigMutations';
-import { CreateZoneForm } from './CreateZoneForm';
+import { ZoneCreateModal } from './ZoneCreateModal';
 import { ZoneConfigModal } from './ZoneConfigModal';
 import { Card } from './ui/Card';
 import { Badge } from './ui/Badge';
@@ -215,12 +215,11 @@ export function ZoneManagementPanel() {
         )}
       </Card>
 
-      {showCreate && (
-        <CreateZoneForm
-          onSuccess={() => setShowCreate(false)}
-          onCancel={() => setShowCreate(false)}
-        />
-      )}
+      <ZoneCreateModal
+        open={showCreate}
+        onClose={() => setShowCreate(false)}
+        onSuccess={() => setShowCreate(false)}
+      />
 
       <ConfirmDialog
         open={pendingDeleteId !== null}
