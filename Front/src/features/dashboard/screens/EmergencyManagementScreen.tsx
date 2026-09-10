@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { isAxiosError } from 'axios';
-import { Settings, Plus, Pencil, Trash2, MapPin, ChevronUp, ChevronDown } from 'lucide-react';
+import { Settings, Plus, Pencil, Trash2, MapPin, ChevronUp, ChevronDown, Search, X, Shield, Flame, Heart, Users } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { AdminMapSelector } from '../../../components/AdminMapSelector';
 import {
   getCities,
@@ -43,6 +44,22 @@ const EMERGENCY_TYPE_BADGE_VARIANTS: Record<EmergencyType, BadgeVariant> = {
   numero_emergencia: 'error',
   otro: 'neutral',
 };
+
+const TYPE_ICONS: Record<string, LucideIcon> = {
+  policia: Shield,
+  bomberos: Flame,
+  salud: Heart,
+  defensa_civil: Users,
+  numero_emergencia: MapPin,
+  otro: MapPin,
+};
+
+function normalizeText(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
 
 interface ModalForm {
   name: string;
@@ -93,6 +110,7 @@ export function EmergencyManagementScreen() {
   const [citySaving, setCitySaving] = useState(false);
   const [cityError, setCityError] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const ciudadSeleccionada = cities.find((c) => c.id === cityId);
 
@@ -139,6 +157,35 @@ export function EmergencyManagementScreen() {
       void cargar();
     }
   }, [cityId, cargar]);
+
+  const filteredAndGrouped = useMemo(() => {
+    const term = normalizeText(searchTerm.trim());
+    const filtered = term
+      ? emergencies.filter((e) => {
+          const haystack = normalizeText(`${e.name} ${e.type} ${e.address ?? ''}`);
+          return haystack.includes(term);
+        })
+      : emergencies;
+
+    const grouped = new Map<string, EmergencyAdminDTO[]>();
+    for (const punto of filtered) {
+      const list = grouped.get(punto.type) ?? [];
+      list.push(punto);
+      grouped.set(punto.type, list);
+    }
+
+    return Array.from(grouped.entries())
+      .map(([type, points]) => ({
+        type,
+        points: points.sort((a, b) => a.name.localeCompare(b.name, 'es')),
+      }))
+      .sort((a, b) =>
+        (EMERGENCY_TYPE_LABELS[a.type as EmergencyType] ?? a.type).localeCompare(
+          EMERGENCY_TYPE_LABELS[b.type as EmergencyType] ?? b.type,
+          'es'
+        )
+      );
+  }, [emergencies, searchTerm]);
 
   const abrirCrear = () => {
     setForm({ ...emptyForm, type: 'policia' });
@@ -331,102 +378,150 @@ export function EmergencyManagementScreen() {
           </p>
         )}
 
-        {loading ? (
-          <p className="text-sm text-slate-500 italic">Cargando ciudades y emergencias...</p>
-        ) : error ? (
-          <div className="mb-4 flex items-center justify-between gap-3 p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
-            <span>{error}</span>
-            <button
-              type="button"
-              onClick={() => {
-                void cargarCiudades();
-                void cargar();
-              }}
-              className="whitespace-nowrap underline font-medium"
-            >
-              Reintentar
-            </button>
-          </div>
-        ) : !cityId || cities.length === 0 ? (
-          <div className="text-center text-slate-500 py-8 bg-white border border-slate-200 rounded-lg">
-            <p className="text-sm">No hay ciudades configuradas en el sistema.</p>
-            <p className="text-xs mt-2">Usa el botón "Gestionar / Crear Ciudad" para agregar una.</p>
-          </div>
-        ) : emergencies.length === 0 ? (
-          <p className="text-sm text-slate-500 italic text-center py-8 bg-white border border-slate-200 rounded-lg">
-            No hay puntos de emergencia en esta ciudad. Creá el primero con "+ Nuevo Punto de Emergencia".
-          </p>
-        ) : (
-          <div className="bg-white rounded-lg border border-slate-200 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 text-left text-slate-500">
-                  <th className="px-4 py-3 font-medium">Nombre</th>
-                  <th className="px-4 py-3 font-medium">Tipo</th>
-                  <th className="px-4 py-3 font-medium">Contacto</th>
-                  <th className="px-4 py-3 font-medium">Ciudad</th>
-                  <th className="px-4 py-3 font-medium">Estado</th>
-                  <th className="px-4 py-3 font-medium text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {emergencies.map((e) => (
-                  <tr key={e.id}>
-                    <td className="px-4 py-3 font-medium text-slate-800">{e.name}</td>
-                    <td className="px-4 py-3">
-                      <Badge variant={EMERGENCY_TYPE_BADGE_VARIANTS[e.type]}>
-                        {EMERGENCY_TYPE_LABELS[e.type]}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">
-                      {e.emergency_number || e.phone || '—'}
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">{ciudadSeleccionada?.name || '—'}</td>
-                    <td className="px-4 py-3">
-                      {e.active ? (
-                        <Badge variant="success">Activo</Badge>
-                      ) : (
-                        <Badge variant="neutral">Inactivo</Badge>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => abrirEditar(e)}
-                          title="Editar"
-                          className="mr-1"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                          Editar
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => void alternarActivo(e)}
-                          title={e.active ? 'Desactivar' : 'Activar'}
-                        >
-                          {e.active ? 'Desactivar' : 'Activar'}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setPendingDeleteId(e.id)}
-                          title="Eliminar"
-                          className="text-red-600 hover:bg-red-50"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          Eliminar
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <Card variant="standard">
+          {loading ? (
+            <p className="text-sm text-slate-500 italic text-center py-8">Cargando ciudades y emergencias...</p>
+          ) : error ? (
+            <div className="flex items-center justify-between gap-3 p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
+              <span>{error}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  void cargarCiudades();
+                  void cargar();
+                }}
+                className="whitespace-nowrap underline font-medium"
+              >
+                Reintentar
+              </button>
+            </div>
+          ) : !cityId || cities.length === 0 ? (
+            <div className="text-center text-slate-500 py-8">
+              <p className="text-sm">No hay ciudades configuradas en el sistema.</p>
+              <p className="text-xs mt-2">Usa el botón "Gestionar / Crear Ciudad" para agregar una.</p>
+            </div>
+          ) : emergencies.length === 0 ? (
+            <p className="text-sm text-slate-500 italic text-center py-8">
+              No hay puntos de emergencia en esta ciudad. Creá el primero con "+ Nuevo Punto de Emergencia".
+            </p>
+          ) : (
+            <>
+              <div className="relative mb-4">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Buscar punto de emergencia por nombre, tipo o dirección..."
+                  className="w-full pl-9 pr-9 py-2 text-sm rounded-lg border border-slate-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                />
+                {searchTerm.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    title="Limpiar búsqueda"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 rounded-full"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {filteredAndGrouped.length === 0 ? (
+                <p className="text-sm text-slate-500 text-center py-8">
+                  No se encontraron puntos de emergencia que coincidan con '{searchTerm.trim()}'.
+                </p>
+              ) : (
+                <div className="space-y-6">
+                  {filteredAndGrouped.map((group) => {
+                    const Icon = TYPE_ICONS[group.type] ?? MapPin;
+                    const label = EMERGENCY_TYPE_LABELS[group.type as EmergencyType] ?? group.type;
+                    return (
+                      <section key={group.type}>
+                        <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-2">
+                          <Icon className="w-4 h-4 text-indigo-600" />
+                          {label}
+                          <span className="text-xs font-normal text-slate-400">
+                            {group.points.length === 1 ? '(1 punto)' : `(${group.points.length} puntos)`}
+                          </span>
+                        </h3>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-slate-200 text-left text-slate-500">
+                                <th className="px-4 py-3 font-medium">Nombre</th>
+                                <th className="px-4 py-3 font-medium">Tipo</th>
+                                <th className="px-4 py-3 font-medium">Contacto</th>
+                                <th className="px-4 py-3 font-medium">Ciudad</th>
+                                <th className="px-4 py-3 font-medium">Estado</th>
+                                <th className="px-4 py-3 font-medium text-right">Acciones</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {group.points.map((e) => (
+                                <tr key={e.id}>
+                                  <td className="px-4 py-3 font-medium text-slate-800">{e.name}</td>
+                                  <td className="px-4 py-3">
+                                    <Badge variant={EMERGENCY_TYPE_BADGE_VARIANTS[e.type]}>
+                                      {EMERGENCY_TYPE_LABELS[e.type]}
+                                    </Badge>
+                                  </td>
+                                  <td className="px-4 py-3 text-slate-600">
+                                    {e.emergency_number || e.phone || '—'}
+                                  </td>
+                                  <td className="px-4 py-3 text-slate-600">{ciudadSeleccionada?.name || '—'}</td>
+                                  <td className="px-4 py-3">
+                                    {e.active ? (
+                                      <Badge variant="success">Activo</Badge>
+                                    ) : (
+                                      <Badge variant="neutral">Inactivo</Badge>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <div className="flex justify-end gap-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => abrirEditar(e)}
+                                        title="Editar"
+                                        className="mr-1"
+                                      >
+                                        <Pencil className="w-3.5 h-3.5" />
+                                        Editar
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => void alternarActivo(e)}
+                                        title={e.active ? 'Desactivar' : 'Activar'}
+                                      >
+                                        {e.active ? 'Desactivar' : 'Activar'}
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setPendingDeleteId(e.id)}
+                                        title="Eliminar"
+                                        className="text-red-600 hover:bg-red-50"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                        Eliminar
+                                      </Button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </section>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+        </Card>
       </section>
 
       {modal && (
