@@ -1,9 +1,10 @@
 import { useEffect, useCallback, useMemo, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Plus } from 'lucide-react';
 import { EVENT_ID } from '@/components/context-engine/constants';
 import { apiClient } from '@/core/api/client';
 import { endpoints } from '@/core/api/endpoints';
 import { useOperationalObservations } from '@/hooks/useOperationalObservations';
+import { Button, Card } from '@/features/dashboard/components/ui';
 
 const SOURCES = [
   { value: 'manual', label: 'Manual' },
@@ -229,18 +230,16 @@ export function ObservationsScreen() {
         <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
       )}
 
-      <section className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="px-5 py-3 bg-slate-50 border-b border-slate-200">
-          <h2 className="font-bold text-slate-800">Registrar Observación</h2>
-        </div>
-        <div className="p-5 space-y-4">
+      <Card variant="standard">
+        <h2 className="font-bold text-slate-800 mb-4">Registrar Observación</h2>
+        <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <label className="block text-sm">
               <span className="text-slate-700 font-medium">Zona</span>
               <select
                 value={zoneId}
                 onChange={(e) => setZoneId(e.target.value)}
-                className="mt-1 w-full px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               >
                 <option value="">Seleccionar zona…</option>
                 {zones.map((z) => (
@@ -255,7 +254,7 @@ export function ObservationsScreen() {
               <select
                 value={eventDayId}
                 onChange={(e) => handleEventDayChange(e.target.value)}
-                className="mt-1 w-full px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               >
                 <option value="">Seleccionar jornada…</option>
                 {eventDays.map((d) => (
@@ -267,12 +266,12 @@ export function ObservationsScreen() {
             </label>
             <label className="block text-sm">
               <span className="text-slate-700 font-medium">Fecha y hora</span>
-<input
-              type="datetime-local"
-              value={timestamp}
-              onChange={(e) => setTimestamp(e.target.value)}
-              className="mt-1 w-full px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
+              <input
+                type="datetime-local"
+                value={timestamp}
+                onChange={(e) => setTimestamp(e.target.value)}
+                className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
               {selectedDay && !timeInRange && (
                 <span className="block mt-1 text-xs text-red-600">
                   La hora está fuera del rango operativo de la jornada (
@@ -289,7 +288,7 @@ export function ObservationsScreen() {
                 value={observedDensity}
                 onChange={(e) => setObservedDensity(e.target.value)}
                 placeholder="0"
-                className="mt-1 w-full px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               />
             </label>
             <label className="block text-sm">
@@ -299,7 +298,7 @@ export function ObservationsScreen() {
                 value={observerId}
                 onChange={(e) => setObserverId(e.target.value)}
                 placeholder="ID del observador"
-                className="mt-1 w-full px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               />
             </label>
             <label className="block text-sm">
@@ -307,7 +306,7 @@ export function ObservationsScreen() {
               <select
                 value={source}
                 onChange={(e) => setSource(e.target.value)}
-                className="mt-1 w-full px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               >
                 {SOURCES.map((s) => (
                   <option key={s.value} value={s.value}>
@@ -327,7 +326,7 @@ export function ObservationsScreen() {
               value={notas}
               onChange={(e) => setNotas(e.target.value)}
               placeholder="Ej: Zona con mucha afluencia por evento cercano"
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               disabled={isSubmitting}
             />
           </div>
@@ -339,18 +338,18 @@ export function ObservationsScreen() {
             <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">{formMessage}</div>
           )}
 
-          <button
+          <Button
             onClick={handleSubmit}
             disabled={isSubmitting || (!!selectedDay && !timeInRange)}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg text-sm disabled:opacity-50"
           >
+            <Plus className="w-4 h-4" />
             {isSubmitting ? 'Registrando...' : 'Registrar Observación'}
-          </button>
+          </Button>
         </div>
-      </section>
+      </Card>
 
-      <section className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="px-5 py-3 bg-slate-50 border-b border-slate-200">
+      <Card variant="standard">
+        <div className="flex items-center justify-between mb-4">
           <h2 className="font-bold text-slate-800">Observaciones recientes ({observations.length})</h2>
         </div>
         <div className="overflow-x-auto">
@@ -389,7 +388,7 @@ export function ObservationsScreen() {
             </tbody>
           </table>
         </div>
-      </section>
+      </Card>
     </main>
   );
 }
