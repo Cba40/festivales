@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { isAxiosError } from 'axios';
+import { Plus, Pencil, Trash2, MapPin, ChevronUp, ChevronDown } from 'lucide-react';
 import { apiClient } from '../../../core/api/client';
 import { endpoints } from '../../../core/api/endpoints';
 import { AdminMapSelector } from '../../../components/AdminMapSelector';
+import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { Badge, type BadgeVariant } from '../components/ui/Badge';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 
 type AccommodationType = 'hotel' | 'hostel' | 'camping' | 'other';
 
@@ -33,11 +38,11 @@ const TYPE_LABELS: Record<AccommodationType, string> = {
   other: 'Otros',
 };
 
-const TYPE_BADGES: Record<AccommodationType, string> = {
-  hotel: 'bg-blue-100 text-blue-700',
-  hostel: 'bg-purple-100 text-purple-700',
-  camping: 'bg-green-100 text-green-700',
-  other: 'bg-amber-100 text-amber-700',
+const TYPE_BADGE_VARIANTS: Record<AccommodationType, BadgeVariant> = {
+  hotel: 'info',
+  hostel: 'neutral',
+  camping: 'success',
+  other: 'warning',
 };
 
 interface ModalForm {
@@ -78,6 +83,7 @@ export function AccommodationManagementScreen({ eventId }: { eventId: string }) 
   const [modalError, setModalError] = useState<string | null>(null);
   const [mapPickerOpen, setMapPickerOpen] = useState(false);
   const [showManualCoords, setShowManualCoords] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const cargar = useCallback(async () => {
     try {
@@ -182,17 +188,16 @@ export function AccommodationManagementScreen({ eventId }: { eventId: string }) 
     }
   };
 
-  const eliminar = async (a: AccommodationDTO) => {
-    const confirmado = window.confirm(
-      `¿Desactivar el alojamiento "${a.name}"? Se dejará de mostrar en la app pública. Esta acción no se puede deshacer.`
-    );
-    if (!confirmado) return;
+  const handleDeleteConfirm = async () => {
+    if (!pendingDeleteId) return;
     try {
-      await apiClient.delete(endpoints.accommodationAdmin.delete(eventId, a.id));
+      await apiClient.delete(endpoints.accommodationAdmin.delete(eventId, pendingDeleteId));
       setResult('Alojamiento desactivado.');
       await cargar();
     } catch {
       setError('No se pudo desactivar el alojamiento.');
+    } finally {
+      setPendingDeleteId(null);
     }
   };
 
@@ -200,7 +205,7 @@ export function AccommodationManagementScreen({ eventId }: { eventId: string }) 
     setForm((prev) => ({ ...prev, [campo]: valor }));
   };
 
-  const inputCls = 'w-full border-slate-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500';
+  const inputCls = 'w-full border-slate-300 rounded-md py-2 px-3 focus:ring-indigo-500 focus:border-indigo-500';
 
   return (
     <div className="space-y-10">
@@ -209,12 +214,10 @@ export function AccommodationManagementScreen({ eventId }: { eventId: string }) 
           <h2 className="text-lg font-semibold text-slate-700">
             Alojamientos del Evento ({alojamientos.length})
           </h2>
-          <button
-            onClick={abrirCrear}
-            className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md text-sm font-medium transition-colors"
-          >
-            + Nuevo Alojamiento
-          </button>
+          <Button variant="primary" onClick={abrirCrear}>
+            <Plus className="w-4 h-4" />
+            Nuevo Alojamiento
+          </Button>
         </div>
 
         {error && (
@@ -252,45 +255,47 @@ export function AccommodationManagementScreen({ eventId }: { eventId: string }) 
                   <tr key={a.id}>
                     <td className="px-4 py-3 font-medium text-slate-800">{a.name}</td>
                     <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_BADGES[a.type]}`}
-                      >
-                        {TYPE_LABELS[a.type]}
-                      </span>
+                      <Badge variant={TYPE_BADGE_VARIANTS[a.type]}>{TYPE_LABELS[a.type]}</Badge>
                     </td>
                     <td className="px-4 py-3 text-slate-600">{a.address || '—'}</td>
                     <td className="px-4 py-3 text-slate-600">{a.phone || '—'}</td>
                     <td className="px-4 py-3">
                       {a.active ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
-                          Activo
-                        </span>
+                        <Badge variant="success">Activo</Badge>
                       ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-200 text-slate-600">
-                          Inactivo
-                        </span>
+                        <Badge variant="neutral">Inactivo</Badge>
                       )}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-1">
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => abrirEditar(a)}
-                          className="text-sm text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-md transition-colors"
+                          title="Editar"
+                          className="mr-1"
                         >
+                          <Pencil className="w-3.5 h-3.5" />
                           Editar
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => void alternarActivo(a)}
-                          className="text-sm text-slate-600 hover:bg-slate-100 px-3 py-1.5 rounded-md transition-colors"
+                          title={a.active ? 'Desactivar' : 'Activar'}
                         >
                           {a.active ? 'Desactivar' : 'Activar'}
-                        </button>
-                        <button
-                          onClick={() => void eliminar(a)}
-                          className="text-sm text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-md transition-colors"
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setPendingDeleteId(a.id)}
+                          title="Eliminar"
+                          className="text-red-600 hover:bg-red-50"
                         >
+                          <Trash2 className="w-3.5 h-3.5" />
                           Eliminar
-                        </button>
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -301,9 +306,23 @@ export function AccommodationManagementScreen({ eventId }: { eventId: string }) 
         )}
       </section>
 
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        title="Eliminar alojamiento"
+        message={`¿Desactivar el alojamiento "${alojamientos.find((a) => a.id === pendingDeleteId)?.name ?? ''}"? Se dejará de mostrar en la app pública. Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        cancelLabel="Cancelar"
+        variant="destructive"
+        onConfirm={() => void handleDeleteConfirm()}
+        onCancel={() => setPendingDeleteId(null)}
+      />
+
       {modal && (
         <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 mx-4 space-y-4 max-h-[90vh] overflow-y-auto">
+          <Card
+            variant="standard"
+            className="w-full max-w-2xl mx-4 space-y-4 max-h-[90vh] overflow-y-auto"
+          >
             <h3 className="text-lg font-semibold text-slate-800">
               {modal.mode === 'create' ? 'Nuevo Alojamiento' : 'Editar Alojamiento'}
             </h3>
@@ -373,13 +392,10 @@ export function AccommodationManagementScreen({ eventId }: { eventId: string }) 
                 </label>
 
                 <div className="flex flex-wrap items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setMapPickerOpen(true)}
-                    className="py-2 px-4 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-md transition-colors"
-                  >
-                    📍 Seleccionar en mapa
-                  </button>
+                  <Button variant="primary" onClick={() => setMapPickerOpen(true)}>
+                    <MapPin className="w-4 h-4" />
+                    Seleccionar en mapa
+                  </Button>
 
                   {form.latitude !== '' || form.longitude !== '' ? (
                     <>
@@ -402,13 +418,15 @@ export function AccommodationManagementScreen({ eventId }: { eventId: string }) 
                   )}
                 </div>
 
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setShowManualCoords((v) => !v)}
-                  className="mt-2 text-xs font-medium text-blue-600 hover:underline"
+                  className="mt-2 text-xs text-indigo-600"
                 >
-                  {showManualCoords ? '▲ Ocultar edición manual' : '▼ Edición manual avanzada'}
-                </button>
+                  {showManualCoords ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  {showManualCoords ? 'Ocultar edición manual' : 'Edición manual avanzada'}
+                </Button>
 
                 {showManualCoords && (
                   <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -466,7 +484,7 @@ export function AccommodationManagementScreen({ eventId }: { eventId: string }) 
                 type="checkbox"
                 checked={form.active}
                 onChange={(e) => setCampo('active', e.target.checked)}
-                className="accent-emerald-600"
+                className="accent-indigo-600"
               />
               Activo (visible en la pantalla "Hospedajes")
             </label>
@@ -478,23 +496,14 @@ export function AccommodationManagementScreen({ eventId }: { eventId: string }) 
             )}
 
             <div className="flex justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setModal(null)}
-                className="py-2 px-4 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors"
-              >
+              <Button variant="secondary" onClick={() => setModal(null)}>
                 Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={() => void guardar()}
-                disabled={modalSaving}
-                className="py-2 px-4 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md transition-colors"
-              >
+              </Button>
+              <Button variant="primary" onClick={() => void guardar()} disabled={modalSaving}>
                 {modalSaving ? 'Guardando...' : 'Guardar'}
-              </button>
+              </Button>
             </div>
-          </div>
+          </Card>
         </div>
       )}
 
@@ -523,24 +532,19 @@ export function AccommodationManagementScreen({ eventId }: { eventId: string }) 
             />
 
             <div className="flex justify-end gap-3">
-              <button
-                type="button"
+              <Button
+                variant="secondary"
                 onClick={() => {
                   setCampo('latitude', '');
                   setCampo('longitude', '');
                   setMapPickerOpen(false);
                 }}
-                className="py-2 px-4 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors"
               >
                 Limpiar y cerrar
-              </button>
-              <button
-                type="button"
-                onClick={() => setMapPickerOpen(false)}
-                className="py-2 px-4 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-md transition-colors"
-              >
+              </Button>
+              <Button variant="primary" onClick={() => setMapPickerOpen(false)}>
                 Confirmar ubicación
-              </button>
+              </Button>
             </div>
           </div>
         </div>
