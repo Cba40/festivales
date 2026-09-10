@@ -8,6 +8,8 @@ import {
 import { fetchDefaultServiceConfig } from '../hooks/useServiceConfigs';
 import { DEFAULTS_POR_SUBTIPO, TRANSPORTE_OPTIONS, ZONE_TYPES } from '../constants';
 import { AdminMapSelector } from '../../../components/AdminMapSelector';
+import { Card } from './ui/Card';
+import { Button } from './ui/Button';
 
 interface DynamicField {
   name: string;
@@ -183,7 +185,8 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
   const fields = dynamicFields[type] || [];
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg border border-slate-200 space-y-4">
+    <form onSubmit={handleSubmit}>
+      <Card variant="standard" className="space-y-4">
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-1">Nombre de la Zona</label>
         <input
@@ -192,7 +195,7 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
           onChange={(e) => setName(e.target.value)}
           required
           placeholder="Ej: Estacionamiento Este"
-          className="w-full border-slate-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500"
+          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
         />
       </div>
 
@@ -201,7 +204,7 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
         <select
           value={type}
           onChange={(e) => { setType(e.target.value); setSubtipo(''); setExtra({}); }}
-          className="w-full border-slate-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500"
+          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
         >
           {ZONE_TYPES.map((t) => (
             <option key={t.value} value={t.value}>{t.label}</option>
@@ -221,7 +224,7 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
               value={subtipo}
               onChange={(e) => { void handleSubtipoChange(e.target.value); }}
               disabled={subtiposLoading}
-              className="w-full border-slate-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-100"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-slate-100"
             >
               <option value="">
                 {subtiposLoading ? 'Cargando subtipos…' : 'Seleccioná un subtipo (opcional)'}
@@ -245,7 +248,7 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
             value={permanencia}
             onChange={(e) => setPermanencia(e.target.value)}
             placeholder="Ej: 15"
-            className="w-full border-slate-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
           />
           <p className="text-[10px] text-slate-400 mt-0.5">
             Se guarda globalmente para este subtipo (service_configs), no por zona.
@@ -262,7 +265,7 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
           required
           min={1}
           placeholder="350"
-          className="w-full border-slate-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500"
+          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
         />
       </div>
 
@@ -275,7 +278,7 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
             value={lat}
             onChange={(e) => setLat(e.target.value)}
             placeholder="-30.9733"
-            className="w-full border-slate-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
           />
         </div>
         <div>
@@ -286,7 +289,7 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
             value={lng}
             onChange={(e) => setLng(e.target.value)}
             placeholder="-64.0885"
-            className="w-full border-slate-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
           />
         </div>
       </div>
@@ -308,7 +311,7 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
               <select
                 value={extra[f.key] || ''}
                 onChange={(e) => setExtra(prev => ({ ...prev, [f.key]: e.target.value }))}
-                className="w-full border-slate-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               >
                 <option value="" disabled>{f.placeholder}</option>
                 {(f.options ?? []).map((o) => (
@@ -326,7 +329,7 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
                   type="checkbox"
                   checked={extra[f.key] === 'true'}
                   onChange={(e) => setExtra(prev => ({ ...prev, [f.key]: e.target.checked ? 'true' : 'false' }))}
-                  className="accent-emerald-600"
+                  className="accent-indigo-600"
                 />
                 {f.name}
               </label>
@@ -344,7 +347,7 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
               value={extra[f.key] || ''}
               onChange={(e) => setExtra(prev => ({ ...prev, [f.key]: e.target.value }))}
               placeholder={f.placeholder}
-              className="w-full border-slate-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>
         );
@@ -368,24 +371,24 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
         </div>
       )}
 
-      <div className="flex justify-end gap-3 pt-2">
+      <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-2">
         {onCancel && (
-          <button
+          <Button
             type="button"
+            variant="secondary"
             onClick={onCancel}
-            className="py-2 px-4 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors"
           >
             Cancelar
-          </button>
+          </Button>
         )}
-        <button
+        <Button
           type="submit"
           disabled={loading || (type === 'salida' && !extra.transporte)}
-          className="py-2 px-4 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md transition-colors"
         >
           {loading ? 'Creando...' : 'Crear Zona'}
-        </button>
+        </Button>
       </div>
+    </Card>
     </form>
   );
 }

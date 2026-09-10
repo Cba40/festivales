@@ -9,23 +9,23 @@ const DEFAULT_EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 export function useZoneConfigMutations(eventId: string = DEFAULT_EVENT_ID) {
   const { removeZone, updateZoneConfig, zones } = useAppStore();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
+  // La confirmación visual (ConfirmDialog) la maneja el componente: este método
+  // solo ejecuta el borrado optimista contra el store y contra la API.
   const deleteZone = async (id: string): Promise<boolean> => {
-    const confirmed = window.confirm(
-      '¿Estás seguro de eliminar esta zona? Esta acción no se puede deshacer.'
-    );
-    if (!confirmed) return false;
-
     const zoneToRemove = zones.find((z) => z.id === id);
     if (!zoneToRemove) return false;
 
     setLoading(true);
+    setError(null);
     removeZone(id);
 
     try {
       await apiClient.delete(endpoints.zones.delete(eventId, id));
     } catch {
       useAppStore.getState().addZone(zoneToRemove);
+      setError('No se pudo eliminar la zona. Intentá de nuevo.');
       return false;
     } finally {
       setLoading(false);
@@ -39,6 +39,7 @@ export function useZoneConfigMutations(eventId: string = DEFAULT_EVENT_ID) {
     if (!previous) return;
 
     setLoading(true);
+    setError(null);
     updateZoneConfig(id, updates);
 
     const body: Record<string, unknown> = {};
@@ -52,6 +53,7 @@ export function useZoneConfigMutations(eventId: string = DEFAULT_EVENT_ID) {
       await apiClient.put(endpoints.zones.updateConfig(eventId, id), body);
     } catch {
       useAppStore.getState().updateZoneConfig(id, previous as Partial<Zone>);
+      setError('No se pudo actualizar la zona. Intentá de nuevo.');
     } finally {
       setLoading(false);
     }
@@ -71,5 +73,5 @@ export function useZoneConfigMutations(eventId: string = DEFAULT_EVENT_ID) {
     }
   };
 
-  return { deleteZone, updateZone, patchZoneFields, loading };
+  return { deleteZone, updateZone, patchZoneFields, loading, error };
 }

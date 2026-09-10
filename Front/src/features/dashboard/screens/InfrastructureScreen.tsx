@@ -35,7 +35,7 @@ export function InfrastructureScreen() {
             onClick={() => setActiveSection(key)}
             className={`text-sm font-medium px-4 py-2 rounded-lg transition-colors ${
               activeSection === key
-                ? 'bg-emerald-600 text-white'
+                ? 'bg-indigo-600 text-white'
                 : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
             }`}
           >

@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { apiClient } from '@/core/api/client';
+import { endpoints } from '@/core/api/endpoints';
 import type { ZoneBehaviorDTO } from '../types';
 
 export interface ZoneBehaviorUpdatePayload {
@@ -16,7 +17,7 @@ export function useZoneBehaviorMutations() {
       setError(null);
       try {
         const { data } = await apiClient.put<ZoneBehaviorDTO>(
-          `/zone-behaviors/${id}`,
+          endpoints.zoneBehaviors.update(id),
           payload
         );
         return data;

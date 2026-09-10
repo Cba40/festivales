@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '@/core/api/client';
+import { endpoints } from '@/core/api/endpoints';
 import type { ZoneBehaviorDTO, ZoneTypeDTO } from '../types';
 
 export function useZoneBehaviors(phaseId: string | null) {
@@ -16,7 +17,7 @@ export function useZoneBehaviors(phaseId: string | null) {
     setError(null);
     try {
       const { data } = await apiClient.get<ZoneBehaviorDTO[]>(
-        `/zone-behaviors/by-phase/${phaseId}`
+        endpoints.zoneBehaviors.byPhase(phaseId)
       );
       setBehaviors(data);
     } catch (err: unknown) {
@@ -41,7 +42,7 @@ export function useZoneTypes() {
     setError(null);
     try {
       const { data } = await apiClient.get<ZoneTypeDTO[]>(
-        '/context-engine/zone-types'
+        endpoints.contextEngine.zoneTypes()
       );
       setZoneTypes(data);
     } catch (err: unknown) {

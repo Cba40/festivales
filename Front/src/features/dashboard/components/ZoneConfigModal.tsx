@@ -7,6 +7,7 @@ import { useServiceConfigMutations } from '../hooks/useServiceConfigMutations';
 import type { Zone } from '../types';
 import { DEFAULTS_POR_SUBTIPO, TRANSPORTE_OPTIONS, ZONE_TYPES } from '../constants';
 import { AdminMapSelector } from '../../../components/AdminMapSelector';
+import { Button } from './ui/Button';
 
 interface Props {
   zone: Zone;
@@ -176,8 +177,8 @@ export function ZoneConfigModal({ zone, onClose }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="px-6 py-4 border-b border-slate-200">
           <h2 className="text-lg font-semibold text-slate-800">Editar Zona</h2>
         </div>
@@ -189,7 +190,7 @@ export function ZoneConfigModal({ zone, onClose }: Props) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              className="w-full border-slate-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>
           <div>
@@ -197,7 +198,7 @@ export function ZoneConfigModal({ zone, onClose }: Props) {
             <select
               value={type}
               onChange={(e) => { setType(e.target.value); setSubtipo(''); }}
-              className="w-full border-slate-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             >
               {ZONE_TYPES.map((t) => (
                 <option key={t.value} value={t.value}>{t.label}</option>
@@ -217,7 +218,7 @@ export function ZoneConfigModal({ zone, onClose }: Props) {
                   value={subtipo}
                   onChange={(e) => setSubtipo(e.target.value)}
                   disabled={subtiposLoading}
-                  className="w-full border-slate-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-100"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-slate-100"
                 >
                   <option value="">
                     {subtiposLoading ? 'Cargando subtipos…' : 'Sin subtipo'}
@@ -241,7 +242,7 @@ export function ZoneConfigModal({ zone, onClose }: Props) {
                 value={permanencia}
                 onChange={(e) => setPermanencia(e.target.value)}
                 placeholder="Ej: 15"
-                className="w-full border-slate-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               />
               <p className="text-[10px] text-slate-400 mt-0.5">
                 Se guarda globalmente para este subtipo (service_configs), no por zona.
@@ -257,7 +258,7 @@ export function ZoneConfigModal({ zone, onClose }: Props) {
               onChange={(e) => setCapacity(e.target.value)}
               required
               min={1}
-              className="w-full border-slate-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -268,7 +269,7 @@ export function ZoneConfigModal({ zone, onClose }: Props) {
                 step="any"
                 value={lat}
                 onChange={(e) => setLat(e.target.value)}
-                className="w-full border-slate-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               />
             </div>
             <div>
@@ -278,7 +279,7 @@ export function ZoneConfigModal({ zone, onClose }: Props) {
                 step="any"
                 value={lng}
                 onChange={(e) => setLng(e.target.value)}
-                className="w-full border-slate-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               />
             </div>
           </div>
@@ -298,7 +299,7 @@ export function ZoneConfigModal({ zone, onClose }: Props) {
                 <select
                   value={transporte}
                   onChange={(e) => setTransporte(e.target.value)}
-                  className="w-full border-slate-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 >
                   <option value="" disabled>Seleccioná el modo de salida</option>
                   {TRANSPORTE_OPTIONS.map((o) => (
@@ -314,7 +315,7 @@ export function ZoneConfigModal({ zone, onClose }: Props) {
                   value={esperaMin}
                   onChange={(e) => setEsperaMin(e.target.value)}
                   placeholder="Ej: 5"
-                  className="w-full border-slate-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
               <div>
@@ -323,7 +324,7 @@ export function ZoneConfigModal({ zone, onClose }: Props) {
                     type="checkbox"
                     checked={esEmbudo}
                     onChange={(e) => setEsEmbudo(e.target.checked)}
-                    className="accent-emerald-600"
+                    className="accent-indigo-600"
                   />
                   ¿Es un punto de embudo?
                 </label>
@@ -345,21 +346,20 @@ export function ZoneConfigModal({ zone, onClose }: Props) {
             </div>
           )}
 
-          <div className="flex justify-end gap-3 pt-2">
-            <button
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-2">
+            <Button
               type="button"
+              variant="secondary"
               onClick={onClose}
-              className="py-2 px-4 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors"
             >
               Cancelar
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={loading || (type === 'salida' && !transporte)}
-              className="py-2 px-4 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md transition-colors"
             >
               {loading ? 'Guardando...' : 'Guardar Cambios'}
-            </button>
+            </Button>
           </div>
         </form>
       </div>
