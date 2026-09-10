@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
-import { HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { HelpCircle, ChevronDown, ChevronUp, CheckCircle2, Info, Settings, Puzzle, RefreshCw } from 'lucide-react';
 import { useRecommendationConfig, useStage4Config, useMotorConfigMutations } from '../hooks/useMotorConfig';
+import { Button, Card } from '../components/ui';
 
 function HelpTip({ text }: { text: string }) {
   return (
@@ -35,7 +36,7 @@ function SliderField({
         min={min} max={max} step={step}
         disabled={disabled}
         aria-label={hint ? `${label}: ${hint}` : label}
-        className="w-full accent-blue-600 disabled:opacity-50"
+        className="w-full accent-indigo-600 disabled:opacity-50"
       />
       <div className="flex justify-between text-xs text-slate-400">
         <span>{min}</span>
@@ -45,23 +46,23 @@ function SliderField({
   );
 }
 
-const CONFIG_SAVED_MSG = '✅ Configuración aplicada correctamente. Se reflejará en la próxima predicción.';
+const CONFIG_SAVED_MSG = 'Configuración aplicada correctamente. Se reflejará en la próxima predicción.';
 
 function ConfigSection({
   title, icon, children,
 }: {
-  title: string; icon: string; children: React.ReactNode;
+  title: string; icon: React.ReactNode; children: React.ReactNode;
 }) {
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-      <div className="px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
-        <span className="text-lg">{icon}</span>
+    <Card variant="standard">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-indigo-500">{icon}</span>
         <h2 className="font-bold text-slate-800">{title}</h2>
       </div>
-      <div className="p-5 space-y-4">
+      <div className="space-y-4">
         {children}
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -175,7 +176,10 @@ export function MotorConfigScreen() {
           onClick={() => setShowHelp((prev) => !prev)}
           className="w-full px-5 py-3 flex items-center justify-between text-left bg-slate-50 hover:bg-slate-100 transition-colors"
         >
-          <span className="font-bold text-slate-800">ℹ️ ¿Cómo funciona esta configuración?</span>
+          <span className="font-bold text-slate-800 flex items-center gap-2">
+            <Info className="w-4 h-4 text-indigo-500" />
+            ¿Cómo funciona esta configuración?
+          </span>
           {showHelp ? (
             <ChevronUp className="w-5 h-5 text-slate-500" />
           ) : (
@@ -194,26 +198,29 @@ export function MotorConfigScreen() {
       </div>
 
       <div className="flex justify-end">
-        <button
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={() => { setDraftRec(null); setDraftStg(null); refreshRec(); refreshStg(); }}
           disabled={loading}
-          className="text-sm px-3 py-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium"
         >
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           {loading ? 'Cargando...' : 'Recargar'}
-        </button>
+        </Button>
       </div>
 
       {error && (
         <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
       )}
       {successMsg && (
-        <div role="status" className="p-4 bg-green-100 border-2 border-green-300 rounded-xl text-green-800 font-medium text-sm shadow-sm">
+        <div role="status" className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-700 flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
           {successMsg}
         </div>
       )}
 
       {/* Recommendation Config */}
-      <ConfigSection title="Recomendaciones" icon="⚙️">
+      <ConfigSection title="Recomendaciones" icon={<Settings className="w-5 h-5" />}>
         {!draftRec ? (
           <p className="text-sm text-slate-400">Cargando...</p>
         ) : (
@@ -224,28 +231,27 @@ export function MotorConfigScreen() {
             <SliderField label="Bonus VIP" hint="Aumenta la prioridad de las recomendaciones para usuarios con este rol." value={draftRec.vip_bonus} onChange={(v) => handleRecChange('vip_bonus', v)} min={0} max={1} step={0.05} disabled={saving} />
             <SliderField label="Bonus Staff" hint="Aumenta la prioridad de las recomendaciones para usuarios con este rol." value={draftRec.staff_bonus} onChange={(v) => handleRecChange('staff_bonus', v)} min={0} max={1} step={0.05} disabled={saving} />
             <SliderField label="Penalización por movilidad" hint="Reduce el score si la zona recomendada está lejos de la ubicación actual del usuario." value={draftRec.mobility_penalty} onChange={(v) => handleRecChange('mobility_penalty', v)} min={0} max={1} step={0.05} disabled={saving} />
-            <div className="pt-2 flex items-center gap-3">
-              <button
+            <div className="pt-2 flex items-center gap-3 flex-wrap">
+              <Button
                 onClick={handleSaveRec}
                 disabled={saving || !recDirty}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg text-sm disabled:opacity-50"
               >
                 {saving ? 'Guardando...' : 'Guardar Configuración'}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="secondary"
                 onClick={handleDiscardRec}
                 disabled={saving || !recDirty}
-                className="text-sm px-4 py-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 font-medium disabled:opacity-50"
               >
                 Descartar cambios
-              </button>
+              </Button>
             </div>
           </div>
         )}
       </ConfigSection>
 
       {/* Stage 4 Config */}
-      <ConfigSection title="Stage 4 — Derivation de Estado" icon="🧩">
+      <ConfigSection title="Stage 4 — Derivation de Estado" icon={<Puzzle className="w-5 h-5" />}>
         {!draftStg ? (
           <p className="text-sm text-slate-400">Cargando...</p>
         ) : (
@@ -253,21 +259,20 @@ export function MotorConfigScreen() {
             <SliderField label="Umbral de saturación alta" hint="Define el límite de densidad/capacidad para clasificar una zona como 'Alta Demanda'." value={draftStg.saturation_high_threshold} onChange={(v) => handleStgChange('saturation_high_threshold', v)} min={0} max={1} step={0.05} disabled={saving} />
             <SliderField label="Umbral de saturación moderada" hint="Define el límite de densidad/capacidad para clasificar una zona como 'Demanda Moderada'." value={draftStg.saturation_moderate_threshold} onChange={(v) => handleStgChange('saturation_moderate_threshold', v)} min={0} max={1} step={0.05} disabled={saving} />
 
-            <div className="pt-2 flex items-center gap-3">
-              <button
+            <div className="pt-2 flex items-center gap-3 flex-wrap">
+              <Button
                 onClick={handleSaveStg}
                 disabled={saving || !stgDirty}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg text-sm disabled:opacity-50"
               >
                 {saving ? 'Guardando...' : 'Guardar Configuración'}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="secondary"
                 onClick={handleDiscardStg}
                 disabled={saving || !stgDirty}
-                className="text-sm px-4 py-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 font-medium disabled:opacity-50"
               >
                 Descartar cambios
-              </button>
+              </Button>
             </div>
           </div>
         )}
