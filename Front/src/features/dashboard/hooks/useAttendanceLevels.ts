@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '@/core/api/client';
+import { endpoints } from '../../../core/api/endpoints';
 import type { AttendanceLevelDTO } from '../types';
 
 export function useAttendanceLevels(eventId: string) {
@@ -17,7 +18,7 @@ export function useAttendanceLevels(eventId: string) {
     setError(null);
     try {
       const { data } = await apiClient.get<AttendanceLevelDTO[]>(
-        `/events/${eventId}/attendance-levels`
+        endpoints.attendanceLevels.list(eventId)
       );
       setLevels(data);
     } catch (err: unknown) {

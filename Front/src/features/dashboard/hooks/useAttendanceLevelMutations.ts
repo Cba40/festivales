@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { apiClient } from '@/core/api/client';
+import { endpoints } from '../../../core/api/endpoints';
 import type { AttendanceLevelDTO } from '../types';
 
 export interface AttendanceLevelCreatePayload {
@@ -29,7 +30,7 @@ export function useAttendanceLevelMutations(eventId: string) {
       setError(null);
       try {
         const { data } = await apiClient.post<AttendanceLevelDTO>(
-          `/events/${eventId}/attendance-levels`,
+          endpoints.attendanceLevels.create(eventId),
           payload
         );
         return data;
@@ -55,7 +56,7 @@ export function useAttendanceLevelMutations(eventId: string) {
       setError(null);
       try {
         const { data } = await apiClient.put<AttendanceLevelDTO>(
-          `/events/${eventId}/attendance-levels/${id}`,
+          endpoints.attendanceLevels.update(eventId, id),
           payload
         );
         return data;
@@ -80,7 +81,7 @@ export function useAttendanceLevelMutations(eventId: string) {
       setSaving(true);
       setError(null);
       try {
-        await apiClient.delete(`/events/${eventId}/attendance-levels/${id}`);
+        await apiClient.delete(endpoints.attendanceLevels.delete(eventId, id));
         return true;
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Error al eliminar nivel de asistencia';

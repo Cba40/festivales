@@ -23,6 +23,12 @@ export const endpoints = {
         `/events/${eventId}/event-days/${dayId}/phases/${phaseId}`,
     },
   },
+  attendanceLevels: {
+    list: (eventId: string) => `/events/${eventId}/attendance-levels`,
+    create: (eventId: string) => `/events/${eventId}/attendance-levels`,
+    update: (eventId: string, id: string) => `/events/${eventId}/attendance-levels/${id}`,
+    delete: (eventId: string, id: string) => `/events/${eventId}/attendance-levels/${id}`,
+  },
   predictions: {
     get: (eventId: string) => `/events/${eventId}/predictions`,
   },
