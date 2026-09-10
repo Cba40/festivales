@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { isAxiosError } from 'axios';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { apiClient } from '../../../core/api/client';
 import { endpoints } from '../../../core/api/endpoints';
+import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 
 interface ExitDestinationDTO {
   id: string;
@@ -37,6 +41,7 @@ export function ExitManagementScreen({ eventId }: { eventId: string }) {
   const [zonasLoading, setZonasLoading] = useState(true);
   const [asignaciones, setAsignaciones] = useState<Record<string, string[]>>({});
   const [statusPorZona, setStatusPorZona] = useState<Record<string, ZoneSaveStatus>>({});
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const cargarDestinos = useCallback(async () => {
     try {
@@ -156,16 +161,15 @@ export function ExitManagementScreen({ eventId }: { eventId: string }) {
     }
   };
 
-  const eliminarDestino = async (destino: ExitDestinationDTO) => {
-    const confirmado = window.confirm(
-      `¿Eliminar el destino "${destino.name}"? También se quitará de todas las salidas que lo tienen asignado. Esta acción no se puede deshacer.`
-    );
-    if (!confirmado) return;
+  const handleDeleteConfirm = async () => {
+    if (!pendingDeleteId) return;
     try {
-      await apiClient.delete(endpoints.exitAdmin.destinations.delete(eventId, destino.id));
+      await apiClient.delete(endpoints.exitAdmin.destinations.delete(eventId, pendingDeleteId));
       await cargarDestinos();
     } catch {
       setDestinosError('No se pudo eliminar el destino.');
+    } finally {
+      setPendingDeleteId(null);
     }
   };
 
@@ -196,12 +200,10 @@ export function ExitManagementScreen({ eventId }: { eventId: string }) {
           <h2 className="text-lg font-semibold text-slate-700">
             Destinos del Evento ({destinos.length})
           </h2>
-          <button
-            onClick={abrirCrear}
-            className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md text-sm font-medium transition-colors"
-          >
-            + Nuevo Destino
-          </button>
+          <Button variant="primary" onClick={abrirCrear}>
+            <Plus className="w-4 h-4" />
+            Nuevo Destino
+          </Button>
         </div>
 
         {destinosError && (
@@ -226,25 +228,35 @@ export function ExitManagementScreen({ eventId }: { eventId: string }) {
                     <span className="ml-2 text-xs text-slate-500">(desactivado)</span>
                   )}
                 </div>
-                <div className="flex gap-2">
-                  <button
+                <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => abrirEditar(destino)}
-                    className="text-sm text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-md transition-colors"
+                    title="Editar"
+                    className="mr-1"
                   >
+                    <Pencil className="w-3.5 h-3.5" />
                     Editar
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => void alternarActivo(destino)}
-                    className="text-sm text-slate-600 hover:bg-slate-100 px-3 py-1.5 rounded-md transition-colors"
+                    title={destino.active ? 'Desactivar' : 'Activar'}
                   >
                     {destino.active ? 'Desactivar' : 'Activar'}
-                  </button>
-                  <button
-                    onClick={() => void eliminarDestino(destino)}
-                    className="text-sm text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-md transition-colors"
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setPendingDeleteId(destino.id)}
+                    title="Eliminar"
+                    className="text-red-600 hover:bg-red-50"
                   >
+                    <Trash2 className="w-3.5 h-3.5" />
                     Eliminar
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))}
@@ -308,7 +320,7 @@ export function ExitManagementScreen({ eventId }: { eventId: string }) {
                             type="checkbox"
                             checked={seleccionados.includes(destino.id)}
                             onChange={() => void toggleDestinoEnZona(zona.id, destino.id)}
-                            className="accent-emerald-600"
+                            className="accent-indigo-600"
                           />
                           <span>
                             {destino.name}
@@ -327,9 +339,20 @@ export function ExitManagementScreen({ eventId }: { eventId: string }) {
         )}
       </section>
 
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        title="Eliminar destino"
+        message={`¿Eliminar el destino "${destinos.find((d) => d.id === pendingDeleteId)?.name ?? ''}"? También se quitará de todas las salidas que lo tienen asignado. Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        cancelLabel="Cancelar"
+        variant="destructive"
+        onConfirm={() => void handleDeleteConfirm()}
+        onCancel={() => setPendingDeleteId(null)}
+      />
+
       {modal && (
         <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 mx-4 space-y-4">
+          <Card variant="standard" className="w-full max-w-md mx-4 space-y-4">
             <h3 className="text-lg font-semibold text-slate-800">
               {modal.mode === 'create' ? 'Nuevo Destino' : `Editar Destino`}
             </h3>
@@ -340,7 +363,7 @@ export function ExitManagementScreen({ eventId }: { eventId: string }) {
                 value={modalName}
                 onChange={(e) => setModalName(e.target.value)}
                 placeholder="Ej: Córdoba"
-                className="w-full border-slate-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full border-slate-300 rounded-md py-2 px-3 focus:ring-indigo-500 focus:border-indigo-500"
               />
             </div>
             <label className="flex items-center gap-2 text-sm text-slate-700">
@@ -348,7 +371,7 @@ export function ExitManagementScreen({ eventId }: { eventId: string }) {
                 type="checkbox"
                 checked={modalActive}
                 onChange={(e) => setModalActive(e.target.checked)}
-                className="accent-emerald-600"
+                className="accent-indigo-600"
               />
               Activo (visible en la pantalla "Salir")
             </label>
@@ -358,23 +381,14 @@ export function ExitManagementScreen({ eventId }: { eventId: string }) {
               </p>
             )}
             <div className="flex justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setModal(null)}
-                className="py-2 px-4 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors"
-              >
+              <Button variant="secondary" onClick={() => setModal(null)}>
                 Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={() => void guardarModal()}
-                disabled={modalSaving}
-                className="py-2 px-4 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md transition-colors"
-              >
+              </Button>
+              <Button variant="primary" onClick={() => void guardarModal()} disabled={modalSaving}>
                 {modalSaving ? 'Guardando...' : 'Guardar'}
-              </button>
+              </Button>
             </div>
-          </div>
+          </Card>
         </div>
       )}
     </div>
