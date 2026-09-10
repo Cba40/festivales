@@ -1,6 +1,10 @@
 import { useState, useCallback } from 'react';
+import { Plus } from 'lucide-react';
 import { EventDayList } from '../components/EventDayList';
 import { EventDayForm } from '../components/EventDayForm';
+import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useEventDays } from '../hooks/useEventDays';
 import { useEventDayMutations } from '../hooks/useEventDayMutations';
 import type { EventDaySummary, EventDay, EventDayCreatePayload } from '../types';
@@ -16,6 +20,7 @@ export function EventDayScreen() {
   const [showForm, setShowForm] = useState(false);
   const [editingDay, setEditingDay] = useState<EventDay | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const handleNew = () => {
     setEditingDay(null);
@@ -36,10 +41,10 @@ export function EventDayScreen() {
     }
   }, []);
 
-  const handleDelete = useCallback(
+  const handleDeleteConfirm = useCallback(
     async (id: string) => {
-      if (!window.confirm('¿Eliminar este día del evento? Esta acción no se puede deshacer.')) return;
       const ok = await remove(id);
+      setPendingDeleteId(null);
       if (ok) refresh();
     },
     [remove, refresh]
@@ -69,60 +74,72 @@ export function EventDayScreen() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 w-full">
-      <header className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center">
-        <h1 className="text-xl font-bold text-slate-800">Gestión de Días del Evento</h1>
-        {!showForm && (
-          <button
-            onClick={handleNew}
-            className="bg-blue-600 hover:bg-blue-700 text-white py-1.5 px-4 rounded-lg text-sm font-medium transition-colors"
-          >
-            + Nuevo día
-          </button>
-        )}
-      </header>
+    <main className="p-4 sm:p-6 max-w-5xl mx-auto space-y-6">
+      <Card variant="standard">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+          <h1 className="text-xl font-bold text-slate-800">Gestión de Días del Evento</h1>
+          {!showForm && (
+            <Button onClick={handleNew}>
+              <Plus className="w-4 h-4" />
+              Nuevo día
+            </Button>
+          )}
+        </div>
+      </Card>
 
-      <main className="p-6 max-w-5xl mx-auto">
-        {formError && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-            {formError}
-          </div>
-        )}
+      {formError && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          {formError}
+        </div>
+      )}
 
-        {error && (
-          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-700">
-            {error}
-          </div>
-        )}
+      {error && (
+        <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-700">
+          {error}
+        </div>
+      )}
 
-        {showForm ? (
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <h2 className="text-lg font-semibold text-slate-800 mb-4">
-              {editingDay ? 'Editar día' : 'Nuevo día del evento'}
-            </h2>
-            <EventDayForm
-              eventDay={editingDay}
-              eventId={EVENT_ID}
-              onSave={handleSave}
-              onCancel={handleCancel}
-              saving={saving}
-            />
-          </div>
-        ) : (
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <h2 className="text-lg font-semibold text-slate-800 mb-4">Días cargados</h2>
-            {loading ? (
-              <div className="text-center py-8 text-slate-500">Cargando...</div>
-            ) : (
+      {showForm ? (
+        <Card variant="standard">
+          <h2 className="text-lg font-semibold text-slate-800 mb-4">
+            {editingDay ? 'Editar día' : 'Nuevo día del evento'}
+          </h2>
+          <EventDayForm
+            eventDay={editingDay}
+            eventId={EVENT_ID}
+            onSave={handleSave}
+            onCancel={handleCancel}
+            saving={saving}
+          />
+        </Card>
+      ) : (
+        <Card variant="standard">
+          <h2 className="text-lg font-semibold text-slate-800 mb-4">Días cargados</h2>
+          {loading ? (
+            <div className="text-center py-8 text-slate-500">Cargando...</div>
+          ) : (
+            <>
               <EventDayList
                 eventDays={eventDays}
                 onEdit={handleEdit}
-                onDelete={handleDelete}
+                onRequestDelete={setPendingDeleteId}
               />
-            )}
-          </div>
-        )}
-      </main>
-    </div>
+              <ConfirmDialog
+                open={pendingDeleteId !== null}
+                title="Eliminar día del evento"
+                message="¿Eliminar este día del evento? Esta acción no se puede deshacer."
+                confirmLabel="Eliminar"
+                cancelLabel="Cancelar"
+                variant="destructive"
+                onConfirm={() => {
+                  if (pendingDeleteId) void handleDeleteConfirm(pendingDeleteId);
+                }}
+                onCancel={() => setPendingDeleteId(null)}
+              />
+            </>
+          )}
+        </Card>
+      )}
+    </main>
   );
 }

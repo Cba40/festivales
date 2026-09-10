@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { Button } from './ui/Button';
 import { EventDayPhaseEditor, validatePhases } from './EventDayPhaseEditor';
 import { useAttendanceLevels } from '../hooks/useAttendanceLevels';
 import { useOperationalPhaseCatalog } from '../hooks/useOperationalPhaseCatalog';
@@ -28,7 +29,7 @@ const WEATHER_OPTIONS = [
   { value: 'tormenta', label: 'Tormenta' },
 ];
 
-const TIMELINE_COLORS = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-teal-500'];
+const TIMELINE_COLORS = ['bg-indigo-500', 'bg-purple-500', 'bg-emerald-500', 'bg-amber-500', 'bg-teal-500'];
 
 function PhaseTimelineBar({
   phases, operationalStartMin, operationalEndMin, operationalPhases,
@@ -210,7 +211,7 @@ export function EventDayForm({ eventDay, eventId, onSave, onCancel, saving }: Ev
             value={date}
             onChange={(e) => setDate(e.target.value)}
             required
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
           />
         </div>
 
@@ -220,7 +221,7 @@ export function EventDayForm({ eventDay, eventId, onSave, onCancel, saving }: Ev
             value={dayOfWeek}
             onChange={(e) => setDayOfWeek(e.target.value)}
             required
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
           >
             <option value="">Seleccionar...</option>
             {DAYS_OF_WEEK.map((d) => (
@@ -242,7 +243,7 @@ export function EventDayForm({ eventDay, eventId, onSave, onCancel, saving }: Ev
               value={attendanceLevelId}
               onChange={(e) => setAttendanceLevelId(e.target.value)}
               required
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             >
               <option value="">Seleccionar...</option>
               {levels.map((l) => (
@@ -262,7 +263,7 @@ export function EventDayForm({ eventDay, eventId, onSave, onCancel, saving }: Ev
             value={estimatedVehicles}
             onChange={(e) => setEstimatedVehicles(e.target.value)}
             placeholder="Ej: 5000"
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
           />
           <p className="text-[10px] text-slate-400 mt-0.5">
             Vehículos estimados que se espera que ingresen al territorio durante este día. Independiente del nivel de asistencia.
@@ -279,7 +280,7 @@ export function EventDayForm({ eventDay, eventId, onSave, onCancel, saving }: Ev
               value={averageParkingDuration}
               onChange={(e) => setAverageParkingDuration(e.target.value)}
               placeholder="Ej: 4"
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             />
             <span className="text-sm text-slate-500 whitespace-nowrap">horas</span>
           </div>
@@ -295,7 +296,7 @@ export function EventDayForm({ eventDay, eventId, onSave, onCancel, saving }: Ev
             value={operationalStartStr}
             onChange={(e) => setOperationalStartStr(e.target.value)}
             required
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
           />
           <p className="text-[10px] text-slate-400 mt-0.5">Ej: 08:00 = 480 min desde medianoche</p>
         </div>
@@ -307,7 +308,7 @@ export function EventDayForm({ eventDay, eventId, onSave, onCancel, saving }: Ev
             value={operationalEndStr}
             onChange={(e) => setOperationalEndStr(e.target.value)}
             required
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
           />
         </div>
       </div>
@@ -343,7 +344,7 @@ export function EventDayForm({ eventDay, eventId, onSave, onCancel, saving }: Ev
             <select
               value={weather}
               onChange={(e) => setWeather(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             >
               {WEATHER_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -358,7 +359,7 @@ export function EventDayForm({ eventDay, eventId, onSave, onCancel, saving }: Ev
               value={headlinerArtist}
               onChange={(e) => setHeadlinerArtist(e.target.value)}
               placeholder="Ej: Los Auténticos Decadentes"
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>
 
@@ -370,7 +371,7 @@ export function EventDayForm({ eventDay, eventId, onSave, onCancel, saving }: Ev
                 onChange={(e) => setIsActive(e.target.checked)}
                 className="sr-only peer"
               />
-              <div className="w-9 h-5 bg-slate-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600" />
+              <div className="w-9 h-5 bg-slate-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600" />
             </label>
             <span className="text-sm font-medium text-slate-700">Día activo</span>
           </div>
@@ -384,7 +385,7 @@ export function EventDayForm({ eventDay, eventId, onSave, onCancel, saving }: Ev
           onChange={(e) => setNotes(e.target.value)}
           rows={3}
           placeholder="Información adicional sobre este día..."
-          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
         />
       </div>
 
@@ -394,22 +395,21 @@ export function EventDayForm({ eventDay, eventId, onSave, onCancel, saving }: Ev
         </div>
       )}
 
-      <div className="flex justify-end gap-3 pt-2">
-        <button
+      <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-2">
+        <Button
           type="button"
+          variant="secondary"
           onClick={onCancel}
           disabled={saving}
-          className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
         >
           Cancelar
-        </button>
-        <button
+        </Button>
+        <Button
           type="submit"
           disabled={saving || !date || !dayOfWeek || !operationalStartStr || !operationalEndStr}
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
         >
           {saving ? 'Guardando...' : isEditing ? 'Actualizar' : 'Crear día'}
-        </button>
+        </Button>
       </div>
     </form>
   );

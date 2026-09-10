@@ -83,7 +83,7 @@ export function EventDayPhaseEditor({
                     <select
                       value={phase.operational_phase_id}
                       onChange={(e) => changeBehavior(index, e.target.value)}
-                      className="w-full px-2 py-1 border border-slate-300 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-2 py-1 border border-slate-300 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     >
                       {operationalPhases.map((op) => (
                         <option key={op.id} value={op.id}>{op.name}</option>
@@ -98,7 +98,7 @@ export function EventDayPhaseEditor({
                         const val = e.target.value;
                         setTime(index, 'start_min', val ? timeStrToMinutes(val) : null);
                       }}
-                      className="w-28 px-2 py-1 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-28 px-2 py-1 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     />
                   </td>
                   <td className="py-2 px-2">
@@ -109,7 +109,7 @@ export function EventDayPhaseEditor({
                         const val = e.target.value;
                         setTime(index, 'end_min', val ? timeStrToMinutes(val) : null);
                       }}
-                      className="w-28 px-2 py-1 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-28 px-2 py-1 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     />
                   </td>
                   <td className="py-2 px-2">
@@ -122,7 +122,7 @@ export function EventDayPhaseEditor({
                         const val = Number(e.target.value);
                         if (Number.isFinite(val) && val > 0) setIntensity(index, val);
                       }}
-                      className="w-20 px-2 py-1 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-20 px-2 py-1 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     />
                   </td>
                   <td className="py-2 pl-2 text-right whitespace-nowrap">
@@ -155,7 +155,7 @@ export function EventDayPhaseEditor({
             }}
             onBlur={() => setShowAddSelector(false)}
             autoFocus
-            className="px-3 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
           >
             <option value="" disabled>Seleccionar fase...</option>
             {operationalPhases.map((op) => (

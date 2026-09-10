@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Button } from './ui/Button';
 
 interface AttendanceLevelFormProps {
   initial?: {
@@ -92,7 +93,7 @@ export function AttendanceLevelForm({ initial, onSave, onCancel, saving }: Atten
           required
           maxLength={50}
           placeholder="Ej: 5.000 asistentes"
-          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
         />
       </div>
 
@@ -106,7 +107,7 @@ export function AttendanceLevelForm({ initial, onSave, onCancel, saving }: Atten
             onChange={(e) => setMinPeople(e.target.value)}
             required
             placeholder="Ej: 0"
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
           />
         </div>
 
@@ -116,7 +117,7 @@ export function AttendanceLevelForm({ initial, onSave, onCancel, saving }: Atten
             <button
               type="button"
               onClick={() => { setHasMax(!hasMax); setMaxPeople(''); }}
-              className="ml-2 text-xs text-blue-600 hover:text-blue-800"
+              className="ml-2 text-xs text-indigo-600 hover:text-indigo-800"
             >
               {hasMax ? 'Sin límite' : 'Con límite'}
             </button>
@@ -128,7 +129,7 @@ export function AttendanceLevelForm({ initial, onSave, onCancel, saving }: Atten
               value={maxPeople}
               onChange={(e) => setMaxPeople(e.target.value)}
               placeholder="Ej: 10000"
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             />
           ) : (
             <div className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-400 bg-slate-50">
@@ -149,22 +150,21 @@ export function AttendanceLevelForm({ initial, onSave, onCancel, saving }: Atten
         </div>
       )}
 
-      <div className="flex justify-end gap-3 pt-2">
-        <button
+      <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-2">
+        <Button
           type="button"
+          variant="secondary"
           onClick={onCancel}
           disabled={saving}
-          className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
         >
           Cancelar
-        </button>
-        <button
+        </Button>
+        <Button
           type="submit"
           disabled={saving || !name.trim() || !minPeople}
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
         >
           {saving ? 'Guardando...' : initial ? 'Actualizar' : 'Crear nivel'}
-        </button>
+        </Button>
       </div>
     </form>
   );
