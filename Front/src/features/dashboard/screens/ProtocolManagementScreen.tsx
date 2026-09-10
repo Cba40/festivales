@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { isAxiosError } from 'axios';
+import { Plus, Pencil, Trash2, ArrowUp, ArrowDown, X, AlertTriangle, Shield, Heart, Ambulance, Flame, ClipboardList } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import {
   getProtocols,
   createProtocol,
@@ -8,7 +10,11 @@ import {
   type ProtocolContext,
   type ProtocolDTO,
 } from '../../../services/emergencyProtocolAdmin';
-import type { EmergencyType } from '../../../services/emergencyAdmin';
+import { EMERGENCY_TYPE_LABELS, type EmergencyType } from '../constants/emergencyLabels';
+import { Badge, type BadgeVariant } from '../components/ui/Badge';
+import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 
 type ContextFilter = ProtocolContext | 'todos';
 
@@ -25,30 +31,46 @@ interface ProtocolForm {
   steps: string[];
   priority: string;
   order: string;
-  target_type: string;
+  target_type: EmergencyType | '';
   active: boolean;
 }
 
-const CONTEXT_OPTIONS: { key: ProtocolContext; label: string; badge: string }[] = [
-  { key: 'festival', label: 'Festival', badge: 'bg-violet-100 text-violet-700' },
-  { key: 'transporte', label: 'Transporte', badge: 'bg-sky-100 text-sky-700' },
-  { key: 'hospedaje', label: 'Hospedaje', badge: 'bg-amber-100 text-amber-700' },
+const CONTEXT_OPTIONS: { key: ProtocolContext; label: string; badgeVariant: BadgeVariant }[] = [
+  { key: 'festival', label: 'Festival', badgeVariant: 'info' },
+  { key: 'transporte', label: 'Transporte', badgeVariant: 'success' },
+  { key: 'hospedaje', label: 'Hospedaje', badgeVariant: 'warning' },
 ];
 
 const PRIORITY_OPTIONS = [
-  { value: '1', label: '1 · Crítica' },
-  { value: '2', label: '2 · Alta' },
-  { value: '3', label: '3 · Media' },
+  { value: '1', label: 'Alta' },
+  { value: '2', label: 'Media' },
+  { value: '3', label: 'Baja' },
 ];
 
-const TYPE_LABELS: Record<EmergencyType, string> = {
-  policia: 'Policía',
-  bomberos: 'Bomberos',
-  salud: 'Salud',
-  defensa_civil: 'Defensa Civil',
-  numero_emergencia: 'Número de Emergencia',
-  otro: 'Otro',
+const PRIORITY_LABELS: Record<string, string> = {
+  '1': 'Alta',
+  '2': 'Media',
+  '3': 'Baja',
 };
+
+const PRIORITY_BADGE_VARIANTS: Record<string, BadgeVariant> = {
+  '1': 'error',
+  '2': 'warning',
+  '3': 'neutral',
+};
+
+const PROTOCOL_ICON_OPTIONS: { value: string; icon: LucideIcon; label: string }[] = [
+  { value: '🚨', icon: AlertTriangle, label: 'Alerta' },
+  { value: '🚑', icon: Ambulance, label: 'Ambulancia' },
+  { value: '🚒', icon: Flame, label: 'Bomberos' },
+  { value: '👮', icon: Shield, label: 'Seguridad' },
+  { value: '🏥', icon: Heart, label: 'Salud' },
+  { value: '📋', icon: ClipboardList, label: 'Documento' },
+];
+
+const PROTOCOL_ICON_MAP: Record<string, LucideIcon> = Object.fromEntries(
+  PROTOCOL_ICON_OPTIONS.map((o) => [o.value, o.icon])
+);
 
 const emptyForm: ProtocolForm = {
   context: 'festival',
@@ -73,6 +95,7 @@ export function ProtocolManagementScreen() {
   const [form, setForm] = useState<ProtocolForm>(emptyForm);
   const [modalSaving, setModalSaving] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -205,10 +228,6 @@ export function ProtocolManagementScreen() {
   };
 
   const eliminar = async (p: ProtocolDTO) => {
-    const confirmado = window.confirm(
-      `¿Desactivar el protocolo "${p.title}"? Se dejará de mostrar en la app pública. Esta acción no se puede deshacer.`
-    );
-    if (!confirmado) return;
     try {
       await deleteProtocol(p.id);
       setResult('Protocolo desactivado.');
@@ -218,13 +237,21 @@ export function ProtocolManagementScreen() {
     }
   };
 
+  const handleDeleteConfirm = async () => {
+    if (!pendingDeleteId) return;
+    const p = protocols.find((pr) => pr.id === pendingDeleteId);
+    if (!p) return;
+    await eliminar(p);
+    setPendingDeleteId(null);
+  };
+
   const labelContexto = (context: ProtocolContext) =>
     CONTEXT_OPTIONS.find((c) => c.key === context)?.label ?? context;
 
-  const badgeContexto = (context: ProtocolContext) =>
-    CONTEXT_OPTIONS.find((c) => c.key === context)?.badge ?? 'bg-slate-100 text-slate-700';
+  const badgeVariantContexto = (context: ProtocolContext) =>
+    CONTEXT_OPTIONS.find((c) => c.key === context)?.badgeVariant ?? 'neutral';
 
-  const inputCls = 'w-full border-slate-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500';
+  const inputCls = 'w-full border-slate-300 rounded-md py-2 px-3 focus:ring-indigo-500 focus:border-indigo-500';
 
   return (
     <div className="space-y-10">
@@ -239,8 +266,8 @@ export function ProtocolManagementScreen() {
                 onClick={() => setActiveContext('todos')}
                 className={`text-sm font-medium px-3 py-1.5 rounded-md transition-colors ${
                   activeContext === 'todos'
-                    ? 'bg-slate-800 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
                 }`}
               >
                 Todos
@@ -251,20 +278,18 @@ export function ProtocolManagementScreen() {
                   onClick={() => setActiveContext(c.key)}
                   className={`text-sm font-medium px-3 py-1.5 rounded-md transition-colors ${
                     activeContext === c.key
-                      ? 'bg-slate-800 text-white'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
                   }`}
                 >
                   {c.label}
                 </button>
               ))}
             </div>
-            <button
-              onClick={abrirCrear}
-              className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md text-sm font-medium transition-colors"
-            >
-              + Nuevo Protocolo
-            </button>
+            <Button variant="primary" onClick={abrirCrear}>
+              <Plus className="w-4 h-4" />
+              Nuevo Protocolo
+            </Button>
           </div>
         </div>
 
@@ -293,81 +318,99 @@ export function ProtocolManagementScreen() {
             Creá el primero con "+ Nuevo Protocolo".
           </p>
         ) : (
-          <div className="bg-white rounded-lg border border-slate-200 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 text-left text-slate-500">
-                  <th className="px-4 py-3 font-medium">Ícono</th>
-                  <th className="px-4 py-3 font-medium">Título</th>
-                  <th className="px-4 py-3 font-medium">Contexto</th>
-                  <th className="px-4 py-3 font-medium">Target Type</th>
-                  <th className="px-4 py-3 font-medium">Prioridad</th>
-                  <th className="px-4 py-3 font-medium">Orden</th>
-                  <th className="px-4 py-3 font-medium">Estado</th>
-                  <th className="px-4 py-3 font-medium text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {protocols.map((p) => (
-                  <tr key={p.id}>
-                    <td className="px-4 py-3 text-xl">{p.icon}</td>
-                    <td className="px-4 py-3 font-medium text-slate-800">{p.title}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${badgeContexto(p.context)}`}
-                      >
-                        {labelContexto(p.context)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">
-                      {p.target_type ? TYPE_LABELS[p.target_type] : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">{p.priority}</td>
-                    <td className="px-4 py-3 text-slate-600">{p.order}</td>
-                    <td className="px-4 py-3">
-                      {p.active ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
-                          Activo
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-200 text-slate-600">
-                          Inactivo
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-1">
-                        <button
-                          onClick={() => abrirEditar(p)}
-                          className="text-sm text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-md transition-colors"
-                        >
-                          Editar
-                        </button>
-                        <button
-                          onClick={() => void alternarActivo(p)}
-                          className="text-sm text-slate-600 hover:bg-slate-100 px-3 py-1.5 rounded-md transition-colors"
-                        >
-                          {p.active ? 'Desactivar' : 'Activar'}
-                        </button>
-                        <button
-                          onClick={() => void eliminar(p)}
-                          className="text-sm text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-md transition-colors"
-                        >
-                          Eliminar
-                        </button>
-                      </div>
-                    </td>
+<div className="bg-white rounded-lg border border-slate-200 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 text-left text-slate-500">
+                    <th className="px-4 py-3 font-medium">Ícono</th>
+                    <th className="px-4 py-3 font-medium">Título</th>
+                    <th className="px-4 py-3 font-medium">Contexto</th>
+                    <th className="px-4 py-3 font-medium">Target Type</th>
+                    <th className="px-4 py-3 font-medium">Prioridad</th>
+                    <th className="px-4 py-3 font-medium">Orden</th>
+                    <th className="px-4 py-3 font-medium">Estado</th>
+                    <th className="px-4 py-3 font-medium text-right">Acciones</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {protocols.map((p) => {
+                    const Icon = PROTOCOL_ICON_MAP[p.icon] ?? AlertTriangle;
+                    return (
+                      <tr key={p.id}>
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600">
+                            <Icon className="w-4 h-4" />
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-medium text-slate-800">{p.title}</td>
+                        <td className="px-4 py-3">
+                          <Badge variant={badgeVariantContexto(p.context)}>
+                            {labelContexto(p.context)}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {p.target_type ? EMERGENCY_TYPE_LABELS[p.target_type] : '—'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <Badge variant={PRIORITY_BADGE_VARIANTS[String(p.priority)] ?? 'neutral'}>
+                            {PRIORITY_LABELS[String(p.priority)] ?? String(p.priority)}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">{p.order}</td>
+                        <td className="px-4 py-3">
+                          {p.active ? (
+                            <Badge variant="success">Activo</Badge>
+                          ) : (
+                            <Badge variant="neutral">Inactivo</Badge>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => abrirEditar(p)}
+                              title="Editar"
+                              className="mr-1"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                              Editar
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => void alternarActivo(p)}
+                              title={p.active ? 'Desactivar' : 'Activar'}
+                            >
+                              {p.active ? 'Desactivar' : 'Activar'}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setPendingDeleteId(p.id)}
+                              title="Eliminar"
+                              className="text-red-600 hover:bg-red-50"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              Eliminar
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
         )}
       </section>
 
       {modal && (
         <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 mx-4 space-y-4 max-h-[90vh] overflow-y-auto">
+          <Card
+            variant="standard"
+            className="w-full max-w-2xl mx-4 space-y-4 max-h-[90vh] overflow-y-auto"
+          >
             <h3 className="text-lg font-semibold text-slate-800">
               {modal.mode === 'create' ? 'Nuevo Protocolo' : 'Editar Protocolo'}
             </h3>
@@ -389,14 +432,29 @@ export function ProtocolManagementScreen() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Ícono</label>
-                <input
-                  type="text"
-                  value={form.icon}
-                  onChange={(e) => setCampo('icon', e.target.value)}
-                  placeholder="Ej: 🚨"
-                  className={inputCls}
-                />
+                <label className="block text-sm font-medium text-slate-700 mb-1">Ícono *</label>
+                <div className="flex flex-wrap gap-2">
+                  {PROTOCOL_ICON_OPTIONS.map((opt) => {
+                    const OptionIcon = opt.icon;
+                    const selected = form.icon === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setCampo('icon', opt.value)}
+                        title={opt.label}
+                        aria-label={opt.label}
+                        className={`flex items-center justify-center w-10 h-10 rounded-lg border transition-colors ${
+                          selected
+                            ? 'bg-indigo-600 text-white border-indigo-600'
+                            : 'bg-white text-slate-600 border-slate-300 hover:border-indigo-400 hover:bg-indigo-50'
+                        }`}
+                      >
+                        <OptionIcon className="w-4 h-4" />
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               <div className="sm:col-span-2">
@@ -429,24 +487,26 @@ export function ProtocolManagementScreen() {
                   {form.steps.map((step, i) => (
                     <div key={i} className="flex items-center gap-2">
                       <div className="flex flex-col">
-                        <button
-                          type="button"
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => moveStep(i, -1)}
                           disabled={i === 0}
-                          className="text-slate-500 hover:text-slate-800 disabled:opacity-30 text-xs leading-none px-1"
                           aria-label="Subir paso"
+                          className="px-1 py-0.5"
                         >
-                          ↑
-                        </button>
-                        <button
-                          type="button"
+                          <ArrowUp className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => moveStep(i, 1)}
                           disabled={i === form.steps.length - 1}
-                          className="text-slate-500 hover:text-slate-800 disabled:opacity-30 text-xs leading-none px-1"
                           aria-label="Bajar paso"
+                          className="px-1 py-0.5"
                         >
-                          ↓
-                        </button>
+                          <ArrowDown className="w-3.5 h-3.5" />
+                        </Button>
                       </div>
                       <input
                         type="text"
@@ -455,23 +515,22 @@ export function ProtocolManagementScreen() {
                         placeholder={`Paso ${i + 1}: qué debe hacer el usuario`}
                         className={inputCls}
                       />
-                      <button
-                        type="button"
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => removeStep(i)}
-                        className="text-red-500 hover:bg-red-50 rounded-md px-2 py-1.5 transition-colors"
                         aria-label="Eliminar paso"
+                        className="text-red-600 hover:bg-red-50"
                       >
-                        ✕
-                      </button>
+                        <X className="w-3.5 h-3.5" />
+                        Eliminar
+                      </Button>
                     </div>
                   ))}
-                  <button
-                    type="button"
-                    onClick={addStep}
-                    className="text-sm font-medium text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-md transition-colors"
-                  >
-                    + Agregar paso
-                  </button>
+                  <Button variant="ghost" size="sm" onClick={addStep}>
+                    <Plus className="w-3.5 h-3.5" />
+                    Agregar paso
+                  </Button>
                 </div>
               </div>
 
@@ -507,13 +566,13 @@ export function ProtocolManagementScreen() {
                 </label>
                 <select
                   value={form.target_type}
-                  onChange={(e) => setCampo('target_type', e.target.value)}
+                  onChange={(e) => setCampo('target_type', e.target.value as EmergencyType | '')}
                   className={inputCls}
                 >
                   <option value="">Ninguno</option>
-                  {(Object.keys(TYPE_LABELS) as EmergencyType[]).map((t) => (
+                  {(Object.keys(EMERGENCY_TYPE_LABELS) as EmergencyType[]).map((t) => (
                     <option key={t} value={t}>
-                      {TYPE_LABELS[t]}
+                      {EMERGENCY_TYPE_LABELS[t]}
                     </option>
                   ))}
                 </select>
@@ -525,7 +584,7 @@ export function ProtocolManagementScreen() {
                 type="checkbox"
                 checked={form.active}
                 onChange={(e) => setCampo('active', e.target.checked)}
-                className="accent-emerald-600"
+                className="accent-indigo-600"
               />
               Activo (visible en la pantalla "Emergencias")
             </label>
@@ -537,25 +596,31 @@ export function ProtocolManagementScreen() {
             )}
 
             <div className="flex justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setModal(null)}
-                className="py-2 px-4 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors"
-              >
+              <Button variant="secondary" onClick={() => setModal(null)}>
                 Cancelar
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="primary"
                 onClick={() => void guardar()}
                 disabled={modalSaving}
-                className="py-2 px-4 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md transition-colors"
               >
                 {modalSaving ? 'Guardando...' : 'Guardar'}
-              </button>
+              </Button>
             </div>
-          </div>
+          </Card>
         </div>
       )}
+
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        title="Eliminar protocolo"
+        message={`¿Desactivar el protocolo "${protocols.find((p) => p.id === pendingDeleteId)?.title ?? ''}"? Se dejará de mostrar en la app pública. Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        cancelLabel="Cancelar"
+        variant="destructive"
+        onConfirm={() => void handleDeleteConfirm()}
+        onCancel={() => setPendingDeleteId(null)}
+      />
     </div>
   );
 }
