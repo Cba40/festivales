@@ -22,6 +22,7 @@ import { useTerritorialPrediction, useAutoRefresh } from '../../hooks/useContext
 import type { ZoneStateItem } from '../../hooks/useContextEngine';
 import { apiClient } from '../../core/api/client';
 import { endpoints } from '../../core/api/endpoints';
+import { Button, Card, Badge } from '../../features/dashboard/components/ui';
 
 const RESTRICTION_LABELS: Record<string, string> = {
   OPEN: 'Abierta',
@@ -188,18 +189,18 @@ export function PredictionsDashboard({ eventId, autoRefreshMs = 15000 }: Predict
       zs.confidence == null &&
       zs.estimated_wait == null;
     return (
-      <div key={zs.zone_id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+      <Card variant="standard" key={zs.zone_id}>
         <div className="flex items-center justify-between mb-3">
           <div>
             <span className="text-sm font-semibold text-slate-800">{name}</span>
-            <span className="ml-2 text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">{typeLabel}</span>
+            <Badge variant="neutral" className="ml-2">{typeLabel}</Badge>
           </div>
           <div className="flex items-center gap-2">
             {zs.active_restriction !== 'OPEN' && (
-              <span className="flex items-center gap-1 text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+              <Badge variant="warning">
                 <ShieldBan size={11} />
                 {restriction}
-              </span>
+              </Badge>
             )}
             <div className={`w-2.5 h-2.5 rounded-full ${statusStyle.color}`} />
             <span className="text-xs font-medium text-slate-600">{statusStyle.label}</span>
@@ -208,12 +209,11 @@ export function PredictionsDashboard({ eventId, autoRefreshMs = 15000 }: Predict
 
         {missingDetailedMetrics && (
           <div className="mb-2">
-            <span
-              className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-full px-2 py-0.5"
-              title="El motor aún no ejecuta un modelo especializado que produzca saturación, disponibilidad y confianza para esta zona."
-            >
-              <Info size={11} />
-              Métricas detalladas pendientes de modelo especializado
+            <span title="El motor aún no ejecuta un modelo especializado que produzca saturación, disponibilidad y confianza para esta zona.">
+              <Badge variant="info">
+                <Info size={11} />
+                Métricas detalladas pendientes de modelo especializado
+              </Badge>
             </span>
           </div>
         )}
@@ -271,7 +271,7 @@ export function PredictionsDashboard({ eventId, autoRefreshMs = 15000 }: Predict
             </div>
           </details>
         )}
-      </div>
+      </Card>
     );
   };
 
@@ -281,18 +281,13 @@ export function PredictionsDashboard({ eventId, autoRefreshMs = 15000 }: Predict
         <h2 className="text-lg font-semibold text-slate-800">Predicciones del motor</h2>
         <div className="flex items-center gap-2">
           {data && (
-            <span
-              className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                data.knowledge_model_version_id
-                  ? 'bg-indigo-50 text-indigo-600 border border-indigo-200'
-                  : 'bg-slate-100 text-slate-500 border border-slate-200'
-              }`}
-              title="Versión del modelo de conocimiento usado para esta predicción"
-            >
-              <RefreshCw className="w-3 h-3" />
-              KM {data.knowledge_model_version_id
-                ? data.knowledge_model_version_id.slice(0, 8)
-                : 'Sin versión'}
+            <span title="Versión del modelo de conocimiento usado para esta predicción">
+              <Badge variant="neutral">
+                <RefreshCw className="w-3 h-3" />
+                KM {data.knowledge_model_version_id
+                  ? data.knowledge_model_version_id.slice(0, 8)
+                  : 'Sin versión'}
+              </Badge>
             </span>
           )}
           <label className="flex items-center gap-1.5 text-xs text-slate-500 cursor-pointer">
@@ -300,18 +295,19 @@ export function PredictionsDashboard({ eventId, autoRefreshMs = 15000 }: Predict
               type="checkbox"
               checked={autoRefresh}
               onChange={(e) => setAutoRefresh(e.target.checked)}
-              className="rounded border-slate-300"
+              className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
             />
             Auto {autoRefreshMs / 1000}s
           </label>
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => refresh()}
             disabled={loading}
-            className="flex items-center gap-1 text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 py-1.5 px-3 rounded-lg transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             {loading ? 'Cargando...' : 'Actualizar'}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -343,14 +339,16 @@ export function PredictionsDashboard({ eventId, autoRefreshMs = 15000 }: Predict
               className="w-full pl-9 pr-9 py-2 text-sm rounded-lg border border-slate-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none bg-white"
             />
             {searchTerm.length > 0 && (
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 type="button"
                 onClick={() => setSearchTerm('')}
                 aria-label="Limpiar búsqueda"
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full"
               >
                 <X className="w-4 h-4" />
-              </button>
+              </Button>
             )}
           </div>
 
