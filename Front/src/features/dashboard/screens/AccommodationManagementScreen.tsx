@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { isAxiosError } from 'axios';
-import { Plus, Pencil, Trash2, MapPin, ChevronUp, ChevronDown } from 'lucide-react';
+import { Plus, Pencil, Trash2, MapPin, ChevronUp, ChevronDown, Search, X, Building2, Home, Tent } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { apiClient } from '../../../core/api/client';
 import { endpoints } from '../../../core/api/endpoints';
 import { AdminMapSelector } from '../../../components/AdminMapSelector';
@@ -45,6 +46,27 @@ const TYPE_BADGE_VARIANTS: Record<AccommodationType, BadgeVariant> = {
   other: 'warning',
 };
 
+const TYPE_GROUP_LABELS: Record<string, string> = {
+  hotel: 'Hoteles',
+  hostel: 'Hostels',
+  camping: 'Campings',
+  other: 'Otros',
+};
+
+const TYPE_ICONS: Record<string, LucideIcon> = {
+  hotel: Building2,
+  hostel: Home,
+  camping: Tent,
+  other: MapPin,
+};
+
+function normalizeText(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
 interface ModalForm {
   name: string;
   type: AccommodationType;
@@ -84,6 +106,7 @@ export function AccommodationManagementScreen({ eventId }: { eventId: string }) 
   const [mapPickerOpen, setMapPickerOpen] = useState(false);
   const [showManualCoords, setShowManualCoords] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const cargar = useCallback(async () => {
     try {
@@ -102,6 +125,32 @@ export function AccommodationManagementScreen({ eventId }: { eventId: string }) 
   useEffect(() => {
     void cargar();
   }, [cargar]);
+
+  const filteredAndGrouped = useMemo(() => {
+    const term = normalizeText(searchTerm.trim());
+    const filtered = term
+      ? alojamientos.filter((a) => {
+          const haystack = normalizeText(`${a.name} ${a.type} ${a.address ?? ''}`);
+          return haystack.includes(term);
+        })
+      : alojamientos;
+
+    const grouped = new Map<string, AccommodationDTO[]>();
+    for (const alojamiento of filtered) {
+      const list = grouped.get(alojamiento.type) ?? [];
+      list.push(alojamiento);
+      grouped.set(alojamiento.type, list);
+    }
+
+    return Array.from(grouped.entries())
+      .map(([type, groupAccommodations]) => ({
+        type,
+        accommodations: groupAccommodations.sort((a, b) => a.name.localeCompare(b.name, 'es')),
+      }))
+      .sort((a, b) =>
+        (TYPE_GROUP_LABELS[a.type] ?? a.type).localeCompare(TYPE_GROUP_LABELS[b.type] ?? b.type, 'es')
+      );
+  }, [alojamientos, searchTerm]);
 
   const abrirCrear = () => {
     setForm(emptyForm);
@@ -220,90 +269,138 @@ export function AccommodationManagementScreen({ eventId }: { eventId: string }) 
           </Button>
         </div>
 
-        {error && (
-          <p className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">
-            {error}
-          </p>
-        )}
-        {result && (
-          <p className="mb-4 text-sm text-green-700 bg-green-50 border border-green-200 rounded-md p-3">
-            {result}
-          </p>
-        )}
+        <Card variant="standard">
+          {error && (
+            <p className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">
+              {error}
+            </p>
+          )}
+          {result && (
+            <p className="mb-4 text-sm text-green-700 bg-green-50 border border-green-200 rounded-md p-3">
+              {result}
+            </p>
+          )}
 
-        {loading ? (
-          <p className="text-sm text-slate-500 italic">Cargando alojamientos...</p>
-        ) : alojamientos.length === 0 ? (
-          <p className="text-sm text-slate-500 italic text-center py-8 bg-white border border-slate-200 rounded-lg">
-            No hay alojamientos registrados. Creá el primero con "+ Nuevo Alojamiento".
-          </p>
-        ) : (
-          <div className="bg-white rounded-lg border border-slate-200 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 text-left text-slate-500">
-                  <th className="px-4 py-3 font-medium">Nombre</th>
-                  <th className="px-4 py-3 font-medium">Tipo</th>
-                  <th className="px-4 py-3 font-medium">Dirección</th>
-                  <th className="px-4 py-3 font-medium">Teléfono</th>
-                  <th className="px-4 py-3 font-medium">Estado</th>
-                  <th className="px-4 py-3 font-medium text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {alojamientos.map((a) => (
-                  <tr key={a.id}>
-                    <td className="px-4 py-3 font-medium text-slate-800">{a.name}</td>
-                    <td className="px-4 py-3">
-                      <Badge variant={TYPE_BADGE_VARIANTS[a.type]}>{TYPE_LABELS[a.type]}</Badge>
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">{a.address || '—'}</td>
-                    <td className="px-4 py-3 text-slate-600">{a.phone || '—'}</td>
-                    <td className="px-4 py-3">
-                      {a.active ? (
-                        <Badge variant="success">Activo</Badge>
-                      ) : (
-                        <Badge variant="neutral">Inactivo</Badge>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => abrirEditar(a)}
-                          title="Editar"
-                          className="mr-1"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                          Editar
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => void alternarActivo(a)}
-                          title={a.active ? 'Desactivar' : 'Activar'}
-                        >
-                          {a.active ? 'Desactivar' : 'Activar'}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setPendingDeleteId(a.id)}
-                          title="Eliminar"
-                          className="text-red-600 hover:bg-red-50"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          Eliminar
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+          {loading ? (
+            <p className="text-sm text-slate-500 italic text-center py-8">Cargando alojamientos...</p>
+          ) : alojamientos.length === 0 ? (
+            <p className="text-sm text-slate-500 italic text-center py-8">
+              No hay alojamientos registrados. Creá el primero con "+ Nuevo Alojamiento".
+            </p>
+          ) : (
+            <>
+              <div className="relative mb-4">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Buscar alojamiento por nombre, tipo o ubicación..."
+                  className="w-full pl-9 pr-9 py-2 text-sm rounded-lg border border-slate-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                />
+                {searchTerm.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    title="Limpiar búsqueda"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 rounded-full"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {filteredAndGrouped.length === 0 ? (
+                <p className="text-sm text-slate-500 text-center py-8">
+                  No se encontraron alojamientos que coincidan con '{searchTerm.trim()}'.
+                </p>
+              ) : (
+                <div className="space-y-6">
+                  {filteredAndGrouped.map((group) => {
+                    const Icon = TYPE_ICONS[group.type] ?? MapPin;
+                    const label = TYPE_GROUP_LABELS[group.type] ?? group.type;
+                    return (
+                      <section key={group.type}>
+                        <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-2">
+                          <Icon className="w-4 h-4 text-indigo-600" />
+                          {label}
+                          <span className="text-xs font-normal text-slate-400">
+                            {group.accommodations.length === 1 ? '(1 alojamiento)' : `(${group.accommodations.length} alojamientos)`}
+                          </span>
+                        </h3>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-slate-200 text-left text-slate-500">
+                                <th className="px-4 py-3 font-medium">Nombre</th>
+                                <th className="px-4 py-3 font-medium">Tipo</th>
+                                <th className="px-4 py-3 font-medium">Dirección</th>
+                                <th className="px-4 py-3 font-medium">Teléfono</th>
+                                <th className="px-4 py-3 font-medium">Estado</th>
+                                <th className="px-4 py-3 font-medium text-right">Acciones</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {group.accommodations.map((a) => (
+                                <tr key={a.id}>
+                                  <td className="px-4 py-3 font-medium text-slate-800">{a.name}</td>
+                                  <td className="px-4 py-3">
+                                    <Badge variant={TYPE_BADGE_VARIANTS[a.type]}>{TYPE_LABELS[a.type]}</Badge>
+                                  </td>
+                                  <td className="px-4 py-3 text-slate-600">{a.address || '—'}</td>
+                                  <td className="px-4 py-3 text-slate-600">{a.phone || '—'}</td>
+                                  <td className="px-4 py-3">
+                                    {a.active ? (
+                                      <Badge variant="success">Activo</Badge>
+                                    ) : (
+                                      <Badge variant="neutral">Inactivo</Badge>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <div className="flex justify-end gap-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => abrirEditar(a)}
+                                        title="Editar"
+                                        className="mr-1"
+                                      >
+                                        <Pencil className="w-3.5 h-3.5" />
+                                        Editar
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => void alternarActivo(a)}
+                                        title={a.active ? 'Desactivar' : 'Activar'}
+                                      >
+                                        {a.active ? 'Desactivar' : 'Activar'}
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setPendingDeleteId(a.id)}
+                                        title="Eliminar"
+                                        className="text-red-600 hover:bg-red-50"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                        Eliminar
+                                      </Button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </section>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+        </Card>
       </section>
 
       <ConfirmDialog
