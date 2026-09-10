@@ -374,7 +374,7 @@ function EventFormModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
+      <Card className="w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto shadow-xl">
         <h2 className="text-lg font-bold text-slate-800 mb-4">
           {isEditingMode ? 'Editar Evento' : 'Nuevo Evento Operativo'}
         </h2>
@@ -596,12 +596,11 @@ function EventFormModal({
           </div>
 
           {/* Actions */}
-          <div className="flex gap-3 pt-2">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4">
             <Button
               type="submit"
               variant="primary"
-              disabled={!canSubmit}
-              className="flex-1"
+              disabled={!canSubmit || saving}
             >
               {saving ? 'Guardando...' : isEditingMode ? 'Guardar Cambios' : 'Registrar Evento'}
             </Button>
