@@ -6,6 +6,8 @@ import {
   useResolveRecommendation,
 } from '@/hooks/useAnalytics';
 import type { ConfigurationRecommendationDTO } from '@/features/dashboard/types';
+import { Badge, Button, Card } from '@/features/dashboard/components/ui';
+import type { BadgeVariant } from '@/features/dashboard/components/ui/Badge';
 
 function formatDate(value: string | null): string {
   if (!value) return '—';
@@ -22,10 +24,10 @@ function truncateId(id: string): string {
   return id.length >= 8 ? `${id.slice(0, 8)}…` : id;
 }
 
-function getStatusClasses(status: ConfigurationRecommendationDTO['status']): string {
-  if (status === 'pending_review') return 'bg-amber-50 text-amber-700 border-amber-200';
-  if (status === 'approved') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-  return 'bg-red-50 text-red-700 border-red-200';
+function getStatusVariant(status: ConfigurationRecommendationDTO['status']): BadgeVariant {
+  if (status === 'pending_review') return 'warning';
+  if (status === 'approved') return 'success';
+  return 'error';
 }
 
 function getStatusLabel(status: ConfigurationRecommendationDTO['status']): string {
@@ -73,13 +75,13 @@ function RecDetailModal({ recommendation, onClose, onResolved }: RecDetailModalP
         <div className="flex items-center justify-between px-5 py-3 bg-slate-50 border-b border-slate-200 sticky top-0">
           <div className="flex items-center gap-2">
             <h3 className="font-bold text-slate-800">Detalle de Recomendación</h3>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${getStatusClasses(recommendation.status)}`}>
+            <Badge variant={getStatusVariant(recommendation.status)}>
               {getStatusLabel(recommendation.status)}
-            </span>
+            </Badge>
           </div>
-          <button onClick={onClose} className="p-1 rounded hover:bg-slate-200 text-slate-500">
+          <Button variant="ghost" size="sm" onClick={onClose} aria-label="Cerrar">
             <X className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
 
         <div className="p-5 space-y-4">
@@ -160,21 +162,25 @@ function RecDetailModal({ recommendation, onClose, onResolved }: RecDetailModalP
                 </div>
               )}
 
-              <div className="flex gap-2">
-                <button
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  variant="primary"
+                  size="sm"
                   onClick={() => handleResolve(true)}
                   disabled={isSubmitting}
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 rounded-lg text-sm disabled:opacity-50"
+                  className="flex-1 sm:flex-none"
                 >
                   {isSubmitting ? 'Resolviendo...' : 'Aprobar'}
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
                   onClick={() => handleResolve(false)}
                   disabled={isSubmitting}
-                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-medium py-2 rounded-lg text-sm disabled:opacity-50"
+                  className="flex-1 sm:flex-none"
                 >
                   {isSubmitting ? 'Resolviendo...' : 'Rechazar'}
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -224,25 +230,26 @@ export function AnalyticsScreen() {
   return (
     <main className="max-w-5xl mx-auto space-y-6">
       <div className="flex justify-end">
-        <button
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={() => {
             fetchRecommendations();
             if (selectedId) fetchAuditLog(selectedId);
           }}
           disabled={recsLoading}
-          className="flex items-center gap-1 text-sm px-3 py-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium disabled:opacity-50"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${recsLoading ? 'animate-spin' : ''}`} />
           {recsLoading ? 'Cargando...' : 'Actualizar'}
-        </button>
+        </Button>
       </div>
 
       {recsError && (
         <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{recsError}</div>
       )}
 
-      <section className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+      <Card variant="standard">
+        <div className="flex items-center justify-between mb-4">
           <h2 className="font-bold text-slate-800">Recomendaciones de Configuración</h2>
           <span className="text-xs text-slate-400">{recommendations.length} recomendaciones</span>
         </div>
@@ -276,29 +283,26 @@ export function AnalyticsScreen() {
                   </td>
                   <td className="px-5 py-2 text-slate-700">{rec.target_entity_type}</td>
                   <td className="px-5 py-2">
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${getStatusClasses(rec.status)}`}>
+                    <Badge variant={getStatusVariant(rec.status)}>
                       {getStatusLabel(rec.status)}
-                    </span>
+                    </Badge>
                   </td>
                   <td className="px-5 py-2 text-slate-600">{formatDate(rec.generated_at)}</td>
                   <td className="px-5 py-2">
-                    <button
-                      onClick={() => handleOpenDetail(rec)}
-                      className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium px-3 py-1.5 rounded-lg"
-                    >
+                    <Button variant="secondary" size="sm" onClick={() => handleOpenDetail(rec)}>
                       Ver Detalle
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      </section>
+      </Card>
 
       {selectedRec && (
-        <section className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+        <Card variant="standard">
+          <div className="flex items-center justify-between mb-4">
             <h2 className="font-bold text-slate-800">Registro de Auditoría</h2>
             <span className="text-xs text-slate-400 font-mono">{truncateId(selectedRec.id)}</span>
           </div>
@@ -336,7 +340,7 @@ export function AnalyticsScreen() {
               </tbody>
             </table>
           </div>
-        </section>
+        </Card>
       )}
 
       {showModal && selectedRec && (
