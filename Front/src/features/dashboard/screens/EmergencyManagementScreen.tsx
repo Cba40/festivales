@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { isAxiosError } from 'axios';
+import { Settings, Plus, Pencil, Trash2, MapPin, ChevronUp, ChevronDown } from 'lucide-react';
 import { AdminMapSelector } from '../../../components/AdminMapSelector';
 import {
   getCities,
@@ -10,8 +11,12 @@ import {
   deleteEmergency,
   type CityDTO,
   type EmergencyAdminDTO,
-  type EmergencyType,
 } from '../../../services/emergencyAdmin';
+import { EMERGENCY_TYPE_LABELS, type EmergencyType } from '../constants/emergencyLabels';
+import { Badge, type BadgeVariant } from '../components/ui/Badge';
+import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 
 type ModalState =
   | { mode: 'create' }
@@ -30,22 +35,13 @@ const emptyCityForm: CityModalForm = {
   country: 'Argentina',
 };
 
-const TYPE_LABELS: Record<EmergencyType, string> = {
-  policia: 'Policía',
-  bomberos: 'Bomberos',
-  salud: 'Salud',
-  defensa_civil: 'Defensa Civil',
-  numero_emergencia: 'Número de Emergencia',
-  otro: 'Otro',
-};
-
-const TYPE_BADGES: Record<EmergencyType, string> = {
-  policia: 'bg-blue-100 text-blue-700',
-  bomberos: 'bg-red-100 text-red-700',
-  salud: 'bg-green-100 text-green-700',
-  defensa_civil: 'bg-amber-100 text-amber-700',
-  numero_emergencia: 'bg-rose-100 text-rose-700',
-  otro: 'bg-slate-100 text-slate-700',
+const EMERGENCY_TYPE_BADGE_VARIANTS: Record<EmergencyType, BadgeVariant> = {
+  policia: 'info',
+  bomberos: 'error',
+  salud: 'success',
+  defensa_civil: 'warning',
+  numero_emergencia: 'error',
+  otro: 'neutral',
 };
 
 interface ModalForm {
@@ -96,6 +92,7 @@ export function EmergencyManagementScreen() {
   const [cityForm, setCityForm] = useState<CityModalForm>(emptyCityForm);
   const [citySaving, setCitySaving] = useState(false);
   const [cityError, setCityError] = useState<string | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const ciudadSeleccionada = cities.find((c) => c.id === cityId);
 
@@ -271,10 +268,6 @@ export function EmergencyManagementScreen() {
   };
 
   const eliminar = async (e: EmergencyAdminDTO) => {
-    const confirmado = window.confirm(
-      `¿Desactivar el punto de emergencia "${e.name}"? Se dejará de mostrar en la app pública. Esta acción no se puede deshacer.`
-    );
-    if (!confirmado) return;
     try {
       await deleteEmergency(e.id);
       setResult('Punto de emergencia desactivado.');
@@ -284,11 +277,19 @@ export function EmergencyManagementScreen() {
     }
   };
 
+  const handleDeleteConfirm = async () => {
+    if (!pendingDeleteId) return;
+    const e = emergencies.find((em) => em.id === pendingDeleteId);
+    if (!e) return;
+    await eliminar(e);
+    setPendingDeleteId(null);
+  };
+
   const setCampo = <K extends keyof ModalForm>(campo: K, valor: ModalForm[K]) => {
     setForm((prev) => ({ ...prev, [campo]: valor }));
   };
 
-  const inputCls = 'w-full border-slate-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500';
+  const inputCls = 'w-full border-slate-300 rounded-md py-2 px-3 focus:ring-indigo-500 focus:border-indigo-500';
 
   return (
     <div className="space-y-10">
@@ -312,17 +313,16 @@ export function EmergencyManagementScreen() {
             </select>
             <button
               onClick={abrirCrearCiudad}
-              className="text-sm text-blue-600 hover:bg-blue-50 border border-blue-200 rounded-md py-1.5 px-3 transition-colors"
+              className="text-sm text-slate-600 hover:bg-slate-100 border border-slate-200 rounded-md py-1.5 px-3 transition-colors inline-flex items-center gap-1.5"
             >
-              ⚙️ Gestionar / Crear Ciudad
+              <Settings className="w-4 h-4" />
+              Gestionar / Crear Ciudad
             </button>
           </div>
-          <button
-            onClick={abrirCrear}
-            className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md text-sm font-medium transition-colors"
-          >
-            + Nuevo Punto de Emergencia
-          </button>
+          <Button variant="primary" onClick={abrirCrear}>
+            <Plus className="w-4 h-4" />
+            Nuevo Punto de Emergencia
+          </Button>
         </div>
 
         {result && (
@@ -350,7 +350,7 @@ export function EmergencyManagementScreen() {
         ) : !cityId || cities.length === 0 ? (
           <div className="text-center text-slate-500 py-8 bg-white border border-slate-200 rounded-lg">
             <p className="text-sm">No hay ciudades configuradas en el sistema.</p>
-            <p className="text-xs mt-2">Usa el botón "⚙️ Gestionar / Crear Ciudad" para agregar una.</p>
+            <p className="text-xs mt-2">Usa el botón "Gestionar / Crear Ciudad" para agregar una.</p>
           </div>
         ) : emergencies.length === 0 ? (
           <p className="text-sm text-slate-500 italic text-center py-8 bg-white border border-slate-200 rounded-lg">
@@ -374,11 +374,9 @@ export function EmergencyManagementScreen() {
                   <tr key={e.id}>
                     <td className="px-4 py-3 font-medium text-slate-800">{e.name}</td>
                     <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_BADGES[e.type]}`}
-                      >
-                        {TYPE_LABELS[e.type]}
-                      </span>
+                      <Badge variant={EMERGENCY_TYPE_BADGE_VARIANTS[e.type]}>
+                        {EMERGENCY_TYPE_LABELS[e.type]}
+                      </Badge>
                     </td>
                     <td className="px-4 py-3 text-slate-600">
                       {e.emergency_number || e.phone || '—'}
@@ -386,35 +384,41 @@ export function EmergencyManagementScreen() {
                     <td className="px-4 py-3 text-slate-600">{ciudadSeleccionada?.name || '—'}</td>
                     <td className="px-4 py-3">
                       {e.active ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
-                          Activo
-                        </span>
+                        <Badge variant="success">Activo</Badge>
                       ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-200 text-slate-600">
-                          Inactivo
-                        </span>
+                        <Badge variant="neutral">Inactivo</Badge>
                       )}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-1">
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => abrirEditar(e)}
-                          className="text-sm text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-md transition-colors"
+                          title="Editar"
+                          className="mr-1"
                         >
+                          <Pencil className="w-3.5 h-3.5" />
                           Editar
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => void alternarActivo(e)}
-                          className="text-sm text-slate-600 hover:bg-slate-100 px-3 py-1.5 rounded-md transition-colors"
+                          title={e.active ? 'Desactivar' : 'Activar'}
                         >
                           {e.active ? 'Desactivar' : 'Activar'}
-                        </button>
-                        <button
-                          onClick={() => void eliminar(e)}
-                          className="text-sm text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-md transition-colors"
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setPendingDeleteId(e.id)}
+                          title="Eliminar"
+                          className="text-red-600 hover:bg-red-50"
                         >
+                          <Trash2 className="w-3.5 h-3.5" />
                           Eliminar
-                        </button>
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -427,7 +431,10 @@ export function EmergencyManagementScreen() {
 
       {modal && (
         <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 mx-4 space-y-4 max-h-[90vh] overflow-y-auto">
+          <Card
+            variant="standard"
+            className="w-full max-w-2xl mx-4 space-y-4 max-h-[90vh] overflow-y-auto"
+          >
             <h3 className="text-lg font-semibold text-slate-800">
               {modal.mode === 'create' ? 'Nuevo Punto de Emergencia' : 'Editar Punto de Emergencia'}
             </h3>
@@ -538,13 +545,14 @@ export function EmergencyManagementScreen() {
                   </p>
 
                   <div className="flex flex-wrap items-center gap-3">
-                    <button
-                      type="button"
+                    <Button
+                      variant="primary"
+                      size="sm"
                       onClick={() => setMapPickerOpen(true)}
-                      className="py-2 px-4 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-md transition-colors"
                     >
-                      📍 Seleccionar en mapa
-                    </button>
+                      <MapPin className="w-4 h-4" />
+                      Seleccionar en mapa
+                    </Button>
 
                     {form.latitude !== '' || form.longitude !== '' ? (
                       <>
@@ -567,13 +575,18 @@ export function EmergencyManagementScreen() {
                     )}
                   </div>
 
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => setShowManualCoords((v) => !v)}
-                    className="mt-2 text-xs font-medium text-blue-600 hover:underline"
+                    className="mt-2"
                   >
-                    {showManualCoords ? '▲ Ocultar edición manual' : '▼ Edición manual avanzada'}
-                  </button>
+                    {showManualCoords ? (
+                      <><ChevronUp className="w-4 h-4" /> Ocultar edición manual</>
+                    ) : (
+                      <><ChevronDown className="w-4 h-4" /> Edición manual avanzada</>
+                    )}
+                  </Button>
 
                   {showManualCoords && (
                     <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -619,7 +632,7 @@ export function EmergencyManagementScreen() {
                 type="checkbox"
                 checked={form.active}
                 onChange={(e) => setCampo('active', e.target.checked)}
-                className="accent-emerald-600"
+                className="accent-indigo-600"
               />
               Activo (visible en la pantalla "Emergencias")
             </label>
@@ -631,29 +644,24 @@ export function EmergencyManagementScreen() {
             )}
 
             <div className="flex justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setModal(null)}
-                className="py-2 px-4 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors"
-              >
+              <Button variant="secondary" onClick={() => setModal(null)}>
                 Cancelar
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="primary"
                 onClick={() => void guardar()}
                 disabled={modalSaving}
-                className="py-2 px-4 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md transition-colors"
               >
                 {modalSaving ? 'Guardando...' : 'Guardar'}
-              </button>
+              </Button>
             </div>
-          </div>
+          </Card>
         </div>
       )}
 
       {cityModalOpen && (
         <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6 mx-4 space-y-4">
+          <Card variant="standard" className="w-full max-w-sm mx-4 space-y-4">
             <h3 className="text-lg font-semibold text-slate-800">Crear Ciudad</h3>
 
             <div className="space-y-4">
@@ -696,29 +704,27 @@ export function EmergencyManagementScreen() {
             )}
 
             <div className="flex justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setCityModalOpen(false)}
-                className="py-2 px-4 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors"
-              >
+              <Button variant="secondary" onClick={() => setCityModalOpen(false)}>
                 Cancelar
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="primary"
                 onClick={() => void guardarCiudad()}
                 disabled={citySaving}
-                className="py-2 px-4 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md transition-colors"
               >
                 {citySaving ? 'Guardando...' : 'Guardar'}
-              </button>
+              </Button>
             </div>
-          </div>
+          </Card>
         </div>
       )}
 
       {mapPickerOpen && (
         <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-[60]">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 mx-4 space-y-4 max-h-[90vh] overflow-y-auto">
+          <Card
+            variant="standard"
+            className="w-full max-w-2xl mx-4 space-y-4 max-h-[90vh] overflow-y-auto"
+          >
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-semibold text-slate-800">Seleccionar ubicación</h3>
               <button
@@ -741,28 +747,34 @@ export function EmergencyManagementScreen() {
             />
 
             <div className="flex justify-end gap-3">
-              <button
-                type="button"
+              <Button
+                variant="secondary"
                 onClick={() => {
                   setCampo('latitude', '');
                   setCampo('longitude', '');
                   setMapPickerOpen(false);
                 }}
-                className="py-2 px-4 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors"
               >
                 Limpiar y cerrar
-              </button>
-              <button
-                type="button"
-                onClick={() => setMapPickerOpen(false)}
-                className="py-2 px-4 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-md transition-colors"
-              >
+              </Button>
+              <Button variant="primary" onClick={() => setMapPickerOpen(false)}>
                 Confirmar ubicación
-              </button>
+              </Button>
             </div>
-          </div>
+          </Card>
         </div>
       )}
+
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        title="Eliminar punto de emergencia"
+        message={`¿Desactivar el punto de emergencia "${emergencies.find((e) => e.id === pendingDeleteId)?.name ?? ''}"? Se dejará de mostrar en la app pública. Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        cancelLabel="Cancelar"
+        variant="destructive"
+        onConfirm={() => void handleDeleteConfirm()}
+        onCancel={() => setPendingDeleteId(null)}
+      />
     </div>
   );
 }
