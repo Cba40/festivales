@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
+import { Save, X } from 'lucide-react';
 import { useEventReferencePoint } from '../hooks/useEventReferencePoint';
 import { AdminMapSelector } from '../../../components/AdminMapSelector';
+import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
 
 export function EventReferencePointScreen() {
   const { event, loading, saving, saved, error, load, save } = useEventReferencePoint();
@@ -58,22 +61,23 @@ export function EventReferencePointScreen() {
   const noReferencePoint = savedLat == null || savedLng == null;
 
   return (
-    <main className="p-6 max-w-4xl mx-auto space-y-6">
-        {error && (
-          <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 text-sm rounded">
-            {error}
-          </div>
-        )}
-        {saved && !error && (
-          <div className="bg-green-50 border-l-4 border-green-500 text-green-700 p-4 text-sm rounded">
-            Punto de referencia operacional guardado correctamente.
-          </div>
-        )}
+    <main className="max-w-5xl mx-auto space-y-6">
+      {error && (
+        <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 text-sm rounded">
+          {error}
+        </div>
+      )}
+      {saved && !error && (
+        <div className="bg-green-50 border-l-4 border-green-500 text-green-700 p-4 text-sm rounded">
+          Punto de referencia operacional guardado correctamente.
+        </div>
+      )}
 
-        <section className="bg-white rounded-lg shadow-sm border border-slate-200 p-6 space-y-4">
+      <Card variant="standard">
+        <div className="space-y-4">
           <div>
-            <h2 className="text-lg font-semibold text-slate-700">Punto de Referencia Operacional</h2>
-            <p className="text-sm text-slate-500">
+            <h1 className="text-xl font-bold text-slate-800">Punto de Referencia Operacional</h1>
+            <p className="text-sm text-slate-500 mt-1">
               Centro de gravedad operacional del evento. Es un dato fijo, independiente del día, perfil, fase o nivel de asistencia.
             </p>
           </div>
@@ -96,24 +100,23 @@ export function EventReferencePointScreen() {
               onChangeLocation={handleChangeLocation}
             />
           )}
-        </section>
 
-        <div className="flex gap-3">
-          <button
-            onClick={handleSave}
-            disabled={!canSave || saving || loading}
-            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white py-2 px-6 rounded text-sm font-medium"
-          >
-            {saving ? 'Guardando...' : 'Guardar'}
-          </button>
-          <button
-            onClick={handleCancel}
-            disabled={!dirty || saving || loading}
-            className="bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-700 py-2 px-6 rounded text-sm font-medium"
-          >
-            Cancelar
-          </button>
+          <div className="flex flex-wrap gap-3">
+            <Button variant="primary" onClick={handleSave} disabled={!canSave || saving || loading}>
+              <Save className="w-4 h-4" />
+              {saving ? 'Guardando...' : 'Guardar'}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={handleCancel}
+              disabled={!dirty || saving || loading}
+            >
+              <X className="w-4 h-4" />
+              Cancelar
+            </Button>
+          </div>
         </div>
-      </main>
+      </Card>
+    </main>
   );
 }
