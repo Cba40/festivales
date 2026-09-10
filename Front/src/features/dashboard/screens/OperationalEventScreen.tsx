@@ -1,12 +1,18 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { apiClient } from '@/core/api/client';
 import { endpoints } from '@/core/api/endpoints';
+import { Plus, RefreshCw, AlertTriangle, Cone, CloudLightning, Siren, Flame, Car, Drama, DoorOpen, Wrench, Music, Zap, MapPin, Trash2, Pencil, ChevronDown, ChevronRight } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { AdminMapSelector } from '@/components/AdminMapSelector';
 import { useOperationalEvents } from '../hooks/useOperationalEvents';
 import { useOperationalEventMutations } from '../hooks/useOperationalEventMutations';
 import { useEventDays } from '../hooks/useEventDays';
 import { FlowRestrictionSection } from '../components/FlowRestrictionSection';
 import { DashboardHeader } from '../components/DashboardHeader';
+import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { Badge } from '../components/ui/Badge';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import type {
   OperationalEventDTO,
   OperationalEventCreatePayload,
@@ -36,18 +42,18 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   corte_energia: 'Corte de Energía',
 };
 
-const EVENT_TYPE_ICONS: Record<string, string> = {
-  accidente: '⚠️',
-  corte_calle: '🚧',
-  tormenta: '⛈️',
-  evacuacion: '🚨',
-  incendio: '🔥',
-  congestion_extraordinaria: '🚗',
-  escenario_finalizado: '🎭',
-  apertura_extraordinaria: '🚪',
-  incidente_operativo: '🔧',
-  fin_espectaculo: '🎵',
-  corte_energia: '💡',
+const EVENT_TYPE_ICONS: Record<string, LucideIcon> = {
+  accidente: AlertTriangle,
+  corte_calle: Cone,
+  tormenta: CloudLightning,
+  evacuacion: Siren,
+  incendio: Flame,
+  congestion_extraordinaria: Car,
+  escenario_finalizado: Drama,
+  apertura_extraordinaria: DoorOpen,
+  incidente_operativo: Wrench,
+  fin_espectaculo: Music,
+  corte_energia: Zap,
 };
 
 const EFFECT_TYPE_LABELS: Record<OperationalEffectType, string> = {
@@ -155,10 +161,10 @@ function getStatus(
   return 'Activo';
 }
 
-const STATUS_CLASSES: Record<string, string> = {
-  Activo: 'text-xs font-bold uppercase text-red-600 bg-red-100 px-2 py-0.5 rounded-full animate-pulse',
-  Finalizado: 'text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full',
-  Expirado: 'text-xs font-bold uppercase text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full',
+const STATUS_BADGE_VARIANTS: Record<string, 'error' | 'warning' | 'neutral'> = {
+  Activo: 'error',
+  Finalizado: 'neutral',
+  Expirado: 'warning',
 };
 
 function EventCard({
@@ -179,6 +185,7 @@ function EventCard({
   const status = getStatus(event);
   const expired = isExpired(event.end_timestamp);
   const lock = expired;
+  const TypeIcon = EVENT_TYPE_ICONS[event.event_type] ?? MapPin;
 
   return (
     <div
@@ -190,19 +197,15 @@ function EventCard({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 min-w-0">
-          <span className="text-2xl flex-shrink-0 mt-0.5">
-            {EVENT_TYPE_ICONS[event.event_type] ?? '📌'}
-          </span>
+          <TypeIcon className="w-6 h-6 flex-shrink-0 mt-0.5 text-slate-600" />
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-bold text-slate-800">
                 {EVENT_TYPE_LABELS[event.event_type] ?? event.event_type}
               </span>
-              <span className={STATUS_CLASSES[status]}>{status}</span>
+              <Badge variant={STATUS_BADGE_VARIANTS[status] ?? 'neutral'}>{status}</Badge>
               {event.is_incident && (
-                <span className="text-xs font-bold uppercase text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">
-                  Incidente
-                </span>
+                <Badge variant="info">Incidente</Badge>
               )}
             </div>
 
@@ -240,28 +243,24 @@ function EventCard({
 
         <div className="flex items-center gap-1 flex-shrink-0">
           {event.is_active && !expired && (
-            <button
-              onClick={() => onFinalize(event.id)}
-              disabled={saving}
-              className="text-xs font-medium px-2.5 py-1.5 rounded bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
-            >
+            <Button variant="secondary" size="sm" onClick={() => onFinalize(event.id)} disabled={saving}>
               Finalizar
-            </button>
+            </Button>
           )}
-          <button
-            onClick={() => onEdit(event)}
-            disabled={lock}
-            className="text-xs font-medium px-2.5 py-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
+          <Button variant="ghost" size="sm" onClick={() => onEdit(event)} disabled={lock}>
+            <Pencil className="w-3.5 h-3.5" />
             Editar
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => onDelete(event.id)}
             disabled={saving || lock}
-            className="text-xs font-medium px-2.5 py-1.5 rounded bg-red-100 hover:bg-red-200 text-red-600 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="text-red-600 hover:bg-red-50"
           >
+            <Trash2 className="w-3.5 h-3.5" />
             Eliminar
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -375,7 +374,7 @@ function EventFormModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
+      <Card className="w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
         <h2 className="text-lg font-bold text-slate-800 mb-4">
           {isEditingMode ? 'Editar Evento' : 'Nuevo Evento Operativo'}
         </h2>
@@ -387,11 +386,11 @@ function EventFormModal({
               value={form.event_type}
               onChange={(e) => setForm((f) => ({ ...f, event_type: e.target.value }))}
               required
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             >
               <option value="">Seleccionar...</option>
               {Object.entries(EVENT_TYPE_LABELS).map(([key, label]) => (
-                <option key={key} value={key}>{EVENT_TYPE_ICONS[key]} {label}</option>
+                <option key={key} value={key}>{label}</option>
               ))}
             </select>
           </div>
@@ -414,7 +413,7 @@ function EventFormModal({
                 onBlur={() => setTimeout(() => setZoneOpen(false), 120)}
                 readOnly={isEditingMode}
                 required
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 read-only:bg-slate-50 read-only:cursor-not-allowed"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 read-only:bg-slate-50 read-only:cursor-not-allowed"
                 placeholder="Buscar zona por nombre (ej: Estacionamiento Norte, Baños Sector A)..."
               />
               {zoneOpen && !isEditingMode && filteredZones.length > 0 && (
@@ -425,13 +424,19 @@ function EventFormModal({
                         type="button"
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => handleZoneSelect(z)}
-                        className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-blue-50"
+                        className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-indigo-50"
                       >
                         <span className="font-medium">{z.name}</span>
-                        {z.type && (
-                          <span className="ml-2 text-xs text-slate-400">
-                            {EVENT_TYPE_ICONS[z.type] ?? ''} {z.type}
+                        {z.type && EVENT_TYPE_ICONS[z.type] ? (
+                          <span className="ml-2 text-xs text-slate-400 inline-flex items-center gap-1">
+                            {(() => {
+                              const Zi = EVENT_TYPE_ICONS[z.type];
+                              return <Zi className="w-3 h-3" />;
+                            })()}
+                            {z.type}
                           </span>
+                        ) : (
+                          z.type && <span className="ml-2 text-xs text-slate-400">{z.type}</span>
                         )}
                       </button>
                     </li>
@@ -458,7 +463,7 @@ function EventFormModal({
                 setForm((f) => ({ ...f, effect_type: e.target.value, effect_value: '' }))
               }
               required
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             >
               <option value="">Seleccionar...</option>
               {Object.entries(EFFECT_TYPE_LABELS).map(([key, label]) => (
@@ -482,7 +487,7 @@ function EventFormModal({
                 min={effectType === 'reduccion_capacidad' ? 1 : 1}
                 max={effectType === 'reduccion_capacidad' ? 100 : undefined}
                 required
-                className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
                   form.effect_value && !effectValueOk
                     ? 'border-red-400 bg-red-50'
                     : 'border-slate-300'
@@ -506,7 +511,7 @@ function EventFormModal({
               id="is_incident"
               checked={form.is_incident}
               onChange={(e) => setForm((f) => ({ ...f, is_incident: e.target.checked }))}
-              className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
             />
             <label htmlFor="is_incident" className="text-sm font-medium text-slate-700 select-none cursor-pointer">
               ¿Es un incidente operativo?
@@ -514,7 +519,7 @@ function EventFormModal({
           </div>
 
           {/* Datetime pickers */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Fecha y hora inicio *</label>
               <input
@@ -522,7 +527,7 @@ function EventFormModal({
                 value={form.start_timestamp}
                 onChange={(e) => setForm((f) => ({ ...f, start_timestamp: e.target.value }))}
                 required
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               />
             </div>
             <div>
@@ -532,7 +537,7 @@ function EventFormModal({
                 value={form.end_timestamp}
                 onChange={(e) => setForm((f) => ({ ...f, end_timestamp: e.target.value }))}
                 required
-                className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
                   form.start_timestamp && form.end_timestamp && !temporalOk
                     ? 'border-red-400 bg-red-50'
                     : 'border-slate-300'
@@ -559,9 +564,16 @@ function EventFormModal({
                 showMarker={true}
               />
               <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setForm(f => ({ ...f, latitude: '', longitude: '' }))} className="text-xs text-amber-600 hover:text-amber-700 font-medium">
-                  🗑️ Limpiar ubicación
-                </button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setForm(f => ({ ...f, latitude: '', longitude: '' }))}
+                  className="text-amber-600 hover:text-amber-700"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Limpiar ubicación
+                </Button>
               </div>
               {(form.latitude && form.longitude) && (
                 <p className="text-xs text-slate-500 mt-1">
@@ -578,31 +590,32 @@ function EventFormModal({
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
               rows={3}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               placeholder="Detalles del evento (opcional)..."
             />
           </div>
 
           {/* Actions */}
           <div className="flex gap-3 pt-2">
-            <button
+            <Button
               type="submit"
+              variant="primary"
               disabled={!canSubmit}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg text-sm disabled:opacity-50"
+              className="flex-1"
             >
               {saving ? 'Guardando...' : isEditingMode ? 'Guardar Cambios' : 'Registrar Evento'}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="secondary"
               onClick={onClose}
               disabled={saving}
-              className="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50"
             >
               Cancelar
-            </button>
+            </Button>
           </div>
         </form>
-      </div>
+      </Card>
     </div>
   );
 }
@@ -617,6 +630,8 @@ export function OperationalEventScreen() {
   const [showFinalized, setShowFinalized] = useState(false);
   const [activeSection, setActiveSection] = useState<'events' | 'restriction'>('events');
   const [zones, setZones] = useState<ZoneOption[]>([]);
+  const [pendingFinalizeId, setPendingFinalizeId] = useState<string | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const loadZones = useCallback(async () => {
     try {
@@ -715,6 +730,26 @@ export function OperationalEventScreen() {
     [remove, refresh],
   );
 
+  const requestFinalize = useCallback((id: string) => {
+    setPendingFinalizeId(id);
+  }, []);
+
+  const requestDelete = useCallback((id: string) => {
+    setPendingDeleteId(id);
+  }, []);
+
+  const handleFinalizeConfirm = useCallback(async () => {
+    if (!pendingFinalizeId) return;
+    await handleDeactivate(pendingFinalizeId);
+    setPendingFinalizeId(null);
+  }, [pendingFinalizeId, handleDeactivate]);
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!pendingDeleteId) return;
+    await handleDelete(pendingDeleteId);
+    setPendingDeleteId(null);
+  }, [pendingDeleteId, handleDelete]);
+
   const openCreateForm = useCallback(() => {
     setEditingEvent(null);
     setShowForm(true);
@@ -746,20 +781,23 @@ export function OperationalEventScreen() {
         title="Incidentes Operativos"
         actions={
           <div className="flex items-center gap-3">
-            <button
+            <Button
+              variant="secondary"
               onClick={refresh}
               disabled={loading}
-              className="text-sm px-3 py-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium"
+              className="text-sm"
             >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               {loading ? 'Cargando...' : 'Actualizar'}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="primary"
               onClick={openCreateForm}
               disabled={activeSection !== 'events'}
-              className="bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow-sm disabled:opacity-50"
             >
-              + Nuevo Evento
-            </button>
+              <Plus className="w-4 h-4" />
+              Nuevo Evento
+            </Button>
           </div>
         }
       />
@@ -771,7 +809,7 @@ export function OperationalEventScreen() {
             onClick={() => setActiveSection('events')}
             className={`text-sm font-medium px-4 py-2 rounded-lg transition-colors ${
               activeSection === 'events'
-                ? 'bg-red-600 text-white'
+                ? 'bg-indigo-600 text-white'
                 : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
             }`}
           >
@@ -781,7 +819,7 @@ export function OperationalEventScreen() {
             onClick={() => setActiveSection('restriction')}
             className={`text-sm font-medium px-4 py-2 rounded-lg transition-colors ${
               activeSection === 'restriction'
-                ? 'bg-red-600 text-white'
+                ? 'bg-indigo-600 text-white'
                 : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
             }`}
           >
@@ -810,7 +848,7 @@ export function OperationalEventScreen() {
                 value={selectedDayId ?? ''}
                 onChange={(e) => setSelectedDayId(e.target.value || null)}
                 disabled={loadingDays}
-                className="w-full max-w-xs px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                className="w-full max-w-xs px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50"
               >
                 <option value="">Seleccionar jornada...</option>
                 {eventDays.map((d) => (
@@ -851,9 +889,9 @@ export function OperationalEventScreen() {
                           key={event.id}
                           event={event}
                           zoneName={zoneNameById[event.zone_id]}
-                          onFinalize={handleDeactivate}
+                          onFinalize={requestFinalize}
                           onEdit={handleEdit}
-                          onDelete={handleDelete}
+                          onDelete={requestDelete}
                           saving={saving}
                         />
                       ))}
@@ -875,9 +913,9 @@ export function OperationalEventScreen() {
                           key={event.id}
                           event={event}
                           zoneName={zoneNameById[event.zone_id]}
-                          onFinalize={handleDeactivate}
+                          onFinalize={requestFinalize}
                           onEdit={handleEdit}
-                          onDelete={handleDelete}
+                          onDelete={requestDelete}
                           saving={saving}
                         />
                       ))}
@@ -887,15 +925,20 @@ export function OperationalEventScreen() {
 
                 {/* Finalized events */}
                 <section>
-                  <button
+                  <Button
+                    variant="ghost"
                     onClick={() => setShowFinalized((v) => !v)}
-                    className="flex items-center justify-between w-full text-left"
+                    className="flex items-center justify-between w-full text-left p-2 -m-2"
                   >
                     <h2 className="text-lg font-bold text-slate-600">
                       Eventos Finalizados ({finalizedEvents.length})
                     </h2>
-                    <span className="text-slate-400 text-lg">{showFinalized ? '▼' : '▶'}</span>
-                  </button>
+                    {showFinalized ? (
+                      <ChevronDown className="w-5 h-5 text-slate-400" />
+                    ) : (
+                      <ChevronRight className="w-5 h-5 text-slate-400" />
+                    )}
+                  </Button>
                   {showFinalized && (
                     <div className="mt-3 space-y-2">
                       {finalizedEvents.length === 0 ? (
@@ -908,9 +951,9 @@ export function OperationalEventScreen() {
                             key={event.id}
                             event={event}
                             zoneName={zoneNameById[event.zone_id]}
-                            onFinalize={handleDeactivate}
+                            onFinalize={requestFinalize}
                             onEdit={handleEdit}
-                            onDelete={handleDelete}
+                            onDelete={requestDelete}
                             saving={saving}
                           />
                         ))
@@ -936,6 +979,25 @@ export function OperationalEventScreen() {
           saving={saving}
         />
       )}
+
+      <ConfirmDialog
+        open={pendingFinalizeId !== null}
+        title="Finalizar evento"
+        message="¿Finalizar este evento? Esta acción no se puede deshacer."
+        variant="primary"
+        confirmLabel="Finalizar"
+        onConfirm={handleFinalizeConfirm}
+        onCancel={() => setPendingFinalizeId(null)}
+      />
+
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        title="Eliminar evento"
+        message="¿Eliminar este evento? Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setPendingDeleteId(null)}
+      />
     </div>
   );
 }

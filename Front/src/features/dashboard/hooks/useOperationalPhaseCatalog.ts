@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '@/core/api/client';
+import { endpoints } from '@/core/api/endpoints';
 import type { OperationalPhaseDTO } from '../types';
 
 export type OperationalPhaseCatalog = Record<string, OperationalPhaseDTO>;
@@ -14,7 +15,7 @@ export function useOperationalPhaseCatalog() {
     setError(null);
     try {
       const { data } = await apiClient.get<OperationalPhaseDTO[]>(
-        '/operational-phases/'
+        endpoints.operationalPhases.list()
       );
       const catalog: OperationalPhaseCatalog = {};
       for (const phase of data) {

@@ -2,6 +2,8 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useOperationalPhaseCatalog } from '../hooks/useOperationalPhaseCatalog';
 import { useZoneBehaviors, useZoneTypes } from '../hooks/useZoneBehaviors';
 import { useZoneBehaviorMutations } from '../hooks/useZoneBehaviorMutations';
+import { Card } from './ui/Card';
+import { Button } from './ui/Button';
 import type { ZoneBehaviorDTO } from '../types';
 
 function FlowRestrictionSelect({ value, onChange, disabled }: { value: string; onChange: (v: 'OPEN' | 'REGULATED' | 'CLOSED') => void; disabled: boolean }) {
@@ -10,7 +12,7 @@ function FlowRestrictionSelect({ value, onChange, disabled }: { value: string; o
       value={value}
       onChange={(e) => onChange(e.target.value as 'OPEN' | 'REGULATED' | 'CLOSED')}
       disabled={disabled}
-      className="px-2 py-1 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+      className="px-2 py-1 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50"
     >
       <option value="OPEN">Abierto</option>
       <option value="REGULATED">Regulado</option>
@@ -116,7 +118,7 @@ export function FlowRestrictionSection() {
             value={selectedPhaseId}
             onChange={(e) => setSelectedPhaseId(e.target.value)}
             disabled={loadingPhases}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50"
           >
             <option value="">Seleccionar fase...</option>
             {phases.map((p) => (
@@ -135,9 +137,9 @@ export function FlowRestrictionSection() {
           Seleccioná una fase para configurar los comportamientos territoriales.
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <Card variant="standard">
           {hasUnsaved && (
-            <div className="px-4 py-2 bg-amber-50 border-b border-amber-200 text-sm text-amber-700">
+            <div className="mb-3 px-4 py-2 bg-amber-50 border border-amber-200 rounded text-sm text-amber-700">
               Tenés cambios sin guardar. Usá el botón Guardar en cada fila modificada.
             </div>
           )}
@@ -165,17 +167,14 @@ export function FlowRestrictionSection() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         {row.behavior ? (
-                          <button
+                          <Button
+                            size="sm"
+                            variant="primary"
                             onClick={() => handleSave(row)}
                             disabled={!row.dirty || isLoading}
-                            className={`text-xs font-medium px-3 py-1.5 rounded transition-colors ${
-                              row.dirty && !isLoading
-                                ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                                : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                            }`}
                           >
                             {isLoading ? 'Guardando...' : 'Guardar'}
-                          </button>
+                          </Button>
                         ) : (
                           <span className="text-xs text-slate-400">Sin registro</span>
                         )}
@@ -186,7 +185,7 @@ export function FlowRestrictionSection() {
               </tbody>
             </table>
           </div>
-        </div>
+        </Card>
       )}
     </>
   );
