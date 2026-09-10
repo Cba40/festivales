@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { apiClient } from '@/core/api/client';
 import { endpoints } from '@/core/api/endpoints';
-import { Plus, RefreshCw, AlertTriangle, Cone, CloudLightning, Siren, Flame, Car, Drama, DoorOpen, Wrench, Music, Zap, MapPin, Trash2, Pencil, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, RefreshCw, AlertTriangle, Cone, CloudLightning, Siren, Flame, Car, Drama, DoorOpen, Wrench, Music, Zap, MapPin, Trash2, Pencil, Search, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { AdminMapSelector } from '@/components/AdminMapSelector';
 import { useOperationalEvents } from '../hooks/useOperationalEvents';
@@ -55,6 +55,24 @@ const EVENT_TYPE_ICONS: Record<string, LucideIcon> = {
   fin_espectaculo: Music,
   corte_energia: Zap,
 };
+
+const EVENT_TYPE_GROUP_LABELS: Record<string, string> = {
+  accidente: 'Accidentes',
+  corte_calle: 'Cortes de calle',
+  tormenta: 'Tormentas',
+  evacuacion: 'Evacuaciones',
+  incendio: 'Incendios',
+  congestion_extraordinaria: 'Congestión Extraordinaria',
+  escenario_finalizado: 'Escenarios Finalizados',
+  apertura_extraordinaria: 'Aperturas Extraordinarias',
+  incidente_operativo: 'Incidentes Operativos',
+  fin_espectaculo: 'Fines de Espectáculo',
+  corte_energia: 'Cortes de Energía',
+};
+
+function normalizeText(value: string): string {
+  return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
 
 const EFFECT_TYPE_LABELS: Record<OperationalEffectType, string> = {
   reduccion_capacidad: 'Reducción de capacidad',
@@ -626,7 +644,7 @@ export function OperationalEventScreen() {
   const { create, update, remove, deactivate, saving, error: mutationError } = useOperationalEventMutations();
   const [showForm, setShowForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState<OperationalEventDTO | null>(null);
-  const [showFinalized, setShowFinalized] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const [activeSection, setActiveSection] = useState<'events' | 'restriction'>('events');
   const [zones, setZones] = useState<ZoneOption[]>([]);
   const [pendingFinalizeId, setPendingFinalizeId] = useState<string | null>(null);
@@ -657,18 +675,37 @@ export function OperationalEventScreen() {
     }
   }, [eventDays, selectedDayId]);
 
-  const activeEvents = useMemo(
-    () => events.filter((e) => e.is_active && !isExpired(e.end_timestamp)),
-    [events],
-  );
-  const expiredEvents = useMemo(
-    () => events.filter((e) => e.is_active && isExpired(e.end_timestamp)),
-    [events],
-  );
-  const finalizedEvents = useMemo(
-    () => events.filter((e) => !e.is_active),
-    [events],
-  );
+  const filteredAndGrouped = useMemo(() => {
+    const q = normalizeText(searchTerm);
+    const filtered = q
+      ? events.filter((event) =>
+          normalizeText(
+            `${event.event_type} ${zoneNameById[event.zone_id] ?? ''} ${event.description ?? ''}`,
+          ).includes(q),
+        )
+      : events;
+
+    const byType = new Map<string, OperationalEventDTO[]>();
+    for (const event of filtered) {
+      const list = byType.get(event.event_type) ?? [];
+      list.push(event);
+      byType.set(event.event_type, list);
+    }
+
+    return Array.from(byType.entries())
+      .map(([type, typeEvents]) => ({
+        type,
+        events: [...typeEvents].sort(
+          (a, b) =>
+            new Date(b.start_timestamp).getTime() - new Date(a.start_timestamp).getTime(),
+        ),
+      }))
+      .sort((a, b) =>
+        (EVENT_TYPE_GROUP_LABELS[a.type] ?? a.type).localeCompare(
+          EVENT_TYPE_GROUP_LABELS[b.type] ?? b.type,
+        ),
+      );
+  }, [events, searchTerm, zoneNameById]);
 
   useEffect(() => {
     if (!events.length) return;
@@ -868,98 +905,72 @@ export function OperationalEventScreen() {
               </div>
             ) : (
               <>
-                {/* Active events */}
-                <section className="mb-8">
-                  <div className="flex items-center justify-between mb-3">
-                    <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
-                      Eventos Activos
-                      <span className="text-sm font-normal text-slate-500">({activeEvents.length})</span>
-                    </h2>
+                {/* Search */}
+                <div className="relative mb-4">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Buscar evento por tipo, zona o descripción..."
+                    className="w-full pl-9 pr-9 py-2 text-sm rounded-lg border border-slate-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                  />
+                  {searchTerm.length > 0 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSearchTerm('')}
+                      title="Limpiar búsqueda"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 rounded-full px-2 py-2"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+
+                {events.length === 0 ? (
+                  <div className="bg-white rounded-xl border-2 border-dashed border-slate-200 p-8 text-center text-slate-400">
+                    No hay eventos registrados en esta jornada.
                   </div>
-                  {activeEvents.length === 0 ? (
-                    <div className="bg-white rounded-xl border-2 border-dashed border-slate-200 p-8 text-center text-slate-400">
-                      No hay eventos activos en esta jornada.
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {activeEvents.map((event) => (
-                        <EventCard
-                          key={event.id}
-                          event={event}
-                          zoneName={zoneNameById[event.zone_id]}
-                          onFinalize={requestFinalize}
-                          onEdit={handleEdit}
-                          onDelete={requestDelete}
-                          saving={saving}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </section>
-
-                {/* Expired events */}
-                {expiredEvents.length > 0 && (
-                  <section className="mb-8">
-                    <h2 className="text-lg font-bold text-amber-600 flex items-center gap-2 mb-3">
-                      <span className="w-2.5 h-2.5 bg-amber-500 rounded-full" />
-                      Eventos Expirados
-                      <span className="text-sm font-normal text-slate-500">({expiredEvents.length})</span>
-                    </h2>
-                    <div className="space-y-3">
-                      {expiredEvents.map((event) => (
-                        <EventCard
-                          key={event.id}
-                          event={event}
-                          zoneName={zoneNameById[event.zone_id]}
-                          onFinalize={requestFinalize}
-                          onEdit={handleEdit}
-                          onDelete={requestDelete}
-                          saving={saving}
-                        />
-                      ))}
-                    </div>
-                  </section>
+                ) : filteredAndGrouped.length === 0 ? (
+                  <div className="bg-white rounded-xl border-2 border-dashed border-slate-200 p-8 text-center text-slate-400">
+                    No se encontraron eventos que coincidan con '{searchTerm.trim()}'.
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {filteredAndGrouped.map((group) => {
+                      const TypeIcon = EVENT_TYPE_ICONS[group.type] ?? MapPin;
+                      const label = EVENT_TYPE_GROUP_LABELS[group.type] ?? group.type;
+                      return (
+                        <section key={group.type}>
+                          <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-3">
+                            <TypeIcon className="w-4 h-4 text-indigo-600" />
+                            {label}
+                            <span className="text-xs font-normal text-slate-400">
+                              {group.events.length === 1
+                                ? '(1 evento)'
+                                : `(${group.events.length} eventos)`}
+                            </span>
+                          </h3>
+                          <div className="space-y-3">
+                            {group.events.map((event) => (
+                              <EventCard
+                                key={event.id}
+                                event={event}
+                                zoneName={zoneNameById[event.zone_id]}
+                                onFinalize={requestFinalize}
+                                onEdit={handleEdit}
+                                onDelete={requestDelete}
+                                saving={saving}
+                              />
+                            ))}
+                          </div>
+                        </section>
+                      );
+                    })}
+                  </div>
                 )}
-
-                {/* Finalized events */}
-                <section>
-                  <Button
-                    variant="ghost"
-                    onClick={() => setShowFinalized((v) => !v)}
-                    className="flex items-center justify-between w-full text-left p-2 -m-2"
-                  >
-                    <h2 className="text-lg font-bold text-slate-600">
-                      Eventos Finalizados ({finalizedEvents.length})
-                    </h2>
-                    {showFinalized ? (
-                      <ChevronDown className="w-5 h-5 text-slate-400" />
-                    ) : (
-                      <ChevronRight className="w-5 h-5 text-slate-400" />
-                    )}
-                  </Button>
-                  {showFinalized && (
-                    <div className="mt-3 space-y-2">
-                      {finalizedEvents.length === 0 ? (
-                        <div className="bg-white rounded-xl border border-slate-200 p-6 text-center text-slate-400 text-sm">
-                          No hay eventos finalizados.
-                        </div>
-                      ) : (
-                        finalizedEvents.map((event) => (
-                          <EventCard
-                            key={event.id}
-                            event={event}
-                            zoneName={zoneNameById[event.zone_id]}
-                            onFinalize={requestFinalize}
-                            onEdit={handleEdit}
-                            onDelete={requestDelete}
-                            saving={saving}
-                          />
-                        ))
-                      )}
-                    </div>
-                  )}
-                </section>
               </>
             )}
           </>
