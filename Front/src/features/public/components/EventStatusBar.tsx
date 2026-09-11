@@ -61,10 +61,14 @@ export function EventStatusBar({ autoRefreshMs = 30000 }: EventStatusBarProps) {
   }
 
   const zones = data.zone_states;
-  const closedZones = zones.filter(z => z.operational_state === 'CLOSED').length;
-  const regulatedZones = zones.filter(z => z.operational_state === 'REGULATED').length;
+  const highIntensityZones = zones.filter(
+    z => z.operational_state === 'CLOSED' || z.operational_state === 'HIGH_DEMAND'
+  ).length;
+  const mediumIntensityZones = zones.filter(
+    z => z.operational_state === 'REGULATED' || z.operational_state === 'MODERATE'
+  ).length;
   const intensityPct = zones.length > 0
-    ? Math.round((closedZones * 100 + regulatedZones * 50) / zones.length)
+    ? Math.round((highIntensityZones * 100 + mediumIntensityZones * 50) / zones.length)
     : null;
   const restrictedZones = zones.filter(z => z.active_restriction !== 'OPEN').length;
   const barColor = intensityPct === null ? 'bg-slate-300' : intensityPct > 75 ? 'bg-red-500' : intensityPct > 50 ? 'bg-amber-500' : 'bg-emerald-500';
