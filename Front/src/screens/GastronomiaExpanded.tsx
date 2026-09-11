@@ -1,17 +1,119 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/Header'
 import { X, UtensilsCrossed, MapPin, Clock } from 'lucide-react'
-import { getTipoLabel, getSentarseLabel } from '@/data/mockCorredoresGastronomicos'
-import { mapZonesToParadas, type CorredorGastronomico } from '@/data/mappers'
-import { useAppStore } from '@/core/state/store'
+import {
+  useGastronomyRecommendations,
+  type ZonaGastronomicaItem,
+} from '@/services/gastronomyProduct'
 import { formatUpdatedAt } from '@/utils/formatTime'
+
+interface CorredorGastronomico {
+  id: string
+  nombre: string
+  saturacion: 'baja' | 'media' | 'alta' | 'desconocida'
+  categoriaLabel: string
+  posibilidadSentarse: 'alta' | 'media' | 'baja'
+  distancia: number | null
+  x: number
+  y: number
+  referencia: string
+  updatedAt: number
+}
+
+const toSaturacion = (level: number | null): CorredorGastronomico['saturacion'] => {
+  if (level === null) return 'desconocida'
+  if (level < 0.6) return 'baja'
+  if (level < 0.8) return 'media'
+  return 'alta'
+}
+
+const toSentarse = (level: number | null): 'alta' | 'media' | 'baja' => {
+  if (level === null || level < 0.5) return 'alta'
+  if (level < 0.8) return 'media'
+  return 'baja'
+}
+
+const getCategoriaLabel = (categoria: string): string => {
+  switch (categoria) {
+    case 'foodtruck': return 'Food Truck'
+    case 'comida_al_paso': return 'Comida al paso'
+    case 'penas': return 'Peñas'
+    case 'patio_de_comidas': return 'Patio de comidas'
+    case 'restaurante': return 'Restaurante'
+    default: return categoria || 'Gastronomía'
+  }
+}
+
+const getSentarseLabel = (posibilidad: string): string => {
+  switch (posibilidad) {
+    case 'alta': return '🟢 Fácil encontrar lugar'
+    case 'media': return '🟡 Moderadamente disponible'
+    default: return '🔴 Muy concurrido'
+  }
+}
+
+const normalizeCoords = (
+  zonas: ZonaGastronomicaItem[]
+): Map<string, { x: number; y: number }> => {
+  const withCoords = zonas.filter(z => z.lat != null && z.lng != null)
+  const positions = new Map<string, { x: number; y: number }>()
+
+  if (withCoords.length === 0) return positions
+  if (withCoords.length === 1) {
+    positions.set(withCoords[0].zone_id, { x: 50, y: 50 })
+    return positions
+  }
+
+  const lats = withCoords.map(z => z.lat as number)
+  const lngs = withCoords.map(z => z.lng as number)
+  const minLat = Math.min(...lats)
+  const maxLat = Math.max(...lats)
+  const minLng = Math.min(...lngs)
+  const maxLng = Math.max(...lngs)
+  const spanLat = maxLat - minLat || 1
+  const spanLng = maxLng - minLng || 1
+
+  for (const z of withCoords) {
+    const x = ((z.lng as number) - minLng) / spanLng * 80 + 10
+    const y = 90 - ((z.lat as number) - minLat) / spanLat * 80
+    positions.set(z.zone_id, { x: Math.round(x), y: Math.round(y) })
+  }
+  return positions
+}
 
 const GastronomiaExpanded = () => {
   const navigate = useNavigate()
-  const zones = useAppStore(s => s.zones)
+  const { data, loading, error, refresh } = useGastronomyRecommendations()
   const [selectedCorredor, setSelectedCorredor] = useState<CorredorGastronomico | null>(null)
-  const corredores = useMemo(() => mapZonesToParadas(zones), [zones])
+
+  useEffect(() => {
+    refresh()
+  }, [refresh])
+
+  const zonas = data?.zonas ?? []
+  const updatedAt = data?.timestamp ? Date.parse(data.timestamp) : Date.now()
+  const positionMap = useMemo(() => normalizeCoords(zonas), [zonas])
+
+  const corredores: CorredorGastronomico[] = useMemo(
+    () =>
+      zonas.map(z => {
+        const pos = positionMap.get(z.zone_id)
+        return {
+          id: z.zone_id,
+          nombre: z.name,
+          saturacion: toSaturacion(z.saturation_level),
+          categoriaLabel: getCategoriaLabel(z.categoria),
+          posibilidadSentarse: toSentarse(z.saturation_level),
+          distancia: z.distancia_min,
+          x: pos?.x ?? 50,
+          y: pos?.y ?? 50,
+          referencia: z.referencia || '',
+          updatedAt,
+        }
+      }),
+    [zonas, positionMap, updatedAt]
+  )
 
   const getSaturacionColor = (saturacion: string) => {
     switch (saturacion) {
@@ -22,22 +124,42 @@ const GastronomiaExpanded = () => {
     }
   }
 
-  const getSaturacionEmoji = (saturacion: string) => {
-    switch (saturacion) {
-      case 'baja': return '🟢'
-      case 'media': return '🟡'
-      case 'alta': return '🔴'
-      default: return '⚪'
-    }
-  }
-
   const getSaturacionLabel = (saturacion: string) => {
     switch (saturacion) {
       case 'baja': return 'Baja saturación'
       case 'media': return 'Media saturación'
       case 'alta': return 'Alta saturación'
-      default: return saturacion
+      default: return 'Sin datos de saturación'
     }
+  }
+
+  if (loading && corredores.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
+        <Header title="Zonas Gastronómicas" showBack onBack={() => navigate('/servicios/comer')} />
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-slate-500">Cargando zonas gastronómicas...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error && corredores.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
+        <Header title="Zonas Gastronómicas" showBack onBack={() => navigate('/servicios/comer')} />
+        <div className="flex-1 p-4 flex flex-col items-center justify-center space-y-4">
+          <p className="text-danger font-bold">Error al cargar</p>
+          <p className="text-sm text-slate-500 text-center">{error}</p>
+          <button
+            onClick={refresh}
+            className="bg-primary text-white px-6 py-2 rounded-lg font-bold"
+          >
+            Reintentar
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -111,6 +233,7 @@ const GastronomiaExpanded = () => {
             <p className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-success" /> Baja saturación — Fácil encontrar lugar</p>
             <p className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-warning" /> Media saturación — Moderadamente disponible</p>
             <p className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-danger" /> Alta saturación — Muy concurrido</p>
+            <p className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-gray-400" /> Sin datos de saturación — Zona informativa</p>
           </div>
         </div>
 
@@ -128,18 +251,21 @@ const GastronomiaExpanded = () => {
               <div className="flex items-start gap-3">
                 <span className={`mt-1 w-2 h-2 rounded-full shrink-0 ${
                   corredor.saturacion === 'baja' ? 'bg-success' :
-                  corredor.saturacion === 'media' ? 'bg-warning' : 'bg-danger'
+                  corredor.saturacion === 'media' ? 'bg-warning' :
+                  corredor.saturacion === 'alta' ? 'bg-danger' : 'bg-gray-400'
                 }`} />
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm text-slate-800 dark:text-slate-100 group-hover:text-primary dark:group-hover:text-primary">
                     {corredor.nombre}
                   </p>
                   <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 flex items-center gap-1">
-                    <UtensilsCrossed size={12} /> {getTipoLabel(corredor.tipo)}
+                    <UtensilsCrossed size={12} /> {corredor.categoriaLabel}
                   </p>
-                  <p className="text-xs text-slate-600 dark:text-slate-300 flex items-center gap-1">
-                    <Clock size={12} /> {corredor.distancia} min
-                  </p>
+                  {corredor.distancia != null && (
+                    <p className="text-xs text-slate-600 dark:text-slate-300 flex items-center gap-1">
+                      <Clock size={12} /> {corredor.distancia} min
+                    </p>
+                  )}
                 </div>
               </div>
             </button>
@@ -166,14 +292,16 @@ const GastronomiaExpanded = () => {
 
             <div className="space-y-2 mb-4">
               <p className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-2">
-                <UtensilsCrossed size={16} /> <strong>{getTipoLabel(selectedCorredor.tipo)}</strong>
+                <UtensilsCrossed size={16} /> <strong>{selectedCorredor.categoriaLabel}</strong>
               </p>
               <p className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-2">
-                <MapPin size={16} /> {selectedCorredor.referencia}
+                <MapPin size={16} /> {selectedCorredor.referencia || 'Sin referencia'}
               </p>
-              <p className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-2">
-                <Clock size={16} /> {selectedCorredor.distancia} min caminando
-              </p>
+              {selectedCorredor.distancia != null && (
+                <p className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-2">
+                  <Clock size={16} /> {selectedCorredor.distancia} min caminando
+                </p>
+              )}
               <p className="text-sm text-slate-600 dark:text-slate-300">
                 {getSentarseLabel(selectedCorredor.posibilidadSentarse)}
               </p>
