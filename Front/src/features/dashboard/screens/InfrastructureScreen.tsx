@@ -7,6 +7,7 @@ import { AccommodationManagementScreen } from './AccommodationManagementScreen';
 import { EmergencyManagementScreen } from './EmergencyManagementScreen';
 import { ProtocolManagementScreen } from './ProtocolManagementScreen';
 import { DashboardHeader } from '../components/DashboardHeader';
+import { SectionTabs } from '../components/ui';
 
 const DEFAULT_EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 
@@ -28,21 +29,12 @@ export function InfrastructureScreen() {
   return (
     <div className="min-h-screen bg-slate-50 w-full">
       <DashboardHeader title="Gestión de Zonas" />
-      <div className="flex flex-wrap gap-2 px-4 sm:px-6 py-3">
-        {SECTIONS.map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => setActiveSection(key)}
-            className={`text-sm font-medium px-4 py-2 rounded-lg transition-colors ${
-              activeSection === key
-                ? 'bg-indigo-600 text-white'
-                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <SectionTabs
+        sections={SECTIONS}
+        activeSection={activeSection}
+        onChange={setActiveSection}
+        className="flex flex-wrap gap-2 px-4 sm:px-6 py-3"
+      />
 
       <main className="p-4 sm:p-6">
         {activeSection === 'zones' && <ZoneAdminScreen />}

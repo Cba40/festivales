@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { isAxiosError } from 'axios';
-import { Plus, Pencil, Trash2, ArrowUp, ArrowDown, X, AlertTriangle, Shield, Heart, Ambulance, Flame, ClipboardList, RefreshCw } from 'lucide-react';
+import { Plus, Pencil, Trash2, ArrowUp, ArrowDown, X, AlertTriangle, Shield, Heart, Ambulance, Flame, ClipboardList } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import {
   getProtocols,
@@ -15,6 +15,7 @@ import { Badge, type BadgeVariant } from '../components/ui/Badge';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
+import { RefreshButton } from '../components/ui';
 
 type ContextFilter = ProtocolContext | 'todos';
 
@@ -300,10 +301,7 @@ export function ProtocolManagementScreen() {
                 </button>
               ))}
             </div>
-            <Button variant="secondary" size="sm" onClick={() => void handleRefresh()} disabled={refreshing}>
-              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-              {refreshing ? 'Actualizando...' : 'Actualizar'}
-            </Button>
+            <RefreshButton onClick={() => void handleRefresh()} loading={refreshing} />
             <Button variant="primary" onClick={abrirCrear}>
               <Plus className="w-4 h-4" />
               Nuevo Protocolo

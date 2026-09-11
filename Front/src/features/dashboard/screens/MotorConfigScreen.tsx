@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
-import { HelpCircle, ChevronDown, ChevronUp, CheckCircle2, Info, Settings, Puzzle, RefreshCw } from 'lucide-react';
+import { HelpCircle, ChevronDown, ChevronUp, CheckCircle2, Info, Settings, Puzzle } from 'lucide-react';
 import { useRecommendationConfig, useStage4Config, useMotorConfigMutations } from '../hooks/useMotorConfig';
-import { Button, Card } from '../components/ui';
+import { Button, Card, RefreshButton } from '../components/ui';
 
 function HelpTip({ text }: { text: string }) {
   return (
@@ -198,15 +198,10 @@ export function MotorConfigScreen() {
       </div>
 
       <div className="flex justify-end">
-        <Button
-          variant="secondary"
-          size="sm"
+        <RefreshButton
           onClick={() => { setDraftRec(null); setDraftStg(null); refreshRec(); refreshStg(); }}
-          disabled={loading}
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          {loading ? 'Cargando...' : 'Recargar'}
-        </Button>
+          loading={loading}
+        />
       </div>
 
       {error && (

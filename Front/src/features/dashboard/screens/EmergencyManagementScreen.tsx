@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { isAxiosError } from 'axios';
-import { Settings, Plus, Pencil, Trash2, MapPin, ChevronUp, ChevronDown, Search, X, Shield, Flame, Heart, Users, RefreshCw } from 'lucide-react';
+import { Settings, Plus, Pencil, Trash2, MapPin, ChevronUp, ChevronDown, Search, X, Shield, Flame, Heart, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { AdminMapSelector } from '../../../components/AdminMapSelector';
 import {
@@ -18,6 +18,7 @@ import { Badge, type BadgeVariant } from '../components/ui/Badge';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
+import { RefreshButton } from '../components/ui';
 
 type ModalState =
   | { mode: 'create' }
@@ -377,15 +378,7 @@ export function EmergencyManagementScreen() {
             </button>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => void handleRefresh()}
-              disabled={refreshing}
-            >
-              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-              {refreshing ? 'Actualizando...' : 'Actualizar'}
-            </Button>
+            <RefreshButton onClick={() => void handleRefresh()} loading={refreshing} />
             <Button variant="primary" onClick={abrirCrear}>
               <Plus className="w-4 h-4" />
               Nuevo Punto de Emergencia

@@ -22,7 +22,7 @@ import { useTerritorialPrediction, useAutoRefresh } from '../../hooks/useContext
 import type { ZoneStateItem } from '../../hooks/useContextEngine';
 import { apiClient } from '../../core/api/client';
 import { endpoints } from '../../core/api/endpoints';
-import { Button, Card, Badge } from '../../features/dashboard/components/ui';
+import { Button, Card, Badge, RefreshButton } from '../../features/dashboard/components/ui';
 
 const RESTRICTION_LABELS: Record<string, string> = {
   OPEN: 'Abierta',
@@ -299,15 +299,7 @@ export function PredictionsDashboard({ eventId, autoRefreshMs = 15000 }: Predict
             />
             Auto {autoRefreshMs / 1000}s
           </label>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => refresh()}
-            disabled={loading}
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            {loading ? 'Cargando...' : 'Actualizar'}
-          </Button>
+          <RefreshButton onClick={() => refresh()} loading={loading} />
         </div>
       </div>
 

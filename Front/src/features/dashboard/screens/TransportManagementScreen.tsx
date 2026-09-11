@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { isAxiosError } from 'axios';
-import { Upload, Download, Plus, Pencil, Trash2, RefreshCw } from 'lucide-react';
+import { Upload, Download, Plus, Pencil, Trash2 } from 'lucide-react';
 import { apiClient } from '../../../core/api/client';
 import { endpoints } from '../../../core/api/endpoints';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
+import { RefreshButton } from '../components/ui';
 
 interface TransportLineDTO {
   id: string;
@@ -433,15 +434,7 @@ export function TransportManagementScreen({ eventId }: { eventId: string }) {
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-semibold text-slate-700">Líneas de Transporte ({lines.length})</h2>
           <div className="flex flex-wrap gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => void handleRefresh()}
-              disabled={refreshing}
-            >
-              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-              {refreshing ? 'Actualizando...' : 'Actualizar'}
-            </Button>
+            <RefreshButton onClick={() => void handleRefresh()} loading={refreshing} />
             <Button variant="primary" onClick={abrirCrearLinea}>
               <Plus className="w-4 h-4" />
               Nueva Línea

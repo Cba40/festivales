@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
-import { RefreshCw, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import {
   useAuditLog,
   useRecommendations,
   useResolveRecommendation,
 } from '@/hooks/useAnalytics';
 import type { ConfigurationRecommendationDTO } from '@/features/dashboard/types';
-import { Badge, Button, Card } from '@/features/dashboard/components/ui';
+import { Badge, Button, Card, RefreshButton } from '@/features/dashboard/components/ui';
+import { truncateId } from '@/features/dashboard/utils/format';
 import type { BadgeVariant } from '@/features/dashboard/components/ui/Badge';
 
 function formatDate(value: string | null): string {
@@ -18,10 +19,6 @@ function formatDate(value: string | null): string {
     hour: '2-digit',
     minute: '2-digit',
   });
-}
-
-function truncateId(id: string): string {
-  return id.length >= 8 ? `${id.slice(0, 8)}…` : id;
 }
 
 function getStatusVariant(status: ConfigurationRecommendationDTO['status']): BadgeVariant {
@@ -230,18 +227,13 @@ export function AnalyticsScreen() {
   return (
     <main className="max-w-5xl mx-auto space-y-6">
       <div className="flex justify-end">
-        <Button
-          variant="secondary"
-          size="sm"
+        <RefreshButton
           onClick={() => {
             fetchRecommendations();
             if (selectedId) fetchAuditLog(selectedId);
           }}
-          disabled={recsLoading}
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${recsLoading ? 'animate-spin' : ''}`} />
-          {recsLoading ? 'Cargando...' : 'Actualizar'}
-        </Button>
+          loading={recsLoading}
+        />
       </div>
 
       {recsError && (

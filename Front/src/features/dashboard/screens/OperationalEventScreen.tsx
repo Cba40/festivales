@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { apiClient } from '@/core/api/client';
 import { endpoints } from '@/core/api/endpoints';
-import { Plus, RefreshCw, AlertTriangle, Cone, CloudLightning, Siren, Flame, Car, Drama, DoorOpen, Wrench, Music, Zap, MapPin, Trash2, Pencil, Search, X } from 'lucide-react';
+import { Plus, AlertTriangle, Cone, CloudLightning, Siren, Flame, Car, Drama, DoorOpen, Wrench, Music, Zap, MapPin, Trash2, Pencil, Search, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { AdminMapSelector } from '@/components/AdminMapSelector';
 import { useOperationalEvents } from '../hooks/useOperationalEvents';
@@ -13,6 +13,8 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
+import { RefreshButton } from '../components/ui/RefreshButton';
+import { SectionTabs } from '../components/ui/SectionTabs';
 import type {
   OperationalEventDTO,
   OperationalEventCreatePayload,
@@ -817,15 +819,7 @@ export function OperationalEventScreen() {
         title="Incidentes Operativos"
         actions={
           <div className="flex items-center gap-3">
-            <Button
-              variant="secondary"
-              onClick={refresh}
-              disabled={loading}
-              className="text-sm"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              {loading ? 'Cargando...' : 'Actualizar'}
-            </Button>
+            <RefreshButton onClick={refresh} loading={loading} />
             <Button
               variant="primary"
               onClick={openCreateForm}
@@ -840,28 +834,14 @@ export function OperationalEventScreen() {
 
       <main className="p-4 sm:p-6 max-w-4xl mx-auto">
         {/* Sub-tabs */}
-        <div className="flex gap-2 mb-6">
-          <button
-            onClick={() => setActiveSection('events')}
-            className={`text-sm font-medium px-4 py-2 rounded-lg transition-colors ${
-              activeSection === 'events'
-                ? 'bg-indigo-600 text-white'
-                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-            }`}
-          >
-            Eventos puntuales
-          </button>
-          <button
-            onClick={() => setActiveSection('restriction')}
-            className={`text-sm font-medium px-4 py-2 rounded-lg transition-colors ${
-              activeSection === 'restriction'
-                ? 'bg-indigo-600 text-white'
-                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-            }`}
-          >
-            Restricción por tipo y fase
-          </button>
-        </div>
+        <SectionTabs
+          sections={[
+            { key: 'events', label: 'Eventos puntuales' },
+            { key: 'restriction', label: 'Restricción por tipo y fase' },
+          ]}
+          activeSection={activeSection}
+          onChange={setActiveSection}
+        />
 
         {mutationError && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">

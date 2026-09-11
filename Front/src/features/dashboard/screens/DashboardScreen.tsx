@@ -7,7 +7,6 @@ import {
   Lightbulb,
   Activity,
   Wifi,
-  RefreshCw,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAppStore } from '../../../core/state/store';
@@ -15,6 +14,7 @@ import { DashboardHeader } from '../components/DashboardHeader';
 import { useDashboardSync } from '../hooks/useDashboardSync';
 import { useEventDays } from '../hooks/useEventDays';
 import { useOperationalEvents } from '../hooks/useOperationalEvents';
+import { RefreshButton } from '../components/ui';
 
 const DEFAULT_EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 
@@ -153,15 +153,7 @@ export function DashboardScreen() {
         subtitle="Operación Territorial"
         actions={
           <nav className="flex flex-wrap gap-2">
-            <button
-              onClick={() => void handleRefresh()}
-              disabled={refreshing}
-              title="Actualizar datos"
-              className="text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-              {refreshing ? 'Actualizando...' : 'Actualizar'}
-            </button>
+            <RefreshButton onClick={() => void handleRefresh()} loading={refreshing} />
             <button
               onClick={() => navigate('/dashboard/event-config')}
               className="text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"

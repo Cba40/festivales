@@ -1,10 +1,11 @@
 import { useEffect, useCallback, useMemo, useState } from 'react';
-import { RefreshCw, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { EVENT_ID } from '@/components/context-engine/constants';
 import { apiClient } from '@/core/api/client';
 import { endpoints } from '@/core/api/endpoints';
 import { useOperationalObservations } from '@/hooks/useOperationalObservations';
-import { Button, Card } from '@/features/dashboard/components/ui';
+import { Button, Card, RefreshButton } from '@/features/dashboard/components/ui';
+import { truncateId } from '@/features/dashboard/utils/format';
 
 const SOURCES = [
   { value: 'manual', label: 'Manual' },
@@ -36,10 +37,6 @@ function formatTimestamp(value: string): string {
     minute: '2-digit',
     second: '2-digit',
   });
-}
-
-function formatZoneId(zoneId: string): string {
-  return zoneId.length >= 8 ? `${zoneId.slice(0, 8)}…` : zoneId;
 }
 
 function pad2(n: number): string {
@@ -216,14 +213,7 @@ export function ObservationsScreen() {
   return (
     <main className="max-w-5xl mx-auto space-y-6">
       <div className="flex justify-end">
-        <button
-          onClick={() => { fetchObservations(); }}
-          disabled={isLoading}
-          className="flex items-center gap-1 text-sm px-3 py-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium disabled:opacity-50"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-          {isLoading ? 'Cargando...' : 'Actualizar'}
-        </button>
+        <RefreshButton onClick={() => void fetchObservations()} loading={isLoading} />
       </div>
 
       {error && (
@@ -377,7 +367,7 @@ export function ObservationsScreen() {
                   <tr key={obs.id} className="border-b border-slate-100">
                     <td className="px-5 py-2 text-slate-600">{formatTimestamp(obs.timestamp)}</td>
                     <td className="px-5 py-2 text-slate-700">
-                      {zona ? zona.name : formatZoneId(obs.zone_id)}
+                      {zona ? zona.name : truncateId(obs.zone_id)}
                     </td>
                     <td className="px-5 py-2 text-slate-700">{obs.observed_density}</td>
                     <td className="px-5 py-2 text-slate-600">{obs.observer_id || '—'}</td>
