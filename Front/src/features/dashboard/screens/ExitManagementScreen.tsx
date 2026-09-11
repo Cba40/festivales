@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { isAxiosError } from 'axios';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, RefreshCw } from 'lucide-react';
 import { apiClient } from '../../../core/api/client';
 import { endpoints } from '../../../core/api/endpoints';
 import { Card } from '../components/ui/Card';
@@ -42,6 +42,7 @@ export function ExitManagementScreen({ eventId }: { eventId: string }) {
   const [asignaciones, setAsignaciones] = useState<Record<string, string[]>>({});
   const [statusPorZona, setStatusPorZona] = useState<Record<string, ZoneSaveStatus>>({});
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const cargarDestinos = useCallback(async () => {
     try {
@@ -101,6 +102,15 @@ export function ExitManagementScreen({ eventId }: { eventId: string }) {
   useEffect(() => {
     void cargarDestinos();
   }, [cargarDestinos]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await cargarDestinos();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const abrirCrear = () => {
     setModalName('');
@@ -200,10 +210,21 @@ export function ExitManagementScreen({ eventId }: { eventId: string }) {
           <h2 className="text-lg font-semibold text-slate-700">
             Destinos del Evento ({destinos.length})
           </h2>
-          <Button variant="primary" onClick={abrirCrear}>
-            <Plus className="w-4 h-4" />
-            Nuevo Destino
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => void handleRefresh()}
+              disabled={refreshing}
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              {refreshing ? 'Actualizando...' : 'Actualizar'}
+            </Button>
+            <Button variant="primary" onClick={abrirCrear}>
+              <Plus className="w-4 h-4" />
+              Nuevo Destino
+            </Button>
+          </div>
         </div>
 
         {destinosError && (

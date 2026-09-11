@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { isAxiosError } from 'axios';
-import { Plus, Pencil, Trash2, ArrowUp, ArrowDown, X, AlertTriangle, Shield, Heart, Ambulance, Flame, ClipboardList } from 'lucide-react';
+import { Plus, Pencil, Trash2, ArrowUp, ArrowDown, X, AlertTriangle, Shield, Heart, Ambulance, Flame, ClipboardList, RefreshCw } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import {
   getProtocols,
@@ -97,6 +97,7 @@ export function ProtocolManagementScreen() {
   const [modalError, setModalError] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [showInactive, setShowInactive] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -117,6 +118,15 @@ export function ProtocolManagementScreen() {
   useEffect(() => {
     void cargar();
   }, [cargar]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await cargar();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const setCampo = <K extends keyof ProtocolForm>(campo: K, valor: ProtocolForm[K]) => {
     setForm((prev) => ({ ...prev, [campo]: valor }));
@@ -290,6 +300,10 @@ export function ProtocolManagementScreen() {
                 </button>
               ))}
             </div>
+            <Button variant="secondary" size="sm" onClick={() => void handleRefresh()} disabled={refreshing}>
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              {refreshing ? 'Actualizando...' : 'Actualizar'}
+            </Button>
             <Button variant="primary" onClick={abrirCrear}>
               <Plus className="w-4 h-4" />
               Nuevo Protocolo

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { isAxiosError } from 'axios';
-import { Plus, Pencil, Trash2, MapPin, ChevronUp, ChevronDown, Search, X, Building2, Home, Tent } from 'lucide-react';
+import { Plus, Pencil, Trash2, MapPin, ChevronUp, ChevronDown, Search, X, Building2, Home, Tent, RefreshCw } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { apiClient } from '../../../core/api/client';
 import { endpoints } from '../../../core/api/endpoints';
@@ -107,6 +107,7 @@ export function AccommodationManagementScreen({ eventId }: { eventId: string }) 
   const [showManualCoords, setShowManualCoords] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
   const cargar = useCallback(async () => {
     try {
@@ -125,6 +126,15 @@ export function AccommodationManagementScreen({ eventId }: { eventId: string }) 
   useEffect(() => {
     void cargar();
   }, [cargar]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await cargar();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const filteredAndGrouped = useMemo(() => {
     const term = normalizeText(searchTerm.trim());
@@ -263,10 +273,21 @@ export function AccommodationManagementScreen({ eventId }: { eventId: string }) 
           <h2 className="text-lg font-semibold text-slate-700">
             Alojamientos del Evento ({alojamientos.length})
           </h2>
-          <Button variant="primary" onClick={abrirCrear}>
-            <Plus className="w-4 h-4" />
-            Nuevo Alojamiento
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => void handleRefresh()}
+              disabled={refreshing}
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              {refreshing ? 'Actualizando...' : 'Actualizar'}
+            </Button>
+            <Button variant="primary" onClick={abrirCrear}>
+              <Plus className="w-4 h-4" />
+              Nuevo Alojamiento
+            </Button>
+          </div>
         </div>
 
         <Card variant="standard">

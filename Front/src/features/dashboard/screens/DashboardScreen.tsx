@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Eye,
@@ -7,10 +7,23 @@ import {
   Lightbulb,
   Activity,
   Wifi,
+  RefreshCw,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAppStore } from '../../../core/state/store';
 import { DashboardHeader } from '../components/DashboardHeader';
+import { useDashboardSync } from '../hooks/useDashboardSync';
+import { useEventDays } from '../hooks/useEventDays';
+import { useOperationalEvents } from '../hooks/useOperationalEvents';
+
+const DEFAULT_EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
+
+function toISODate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 
 interface QuickAction {
   icon: LucideIcon;
@@ -73,6 +86,16 @@ export function DashboardScreen() {
   const navigate = useNavigate();
   const logout = useAppStore((state) => state.logout);
   const [syncTime, setSyncTime] = useState(() => new Date());
+  const [refreshing, setRefreshing] = useState(false);
+
+  const { zones, refresh: refreshZones } = useDashboardSync();
+  const { eventDays, refresh: refreshDays } = useEventDays(DEFAULT_EVENT_ID);
+  const todayIso = toISODate(new Date());
+  const todayDayId = useMemo(
+    () => eventDays.find((d) => d.date === todayIso && d.is_active)?.id ?? null,
+    [eventDays, todayIso]
+  );
+  const { events: incidentEvents, refresh: refreshIncidents } = useOperationalEvents(todayDayId);
 
   useEffect(() => {
     const id = setInterval(() => setSyncTime(new Date()), 30000);
@@ -81,20 +104,35 @@ export function DashboardScreen() {
 
   const handleLogout = () => { logout(); navigate('/'); };
 
+  const handleRefresh = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    await Promise.allSettled([refreshZones(), refreshDays(), refreshIncidents()]);
+    setSyncTime(new Date());
+    setRefreshing(false);
+  };
+
+  const criticalZones = zones.filter(
+    (z) => z.saturation === 'alto' || z.saturation === 'colapsado'
+  ).length;
+  const activeIncidentsToday = incidentEvents.filter(
+    (e) => e.is_incident && e.is_active
+  ).length;
+
   const systemMetrics: SystemMetric[] = [
     {
       icon: Activity,
       label: 'Zonas en Estado Crítico',
-      value: '—',
-      sub: 'Esperando datos del motor',
+      value: String(criticalZones),
+      sub: criticalZones > 0 ? 'Saturación alta o colapsada' : 'Sin zonas críticas',
       accent: 'text-orange-600',
       iconBg: 'bg-orange-50 border-orange-100',
     },
     {
       icon: AlertTriangle,
       label: 'Incidentes Activos Hoy',
-      value: '—',
-      sub: 'Sin incidentes reportados',
+      value: String(activeIncidentsToday),
+      sub: activeIncidentsToday > 0 ? 'Incidentes reportados' : 'Sin incidentes reportados',
       accent: 'text-red-600',
       iconBg: 'bg-red-50 border-red-100',
     },
@@ -115,6 +153,15 @@ export function DashboardScreen() {
         subtitle="Operación Territorial"
         actions={
           <nav className="flex flex-wrap gap-2">
+            <button
+              onClick={() => void handleRefresh()}
+              disabled={refreshing}
+              title="Actualizar datos"
+              className="text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+              {refreshing ? 'Actualizando...' : 'Actualizar'}
+            </button>
             <button
               onClick={() => navigate('/dashboard/event-config')}
               className="text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"

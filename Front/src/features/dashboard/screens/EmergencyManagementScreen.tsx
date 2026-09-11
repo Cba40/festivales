@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { isAxiosError } from 'axios';
-import { Settings, Plus, Pencil, Trash2, MapPin, ChevronUp, ChevronDown, Search, X, Shield, Flame, Heart, Users } from 'lucide-react';
+import { Settings, Plus, Pencil, Trash2, MapPin, ChevronUp, ChevronDown, Search, X, Shield, Flame, Heart, Users, RefreshCw } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { AdminMapSelector } from '../../../components/AdminMapSelector';
 import {
@@ -111,6 +111,7 @@ export function EmergencyManagementScreen() {
   const [cityError, setCityError] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
   const ciudadSeleccionada = cities.find((c) => c.id === cityId);
 
@@ -157,6 +158,15 @@ export function EmergencyManagementScreen() {
       void cargar();
     }
   }, [cityId, cargar]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([cargarCiudades(), cargar()]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const filteredAndGrouped = useMemo(() => {
     const term = normalizeText(searchTerm.trim());
@@ -366,10 +376,21 @@ export function EmergencyManagementScreen() {
               Gestionar / Crear Ciudad
             </button>
           </div>
-          <Button variant="primary" onClick={abrirCrear}>
-            <Plus className="w-4 h-4" />
-            Nuevo Punto de Emergencia
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => void handleRefresh()}
+              disabled={refreshing}
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              {refreshing ? 'Actualizando...' : 'Actualizar'}
+            </Button>
+            <Button variant="primary" onClick={abrirCrear}>
+              <Plus className="w-4 h-4" />
+              Nuevo Punto de Emergencia
+            </Button>
+          </div>
         </div>
 
         {result && (
