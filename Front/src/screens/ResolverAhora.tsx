@@ -159,12 +159,6 @@ const ResolverAhora = () => {
                 <p className="text-lg font-bold">
                   👉 Dirigite ahora a {zonaPrincipal.name}
                 </p>
-                {zonaPrincipal.referencia && (
-                  <p className="text-sm opacity-90">📍 {zonaPrincipal.referencia}</p>
-                )}
-                {zonaPrincipal.distancia_min != null && (
-                  <p className="text-sm opacity-90">🚶 {zonaPrincipal.distancia_min} min</p>
-                )}
                 {(zonaPrincipal.saturation === 'alto' || zonaPrincipal.saturation === 'colapsado') && (
                   <p className="text-xs opacity-75 mt-1">⚠️ Últimos lugares (alto riesgo)</p>
                 )}
@@ -182,14 +176,6 @@ const ResolverAhora = () => {
                 <p className="font-bold text-slate-800 dark:text-slate-100">
                   Si está lleno → {zonaAlternativa.name}
                 </p>
-                {zonaAlternativa.referencia && (
-                  <p className="text-sm text-slate-600 dark:text-slate-300">{zonaAlternativa.referencia}</p>
-                )}
-                {zonaAlternativa.distancia_min != null && (
-                  <p className="text-sm text-slate-600 dark:text-slate-300">
-                    {zonaAlternativa.distancia_min} min
-                  </p>
-                )}
               </div>
             </button>
           )}
@@ -228,14 +214,6 @@ const ResolverAhora = () => {
               </h3>
 
               <div className="space-y-2 mb-4">
-                <p className="text-sm text-slate-600 dark:text-slate-300">
-                  📍 {selectedZona.referencia || 'Sin referencia'}
-                </p>
-                {selectedZona.distancia_min != null && (
-                  <p className="text-sm text-slate-600 dark:text-slate-300">
-                    🚶 {selectedZona.distancia_min} min
-                  </p>
-                )}
                 <p className="text-sm text-slate-600 dark:text-slate-300">
                   📊 Estado: {selectedZona.saturation}
                 </p>

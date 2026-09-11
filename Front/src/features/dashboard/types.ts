@@ -11,9 +11,7 @@ export interface Zone {
   availableCapacity: number;
   lat?: number;
   lng?: number;
-  distancia_min?: number;
   espera_min?: number;
-  referencia?: string;
   calle?: string;
   disponibilidad?: number;
   subtipo?: string;

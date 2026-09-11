@@ -17,9 +17,7 @@ interface ApiZone {
   latitude: number | null;
   longitude: number | null;
   disponibilidad: number | null;
-  distancia_min: number | null;
   espera_min: number | null;
-  referencia: string | null;
   calle: string | null;
   subtipo: string | null;
   tipo_culinario: string | null;
@@ -46,9 +44,7 @@ function mapZone(api: ApiZone): Zone {
     lat: api.latitude ?? undefined,
     lng: api.longitude ?? undefined,
     disponibilidad: api.disponibilidad ?? undefined,
-    distancia_min: api.distancia_min ?? undefined,
     espera_min: api.espera_min ?? undefined,
-    referencia: api.referencia ?? undefined,
     calle: api.calle ?? undefined,
     subtipo: api.subtipo ?? undefined,
     tipo_culinario: api.tipo_culinario ?? undefined,
