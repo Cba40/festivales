@@ -96,11 +96,15 @@ export function ProtocolManagementScreen() {
   const [modalSaving, setModalSaving] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [showInactive, setShowInactive] = useState(false);
 
   const cargar = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getProtocols(activeContext === 'todos' ? undefined : activeContext);
+      const data = await getProtocols(
+        activeContext === 'todos' ? undefined : activeContext,
+        showInactive
+      );
       setProtocols(data);
       setError(null);
     } catch {
@@ -108,7 +112,7 @@ export function ProtocolManagementScreen() {
     } finally {
       setLoading(false);
     }
-  }, [activeContext]);
+  }, [activeContext, showInactive]);
 
   useEffect(() => {
     void cargar();
@@ -298,6 +302,23 @@ export function ProtocolManagementScreen() {
             {result}
           </p>
         )}
+
+        <div className="flex items-center justify-end gap-2 mb-4">
+          <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={showInactive}
+              onChange={(e) => setShowInactive(e.target.checked)}
+              className="h-4 w-4 rounded accent-indigo-600"
+            />
+            Mostrar inactivos
+          </label>
+          {showInactive && protocols.some((p) => !p.active) && (
+            <Badge variant="neutral">
+              {protocols.filter((p) => !p.active).length} inactivos
+            </Badge>
+          )}
+        </div>
 
         {loading ? (
           <p className="text-sm text-slate-500 italic">Cargando protocolos...</p>

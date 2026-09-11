@@ -62,12 +62,15 @@ def _clean(value: str | None) -> str | None:
 @router.get("/emergency-protocols", response_model=list[EmergencyProtocolResponse])
 def list_protocols(
     context: EmergencyProtocolContext | None = None,
+    include_inactive: bool = False,
     db: Session = Depends(get_db),
 ):
-    """Lista todos los protocolos (incluye inactivos), opcionalmente por contexto."""
+    """Lista protocolos, opcionalmente por contexto. Por defecto oculta los inactivos."""
     query = db.query(EmergencyProtocol)
     if context is not None:
         query = query.filter(EmergencyProtocol.context == context)
+    if not include_inactive:
+        query = query.filter(EmergencyProtocol.active == True)  # noqa: E712
     return (
         query.order_by(
             EmergencyProtocol.context,

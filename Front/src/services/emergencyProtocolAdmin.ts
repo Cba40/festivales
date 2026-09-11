@@ -41,9 +41,13 @@ export interface ProtocolUpdateDTO {
   active?: boolean
 }
 
-export async function getProtocols(context?: string): Promise<ProtocolDTO[]> {
+export async function getProtocols(
+  context?: string,
+  includeInactive = false
+): Promise<ProtocolDTO[]> {
   const { data } = await apiClient.get<ProtocolDTO[]>(
-    endpoints.emergencyAdmin.listProtocols(context)
+    endpoints.emergencyAdmin.listProtocols(context),
+    { params: { include_inactive: includeInactive } }
   )
   return data
 }
