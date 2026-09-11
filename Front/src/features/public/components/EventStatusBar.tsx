@@ -61,17 +61,18 @@ export function EventStatusBar({ autoRefreshMs = 30000 }: EventStatusBarProps) {
   }
 
   const zones = data.zone_states;
-  const zonesWithSaturation = zones.filter(z => z.saturation_level != null);
-  const saturationPct = zonesWithSaturation.length > 0
-    ? Math.round((zonesWithSaturation.reduce((sum, z) => sum + z.saturation_level, 0) / zonesWithSaturation.length) * 100)
+  const closedZones = zones.filter(z => z.operational_state === 'CLOSED').length;
+  const regulatedZones = zones.filter(z => z.operational_state === 'REGULATED').length;
+  const intensityPct = zones.length > 0
+    ? Math.round((closedZones * 100 + regulatedZones * 50) / zones.length)
     : null;
   const restrictedZones = zones.filter(z => z.active_restriction !== 'OPEN').length;
-  const barColor = saturationPct === null ? 'bg-slate-300' : saturationPct > 75 ? 'bg-red-500' : saturationPct > 50 ? 'bg-amber-500' : 'bg-emerald-500';
-  const dotColor = saturationPct === null ? 'bg-slate-300' : saturationPct > 75 ? 'bg-red-500' : saturationPct > 50 ? 'bg-amber-500' : 'bg-emerald-500';
+  const barColor = intensityPct === null ? 'bg-slate-300' : intensityPct > 75 ? 'bg-red-500' : intensityPct > 50 ? 'bg-amber-500' : 'bg-emerald-500';
+  const dotColor = intensityPct === null ? 'bg-slate-300' : intensityPct > 75 ? 'bg-red-500' : intensityPct > 50 ? 'bg-amber-500' : 'bg-emerald-500';
 
   return (
     <div className="px-4 py-3 border-b flex items-center gap-3 bg-white border-l-4 border-l-emerald-500">
-      <div className={`w-3 h-3 rounded-full shrink-0 ${dotColor}`} role="img" aria-label={`Saturación: ${saturationPct !== null ? `${saturationPct}%` : 'sin datos'}`} />
+      <div className={`w-3 h-3 rounded-full shrink-0 ${dotColor}`} role="img" aria-label={`Intensidad territorial: ${intensityPct !== null ? `${intensityPct}%` : 'sin datos'}`} />
       <div className="flex-1 min-w-0 space-y-0.5">
         <div className="flex items-center gap-2">
           <p className="text-sm font-bold text-slate-800">Territorio activo</p>
@@ -80,12 +81,12 @@ export function EventStatusBar({ autoRefreshMs = 30000 }: EventStatusBarProps) {
         <div className="flex items-center gap-3 text-xs text-slate-500">
           <div className="flex items-center gap-1.5">
             <div className={`h-1.5 w-16 rounded-full bg-slate-200 overflow-hidden`}>
-              <div className={`h-full rounded-full ${barColor} transition-all`} style={{ width: `${saturationPct ?? 0}%` }} />
+              <div className={`h-full rounded-full ${barColor} transition-all`} style={{ width: `${intensityPct ?? 0}%` }} />
             </div>
-            <span>{saturationPct !== null ? `${saturationPct}% saturado` : 'Sin datos'}</span>
-            {saturationPct === null && (
-              <span className="text-[10px] text-slate-400" title="El motor no calculó saturación para estas zonas">
-                Esperando datos del motor
+            <span>{intensityPct !== null ? `${intensityPct}% intensidad territorial` : 'Sin datos'}</span>
+            {intensityPct === null && (
+              <span className="text-[10px] text-slate-400" title="Basado en el estado operativo de las zonas">
+                Intensidad territorial proyectada
               </span>
             )}
           </div>
