@@ -62,17 +62,16 @@ export function EventStatusBar({ autoRefreshMs = 30000 }: EventStatusBarProps) {
 
   const zones = data.zone_states;
   const zonesWithSaturation = zones.filter(z => z.saturation_level != null);
-  const avgSaturation = zonesWithSaturation.length > 0
-    ? zonesWithSaturation.reduce((sum, z) => sum + z.saturation_level, 0) / zonesWithSaturation.length
-    : 0;
+  const saturationPct = zonesWithSaturation.length > 0
+    ? Math.round((zonesWithSaturation.reduce((sum, z) => sum + z.saturation_level, 0) / zonesWithSaturation.length) * 100)
+    : null;
   const restrictedZones = zones.filter(z => z.active_restriction !== 'OPEN').length;
-  const saturationPct = Math.round(avgSaturation * 100);
-  const barColor = saturationPct > 75 ? 'bg-red-500' : saturationPct > 50 ? 'bg-amber-500' : 'bg-emerald-500';
-  const dotColor = saturationPct > 75 ? 'bg-red-500' : saturationPct > 50 ? 'bg-amber-500' : 'bg-emerald-500';
+  const barColor = saturationPct === null ? 'bg-slate-300' : saturationPct > 75 ? 'bg-red-500' : saturationPct > 50 ? 'bg-amber-500' : 'bg-emerald-500';
+  const dotColor = saturationPct === null ? 'bg-slate-300' : saturationPct > 75 ? 'bg-red-500' : saturationPct > 50 ? 'bg-amber-500' : 'bg-emerald-500';
 
   return (
     <div className="px-4 py-3 border-b flex items-center gap-3 bg-white border-l-4 border-l-emerald-500">
-      <div className={`w-3 h-3 rounded-full shrink-0 ${dotColor}`} role="img" aria-label={`Saturación: ${saturationPct}%`} />
+      <div className={`w-3 h-3 rounded-full shrink-0 ${dotColor}`} role="img" aria-label={`Saturación: ${saturationPct !== null ? `${saturationPct}%` : 'sin datos'}`} />
       <div className="flex-1 min-w-0 space-y-0.5">
         <div className="flex items-center gap-2">
           <p className="text-sm font-bold text-slate-800">Territorio activo</p>
@@ -81,9 +80,14 @@ export function EventStatusBar({ autoRefreshMs = 30000 }: EventStatusBarProps) {
         <div className="flex items-center gap-3 text-xs text-slate-500">
           <div className="flex items-center gap-1.5">
             <div className={`h-1.5 w-16 rounded-full bg-slate-200 overflow-hidden`}>
-              <div className={`h-full rounded-full ${barColor} transition-all`} style={{ width: `${saturationPct}%` }} />
+              <div className={`h-full rounded-full ${barColor} transition-all`} style={{ width: `${saturationPct ?? 0}%` }} />
             </div>
-            <span>{saturationPct}% saturado</span>
+            <span>{saturationPct !== null ? `${saturationPct}% saturado` : 'Sin datos'}</span>
+            {saturationPct === null && (
+              <span className="text-[10px] text-slate-400" title="El motor no calculó saturación para estas zonas">
+                Esperando datos del motor
+              </span>
+            )}
           </div>
           {restrictedZones > 0 && (
             <span className="flex items-center gap-1">
