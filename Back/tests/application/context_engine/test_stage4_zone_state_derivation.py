@@ -120,7 +120,7 @@ def _make_evaluation_result(
 
 
 class TestSaturationLevel:
-    def test_saturation_is_none_without_model(
+    def test_saturation_falls_back_to_density_ratio_without_model(
         self,
         peak_phase: OperationalPhase,
         active_day_phase: EventDayPhase,
@@ -128,7 +128,8 @@ class TestSaturationLevel:
         zone_a: Zone,
         default_config: Stage4Config,
     ) -> None:
-        """Sin modelo especializado, el Context Engine NO genera saturation_level (ADR-004)."""
+        """Sin modelo especializado, el Context Engine emite saturation_level
+        como densidad proyectada / capacidad (fallback universal)."""
         stage3_result = _build_stage3_result(
             peak_phase, active_day_phase, timestamp,
             {zone_a.id: (500, FlowRestriction.OPEN)},
@@ -139,7 +140,7 @@ class TestSaturationLevel:
         states = derive_zone_states(
             stage3_result, [zone_a], [], evaluation_result, default_config
         )
-        assert states[0].saturation_level is None
+        assert states[0].saturation_level == pytest.approx(1.0)
 
     def test_projected_density_is_context_common(
         self,
@@ -180,7 +181,7 @@ class TestSaturationLevel:
             stage3_result, [zone_a], [], evaluation_result, default_config
         )
         assert states[0].projected_density == 0
-        assert states[0].saturation_level is None
+        assert states[0].saturation_level == pytest.approx(0.0)
 
 
 class TestAvailability:
@@ -590,7 +591,7 @@ class TestMultiZone:
 
         s_a = state_map[zone_a.id]
         assert s_a.operational_state == "REGULATED"
-        assert s_a.saturation_level is None
+        assert s_a.saturation_level == pytest.approx(0.7)
         assert s_a.availability is None
         assert s_a.confidence is None
         assert s_a.projected_density == 350
@@ -598,7 +599,7 @@ class TestMultiZone:
 
         s_b = state_map[zone_b.id]
         assert s_b.operational_state == "CLOSED"
-        assert s_b.saturation_level is None
+        assert s_b.saturation_level == pytest.approx(0.9)
         assert s_b.availability is None
         assert s_b.confidence is None
         assert s_b.projected_density == 1800

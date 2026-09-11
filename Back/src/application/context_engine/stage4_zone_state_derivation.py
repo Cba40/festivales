@@ -66,6 +66,8 @@ def derive_zone_states(
         saturation_level = (
             model_data.get("saturation_level") if model_data is not None else None
         )
+        if saturation_level is None:
+            saturation_level = _density_ratio(projected_density, capacity)
         availability = (
             model_data.get("availability") if model_data is not None else None
         )
