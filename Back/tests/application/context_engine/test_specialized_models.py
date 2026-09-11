@@ -258,7 +258,7 @@ class TestIntensityDelivery:
         parking_state = next(
             s for s in result.zone_states if s.zone_id == zones[0].id
         )
-        assert parking_state.saturation_level == pytest.approx(0.8)
+        assert parking_state.saturation_level is None
 
 
 class TestSpecificResult:
@@ -366,7 +366,7 @@ class TestNoUniversalFields:
             s for s in result.zone_states if s.zone_id == zones[0].id
         )
         assert parking_state.availability is None
-        assert parking_state.saturation_level == pytest.approx(0.8)
+        assert parking_state.saturation_level is None
         assert parking_state.estimated_wait is None
         assert parking_state.confidence is None
         assert parking_state.model_result == {"free_spaces": 12}

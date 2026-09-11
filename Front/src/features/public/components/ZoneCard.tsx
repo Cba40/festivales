@@ -79,10 +79,20 @@ interface ZoneCardProps {
 }
 
 export const ZoneCard = React.memo(function ZoneCard({ zone }: ZoneCardProps) {
-  const satVal = zone.saturation_level ?? 0;
-  const satLevel = getSaturationLevel(satVal);
+  const satVal = zone.saturation_level;
+  const hasSaturation = satVal !== null && satVal !== undefined;
+  const satLevel = hasSaturation
+    ? getSaturationLevel(satVal)
+    : {
+        label: 'Sin datos',
+        color: '#94a3b8',
+        bgLight: 'bg-slate-50',
+        barColor: 'bg-slate-300',
+        textColor: 'text-slate-600',
+        borderColor: 'border-slate-200',
+      };
   const IconComponent = getZoneIcon(zone.type || zone.subtipo || '');
-  const isHighDemand = satVal >= 0.8;
+  const isHighDemand = hasSaturation && satVal >= 0.8;
   const displayName = zone.name || zone.type || 'Zona';
   const displayType = (zone.type || zone.subtipo || '').replace(/_/g, ' ');
 
@@ -115,28 +125,32 @@ export const ZoneCard = React.memo(function ZoneCard({ zone }: ZoneCardProps) {
               {zone.active_restriction}
             </span>
           )}
-          <span
-            className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${satLevel.textColor} ${satLevel.borderColor} ${satLevel.bgLight}`}
-            aria-label={`Saturación: ${satLevel.label}`}
-          >
+          {hasSaturation && (
             <span
-              className="w-1.5 h-1.5 rounded-full shrink-0"
-              style={{ backgroundColor: satLevel.color }}
-              aria-hidden="true"
-            />
-            {satLevel.label}
-          </span>
+              className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${satLevel.textColor} ${satLevel.borderColor} ${satLevel.bgLight}`}
+              aria-label={`Saturación: ${satLevel.label}`}
+            >
+              <span
+                className="w-1.5 h-1.5 rounded-full shrink-0"
+                style={{ backgroundColor: satLevel.color }}
+                aria-hidden="true"
+              />
+              {satLevel.label}
+            </span>
+          )}
         </div>
       </div>
 
-      <div className="mb-3">
-        <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden" role="progressbar" aria-valuenow={Math.round(satVal * 100)} aria-valuemin={0} aria-valuemax={100} aria-label={`Saturación ${Math.round(satVal * 100)}%`}>
-          <div
-            className={`h-full rounded-full transition-all duration-500 ${satLevel.barColor}`}
-            style={{ width: `${Math.min(satVal * 100, 100)}%` }}
-          />
+      {hasSaturation && (
+        <div className="mb-3">
+          <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden" role="progressbar" aria-valuenow={Math.round(satVal * 100)} aria-valuemin={0} aria-valuemax={100} aria-label={`Saturación ${Math.round(satVal * 100)}%`}>
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${satLevel.barColor}`}
+              style={{ width: `${Math.min(satVal * 100, 100)}%` }}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       {isHighDemand && (
         <div className="flex items-center gap-1.5 mb-2">
@@ -148,7 +162,7 @@ export const ZoneCard = React.memo(function ZoneCard({ zone }: ZoneCardProps) {
       <div className="grid grid-cols-3 gap-2">
         <div className="bg-white/70 rounded-lg p-2 text-center border border-slate-100">
           <Users size={14} className="text-slate-400 mx-auto mb-0.5" aria-hidden="true" />
-          <div className="text-xs font-bold text-slate-700">{satVal.toFixed(2)}</div>
+          <div className="text-xs font-bold text-slate-700">{hasSaturation ? satVal.toFixed(2) : '—'}</div>
           <div className="text-[9px] text-slate-400 font-medium">Saturación</div>
         </div>
         <div className="bg-white/70 rounded-lg p-2 text-center border border-slate-100">
