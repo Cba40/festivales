@@ -8,15 +8,19 @@ from src.domain.entities.zone_behavior import FlowRestriction
 from src.domain.value_objects.territorial_prediction import TerritorialPrediction
 from src.domain.value_objects.zone_state import ZoneState
 from src.infrastructure.persistence.models import PredictionModel
-from src.infrastructure.persistence.repositories import SQLPredictionRepository
+from src.infrastructure.persistence.repositories.prediction_repository import (
+    SQLPredictionRepository,
+)
 
 A_UUID = UUID("11111111-1111-1111-1111-111111111111")
 B_UUID = UUID("22222222-2222-2222-2222-222222222222")
 C_UUID = UUID("33333333-3333-3333-3333-333333333333")
+DAY = "99999999-9999-9999-9999-999999999999"
 
 
 def _make_prediction(
     timestamp: datetime | None = None,
+    event_day_id: str | None = None,
 ) -> TerritorialPrediction:
     zone_states = [
         ZoneState(
@@ -45,15 +49,18 @@ def _make_prediction(
         zone_states=zone_states,
         active_phase_id=C_UUID,
         active_event_day_phase_id=A_UUID,
+        event_day_id=event_day_id,
     )
 
 
 def _make_prediction_model(
     timestamp: datetime | None = None,
+    event_day_id: str | None = None,
 ) -> PredictionModel:
     model = PredictionModel(
         id=uuid4(),
         timestamp=timestamp or datetime(2026, 7, 10, 10, 0, 0),
+        event_day_id=event_day_id,
         active_phase_id=C_UUID,
         active_event_day_phase_id=A_UUID,
         zone_states_data=[
@@ -139,6 +146,20 @@ class TestSQLPredictionRepositorySave:
 
         session.rollback.assert_not_called()
 
+    async def test_save_persists_event_day_id(self) -> None:
+        session = AsyncMock()
+        session.add = MagicMock()
+        session.flush = AsyncMock()
+        session.refresh = AsyncMock()
+
+        prediction = _make_prediction(event_day_id=DAY)
+        repo = SQLPredictionRepository(session)
+
+        await repo.save(prediction)
+
+        model = session.add.call_args.args[0]
+        assert model.event_day_id == DAY
+
 
 class TestSQLPredictionRepositoryFind:
     async def test_find_by_timestamp_returns_prediction(self) -> None:
@@ -206,6 +227,45 @@ class TestSQLPredictionRepositoryFind:
         await repo.find_by_timestamp(datetime(2026, 7, 10, 10, 0, 0))
 
         session.execute.assert_awaited_once()
+
+    async def test_find_by_event_day_id_returns_prediction_with_event_day_id(
+        self,
+    ) -> None:
+        session = AsyncMock()
+        scalars_result = MagicMock()
+        scalars_result.all.return_value = [_make_prediction_model(
+            datetime(2026, 7, 10, 10, 0, 0),
+            event_day_id=DAY,
+        )]
+        scalar_result = MagicMock()
+        scalar_result.scalars = MagicMock(return_value=scalars_result)
+        session.execute = AsyncMock(return_value=scalar_result)
+
+        repo = SQLPredictionRepository(session)
+
+        result = await repo.find_by_event_day_id(DAY)
+
+        assert result is not None
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0].event_day_id == DAY
+
+    async def test_find_by_event_day_id_filters_by_event_day(self) -> None:
+        session = AsyncMock()
+        scalars_result = MagicMock()
+        scalars_result.all.return_value = []
+        scalar_result = MagicMock()
+        scalar_result.scalars = MagicMock(return_value=scalars_result)
+        session.execute = AsyncMock(return_value=scalar_result)
+
+        repo = SQLPredictionRepository(session)
+
+        await repo.find_by_event_day_id(DAY)
+
+        call_args = session.execute.call_args[0][0]
+        compiled = str(call_args.compile(compile_kwargs={"literal_binds": True}))
+        assert "predictions" in compiled
+        assert DAY in compiled
 
     def test_implements_prediction_repository_port(self) -> None:
         from src.domain.ports.prediction_repository import PredictionRepository

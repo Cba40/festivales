@@ -5,7 +5,7 @@ All DB access is mocked — only the route's HTTP contract is tested.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID
 
 import pytest
@@ -18,6 +18,13 @@ from app.main import app
 from src.domain.value_objects.territorial_prediction import TerritorialPrediction
 from src.domain.value_objects.zone_state import ZoneState
 from src.domain.entities.zone_behavior import FlowRestriction
+from src.infrastructure.persistence.models import PredictionModel
+from src.interfaces.rest.predictions import get_territorial_prediction_adapter
+from tests.infrastructure.composition.test_prediction_module import (
+    CapturingEngine,
+    EVENT_ID as PREDICTION_MODULE_EVENT_ID,
+    _mock_full_flow_session,
+)
 
 EVENT_ID = "test-event-1"
 BASE_URL = f"/api/events/{EVENT_ID}"
@@ -248,3 +255,45 @@ class TestPredictionsEndpoint:
         body = resp.json()
         expected = sample_prediction.timestamp.isoformat()
         assert body["timestamp"] == expected
+
+
+class TestPublicEndpointNoPredictionPersistence:
+    """El endpoint público no persiste predicciones.
+
+    Ejecuta el flujo real (get_territorial_prediction_adapter ->
+    PredictionModule{persist=False}) e inyecta SQLPredictionRepository para
+    probar que ni se instancia (luego save() nunca corre) y que ninguna fila
+    de `predictions` (PredictionModel) se empaqueta en la sesión.
+    Nota: flush/commit de nivel sesión siguen existiendo en el camino previo
+    de versionado del knowledge model (KnowledgeModelSnapshotService), ajeno y
+    anterior a la persistencia de predicciones; la regla verificada aquí es
+    que la predicción del endpoint público no se persiste.
+    """
+
+    async def test_full_flow_never_engages_prediction_persistence(
+        self,
+    ) -> None:
+        session = _mock_full_flow_session()
+        with patch(
+            "src.infrastructure.composition.prediction_module.ContextEngine",
+            return_value=CapturingEngine(),
+        ), patch(
+            "src.infrastructure.composition.prediction_module.SQLPredictionRepository"
+        ) as sql_repo_cls:
+            prediction = await get_territorial_prediction_adapter(
+                session,
+                timestamp=datetime(2026, 7, 15, 15, 0, tzinfo=timezone.utc),
+                event_id=PREDICTION_MODULE_EVENT_ID,
+            )
+
+        assert prediction is not None
+        assert prediction.event_day_id is None
+
+        sql_repo_cls.assert_not_called()
+
+        staged_models = [
+            c.args[0]
+            for c in session.add.call_args_list
+            if isinstance(c.args[0], PredictionModel)
+        ]
+        assert staged_models == []

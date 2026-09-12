@@ -50,6 +50,9 @@ from src.infrastructure.composition.adapters.operational_event_adapter import (
 from src.infrastructure.persistence.repositories.knowledge_model_version_repository import (
     SQLKnowledgeModelVersionRepository,
 )
+from src.infrastructure.persistence.repositories.prediction_repository import (
+    SQLPredictionRepository,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -419,6 +422,7 @@ class PredictionModule:
         *,
         timestamp: datetime,
         event_id: str,
+        persist: bool = False,
     ) -> TerritorialPrediction | None:
         local_ts = timestamp.astimezone(LOCAL_TZ)
         type_map = await _load_zone_type_map(self._db)
@@ -484,4 +488,27 @@ class PredictionModule:
             config=stage4_config,
         )
 
+        if persist and prediction is not None:
+            await self._persist_prediction(prediction, event_day)
+
         return prediction
+
+    async def _persist_prediction(
+        self,
+        prediction: TerritorialPrediction,
+        event_day: EventDay,
+    ) -> None:
+        """Persiste la predicción con event_day_id sin confirmar la transacción.
+
+        Reconstruye el VO para transportar event_day_id (el assembly de Stage 5
+        no lo propaga); el commit/rollback corresponde al servicio coordinador.
+        """
+        persistable = TerritorialPrediction(
+            timestamp=prediction.timestamp,
+            zone_states=prediction.zone_states,
+            active_phase_id=prediction.active_phase_id,
+            active_event_day_phase_id=prediction.active_event_day_phase_id,
+            event_day_id=str(event_day.id),
+            knowledge_model_version_id=prediction.knowledge_model_version_id,
+        )
+        await SQLPredictionRepository(self._db).save(persistable)

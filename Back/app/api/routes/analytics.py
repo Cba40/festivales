@@ -47,6 +47,7 @@ from src.domain.entities.recommendation_enums import (
 )
 from app.models.event_day import EventDay
 from app.models.operational_phase import OperationalPhase
+from src.infrastructure.composition.prediction_module import PredictionModule
 from app.schemas.analytics import (
     AnomalyResponse,
     EvaluationRequest,
@@ -55,7 +56,7 @@ from app.schemas.analytics import (
     RecommendationCreatedResponse,
 )
 from uuid import UUID, uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -466,6 +467,35 @@ def _build_recommendation(
     )
 
 
+async def _capture_prediction(
+    session: AsyncSession,
+    event_id: str,
+    timestamp: datetime,
+) -> None:
+    """Genera y persiste una predicción para la evaluación L&A (Camino A).
+
+    PredictionModule(persist=True) ejecuta el flujo completo y delega el save
+    (flush sin commit) a SQLPredictionRepository; el commit y el rollback
+    pertenecen a este servicio coordinador.
+    """
+    try:
+        prediction = await PredictionModule(session).execute(
+            timestamp=timestamp,
+            event_id=event_id,
+            persist=True,
+        )
+    except Exception:
+        await session.rollback()
+        raise
+    if prediction is None:
+        logger.warning(
+            "L&A capture: no se pudo generar predicción (event_id=%s); "
+            "las métricas que dependen de predicciones quedarán BLOCKED.",
+            event_id,
+        )
+    await session.commit()
+
+
 @router.post("/evaluate", response_model=EvaluationResponse)
 async def evaluate_metrics(
     request: EvaluationRequest,
@@ -480,10 +510,10 @@ async def evaluate_metrics(
     )
 
     # 1. Validar que event_day y phase existan
-    day_result = await db.execute(
-        select(EventDay).where(EventDay.id == request.event_day_id)
-    )
-    if day_result.scalar_one_or_none() is None:
+    day_row = (
+        await db.execute(select(EventDay).where(EventDay.id == request.event_day_id))
+    ).scalar_one_or_none()
+    if day_row is None:
         raise HTTPException(status_code=404, detail="EventDay no encontrado")
 
     try:
@@ -497,7 +527,23 @@ async def evaluate_metrics(
     if phase_result.scalar_one_or_none() is None:
         raise HTTPException(status_code=404, detail="Phase no encontrada")
 
-    # 2. Ejecutar MetricService.calculate_all
+    # 2. Capturar una predicción persistible para la evaluación L&A (Camino A)
+    try:
+        await _capture_prediction(
+            db,
+            event_id=day_row.event_id,
+            timestamp=datetime.now(timezone.utc),
+        )
+    except Exception as exc:
+        logger.exception(
+            "Fallo al capturar predicción en evaluación L&A: %s", exc
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Error interno al capturar predicción para la evaluación",
+        )
+
+    # 3. Ejecutar MetricService.calculate_all
     #    phase_id alineado: el mismo UUID validado en OperationalPhase se pasa en
     #    forma canónica; MetricService filtra ZoneBehaviorModel.operational_phase_id.
     try:
@@ -526,10 +572,10 @@ async def evaluate_metrics(
         for r in results
     ]
 
-    # 3. Detectar anomalías
+    # 5. Detectar anomalías
     anomalies = AnomalyDetector().detect_all(results)
 
-    # 4. Crear una recomendación por anomalía; un fallo individual no rompe el flujo
+    # 6. Crear una recomendación por anomalía; un fallo individual no rompe el flujo
     workflow_service = await _get_workflow_service(db)
     recommendations_created: list[RecommendationCreatedResponse] = []
     for anomaly in anomalies:
@@ -556,7 +602,7 @@ async def evaluate_metrics(
             )
             continue
 
-    # 5. Resumen completo
+    # 7. Resumen completo
     return EvaluationResponse(
         metrics=metrics,
         anomalies_detected=len(anomalies),

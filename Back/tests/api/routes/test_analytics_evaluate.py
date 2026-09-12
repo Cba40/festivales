@@ -6,13 +6,16 @@ de la ruta y la lógica de anomalías/recomendaciones.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 from jose import jwt
+from sqlalchemy.exc import IntegrityError
 
+from app.api.routes.analytics import _capture_prediction
 from app.core.config import settings
 from app.db.session import get_async_db
 from app.main import app
@@ -23,6 +26,7 @@ from src.domain.entities.recommendation_enums import RecommendationStatus, Recom
 ENDPOINT = "/api/analytics/evaluate"
 EVENT_DAY = "test-day-0001"
 PHASE = "22222222-2222-2222-2222-222222222222"
+EVENT_ID = "event-1"
 
 
 def _metric(
@@ -136,10 +140,20 @@ def client() -> TestClient:
 
 
 @pytest.fixture
+def _capture_prediction_mock():
+    with patch(
+        "app.api.routes.analytics._capture_prediction",
+        new_callable=AsyncMock,
+    ) as m:
+        m.return_value = None
+        yield m
+
+
+@pytest.fixture
 def db_mock() -> AsyncMock:
     db = AsyncMock()
     found = MagicMock()
-    found.scalar_one_or_none.return_value = object()
+    found.scalar_one_or_none.return_value = SimpleNamespace(event_id=EVENT_ID)
     db.execute.return_value = found
 
     async def override():
@@ -181,7 +195,7 @@ class TestEvaluationEndpoint:
         auth_headers: dict[str, str],
     ):
         found = MagicMock()
-        found.scalar_one_or_none.return_value = object()
+        found.scalar_one_or_none.return_value = SimpleNamespace(event_id=EVENT_ID)
         missing = MagicMock()
         missing.scalar_one_or_none.return_value = None
         db_mock.execute.side_effect = [found, missing]
@@ -200,7 +214,7 @@ class TestEvaluationEndpoint:
         auth_headers: dict[str, str],
     ):
         found = MagicMock()
-        found.scalar_one_or_none.return_value = object()
+        found.scalar_one_or_none.return_value = SimpleNamespace(event_id=EVENT_ID)
         db_mock.execute.return_value = found
 
         resp = client.post(
@@ -217,6 +231,7 @@ class TestEvaluationEndpoint:
         auth_headers: dict[str, str],
         _metric_service: AsyncMock,
         _workflow_service: MagicMock,
+        _capture_prediction_mock: AsyncMock,
     ):
         _metric_service.return_value = _results_no_anomalies()
 
@@ -247,6 +262,7 @@ class TestEvaluationEndpoint:
         auth_headers: dict[str, str],
         _metric_service: AsyncMock,
         _workflow_service: MagicMock,
+        _capture_prediction_mock: AsyncMock,
     ):
         _metric_service.return_value = _results_with_anomalies()
         _workflow_service.create_recommendation.return_value = _fake_recommendation(
@@ -280,6 +296,7 @@ class TestEvaluationEndpoint:
         auth_headers: dict[str, str],
         _metric_service: AsyncMock,
         _workflow_service: MagicMock,
+        _capture_prediction_mock: AsyncMock,
     ):
         _metric_service.return_value = _results_all_blocked()
 
@@ -304,6 +321,7 @@ class TestEvaluationEndpoint:
         auth_headers: dict[str, str],
         _metric_service: AsyncMock,
         _workflow_service: MagicMock,
+        _capture_prediction_mock: AsyncMock,
     ):
         _metric_service.return_value = _results_two_anomalies()
         second_fake = _fake_recommendation("zone_behavior_adherence")
@@ -334,6 +352,7 @@ class TestEvaluationEndpoint:
         db_mock: AsyncMock,
         auth_headers: dict[str, str],
         _metric_service: AsyncMock,
+        _capture_prediction_mock: AsyncMock,
     ):
         _metric_service.side_effect = RuntimeError("motor caído")
 
@@ -343,6 +362,103 @@ class TestEvaluationEndpoint:
             headers=auth_headers,
         )
         assert resp.status_code == 500
+
+    def test_capture_prediction_runs_before_metrics(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+        _metric_service: AsyncMock,
+        _workflow_service: MagicMock,
+        _capture_prediction_mock: AsyncMock,
+    ):
+        results = _results_no_anomalies()
+        order: list[str] = []
+        calc_all = _metric_service
+        calc_all.side_effect = lambda *a, **k: (order.append("metrics"), results)[1]
+        _capture_prediction_mock.side_effect = lambda *a, **k: order.append(
+            "capture"
+        )
+
+        resp = client.post(
+            ENDPOINT,
+            json={"event_day_id": EVENT_DAY, "phase_id": PHASE},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        assert order == ["capture", "metrics"]
+
+        _capture_prediction_mock.assert_awaited_once()
+        call = _capture_prediction_mock.await_args
+        assert call.args[0] is db_mock
+        assert call.kwargs["event_id"] == EVENT_ID
+        assert call.kwargs["timestamp"] is not None
+
+        calc_all.assert_awaited_once_with(EVENT_DAY, PHASE)
+
+    def test_500_when_capture_prediction_fails(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+        _metric_service: AsyncMock,
+        _capture_prediction_mock: AsyncMock,
+    ):
+        _capture_prediction_mock.side_effect = RuntimeError("fallo al capturar")
+
+        resp = client.post(
+            ENDPOINT,
+            json={"event_day_id": EVENT_DAY, "phase_id": PHASE},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 500
+        assert "capturar predicción" in resp.json()["detail"]
+        _metric_service.assert_not_awaited()
+
+
+class TestCapturePrediction:
+    """Contrato transaccional de _capture_prediction (Camino A)."""
+
+    async def test_success_persists_and_commits(self) -> None:
+        session = AsyncMock()
+        ts = datetime.now(timezone.utc)
+        execute = AsyncMock(return_value=MagicMock())
+        with patch("app.api.routes.analytics.PredictionModule") as module_cls:
+            module_cls.return_value.execute = execute
+            await _capture_prediction(session, event_id=EVENT_ID, timestamp=ts)
+
+        execute.assert_awaited_once_with(
+            timestamp=ts,
+            event_id=EVENT_ID,
+            persist=True,
+        )
+        session.commit.assert_awaited_once()
+        session.rollback.assert_not_awaited()
+
+    async def test_none_prediction_still_commits(self) -> None:
+        session = AsyncMock()
+        execute = AsyncMock(return_value=None)
+        with patch("app.api.routes.analytics.PredictionModule") as module_cls:
+            module_cls.return_value.execute = execute
+            await _capture_prediction(session, event_id=EVENT_ID, timestamp=datetime.now(timezone.utc))
+
+        session.commit.assert_awaited_once()
+        session.rollback.assert_not_awaited()
+
+    async def test_failure_rolls_back_and_reraises(self) -> None:
+        session = AsyncMock()
+        execute = AsyncMock(side_effect=IntegrityError("stmt", {}, "dup"))
+        with patch("app.api.routes.analytics.PredictionModule") as module_cls:
+            module_cls.return_value.execute = execute
+            with pytest.raises(IntegrityError):
+                await _capture_prediction(
+                    session,
+                    event_id=EVENT_ID,
+                    timestamp=datetime.now(timezone.utc),
+                )
+
+        session.rollback.assert_awaited_once()
+        session.commit.assert_not_awaited()
 
 
 class TestAnomalyDetectorUnit:

@@ -23,6 +23,7 @@ from src.infrastructure.composition.prediction_module import (
     PredictionModule,
     _to_uuid_or_none,
 )
+from src.infrastructure.persistence.models import PredictionModel
 
 EVENT_ID = "event-1"
 DAY_IDS = {
@@ -69,6 +70,15 @@ def _one_result(row):
     return result
 
 
+def _first_result(model):
+    """Result para queries que usan `.scalars().first()`."""
+    result = MagicMock()
+    scalars_mock = MagicMock()
+    scalars_mock.first = MagicMock(return_value=model)
+    result.scalars = MagicMock(return_value=scalars_mock)
+    return result
+
+
 class CapturingEngine:
     """Reemplaza ContextEngine para capturar los datos que llegan al dominio."""
 
@@ -86,6 +96,8 @@ class CapturingEngine:
         attendance_level,
         event_day,
         events,
+        config=None,
+        knowledge_model_version_id=None,
     ) -> TerritorialPrediction:
         self.captured_event_day = event_day
         self.captured_zones = list(zones)
@@ -182,6 +194,19 @@ def _mock_full_flow_session(
         )
     ]
 
+    recommendation_row = SimpleNamespace(
+        low_density_saturation_threshold=1.5,
+        low_density_reasoning_threshold=1.2,
+        regulated_penalty=0.05,
+        vip_bonus=-0.02,
+        staff_bonus=-0.03,
+        mobility_penalty=0.10,
+    )
+    stage4_row = SimpleNamespace(
+        saturation_high_threshold=0.9,
+        saturation_moderate_threshold=0.5,
+    )
+
     execute_calls = [
         _scalars_result(zone_type_rows),
         _one_result(ref_row),
@@ -192,10 +217,18 @@ def _mock_full_flow_session(
     if attendance_level_id is not None:
         execute_calls.append(_scalar_one_result(attendance_row))
     execute_calls.append(_scalars_result(phase_rows))
+    # Snapshot KM: recommendation_config + stage4_config (`.scalars().first()`)
+    # y zone_behaviors (`.scalars().all()`), luego version y stage4 defaults.
+    execute_calls.append(_first_result(recommendation_row))
+    execute_calls.append(_first_result(stage4_row))
+    execute_calls.append(_scalars_result([]))
+    execute_calls.append(_scalar_one_result(None))  # knowledge_model_versions
+    execute_calls.append(_scalar_one_result(None))  # stage4_config (default)
     # operational_events (OperationalEventAdapter): sin eventos activos.
     execute_calls.append(_scalars_result([]))
 
     session.execute = AsyncMock(side_effect=execute_calls)
+    session.add = MagicMock()
     return session
 
 
@@ -260,3 +293,56 @@ class TestPredictionModuleFullFlow:
         assert prediction is not None
         assert engine.captured_event_day is not None
         assert engine.captured_event_day.attendance_level_id is None
+
+
+class TestPredictionModulePersistence:
+    """L&A — persistencia controlada de predicciones (Camino A).
+
+    PredictionModule(execute, persist=True) guarda la predicción con
+    event_day_id vía SQLPredictionRepository (flush, sin commit propio); el
+    commit pertenece al servicio coordinador (KnowledgeModelSnapshotService ya
+    confirma su propia transacción KM, que es independiente).
+    """
+
+    def _added_prediction_models(self, session) -> list[PredictionModel]:
+        return [
+            c.args[0]
+            for c in session.add.call_args_list
+            if isinstance(c.args[0], PredictionModel)
+        ]
+
+    async def test_execute_persist_true_persists_prediction_with_event_day_id(
+        self,
+    ) -> None:
+        session = _mock_full_flow_session()
+        module = PredictionModule(session)
+        prediction = await module.execute(
+            timestamp=datetime(2026, 7, 15, 15, 0, tzinfo=timezone.utc),
+            event_id=EVENT_ID,
+            persist=True,
+        )
+
+        assert prediction is not None
+
+        models = self._added_prediction_models(session)
+        assert len(models) == 1
+        model = models[0]
+        assert model.event_day_id == DAY_IDS["id"]
+        assert model.timestamp is not None
+        assert model.active_phase_id is not None
+
+        session.flush.assert_awaited()
+        session.refresh.assert_awaited()
+
+    async def test_execute_persist_false_does_not_persist_prediction(self) -> None:
+        session = _mock_full_flow_session()
+        module = PredictionModule(session)
+        prediction = await module.execute(
+            timestamp=datetime(2026, 7, 15, 15, 0, tzinfo=timezone.utc),
+            event_id=EVENT_ID,
+            persist=False,
+        )
+
+        assert prediction is not None
+        assert self._added_prediction_models(session) == []
+        assert prediction.event_day_id is None
