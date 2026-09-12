@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import String, Text, Uuid, Integer, Boolean, DateTime, JSON
+from sqlalchemy import String, Text, Uuid, Integer, Boolean, DateTime, JSON, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -13,7 +13,9 @@ from app.db.session import Base
 class ConfigurationRecommendation(Base):
     __tablename__ = "configuration_recommendations"
 
-    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    id: Mapped[UUID] = mapped_column(
+        Uuid, primary_key=True, server_default=text("gen_random_uuid()")
+    )
     target_entity_type: Mapped[str] = mapped_column(String(50), nullable=False)
     target_entity_id: Mapped[Optional[str]] = mapped_column(String(36))
     proposed_change: Mapped[str] = mapped_column(Text, nullable=False)
@@ -25,7 +27,7 @@ class ConfigurationRecommendation(Base):
     generated_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=datetime.now
     )
-    km_version_analyzed: Mapped[Optional[str]] = mapped_column(String(36))
+    km_version_analyzed: Mapped[Optional[UUID]] = mapped_column(Uuid)
     algorithm_version: Mapped[Optional[str]] = mapped_column(String(50))
     event_ids: Mapped[list] = mapped_column(JSON, nullable=False)
     resolved_by: Mapped[Optional[str]] = mapped_column(String(100))

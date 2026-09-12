@@ -23,7 +23,7 @@ class SQLConfigurationRecommendationRepository:
                 recommendation_confidence=recommendation.recommendation_confidence,
                 status=recommendation.status.value,
                 generated_at=recommendation.generated_at,
-                km_version_analyzed=str(recommendation.km_version_analyzed) if recommendation.km_version_analyzed else None,
+                km_version_analyzed=UUID(recommendation.km_version_analyzed) if recommendation.km_version_analyzed else None,
                 algorithm_version=recommendation.algorithm_version,
                 event_ids=recommendation.event_ids,
                 resolved_by=recommendation.resolved_by,
