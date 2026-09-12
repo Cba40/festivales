@@ -41,3 +41,16 @@ class SQLPredictionRepository(PredictionRepository):
         if model is None:
             return None
         return prediction_to_domain(model)
+
+    async def find_by_event_day_id(
+        self,
+        event_day_id: str,
+    ) -> list[TerritorialPrediction]:
+        stmt = (
+            select(PredictionModel)
+            .where(PredictionModel.event_day_id == event_day_id)
+            .order_by(PredictionModel.timestamp)
+        )
+        result = await self._session.execute(stmt)
+        models = result.scalars().all()
+        return [prediction_to_domain(model) for model in models]

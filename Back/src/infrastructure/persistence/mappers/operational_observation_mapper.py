@@ -15,7 +15,7 @@ def observation_to_model(entity: OperationalObservation) -> OperationalObservati
         observed_density=entity.observed_density,
         observer_id=entity.observer_id,
         source=entity.source,
-        metadata=entity.metadata,
+        metadata_=entity.metadata,
         created_at=entity.created_at,
     )
 
@@ -29,6 +29,6 @@ def observation_to_domain(model: OperationalObservationModel) -> OperationalObse
         observed_density=model.observed_density,
         observer_id=model.observer_id,
         source=model.source,
-        metadata=model.metadata,
+        metadata=model.metadata_,
         created_at=model.created_at,
     )

@@ -15,3 +15,9 @@ class PredictionRepository(Protocol):
         timestamp: datetime,
     ) -> TerritorialPrediction | None:
         ...
+
+    async def find_by_event_day_id(
+        self,
+        event_day_id: str,
+    ) -> list[TerritorialPrediction]:
+        ...
