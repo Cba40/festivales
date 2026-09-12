@@ -303,6 +303,42 @@ export interface MetricsStatusDTO {
   zone_behavior_adherence: string;
 }
 
+export type MetricStatus = 'ENABLED' | 'LIMITED' | 'BLOCKED';
+export type AnomalySeverity = 'high' | 'medium' | 'low';
+
+export interface MetricResultResponse {
+  name: string;
+  display_name: string;
+  status: MetricStatus;
+  value: number | null;
+  reason: string;
+  data_points: number;
+  limitations: string[];
+  is_provisional: boolean;
+}
+
+export interface AnomalyResponse {
+  metric_name: string;
+  severity: AnomalySeverity;
+  description: string;
+  suggested_action: string;
+  value: number | null;
+  is_provisional: boolean;
+}
+
+export interface RecommendationCreatedDTO {
+  id: string;
+  status: string;
+  metric_name: string;
+}
+
+export interface EvaluationResponse {
+  metrics: MetricResultResponse[];
+  anomalies_detected: number;
+  anomalies: AnomalyResponse[];
+  recommendations_created: RecommendationCreatedDTO[];
+}
+
 export interface ConfigurationRecommendationDTO {
   id: string;
   target_entity_type: string;

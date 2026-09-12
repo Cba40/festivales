@@ -1,11 +1,22 @@
 import { useCallback, useEffect, useState } from 'react';
-import { X } from 'lucide-react';
+import { AlertTriangle, X } from 'lucide-react';
 import {
   useAuditLog,
   useRecommendations,
   useResolveRecommendation,
 } from '@/hooks/useAnalytics';
-import type { ConfigurationRecommendationDTO } from '@/features/dashboard/types';
+import { useMetricsEvaluation } from '@/hooks/useMetricsEvaluation';
+import { apiClient } from '@/core/api/client';
+import { endpoints } from '@/core/api/endpoints';
+import { EVENT_ID } from '@/components/context-engine/constants';
+import type {
+  AnomalySeverity,
+  ConfigurationRecommendationDTO,
+  EventDaySummary,
+  MetricResultResponse,
+  MetricStatus,
+  OperationalPhaseDTO,
+} from '@/features/dashboard/types';
 import { Badge, Button, Card, RefreshButton } from '@/features/dashboard/components/ui';
 import { truncateId } from '@/features/dashboard/utils/format';
 import type { BadgeVariant } from '@/features/dashboard/components/ui/Badge';
@@ -198,6 +209,214 @@ function RecDetailModal({ recommendation, onClose, onResolved }: RecDetailModalP
   );
 }
 
+const METRIC_STATUS_CLASSES: Record<MetricStatus, string> = {
+  ENABLED: 'bg-emerald-100 text-emerald-800',
+  LIMITED: 'bg-amber-100 text-amber-800',
+  BLOCKED: 'bg-slate-100 text-slate-800',
+};
+
+const SEVERITY_LABELS: Record<AnomalySeverity, string> = {
+  high: 'Alta',
+  medium: 'Media',
+  low: 'Baja',
+};
+
+function MetricCard({ metric }: { metric: MetricResultResponse }) {
+  return (
+    <div className="border border-slate-200 rounded-lg p-4 flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <h4 className="font-semibold text-slate-800 text-sm">{metric.display_name}</h4>
+        <span
+          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${METRIC_STATUS_CLASSES[metric.status]}`}
+        >
+          {metric.status}
+        </span>
+      </div>
+
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-2xl font-bold text-slate-900">
+          {metric.value !== null ? metric.value.toFixed(2) : 'N/A'}
+        </span>
+        {metric.is_provisional && (
+          <span
+            title="Fórmula y umbrales provisionales en esta etapa del sistema"
+            className="text-[10px] font-bold px-2 py-0.5 rounded-full border inline-flex items-center gap-1 bg-amber-50 text-amber-700 border-amber-200"
+          >
+            <AlertTriangle className="w-3 h-3" />
+            Fórmula provisional
+          </span>
+        )}
+      </div>
+
+      <p className="text-xs text-slate-500">{metric.reason}</p>
+
+      {metric.limitations.length > 0 && (
+        <details className="text-xs text-slate-500">
+          <summary className="cursor-pointer hover:text-slate-700">
+            Limitaciones ({metric.limitations.length})
+          </summary>
+          <ul className="mt-1 space-y-1 list-disc pl-4">
+            {metric.limitations.map((limitation, index) => (
+              <li key={index}>{limitation}</li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function MetricsEvaluationCard() {
+  const { data, isEvaluating, error, evaluate } = useMetricsEvaluation();
+  const [eventDays, setEventDays] = useState<EventDaySummary[]>([]);
+  const [phases, setPhases] = useState<OperationalPhaseDTO[]>([]);
+  const [eventDayId, setEventDayId] = useState('');
+  const [phaseId, setPhaseId] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    apiClient
+      .get<EventDaySummary[]>(endpoints.eventDays.list(EVENT_ID))
+      .then((res) => {
+        if (cancelled) return;
+        const days = res.data ?? [];
+        setEventDays(days);
+        const active = days.find((d) => d.is_active) ?? days[0];
+        if (active) setEventDayId(active.id);
+      })
+      .catch(() => {});
+
+    apiClient
+      .get<OperationalPhaseDTO[]>(endpoints.operationalPhases.list())
+      .then((res) => {
+        if (cancelled) return;
+        const phaseList = res.data ?? [];
+        setPhases(phaseList);
+        if (phaseList.length > 0) setPhaseId(phaseList[0].id);
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleEvaluate = useCallback(() => {
+    if (!eventDayId || !phaseId) return;
+    void evaluate(eventDayId, phaseId);
+  }, [eventDayId, phaseId, evaluate]);
+
+  const createdCount = data?.recommendations_created.length ?? 0;
+
+  return (
+    <Card variant="standard">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-bold text-slate-800">Evaluación de Métricas</h2>
+        <span className="text-xs text-slate-400">POST /api/analytics/evaluate</span>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <label className="block text-sm">
+          <span className="text-slate-700 font-medium">Jornada</span>
+          <select
+            value={eventDayId}
+            onChange={(e) => setEventDayId(e.target.value)}
+            className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          >
+            <option value="">Seleccionar jornada…</option>
+            {eventDays.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.date} {d.is_active ? '(Hoy)' : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="block text-sm">
+          <span className="text-slate-700 font-medium">Fase operativa</span>
+          <select
+            value={phaseId}
+            onChange={(e) => setPhaseId(e.target.value)}
+            className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          >
+            <option value="">Seleccionar fase…</option>
+            {phases.map((phase) => (
+              <option key={phase.id} value={phase.id}>
+                {phase.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="mt-4 flex items-center justify-between gap-2 flex-wrap">
+        <Button onClick={handleEvaluate} disabled={isEvaluating || !eventDayId || !phaseId}>
+          {isEvaluating ? 'Evaluando…' : 'Evaluar Métricas'}
+        </Button>
+        {data && !isEvaluating && (
+          <span className="text-xs text-slate-400">
+            {data.metrics.length} métricas · {data.anomalies_detected} anomalías · {createdCount}{' '}
+            recomendaciones
+          </span>
+        )}
+      </div>
+
+      {error && (
+        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      {data && (
+        <>
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {data.metrics.map((metric) => (
+              <MetricCard key={metric.name} metric={metric} />
+            ))}
+          </div>
+
+          {data.anomalies_detected > 0 && (
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <h4 className="font-bold text-red-800 text-sm mb-2">
+                {data.anomalies_detected} anomalía(s) detectada(s)
+              </h4>
+              <ul className="space-y-3">
+                {data.anomalies.map((anomaly, index) => (
+                  <li key={`${anomaly.metric_name}-${index}`} className="text-sm text-red-800">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold capitalize">
+                        {anomaly.metric_name.replace(/_/g, ' ')}
+                      </span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+                        Severidad {SEVERITY_LABELS[anomaly.severity]}
+                      </span>
+                      {anomaly.is_provisional && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border inline-flex items-center gap-1 bg-amber-50 text-amber-700 border-amber-200">
+                          <AlertTriangle className="w-3 h-3" />
+                          Uso provisional
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-red-900/70">{anomaly.description}</p>
+                    <p className="text-red-900/70 italic">Propuesta: {anomaly.suggested_action}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {createdCount > 0 && (
+            <div className="mt-3 p-3 bg-indigo-50 border border-indigo-200 rounded-lg text-sm text-indigo-800">
+              Se crearon {createdCount} recomendación(es). Revisalas en la lista de recomendaciones
+              a continuación.
+            </div>
+          )}
+        </>
+      )}
+    </Card>
+  );
+}
+
 export function AnalyticsScreen() {
   const {
     recommendations,
@@ -239,6 +458,8 @@ export function AnalyticsScreen() {
       {recsError && (
         <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{recsError}</div>
       )}
+
+      <MetricsEvaluationCard />
 
       <Card variant="standard">
         <div className="flex items-center justify-between mb-4">
