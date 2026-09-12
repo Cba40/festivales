@@ -54,14 +54,13 @@ class AnomalyDetector:
                 metric_name=result.name,
                 severity=self.SEVERITY_HIGH,
                 description=(
-                    f"La desviación de densidad promedio ({value:.3f}) supera el umbral "
-                    f"de {self._density_deviation_threshold}. El comportamiento observado "
-                    "difiere del proyectado."
+                    f"La cantidad de personas observada en las zonas es un {int(value * 100)}% mayor "
+                    f"a lo que el sistema predijo. Esto indica que las zonas se están llenando más "
+                    f"rápido de lo esperado."
                 ),
                 suggested_action=(
-                    "Calibrar el density_factor de los zone_behaviors y revisar las "
-                    "predicciones de densidad de las zonas afectadas antes del próximo "
-                    "ciclo de evaluación."
+                    "Revisar la distribución de recursos (personal, señalización o accesos) en las "
+                    "zonas afectadas para mejorar el flujo de personas en el próximo ciclo."
                 ),
                 value=value,
                 is_provisional=True,

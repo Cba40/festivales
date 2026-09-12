@@ -8,7 +8,6 @@ from .recommendation_enums import RecommendationType, RecommendationStatus
 class ConfigurationRecommendation:
     def __init__(
         self,
-        id: UUID,
         target_entity_type: str,
         target_entity_id: str | None = None,
         proposed_change: str | None = None,
@@ -24,6 +23,7 @@ class ConfigurationRecommendation:
         resolved_by: str | None = None,
         resolved_at: datetime | None = None,
         resolution_justification: str | None = None,
+        id: UUID | None = None,
     ) -> None:
         self._id = id
         self._target_entity_type = target_entity_type
@@ -44,7 +44,7 @@ class ConfigurationRecommendation:
 
     # Propiedades de solo lectura
     @property
-    def id(self) -> UUID:
+    def id(self) -> UUID | None:
         return self._id
 
     @property

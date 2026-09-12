@@ -1,8 +1,8 @@
 # backend/app/models/configuration_recommendation.py
 
-import uuid
 from datetime import datetime
 from typing import Optional
+from uuid import UUID
 
 from sqlalchemy import String, Text, Uuid, Integer, Boolean, DateTime, JSON
 from sqlalchemy.orm import Mapped, mapped_column
@@ -13,9 +13,7 @@ from app.db.session import Base
 class ConfigurationRecommendation(Base):
     __tablename__ = "configuration_recommendations"
 
-    id: Mapped[str] = mapped_column(
-        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
-    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     target_entity_type: Mapped[str] = mapped_column(String(50), nullable=False)
     target_entity_id: Mapped[Optional[str]] = mapped_column(String(36))
     proposed_change: Mapped[str] = mapped_column(Text, nullable=False)

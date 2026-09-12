@@ -42,7 +42,6 @@ class RecommendationWorkflowService:
             from src.infrastructure.persistence.models.configuration_recommendation import ConfigurationRecommendation as ConfigModel
             
             model = ConfigModel(
-                id=str(recommendation.id),
                 target_entity_type=recommendation.target_entity_type,
                 target_entity_id=recommendation.target_entity_id,
                 proposed_change=recommendation.proposed_change,
@@ -59,6 +58,26 @@ class RecommendationWorkflowService:
             session.add(model)
             await session.flush()
             await session.refresh(model)
+
+            # La BD genera el UUID (server_default=gen_random_uuid()); la entidad
+            # se reconstruye con el id real persistido.
+            from src.domain.entities.recommendation_enums import RecommendationType
+
+            created = ConfigurationRecommendation(
+                id=UUID(model.id),
+                target_entity_type=model.target_entity_type,
+                target_entity_id=model.target_entity_id,
+                proposed_change=model.proposed_change,
+                recommendation_type=RecommendationType(model.recommendation_type),
+                supporting_metrics=model.supporting_metrics,
+                historic_trace=model.historic_trace,
+                recommendation_confidence=model.recommendation_confidence,
+                status=RecommendationStatus(model.status),
+                generated_at=model.generated_at,
+                km_version_analyzed=UUID(model.km_version_analyzed) if model.km_version_analyzed else None,
+                algorithm_version=model.algorithm_version,
+                event_ids=model.event_ids,
+            )
 
             # Registrar auditoría: action='generated'
             from src.infrastructure.persistence.models.recommendation_audit_entry import RecommendationAuditEntry as AuditModel
@@ -78,9 +97,9 @@ class RecommendationWorkflowService:
             await session.flush()
 
             # Notificar
-            await self._notification_service.notify_new_recommendation(recommendation)
+            await self._notification_service.notify_new_recommendation(created)
 
-            return recommendation
+            return created
 
     async def resolve_recommendation(
         self,

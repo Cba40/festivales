@@ -14,7 +14,6 @@ class SQLConfigurationRecommendationRepository:
     async def save(self, recommendation: ConfigurationRecommendation) -> ConfigurationRecommendation:
         async with AsyncSessionLocal() as session:
             model = ConfigModel(
-                id=str(recommendation.id),
                 target_entity_type=recommendation.target_entity_type,
                 target_entity_id=recommendation.target_entity_id,
                 proposed_change=recommendation.proposed_change,
@@ -34,7 +33,26 @@ class SQLConfigurationRecommendationRepository:
             session.add(model)
             await session.flush()
             await session.refresh(model)
-            return recommendation
+            # La BD genera el UUID (server_default=gen_random_uuid()); la entidad
+            # se reconstruye con el id real persistido.
+            return ConfigurationRecommendation(
+                id=UUID(model.id),
+                target_entity_type=model.target_entity_type,
+                target_entity_id=model.target_entity_id,
+                proposed_change=model.proposed_change,
+                recommendation_type=RecommendationType(model.recommendation_type),
+                supporting_metrics=model.supporting_metrics,
+                historic_trace=model.historic_trace,
+                recommendation_confidence=model.recommendation_confidence,
+                status=RecommendationStatus(model.status),
+                generated_at=model.generated_at,
+                km_version_analyzed=UUID(model.km_version_analyzed) if model.km_version_analyzed else None,
+                algorithm_version=model.algorithm_version,
+                event_ids=model.event_ids,
+                resolved_by=model.resolved_by,
+                resolved_at=model.resolved_at,
+                resolution_justification=model.resolution_justification,
+            )
 
     async def find_by_id(self, id: UUID) -> ConfigurationRecommendation | None:
         async with AsyncSessionLocal() as session:
