@@ -10,3 +10,4 @@ class MetricResult:
     reason: str
     data_points: int
     limitations: list[str]
+    is_provisional: bool = True

@@ -1,9 +1,13 @@
-from fastapi import APIRouter, Depends
+import logging
+from dataclasses import asdict
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 
+from app.api.deps import TokenPayload, verify_token
 from app.core.config import settings
 from app.db.session import get_async_db, AsyncSessionLocal as async_session_maker
 from app.schemas.configuration_recommendation import (
@@ -32,8 +36,28 @@ from src.infrastructure.notifications.stub_notification_service import (
 from src.domain.ports.configuration_recommendation_repository import (
     ConfigurationRecommendationRepository,
 )
-from uuid import UUID
+from src.application.learning.anomaly_detector import Anomaly, AnomalyDetector
+from src.application.learning.metric_service import MetricService
+from src.domain.entities.configuration_recommendation import (
+    ConfigurationRecommendation,
+)
+from src.domain.entities.recommendation_enums import (
+    RecommendationStatus,
+    RecommendationType,
+)
+from app.models.event_day import EventDay
+from app.models.operational_phase import OperationalPhase
+from app.schemas.analytics import (
+    AnomalyResponse,
+    EvaluationRequest,
+    EvaluationResponse,
+    MetricResultResponse,
+    RecommendationCreatedResponse,
+)
+from uuid import UUID, uuid4
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 
 class MetricsStatusResponse(BaseModel):
@@ -412,3 +436,130 @@ async def get_audit_log(
             }
             for m in models
         ]
+
+
+def _build_recommendation(
+    anomaly: Anomaly,
+    request: EvaluationRequest,
+) -> ConfigurationRecommendation:
+    """Construye una ConfigurationRecommendation en estado PENDING_REVIEW."""
+    return ConfigurationRecommendation(
+        id=uuid4(),
+        target_entity_type="event_day",
+        target_entity_id=request.event_day_id,
+        proposed_change=anomaly.suggested_action,
+        recommendation_type=RecommendationType.PARAMETER_ADJUSTMENT,
+        supporting_metrics={
+            "metric": anomaly.metric_name,
+            "value": anomaly.value,
+            "phase_id": request.phase_id,
+        },
+        historic_trace={
+            "event_day_id": request.event_day_id,
+            "phase_id": request.phase_id,
+        },
+        recommendation_confidence=0.9,
+        status=RecommendationStatus.PENDING_REVIEW,
+        km_version_analyzed=None,
+        algorithm_version="etapa2-v1",
+        event_ids=None,
+    )
+
+
+@router.post("/evaluate", response_model=EvaluationResponse)
+async def evaluate_metrics(
+    request: EvaluationRequest,
+    db: AsyncSession = Depends(get_async_db),
+    _: TokenPayload = Depends(verify_token),
+):
+    """Ejecuta el MetricService, detecta anomalías y crea recomendaciones (Etapa 2)."""
+    logger.info(
+        "evaluate_metrics event_day_id=%s phase_id=%s",
+        request.event_day_id,
+        request.phase_id,
+    )
+
+    # 1. Validar que event_day y phase existan
+    day_result = await db.execute(
+        select(EventDay).where(EventDay.id == request.event_day_id)
+    )
+    if day_result.scalar_one_or_none() is None:
+        raise HTTPException(status_code=404, detail="EventDay no encontrado")
+
+    try:
+        phase_uuid = UUID(request.phase_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Phase no encontrada")
+
+    phase_result = await db.execute(
+        select(OperationalPhase).where(OperationalPhase.id == phase_uuid)
+    )
+    if phase_result.scalar_one_or_none() is None:
+        raise HTTPException(status_code=404, detail="Phase no encontrada")
+
+    # 2. Ejecutar MetricService.calculate_all
+    #    phase_id alineado: el mismo UUID validado en OperationalPhase se pasa en
+    #    forma canónica; MetricService filtra ZoneBehaviorModel.operational_phase_id.
+    try:
+        results = await MetricService(db).calculate_all(
+            request.event_day_id,
+            str(phase_uuid),
+        )
+    except Exception as exc:
+        logger.exception("Fallo en MetricService.calculate_all: %s", exc)
+        raise HTTPException(
+            status_code=500,
+            detail="Error interno al evaluar métricas",
+        )
+
+    metrics = [
+        MetricResultResponse(
+            name=r.name,
+            display_name=r.display_name,
+            status=r.status,
+            value=r.value,
+            reason=r.reason,
+            data_points=r.data_points,
+            limitations=r.limitations or [],
+            is_provisional=r.is_provisional,
+        )
+        for r in results
+    ]
+
+    # 3. Detectar anomalías
+    anomalies = AnomalyDetector().detect_all(results)
+
+    # 4. Crear una recomendación por anomalía; un fallo individual no rompe el flujo
+    workflow_service = await _get_workflow_service(db)
+    recommendations_created: list[RecommendationCreatedResponse] = []
+    for anomaly in anomalies:
+        try:
+            created = await workflow_service.create_recommendation(
+                _build_recommendation(anomaly, request)
+            )
+            recommendations_created.append(
+                RecommendationCreatedResponse(
+                    id=str(created.id),
+                    status=(
+                        created.status.value
+                        if created.status
+                        else RecommendationStatus.PENDING_REVIEW.value
+                    ),
+                    metric_name=anomaly.metric_name,
+                )
+            )
+        except Exception as exc:
+            logger.exception(
+                "Fallo al crear recomendación para %s: %s",
+                anomaly.metric_name,
+                exc,
+            )
+            continue
+
+    # 5. Resumen completo
+    return EvaluationResponse(
+        metrics=metrics,
+        anomalies_detected=len(anomalies),
+        anomalies=[AnomalyResponse(**asdict(a)) for a in anomalies],
+        recommendations_created=recommendations_created,
+    )
