@@ -68,6 +68,37 @@ const AUDIT_ACTION_LABELS: Record<string, string> = {
   rejected: 'Rechazada',
 };
 
+const formatSupportingMetrics = (metrics: any) => {
+  if (!metrics) return 'No disponible';
+  const parts: string[] = [];
+
+  if (metrics.metric === 'density_deviation') {
+    parts.push('Desviación de Densidad');
+  }
+  if (metrics.value !== null && metrics.value !== undefined) {
+    parts.push(`Valor: ${(Number(metrics.value) * 100).toFixed(1)}%`);
+  }
+  if (metrics.phase_id) {
+    parts.push('Fase operativa actual');
+  }
+
+  return parts.length > 0 ? parts.join(' • ') : 'Análisis de métricas del sistema';
+};
+
+const formatHistoricTrace = (trace: any) => {
+  if (!trace) return 'No disponible';
+  // Si los arrays están vacíos, es mejor dar un mensaje contextual que mostrar []
+  const hasData =
+    (trace.prediction_ids?.length || 0) > 0 ||
+    (trace.observation_ids?.length || 0) > 0 ||
+    (trace.operational_event_ids?.length || 0) > 0;
+
+  if (hasData) {
+    return 'Basado en el historial de predicciones, observaciones y eventos de la jornada.';
+  }
+  return 'Generado a partir del análisis en tiempo real de la jornada actual.';
+};
+
 interface RecDetailModalProps {
   recommendation: ConfigurationRecommendationDTO;
   onClose: () => void;
@@ -146,18 +177,18 @@ function RecDetailModal({ recommendation, onClose, onResolved }: RecDetailModalP
           {recommendation.supporting_metrics && (
             <div>
               <div className="text-xs text-slate-400 mb-1">Métricas de soporte</div>
-              <pre className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3 whitespace-pre-wrap font-mono">
-                {JSON.stringify(recommendation.supporting_metrics, null, 2)}
-              </pre>
+              <p className="text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-lg p-3">
+                {formatSupportingMetrics(recommendation.supporting_metrics)}
+              </p>
             </div>
           )}
 
           {recommendation.historic_trace && (
             <div>
               <div className="text-xs text-slate-400 mb-1">Trazabilidad histórica</div>
-              <pre className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3 whitespace-pre-wrap font-mono">
-                {JSON.stringify(recommendation.historic_trace, null, 2)}
-              </pre>
+              <p className="text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-lg p-3">
+                {formatHistoricTrace(recommendation.historic_trace)}
+              </p>
             </div>
           )}
 
