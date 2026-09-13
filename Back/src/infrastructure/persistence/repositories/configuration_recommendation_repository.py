@@ -34,10 +34,10 @@ class SQLConfigurationRecommendationRepository:
             session.add(model)
             await session.flush()
             await session.refresh(model)
-            # La BD genera el UUID (server_default=gen_random_uuid()); la entidad
+            # El id se genera como UUID nativo en Python; se reconstruye con el valor persistido.
             # se reconstruye con el id real persistido.
             return ConfigurationRecommendation(
-                id=UUID(model.id),
+                id=model.id,
                 target_entity_type=model.target_entity_type,
                 target_entity_id=model.target_entity_id,
                 proposed_change=model.proposed_change,
@@ -47,7 +47,7 @@ class SQLConfigurationRecommendationRepository:
                 recommendation_confidence=model.recommendation_confidence,
                 status=RecommendationStatus(model.status),
                 generated_at=model.generated_at,
-                km_version_analyzed=UUID(model.km_version_analyzed) if model.km_version_analyzed else None,
+                km_version_analyzed=model.km_version_analyzed,
                 algorithm_version=model.algorithm_version,
                 event_ids=model.event_ids,
                 resolved_by=model.resolved_by,
@@ -64,7 +64,7 @@ class SQLConfigurationRecommendationRepository:
                 return None
             
             return ConfigurationRecommendation(
-                id=UUID(model.id),
+                id=model.id,
                 target_entity_type=model.target_entity_type,
                 target_entity_id=model.target_entity_id,
                 proposed_change=model.proposed_change,
@@ -74,7 +74,7 @@ class SQLConfigurationRecommendationRepository:
                 recommendation_confidence=model.recommendation_confidence,
                 status=RecommendationStatus(model.status),
                 generated_at=model.generated_at,
-                km_version_analyzed=UUID(model.km_version_analyzed) if model.km_version_analyzed else None,
+                km_version_analyzed=model.km_version_analyzed,
                 algorithm_version=model.algorithm_version,
                 event_ids=model.event_ids,
                 resolved_by=model.resolved_by,
@@ -95,7 +95,7 @@ class SQLConfigurationRecommendationRepository:
             
             return [
                 ConfigurationRecommendation(
-                    id=UUID(m.id),
+                    id=m.id,
                     target_entity_type=m.target_entity_type,
                     target_entity_id=m.target_entity_id,
                     proposed_change=m.proposed_change,
@@ -105,7 +105,7 @@ class SQLConfigurationRecommendationRepository:
                     recommendation_confidence=m.recommendation_confidence,
                     status=RecommendationStatus(m.status),
                     generated_at=m.generated_at,
-                    km_version_analyzed=UUID(m.km_version_analyzed) if m.km_version_analyzed else None,
+                    km_version_analyzed=m.km_version_analyzed,
                     algorithm_version=m.algorithm_version,
                     event_ids=m.event_ids,
                     resolved_by=m.resolved_by,

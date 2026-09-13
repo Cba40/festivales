@@ -60,12 +60,12 @@ class RecommendationWorkflowService:
             await session.flush()
             await session.refresh(model)
 
-            # La BD genera el UUID (server_default=gen_random_uuid()); la entidad
+            # El id se genera como UUID nativo en Python; se reconstruye con el valor persistido.
             # se reconstruye con el id real persistido.
             from src.domain.entities.recommendation_enums import RecommendationType
 
             created = ConfigurationRecommendation(
-                id=UUID(model.id),
+                id=model.id,
                 target_entity_type=model.target_entity_type,
                 target_entity_id=model.target_entity_id,
                 proposed_change=model.proposed_change,
@@ -75,7 +75,7 @@ class RecommendationWorkflowService:
                 recommendation_confidence=model.recommendation_confidence,
                 status=RecommendationStatus(model.status),
                 generated_at=model.generated_at,
-                km_version_analyzed=UUID(model.km_version_analyzed) if model.km_version_analyzed else None,
+                km_version_analyzed=model.km_version_analyzed,
                 algorithm_version=model.algorithm_version,
                 event_ids=model.event_ids,
             )
@@ -154,7 +154,7 @@ class RecommendationWorkflowService:
             from src.domain.entities.recommendation_enums import RecommendationType
             
             return ConfigurationRecommendation(
-                id=UUID(model.id),
+                id=model.id,
                 target_entity_type=model.target_entity_type,
                 target_entity_id=model.target_entity_id,
                 proposed_change=model.proposed_change,
@@ -164,7 +164,7 @@ class RecommendationWorkflowService:
                 recommendation_confidence=model.recommendation_confidence,
                 status=RecommendationStatus(model.status),
                 generated_at=model.generated_at,
-                km_version_analyzed=UUID(model.km_version_analyzed) if model.km_version_analyzed else None,
+                km_version_analyzed=model.km_version_analyzed,
                 algorithm_version=model.algorithm_version,
                 event_ids=model.event_ids,
                 resolved_by=model.resolved_by,
