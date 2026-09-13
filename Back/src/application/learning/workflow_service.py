@@ -84,8 +84,7 @@ class RecommendationWorkflowService:
             from src.infrastructure.persistence.models.recommendation_audit_entry import RecommendationAuditEntry as AuditModel
 
             audit_db_model = AuditModel(
-                id=str(UUID()),
-                recommendation_id=str(model.id),
+                recommendation_id=model.id,
                 action="generated",
                 timestamp=datetime.now(),
                 operator_id=None,
@@ -96,6 +95,7 @@ class RecommendationWorkflowService:
             )
             session.add(audit_db_model)
             await session.flush()
+            await session.commit()
 
             # Notificar
             await self._notification_service.notify_new_recommendation(created)
@@ -115,7 +115,7 @@ class RecommendationWorkflowService:
         async with AsyncSessionLocal() as session:
             from src.infrastructure.persistence.models.configuration_recommendation import ConfigurationRecommendation as ConfigModel
 
-            stmt = select(ConfigModel).where(ConfigModel.id == str(recommendation_id))
+            stmt = select(ConfigModel).where(ConfigModel.id == recommendation_id)
             result = await session.execute(stmt)
             model = result.scalar_one_or_none()
             
@@ -137,8 +137,7 @@ class RecommendationWorkflowService:
             from src.infrastructure.persistence.models.recommendation_audit_entry import RecommendationAuditEntry as AuditModel
 
             audit_db_model = AuditModel(
-                id=str(UUID()),
-                recommendation_id=str(model.id),
+                recommendation_id=model.id,
                 action="resolved",
                 timestamp=datetime.now(),
                 operator_id=operator_id,
@@ -149,6 +148,7 @@ class RecommendationWorkflowService:
             )
             session.add(audit_db_model)
             await session.flush()
+            await session.commit()
 
             # Retornar entidad de dominio actualizada
             from src.domain.entities.recommendation_enums import RecommendationType

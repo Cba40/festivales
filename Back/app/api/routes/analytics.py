@@ -191,15 +191,15 @@ async def create_recommendation(
         )
 
         recommendation = ConfigModel(
-            id=UUID(),
+            id=uuid4(),
             target_entity_type=recommendation_in.target_entity_type,
             target_entity_id=recommendation_in.target_entity_id or None,
             proposed_change=recommendation_in.proposed_change,
             recommendation_type=recommendation_in.recommendation_type.value
             if recommendation_in.recommendation_type
             else None,
-            supporting_metrics=recommendation_in.supporting_metrics,
-            historic_trace=recommendation_in.historic_trace,
+            supporting_metrics=recommendation_in.supporting_metrics.model_dump(),
+            historic_trace=recommendation_in.historic_trace.model_dump(),
             recommendation_confidence=recommendation_in.recommendation_confidence,
             event_ids=recommendation_in.event_ids or None,
             km_version_analyzed=recommendation_in.km_version_analyzed,
@@ -207,15 +207,15 @@ async def create_recommendation(
         )
 
         domain_rec = DomainRec(
-            id=UUID(),
+            id=uuid4(),
             target_entity_type=recommendation_in.target_entity_type,
             target_entity_id=recommendation_in.target_entity_id or None,
             proposed_change=recommendation_in.proposed_change,
             recommendation_type=recommendation_in.recommendation_type,
-            supporting_metrics=recommendation_in.supporting_metrics,
-            historic_trace=recommendation_in.historic_trace,
+            supporting_metrics=recommendation_in.supporting_metrics.model_dump(),
+            historic_trace=recommendation_in.historic_trace.model_dump(),
             recommendation_confidence=recommendation_in.recommendation_confidence,
-            status="pending_review",
+            status=RecommendationStatus.PENDING_REVIEW,
             generated_at=datetime.now(),
             km_version_analyzed=recommendation_in.km_version_analyzed,
             algorithm_version=recommendation_in.algorithm_version,
@@ -394,7 +394,7 @@ async def resolve_recommendation(
         )
 
         result = await workflow.resolve_recommendation(
-            id=UUID(id),
+            recommendation_id=UUID(id),
             approved=request.approved,
             operator_id=request.operator_id,
             justification=request.justification,
@@ -418,7 +418,11 @@ async def get_audit_log(
 
         stmt = select(M)
         if recommendation_id is not None:
-            stmt = stmt.where(M.recommendation_id == recommendation_id)
+            try:
+                filter_uuid = UUID(recommendation_id)
+            except ValueError:
+                return []
+            stmt = stmt.where(M.recommendation_id == filter_uuid)
         result = await session.execute(stmt)
         models = result.scalars().all()
 

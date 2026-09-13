@@ -57,7 +57,7 @@ class SQLConfigurationRecommendationRepository:
 
     async def find_by_id(self, id: UUID) -> ConfigurationRecommendation | None:
         async with AsyncSessionLocal() as session:
-            stmt = select(ConfigModel).where(ConfigModel.id == str(id))
+            stmt = select(ConfigModel).where(ConfigModel.id == id)
             result = await session.execute(stmt)
             model = result.scalar_one_or_none()
             if not model:

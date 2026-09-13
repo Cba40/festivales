@@ -13,15 +13,15 @@ class SQLRecommendationAuditEntryRepository:
     async def save(self, entry: RecommendationAuditEntry) -> RecommendationAuditEntry:
         async with AsyncSessionLocal() as session:
             model = AuditModel(
-                id=str(entry.id),
-                recommendation_id=str(entry.recommendation_id),
+                id=entry.id,
+                recommendation_id=entry.recommendation_id,
                 action=entry.action,
                 timestamp=entry.timestamp,
                 operator_id=entry.operator_id,
                 justification=entry.justification,
                 metrics_snapshot=entry.metrics_snapshot,
                 input_data_snapshot=entry.input_data_snapshot,
-                km_version=str(entry.km_version) if entry.km_version else None,
+                km_version=entry.km_version,
                 algorithm_version=entry.algorithm_version,
                 llm_version=entry.llm_version,
             )
@@ -32,21 +32,21 @@ class SQLRecommendationAuditEntryRepository:
 
     async def find_by_recommendation_id(self, recommendation_id: UUID) -> list[RecommendationAuditEntry]:
         async with AsyncSessionLocal() as session:
-            stmt = select(AuditModel).where(AuditModel.recommendation_id == str(recommendation_id))
+            stmt = select(AuditModel).where(AuditModel.recommendation_id == recommendation_id)
             result = await session.execute(stmt)
             models = result.scalars().all()
             
             return [
                 RecommendationAuditEntry(
-                    id=UUID(m.id),
-                    recommendation_id=UUID(m.recommendation_id),
+                    id=m.id,
+                    recommendation_id=m.recommendation_id,
                     action=m.action,
                     timestamp=m.timestamp,
                     operator_id=m.operator_id,
                     justification=m.justification,
                     metrics_snapshot=m.metrics_snapshot,
                     input_data_snapshot=m.input_data_snapshot,
-                    km_version=UUID(m.km_version) if m.km_version else None,
+                    km_version=m.km_version,
                     algorithm_version=m.algorithm_version,
                     llm_version=m.llm_version,
                 )

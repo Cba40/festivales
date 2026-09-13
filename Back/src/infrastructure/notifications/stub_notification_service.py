@@ -9,7 +9,7 @@ from src.domain.ports.notification_service import NotificationService
 class StubNotificationService(NotificationService):
     """Implementación stub: solo registra en log."""
 
-    def notify_new_recommendation(self, recommendation: ConfigurationRecommendation) -> None:
+    async def notify_new_recommendation(self, recommendation: ConfigurationRecommendation) -> None:
         logger = logging.getLogger(__name__)
         logger.info(
             f"Nueva recomendación pendiente: {recommendation.id} "

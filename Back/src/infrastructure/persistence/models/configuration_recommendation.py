@@ -28,7 +28,7 @@ class ConfigurationRecommendation(Base):
     )
     km_version_analyzed: Mapped[Optional[UUID]] = mapped_column(Uuid)
     algorithm_version: Mapped[Optional[str]] = mapped_column(String(50))
-    event_ids: Mapped[list] = mapped_column(JSON, nullable=False)
+    event_ids: Mapped[list] = mapped_column(JSON, nullable=True)
     resolved_by: Mapped[Optional[str]] = mapped_column(String(100))
     resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     resolution_justification: Mapped[Optional[str]] = mapped_column(Text)
