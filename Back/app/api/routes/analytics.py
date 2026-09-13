@@ -55,7 +55,7 @@ from app.schemas.analytics import (
     MetricResultResponse,
     RecommendationCreatedResponse,
 )
-from uuid import UUID
+from uuid import UUID, uuid4
 from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
@@ -341,7 +341,6 @@ async def resolve_recommendation(
         from src.infrastructure.persistence.models.recommendation_audit_entry import (
             RecommendationAuditEntry as AuditM,
         )
-        from uuid import UUID
         from datetime import datetime
 
         stmt = select(M).where(M.id == UUID(id))
@@ -445,6 +444,7 @@ def _build_recommendation(
 ) -> ConfigurationRecommendation:
     """Construye una ConfigurationRecommendation en estado PENDING_REVIEW."""
     return ConfigurationRecommendation(
+        id=uuid4(),
         target_entity_type="event_day",
         target_entity_id=request.event_day_id,
         proposed_change=anomaly.suggested_action,

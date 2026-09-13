@@ -42,6 +42,7 @@ class RecommendationWorkflowService:
             from src.infrastructure.persistence.models.configuration_recommendation import ConfigurationRecommendation as ConfigModel
             
             model = ConfigModel(
+                id=recommendation.id,
                 target_entity_type=recommendation.target_entity_type,
                 target_entity_id=recommendation.target_entity_id,
                 proposed_change=recommendation.proposed_change,
@@ -51,7 +52,7 @@ class RecommendationWorkflowService:
                 recommendation_confidence=recommendation.recommendation_confidence,
                 status=recommendation.status.value,
                 generated_at=recommendation.generated_at,
-                km_version_analyzed=UUID(recommendation.km_version_analyzed) if recommendation.km_version_analyzed else None,
+                km_version_analyzed=recommendation.km_version_analyzed,
                 algorithm_version=recommendation.algorithm_version,
                 event_ids=recommendation.event_ids,
             )
