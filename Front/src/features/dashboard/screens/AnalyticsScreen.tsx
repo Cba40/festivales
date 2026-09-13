@@ -44,6 +44,30 @@ function getStatusLabel(status: ConfigurationRecommendationDTO['status']): strin
   return 'Rechazada';
 }
 
+const RECOMMENDATION_TYPE_LABELS: Record<string, string> = {
+  parameter_adjustment: 'Ajuste de Parámetros',
+  resource_allocation: 'Asignación de Recursos',
+  protocol_activation: 'Activación de Protocolo',
+};
+
+const ENTITY_TYPE_LABELS: Record<string, string> = {
+  event_day: 'Jornada del Evento',
+  zone: 'Zona',
+  operational_phase: 'Fase Operativa',
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  pending_review: 'Pendiente de Revisión',
+  approved: 'Aprobada',
+  rejected: 'Rechazada',
+};
+
+const AUDIT_ACTION_LABELS: Record<string, string> = {
+  generated: 'Generada automáticamente',
+  resolved: 'Resuelta por operador',
+  rejected: 'Rechazada',
+};
+
 interface RecDetailModalProps {
   recommendation: ConfigurationRecommendationDTO;
   onClose: () => void;
@@ -491,13 +515,15 @@ export function AnalyticsScreen() {
                   <td className="px-5 py-2 text-slate-600 font-mono" title={rec.id}>
                     {truncateId(rec.id)}
                   </td>
-                  <td className="px-5 py-2 text-slate-700 capitalize">
-                    {rec.recommendation_type.replace(/_/g, ' ')}
+                  <td className="px-5 py-2 text-slate-700">
+                    {RECOMMENDATION_TYPE_LABELS[rec.recommendation_type] || rec.recommendation_type}
                   </td>
-                  <td className="px-5 py-2 text-slate-700">{rec.target_entity_type}</td>
+                  <td className="px-5 py-2 text-slate-700">
+                    {ENTITY_TYPE_LABELS[rec.target_entity_type] || rec.target_entity_type}
+                  </td>
                   <td className="px-5 py-2">
                     <Badge variant={getStatusVariant(rec.status)}>
-                      {getStatusLabel(rec.status)}
+                      {STATUS_LABELS[rec.status] || rec.status}
                     </Badge>
                   </td>
                   <td className="px-5 py-2 text-slate-600">{formatDate(rec.generated_at)}</td>
@@ -544,9 +570,9 @@ export function AnalyticsScreen() {
                 )}
                 {entries.map((entry) => (
                   <tr key={entry.id} className="border-b border-slate-100">
-                    <td className="px-5 py-2 text-slate-700 capitalize">{entry.action}</td>
+                    <td className="px-5 py-2 text-slate-700">{AUDIT_ACTION_LABELS[entry.action] || entry.action}</td>
                     <td className="px-5 py-2 text-slate-600">{formatDate(entry.timestamp)}</td>
-                    <td className="px-5 py-2 text-slate-600">{entry.operator_id || '—'}</td>
+                    <td className="px-5 py-2 text-slate-600">{entry.operator_id || 'Sistema'}</td>
                     <td className="px-5 py-2 text-slate-600">{entry.justification || '—'}</td>
                   </tr>
                 ))}
