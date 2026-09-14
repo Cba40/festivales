@@ -26,7 +26,7 @@ const Estacionar = () => {
 
   useEffect(() => {
     refresh()
-  }, [refresh, userLocation])
+  }, [refresh])
 
   const zonas = data?.zonas ?? []
 

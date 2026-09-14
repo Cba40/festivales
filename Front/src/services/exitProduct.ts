@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { apiClient } from '@/core/api/client'
 import { endpoints } from '@/core/api/endpoints'
 import { useAppStore } from '@/core/state/store'
@@ -41,18 +41,21 @@ export function useExitRecommendations(
 
   const userLocation = useAppStore(s => s.userLocation)
 
+  const ctxRef = useRef({ userLocation })
+
   const refresh = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
+      const { userLocation: locationSnapshot } = ctxRef.current
       const { data: res } = await apiClient.get<ExitRecommendationResponse>(
         endpoints.products.exit(EVENT_ID),
         {
           params: {
             ...(destinationId ? { destination_id: destinationId } : {}),
             ...(mode ? { mode } : {}),
-            ...(userLocation
-              ? { latitude: userLocation[0], longitude: userLocation[1] }
+            ...(locationSnapshot
+              ? { latitude: locationSnapshot[0], longitude: locationSnapshot[1] }
               : {}),
           },
         }
@@ -65,7 +68,7 @@ export function useExitRecommendations(
     } finally {
       setLoading(false)
     }
-  }, [destinationId, mode, userLocation])
+  }, [destinationId, mode])
 
   return { data, loading, error, refresh }
 }

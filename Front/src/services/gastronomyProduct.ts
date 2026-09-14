@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { apiClient } from '@/core/api/client'
 import { endpoints } from '@/core/api/endpoints'
 import { useAppStore } from '@/core/state/store'
@@ -40,19 +40,22 @@ export function useGastronomyRecommendations() {
   const userLocation = useAppStore(s => s.userLocation)
   const currentZoneId = useAppStore(s => s.zones[0]?.id)
 
+  const ctxRef = useRef({ currentZoneId, userLocation })
+
   const refresh = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
+      const { currentZoneId: zoneIdSnapshot, userLocation: locationSnapshot } = ctxRef.current
       const params = {
         speed: 1.5,
         accessibility_required: false,
         limit: 6,
-        current_zone_id: currentZoneId || undefined,
+        current_zone_id: zoneIdSnapshot || undefined,
         user_id: '00000000-0000-0000-0000-000000000000',
         access_level: 'STANDARD',
-        ...(userLocation
-          ? { latitude: userLocation[0], longitude: userLocation[1] }
+        ...(locationSnapshot
+          ? { latitude: locationSnapshot[0], longitude: locationSnapshot[1] }
           : {}),
       }
       const { data: res } = await apiClient.get<GastronomyRecommendationResponse>(
@@ -65,7 +68,7 @@ export function useGastronomyRecommendations() {
     } finally {
       setLoading(false)
     }
-  }, [currentZoneId, userLocation])
+  }, [])
 
   return { data, loading, error, refresh }
 }

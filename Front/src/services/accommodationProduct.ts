@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { apiClient } from '@/core/api/client'
 import { endpoints } from '@/core/api/endpoints'
 import { useAppStore } from '@/core/state/store'
@@ -37,17 +37,20 @@ export function useAccommodationRecommendations(
 
   const userLocation = useAppStore(s => s.userLocation)
 
+  const ctxRef = useRef({ userLocation })
+
   const refresh = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
+      const { userLocation: locationSnapshot } = ctxRef.current
       const { data: res } = await apiClient.get<AccommodationRecommendationResponse>(
         endpoints.products.accommodation(EVENT_ID),
         {
           params: {
             limit: 100,
-            ...(userLocation
-              ? { latitude: userLocation[0], longitude: userLocation[1] }
+            ...(locationSnapshot
+              ? { latitude: locationSnapshot[0], longitude: locationSnapshot[1] }
               : {}),
             ...(type ? { type } : {}),
           },
@@ -59,7 +62,7 @@ export function useAccommodationRecommendations(
     } finally {
       setLoading(false)
     }
-  }, [userLocation, type])
+  }, [type])
 
   return { data, loading, error, refresh }
 }
