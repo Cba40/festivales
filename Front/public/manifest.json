@@ -1,6 +1,7 @@
 {
   "name": "Festival Jesús María - Sistema de Decisión",
   "short_name": "Festival JM",
+  "scope": "/",
   "description": "Sistema de decisión territorial para eventos masivos",
   "start_url": "/",
   "display": "standalone",
