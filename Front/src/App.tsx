@@ -1,28 +1,47 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { useAppStore } from './core/state/store';
-import Home from './screens/Home';
-import Estacionar from './screens/Estacionar';
-import Emergencia from './screens/Emergencia';
-import Salir from './screens/Salir';
-import ResolverAhora from './screens/ResolverAhora';
-import Servicios from './screens/Servicios';
-import ServiciosTransporte from './screens/ServiciosTransporte';
-import ServiciosComer from './screens/ServiciosComer';
-import GastronomiaExpanded from './screens/GastronomiaExpanded';
-import ServiciosGenerales from './screens/ServiciosGenerales';
-import Pernoctar from './screens/Pernoctar';
-import AsistenteScreen from './screens/AsistenteScreen';
-import { DashboardScreen } from './features/dashboard/screens/DashboardScreen';
 import { useDashboardSync } from './features/dashboard/hooks/useDashboardSync';
 import { loadEventDayContext } from './utils/contextoEvento';
 import { recargarFases } from './config/eventoConfig';
-import { InfrastructureScreen } from './features/dashboard/screens/InfrastructureScreen';
-import { EventConfigScreen } from './features/dashboard/screens/EventConfigScreen';
-import { OperationalEventScreen } from './features/dashboard/screens/OperationalEventScreen';
-import { MotorScreen } from './features/dashboard/screens/MotorScreen';
-import LoginScreen from './features/auth/screens/LoginScreen';
 import ProtectedRoute from './shared/components/ProtectedRoute';
+
+const Home = lazy(() => import('./screens/Home'));
+const Estacionar = lazy(() => import('./screens/Estacionar'));
+const Emergencia = lazy(() => import('./screens/Emergencia'));
+const Salir = lazy(() => import('./screens/Salir'));
+const ResolverAhora = lazy(() => import('./screens/ResolverAhora'));
+const Servicios = lazy(() => import('./screens/Servicios'));
+const ServiciosTransporte = lazy(() => import('./screens/ServiciosTransporte'));
+const ServiciosComer = lazy(() => import('./screens/ServiciosComer'));
+const GastronomiaExpanded = lazy(() => import('./screens/GastronomiaExpanded'));
+const ServiciosGenerales = lazy(() => import('./screens/ServiciosGenerales'));
+const Pernoctar = lazy(() => import('./screens/Pernoctar'));
+const AsistenteScreen = lazy(() => import('./screens/AsistenteScreen'));
+const DashboardScreen = lazy(() =>
+  import('./features/dashboard/screens/DashboardScreen').then((m) => ({ default: m.DashboardScreen }))
+);
+const InfrastructureScreen = lazy(() =>
+  import('./features/dashboard/screens/InfrastructureScreen').then((m) => ({ default: m.InfrastructureScreen }))
+);
+const EventConfigScreen = lazy(() =>
+  import('./features/dashboard/screens/EventConfigScreen').then((m) => ({ default: m.EventConfigScreen }))
+);
+const OperationalEventScreen = lazy(() =>
+  import('./features/dashboard/screens/OperationalEventScreen').then((m) => ({ default: m.OperationalEventScreen }))
+);
+const MotorScreen = lazy(() =>
+  import('./features/dashboard/screens/MotorScreen').then((m) => ({ default: m.MotorScreen }))
+);
+const LoginScreen = lazy(() => import('./features/auth/screens/LoginScreen'));
+
+function ScreenLoading() {
+  return (
+    <div className="flex min-h-[40vh] items-center justify-center text-slate-500">
+      <span>Cargando...</span>
+    </div>
+  );
+}
 
 function AppLayout() {
   const location = useLocation();
@@ -137,6 +156,7 @@ function AppLayout() {
             Modo sin conexión. Se mostrarán datos disponibles localmente.
           </div>
         )}
+        <Suspense fallback={<ScreenLoading />}>
         <Routes>
         <Route path="/dashboard/login" element={<LoginScreen />} />
         <Route path="/dashboard/*" element={
@@ -161,6 +181,7 @@ function AppLayout() {
           </ProtectedRoute>
         } />
         </Routes>
+        </Suspense>
       </>
     );
   }
@@ -174,6 +195,7 @@ function AppLayout() {
       )}
       <div className="min-h-screen bg-slate-50 flex justify-center">
         <div className="w-full max-w-md bg-white min-h-screen relative shadow-lg">
+          <Suspense fallback={<ScreenLoading />}>
           <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/estacionar" element={<Estacionar />} />
@@ -187,7 +209,8 @@ function AppLayout() {
           <Route path="/servicios/generales" element={<ServiciosGenerales />} />
           <Route path="/pernoctar" element={<Pernoctar />} />
           <Route path="/asistente" element={<AsistenteScreen />} />
-        </Routes>
+          </Routes>
+          </Suspense>
         </div>
       </div>
     </>
