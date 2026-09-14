@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { apiClient } from '@/core/api/client'
 import { endpoints } from '@/core/api/endpoints'
+import { readThroughCache, productCacheKey, PRODUCT_TTL_MS } from '@/core/cache/memoryCache'
 import { useAppStore } from '@/core/state/store'
 
 const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id'
@@ -43,24 +44,31 @@ export function useExitRecommendations(
 
   const ctxRef = useRef({ userLocation })
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (force = false) => {
     setLoading(true)
     setError(null)
     try {
       const { userLocation: locationSnapshot } = ctxRef.current
-      const { data: res } = await apiClient.get<ExitRecommendationResponse>(
-        endpoints.products.exit(EVENT_ID),
-        {
-          params: {
-            ...(destinationId ? { destination_id: destinationId } : {}),
-            ...(mode ? { mode } : {}),
-            ...(locationSnapshot
-              ? { latitude: locationSnapshot[0], longitude: locationSnapshot[1] }
-              : {}),
-          },
-        }
+      const params: Record<string, unknown> = {
+        ...(destinationId ? { destination_id: destinationId } : {}),
+        ...(mode ? { mode } : {}),
+        ...(locationSnapshot
+          ? { latitude: locationSnapshot[0], longitude: locationSnapshot[1] }
+          : {}),
+      }
+      const data = await readThroughCache<ExitRecommendationResponse>(
+        productCacheKey(EVENT_ID, 'exit', params),
+        PRODUCT_TTL_MS,
+        async () => {
+          const { data } = await apiClient.get<ExitRecommendationResponse>(
+            endpoints.products.exit(EVENT_ID),
+            { params },
+          )
+          return data
+        },
+        force
       )
-      setData(res)
+      setData(data)
     } catch (err) {
       const detail = (err as { response?: { data?: { detail?: string } } })
         ?.response?.data?.detail

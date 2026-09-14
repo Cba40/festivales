@@ -6,6 +6,7 @@ type CacheEntry<T> = {
 export const ZONES_TTL_MS = 60_000
 export const EVENT_DAY_TTL_MS = 60_000
 export const PREDICTION_TTL_MS = 15_000
+export const PRODUCT_TTL_MS = 30_000
 
 const cache = new Map<string, CacheEntry<unknown>>()
 
@@ -23,6 +24,29 @@ export function eventDayTodayCacheKey(eventId: string): string {
 
 export function predictionCacheKey(eventId: string): string {
   return `predictions:${normalizeEventId(eventId)}`
+}
+
+const COORDINATE_KEYS = new Set(['lat', 'lng', 'latitude', 'longitude'])
+
+export function productCacheKey(
+  eventId: string,
+  productType: string,
+  params: Record<string, unknown> = {}
+): string {
+  const normalizedId = normalizeEventId(eventId)
+  const normalizedParams = Object.keys(params)
+    .sort()
+    .reduce<Record<string, unknown>>((acc, key) => {
+      const value = params[key]
+      if (value === undefined) return acc
+      if (typeof value === 'number' && COORDINATE_KEYS.has(key)) {
+        acc[key] = Number(value.toFixed(4))
+      } else {
+        acc[key] = value
+      }
+      return acc
+    }, {})
+  return `product:${normalizedId}:${productType}:${JSON.stringify(normalizedParams)}`
 }
 
 function getValid<T>(key: string): { hit: true; data: T } | { hit: false } {

@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { apiClient } from '@/core/api/client'
 import { endpoints } from '@/core/api/endpoints'
+import { readThroughCache, zoneCacheKey, ZONES_TTL_MS } from '@/core/cache/memoryCache'
 
 const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id'
 
@@ -36,12 +37,18 @@ export function useCajeros() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (force = false) => {
     setLoading(true)
     setError(null)
     try {
-      const { data: zones } = await apiClient.get<ZoneRow[]>(
-        endpoints.zones.list(EVENT_ID)
+      const zones = await readThroughCache<ZoneRow[]>(
+        zoneCacheKey(EVENT_ID),
+        ZONES_TTL_MS,
+        async () => {
+          const { data } = await apiClient.get<ZoneRow[]>(endpoints.zones.list(EVENT_ID))
+          return data
+        },
+        force
       )
       const cajeros = zones
         .filter((z) => z.subtipo === 'cajeros')

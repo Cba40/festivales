@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { apiClient } from '@/core/api/client'
 import { endpoints } from '@/core/api/endpoints'
+import { readThroughCache, productCacheKey, PRODUCT_TTL_MS } from '@/core/cache/memoryCache'
 import { useAppStore } from '@/core/state/store'
 
 const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id'
@@ -41,31 +42,35 @@ export function useBathroomRecommendations() {
 
   const ctxRef = useRef({ currentZoneId, userLocation })
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (force = false) => {
     setLoading(true)
     setError(null)
     try {
       const { currentZoneId: zoneIdSnapshot, userLocation: locationSnapshot } = ctxRef.current
-      const { data: res } = await apiClient.get<BathroomRecommendationResponse>(
-        endpoints.products.bathroom(EVENT_ID),
-        {
-          params: {
-            speed: 1.5,
-            accessibility_required: false,
-            limit: 10,
-            current_zone_id: zoneIdSnapshot || undefined,
-            // TODO:
-            // Reemplazar por el identificador real del visitante
-            // cuando exista contexto de autenticación.
-            user_id: '00000000-0000-0000-0000-000000000000',
-            access_level: 'STANDARD',
-            ...(locationSnapshot
-              ? { latitude: locationSnapshot[0], longitude: locationSnapshot[1] }
-              : {}),
-          },
-        }
+      const params: Record<string, unknown> = {
+        speed: 1.5,
+        accessibility_required: false,
+        limit: 10,
+        current_zone_id: zoneIdSnapshot || undefined,
+        user_id: '00000000-0000-0000-0000-000000000000',
+        access_level: 'STANDARD',
+        ...(locationSnapshot
+          ? { latitude: locationSnapshot[0], longitude: locationSnapshot[1] }
+          : {}),
+      }
+      const data = await readThroughCache<BathroomRecommendationResponse>(
+        productCacheKey(EVENT_ID, 'bathroom', params),
+        PRODUCT_TTL_MS,
+        async () => {
+          const { data } = await apiClient.get<BathroomRecommendationResponse>(
+            endpoints.products.bathroom(EVENT_ID),
+            { params },
+          )
+          return data
+        },
+        force
       )
-      setData(res)
+      setData(data)
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Error al obtener recomendaciones de baños')
     } finally {

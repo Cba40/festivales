@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { apiClient } from '@/core/api/client'
 import { endpoints } from '@/core/api/endpoints'
+import { readThroughCache, productCacheKey, PRODUCT_TTL_MS } from '@/core/cache/memoryCache'
 import { useAppStore } from '@/core/state/store'
 
 const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id'
@@ -41,7 +42,7 @@ export function useParkingRecommendations() {
 
   const ctxRef = useRef({ currentZoneId, userLocation })
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (force = false) => {
     setLoading(true)
     setError(null)
     try {
@@ -57,11 +58,19 @@ export function useParkingRecommendations() {
           ? { latitude: locationSnapshot[0], longitude: locationSnapshot[1] }
           : {}),
       }
-      const { data: res } = await apiClient.get<ParkingRecommendationResponse>(
-        endpoints.products.parking(EVENT_ID),
-        { params },
+      const data = await readThroughCache<ParkingRecommendationResponse>(
+        productCacheKey(EVENT_ID, 'parking', params),
+        PRODUCT_TTL_MS,
+        async () => {
+          const { data } = await apiClient.get<ParkingRecommendationResponse>(
+            endpoints.products.parking(EVENT_ID),
+            { params },
+          )
+          return data
+        },
+        force
       )
-      setData(res)
+      setData(data)
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Error al obtener recomendaciones de estacionamiento')
     } finally {
