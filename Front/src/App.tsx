@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { useAppStore } from './core/state/store';
 import Home from './screens/Home';
@@ -31,6 +31,18 @@ function AppLayout() {
   const setUserLocation = useAppStore(s => s.setUserLocation);
   const setLocationPermissionDenied = useAppStore(s => s.setLocationPermissionDenied);
   const requestLocation = useAppStore(s => s.requestLocation);
+  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
+
+  useEffect(() => {
+    const onOnline = () => setIsOnline(true);
+    const onOffline = () => setIsOnline(false);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, []);
 
   useEffect(() => {
     refresh();
@@ -119,7 +131,13 @@ function AppLayout() {
 
   if (isDashboard) {
     return (
-      <Routes>
+      <>
+        {!isOnline && (
+          <div className="bg-yellow-500 text-black text-center text-sm p-1">
+            Modo sin conexión. Se mostrarán datos disponibles localmente.
+          </div>
+        )}
+        <Routes>
         <Route path="/dashboard/login" element={<LoginScreen />} />
         <Route path="/dashboard/*" element={
           <ProtectedRoute>
@@ -142,14 +160,21 @@ function AppLayout() {
             <MotorScreen />
           </ProtectedRoute>
         } />
-      </Routes>
+        </Routes>
+      </>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex justify-center">
-      <div className="w-full max-w-md bg-white min-h-screen relative shadow-lg">
-        <Routes>
+    <>
+      {!isOnline && (
+        <div className="bg-yellow-500 text-black text-center text-sm p-1">
+          Modo sin conexión. Se mostrarán datos disponibles localmente.
+        </div>
+      )}
+      <div className="min-h-screen bg-slate-50 flex justify-center">
+        <div className="w-full max-w-md bg-white min-h-screen relative shadow-lg">
+          <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/estacionar" element={<Estacionar />} />
           <Route path="/emergencia" element={<Emergencia />} />
@@ -163,8 +188,9 @@ function AppLayout() {
           <Route path="/pernoctar" element={<Pernoctar />} />
           <Route path="/asistente" element={<AsistenteScreen />} />
         </Routes>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
