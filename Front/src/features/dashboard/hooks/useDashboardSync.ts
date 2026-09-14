@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { useAppStore } from '../../../core/state/store';
 import { apiClient } from '../../../core/api/client';
 import { endpoints } from '../../../core/api/endpoints';
+import { readThroughCache, zoneCacheKey, ZONES_TTL_MS } from '../../../core/cache/memoryCache';
 import type { Zone } from '../types';
 
 const DEFAULT_EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
@@ -66,12 +67,20 @@ export function useDashboardSync(eventId: string = DEFAULT_EVENT_ID) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (force = false) => {
     setLoading(true);
     setError(null);
     try {
-      const zonesRes = await apiClient.get<ApiZone[]>(endpoints.zones.list(eventId));
-      setZones(zonesRes.data.map(mapZone));
+      const zones = await readThroughCache<ApiZone[]>(
+        zoneCacheKey(eventId),
+        ZONES_TTL_MS,
+        async () => {
+          const zonesRes = await apiClient.get<ApiZone[]>(endpoints.zones.list(eventId));
+          return zonesRes.data;
+        },
+        force
+      );
+      setZones(zones.map(mapZone));
     } catch (err) {
       const msg =
         (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||

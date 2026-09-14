@@ -3,6 +3,7 @@ import { RefreshCw, Layers } from 'lucide-react';
 import { useTerritorialPrediction, useAutoRefresh } from '../../../hooks/useContextEngine';
 import { apiClient } from '../../../core/api/client';
 import { endpoints } from '../../../core/api/endpoints';
+import { readThroughCache, zoneCacheKey, ZONES_TTL_MS } from '../../../core/cache/memoryCache';
 import { ZoneCard } from './ZoneCard';
 
 const EVENT_ID = import.meta.env.VITE_EVENT_ID || '';
@@ -28,12 +29,18 @@ export function ZoneList({ autoRefreshMs = 30000 }: ZoneListProps) {
 
   useEffect(() => {
     let cancelled = false;
-    apiClient
-      .get<ZoneInfo[]>(endpoints.zones.list(EVENT_ID))
-      .then((res) => {
+    readThroughCache<ZoneInfo[]>(
+      zoneCacheKey(EVENT_ID),
+      ZONES_TTL_MS,
+      async () => {
+        const res = await apiClient.get<ZoneInfo[]>(endpoints.zones.list(EVENT_ID));
+        return res.data ?? [];
+      }
+    )
+      .then((zones) => {
         if (cancelled) return;
         const map: Record<string, { name: string; type: string; subtipo?: string | null }> = {};
-        for (const z of res.data ?? []) {
+        for (const z of zones) {
           map[z.id] = { name: z.name, type: z.type, subtipo: z.subtipo ?? undefined };
         }
         setZonesById(map);
@@ -136,7 +143,7 @@ export function ZoneList({ autoRefreshMs = 30000 }: ZoneListProps) {
           </span>
         </div>
         <button
-          onClick={() => refresh()}
+          onClick={() => refresh(true)}
           disabled={loading}
           className="flex items-center gap-1 text-[10px] font-semibold text-slate-400 hover:text-slate-600 transition-colors disabled:opacity-50"
           aria-label="Actualizar zonas"

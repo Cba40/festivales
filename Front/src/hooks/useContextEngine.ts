@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { apiClient } from '../core/api/client';
 import { endpoints } from '../core/api/endpoints';
+import { readThroughCache, predictionCacheKey, PREDICTION_TTL_MS } from '../core/cache/memoryCache';
 
 const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 
@@ -30,12 +31,20 @@ export function useTerritorialPrediction(eventId: string = EVENT_ID) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (force = false) => {
     setLoading(true);
     setError(null);
     try {
-      const { data: res } = await apiClient.get<TerritorialPredictionResponse>(
-        endpoints.predictions.get(eventId)
+      const res = await readThroughCache<TerritorialPredictionResponse>(
+        predictionCacheKey(eventId),
+        PREDICTION_TTL_MS,
+        async () => {
+          const { data } = await apiClient.get<TerritorialPredictionResponse>(
+            endpoints.predictions.get(eventId)
+          );
+          return data;
+        },
+        force
       );
       setData(res);
     } catch (err: any) {

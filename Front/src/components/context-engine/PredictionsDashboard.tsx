@@ -22,6 +22,7 @@ import { useTerritorialPrediction, useAutoRefresh } from '../../hooks/useContext
 import type { ZoneStateItem } from '../../hooks/useContextEngine';
 import { apiClient } from '../../core/api/client';
 import { endpoints } from '../../core/api/endpoints';
+import { readThroughCache, zoneCacheKey, ZONES_TTL_MS } from '../../core/cache/memoryCache';
 import { Button, Card, Badge, RefreshButton } from '../../features/dashboard/components/ui';
 
 const RESTRICTION_LABELS: Record<string, string> = {
@@ -122,12 +123,18 @@ export function PredictionsDashboard({ eventId, autoRefreshMs = 15000 }: Predict
 
   useEffect(() => {
     let cancelled = false;
-    apiClient
-      .get<ZoneInfo[]>(endpoints.zones.list(eid))
-      .then((res) => {
+    readThroughCache<ZoneInfo[]>(
+      zoneCacheKey(eid),
+      ZONES_TTL_MS,
+      async () => {
+        const res = await apiClient.get<ZoneInfo[]>(endpoints.zones.list(eid));
+        return res.data ?? [];
+      }
+    )
+      .then((zones) => {
         if (cancelled) return;
         const map: Record<string, { name: string; type: string }> = {};
-        for (const z of res.data ?? []) {
+        for (const z of zones) {
           map[z.id] = { name: z.name, type: z.type };
         }
         setZonesById(map);
@@ -299,7 +306,7 @@ export function PredictionsDashboard({ eventId, autoRefreshMs = 15000 }: Predict
             />
             Auto {autoRefreshMs / 1000}s
           </label>
-          <RefreshButton onClick={() => refresh()} loading={loading} />
+          <RefreshButton onClick={() => refresh(true)} loading={loading} />
         </div>
       </div>
 

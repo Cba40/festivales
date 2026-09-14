@@ -1,21 +1,29 @@
 import { apiClient } from '@/core/api/client';
 import { endpoints } from '@/core/api/endpoints';
+import { readThroughCache, eventDayTodayCacheKey, EVENT_DAY_TTL_MS } from '@/core/cache/memoryCache';
 import type { EventDay } from '@/features/dashboard/types';
 
 let cachedEventDay: EventDay | null = null;
 
 export const getCachedEventDay = (): EventDay | null => cachedEventDay;
 
-export const loadEventDayContext = async (eventId: string): Promise<EventDay | null> => {
+export const loadEventDayContext = async (eventId: string, force = false): Promise<EventDay | null> => {
   try {
-    const { data } = await apiClient.get<EventDay | null>(
-      endpoints.eventDays.today(eventId)
+    const data = await readThroughCache<EventDay | null>(
+      eventDayTodayCacheKey(eventId),
+      EVENT_DAY_TTL_MS,
+      async () => {
+        const { data } = await apiClient.get<EventDay | null>(
+          endpoints.eventDays.today(eventId)
+        );
+        return data;
+      },
+      force
     );
     cachedEventDay = data;
     return data;
   } catch {
-    cachedEventDay = null;
-    return null;
+    return cachedEventDay ?? null;
   }
 };
 

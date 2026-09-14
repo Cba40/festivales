@@ -107,7 +107,7 @@ export function DashboardScreen() {
   const handleRefresh = async () => {
     if (refreshing) return;
     setRefreshing(true);
-    await Promise.allSettled([refreshZones(), refreshDays(), refreshIncidents()]);
+    await Promise.allSettled([refreshZones(true), refreshDays(), refreshIncidents()]);
     setSyncTime(new Date());
     setRefreshing(false);
   };
