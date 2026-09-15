@@ -389,18 +389,7 @@ const ServiciosGenerales = () => {
     )
   }
 
-  if (isBanos && loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        <Header title="Baños" showBack onBack={() => setSubtipoActivo(null)} />
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-slate-500">Cargando recomendaciones...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (isBanos && error) {
+  if (isBanos && bathroomData === null && error && !loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
         <Header title="Baños" showBack onBack={() => setSubtipoActivo(null)} />
@@ -408,11 +397,22 @@ const ServiciosGenerales = () => {
           <p className="text-danger font-bold">Error al cargar</p>
           <p className="text-sm text-slate-500 text-center">{error}</p>
           <button
-            onClick={refresh}
+            onClick={() => refresh(true)}
             className="bg-primary text-white px-6 py-2 rounded-lg font-bold"
           >
             Reintentar
           </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (isBanos && bathroomData === null) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
+        <Header title="Baños" showBack onBack={() => setSubtipoActivo(null)} />
+        <div className="flex-1 p-4 flex items-center justify-center" aria-live="polite">
+          <p className="text-slate-500">Cargando recomendaciones...</p>
         </div>
       </div>
     )
@@ -510,18 +510,7 @@ const ServiciosGenerales = () => {
     )
   }
 
-  if (isDescanso && restLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        <Header title="Descanso" showBack onBack={() => setSubtipoActivo(null)} />
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-slate-500">Cargando recomendaciones...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (isDescanso && restError) {
+  if (isDescanso && restData === null && restError && !restLoading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
         <Header title="Descanso" showBack onBack={() => setSubtipoActivo(null)} />
@@ -529,11 +518,22 @@ const ServiciosGenerales = () => {
           <p className="text-danger font-bold">Error al cargar</p>
           <p className="text-sm text-slate-500 text-center">{restError}</p>
           <button
-            onClick={refreshRest}
+            onClick={() => refreshRest(true)}
             className="bg-primary text-white px-6 py-2 rounded-lg font-bold"
           >
             Reintentar
           </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (isDescanso && restData === null) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
+        <Header title="Descanso" showBack onBack={() => setSubtipoActivo(null)} />
+        <div className="flex-1 p-4 flex items-center justify-center" aria-live="polite">
+          <p className="text-slate-500">Cargando recomendaciones...</p>
         </div>
       </div>
     )
@@ -631,18 +631,7 @@ const ServiciosGenerales = () => {
     )
   }
 
-  if (isHidratacion && hydrationLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        <Header title="Agua" showBack onBack={() => setSubtipoActivo(null)} />
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-slate-500">Cargando recomendaciones...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (isHidratacion && hydrationError) {
+  if (isHidratacion && hydrationData === null && hydrationError && !hydrationLoading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
         <Header title="Agua" showBack onBack={() => setSubtipoActivo(null)} />
@@ -650,11 +639,22 @@ const ServiciosGenerales = () => {
           <p className="text-danger font-bold">Error al cargar</p>
           <p className="text-sm text-slate-500 text-center">{hydrationError}</p>
           <button
-            onClick={refreshHydration}
+            onClick={() => refreshHydration(true)}
             className="bg-primary text-white px-6 py-2 rounded-lg font-bold"
           >
             Reintentar
           </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (isHidratacion && hydrationData === null) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
+        <Header title="Agua" showBack onBack={() => setSubtipoActivo(null)} />
+        <div className="flex-1 p-4 flex items-center justify-center" aria-live="polite">
+          <p className="text-slate-500">Cargando recomendaciones...</p>
         </div>
       </div>
     )
@@ -752,18 +752,7 @@ const ServiciosGenerales = () => {
     )
   }
 
-  if (isCajeros && cajerosLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        <Header title="Cajeros" showBack onBack={() => setSubtipoActivo(null)} />
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-slate-500">Cargando cajeros...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (isCajeros && cajerosError) {
+  if (isCajeros && cajeros.length === 0 && cajerosError && !cajerosLoading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
         <Header title="Cajeros" showBack onBack={() => setSubtipoActivo(null)} />
@@ -771,11 +760,22 @@ const ServiciosGenerales = () => {
           <p className="text-danger font-bold">Error al cargar</p>
           <p className="text-sm text-slate-500 text-center">{cajerosError}</p>
           <button
-            onClick={refreshCajeros}
+            onClick={() => refreshCajeros(true)}
             className="bg-primary text-white px-6 py-2 rounded-lg font-bold"
           >
             Reintentar
           </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (isCajeros && cajeros.length === 0 && cajerosLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
+        <Header title="Cajeros" showBack onBack={() => setSubtipoActivo(null)} />
+        <div className="flex-1 p-4 flex items-center justify-center" aria-live="polite">
+          <p className="text-slate-500">Cargando cajeros...</p>
         </div>
       </div>
     )

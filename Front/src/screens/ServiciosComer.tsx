@@ -114,18 +114,7 @@ const ServiciosComer = () => {
     </>
   )
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
-        <Header title="Comer" showBack onBack={() => navigate('/')} />
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-slate-500">Cargando recomendaciones...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (error) {
+  if (data === null && error && !loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
         <Header title="Comer" showBack onBack={() => navigate('/')} />
@@ -133,11 +122,22 @@ const ServiciosComer = () => {
           <p className="text-danger font-bold">Error al cargar</p>
           <p className="text-sm text-slate-500 text-center">{error}</p>
           <button
-            onClick={refresh}
+            onClick={() => refresh(true)}
             className="bg-primary text-white px-6 py-2 rounded-lg font-bold"
           >
             Reintentar
           </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (data === null) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
+        <Header title="Comer" showBack onBack={() => navigate('/')} />
+        <div className="flex-1 p-4 flex items-center justify-center" aria-live="polite">
+          <p className="text-slate-500">Cargando recomendaciones...</p>
         </div>
       </div>
     )
