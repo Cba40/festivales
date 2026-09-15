@@ -59,7 +59,7 @@ export function useHydrationRecommendations() {
           : {}),
       }
       const data = await readThroughCache<HydrationRecommendationResponse>(
-        productCacheKey(EVENT_ID, 'hydration', params),
+        productCacheKey(EVENT_ID, 'hydration'),
         PRODUCT_TTL_MS,
         async () => {
           const { data } = await apiClient.get<HydrationRecommendationResponse>(

@@ -60,7 +60,7 @@ export function useGastronomyRecommendations() {
           : {}),
       }
       const data = await readThroughCache<GastronomyRecommendationResponse>(
-        productCacheKey(EVENT_ID, 'gastronomy', params),
+        productCacheKey(EVENT_ID, 'gastronomy'),
         PRODUCT_TTL_MS,
         async () => {
           const { data } = await apiClient.get<GastronomyRecommendationResponse>(

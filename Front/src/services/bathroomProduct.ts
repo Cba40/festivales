@@ -59,7 +59,7 @@ export function useBathroomRecommendations() {
           : {}),
       }
       const data = await readThroughCache<BathroomRecommendationResponse>(
-        productCacheKey(EVENT_ID, 'bathroom', params),
+        productCacheKey(EVENT_ID, 'bathroom'),
         PRODUCT_TTL_MS,
         async () => {
           const { data } = await apiClient.get<BathroomRecommendationResponse>(

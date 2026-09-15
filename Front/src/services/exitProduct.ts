@@ -57,7 +57,7 @@ export function useExitRecommendations(
           : {}),
       }
       const data = await readThroughCache<ExitRecommendationResponse>(
-        productCacheKey(EVENT_ID, 'exit', params),
+        productCacheKey(EVENT_ID, 'exit'),
         PRODUCT_TTL_MS,
         async () => {
           const { data } = await apiClient.get<ExitRecommendationResponse>(

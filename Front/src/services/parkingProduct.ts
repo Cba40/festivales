@@ -59,7 +59,7 @@ export function useParkingRecommendations() {
           : {}),
       }
       const data = await readThroughCache<ParkingRecommendationResponse>(
-        productCacheKey(EVENT_ID, 'parking', params),
+        productCacheKey(EVENT_ID, 'parking'),
         PRODUCT_TTL_MS,
         async () => {
           const { data } = await apiClient.get<ParkingRecommendationResponse>(

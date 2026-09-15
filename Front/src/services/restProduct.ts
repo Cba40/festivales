@@ -59,7 +59,7 @@ export function useRestRecommendations() {
           : {}),
       }
       const data = await readThroughCache<RestRecommendationResponse>(
-        productCacheKey(EVENT_ID, 'rest', params),
+        productCacheKey(EVENT_ID, 'rest'),
         PRODUCT_TTL_MS,
         async () => {
           const { data } = await apiClient.get<RestRecommendationResponse>(

@@ -53,7 +53,7 @@ export function useAccommodationRecommendations(
         ...(type ? { type } : {}),
       }
       const data = await readThroughCache<AccommodationRecommendationResponse>(
-        productCacheKey(EVENT_ID, 'accommodation', params),
+        productCacheKey(EVENT_ID, 'accommodation'),
         PRODUCT_TTL_MS,
         async () => {
           const { data } = await apiClient.get<AccommodationRecommendationResponse>(

@@ -26,27 +26,11 @@ export function predictionCacheKey(eventId: string): string {
   return `predictions:${normalizeEventId(eventId)}`
 }
 
-const COORDINATE_KEYS = new Set(['lat', 'lng', 'latitude', 'longitude'])
-
 export function productCacheKey(
   eventId: string,
   productType: string,
-  params: Record<string, unknown> = {}
 ): string {
-  const normalizedId = normalizeEventId(eventId)
-  const normalizedParams = Object.keys(params)
-    .sort()
-    .reduce<Record<string, unknown>>((acc, key) => {
-      const value = params[key]
-      if (value === undefined) return acc
-      if (typeof value === 'number' && COORDINATE_KEYS.has(key)) {
-        acc[key] = Number(value.toFixed(4))
-      } else {
-        acc[key] = value
-      }
-      return acc
-    }, {})
-  return `product:${normalizedId}:${productType}:${JSON.stringify(normalizedParams)}`
+  return `product:${normalizeEventId(eventId)}:${productType}`
 }
 
 function getStale<T>(key: string): T | undefined {
