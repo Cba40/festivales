@@ -36,8 +36,15 @@ export async function getExitRecommendations(
   eventId: string,
   params: Record<string, unknown> = {}
 ): Promise<ExitRecommendationResponse> {
+  const modo = typeof params.mode === 'string' ? params.mode : undefined
+  const dest = typeof params.destination_id === 'string' ? params.destination_id : undefined
+  const cacheProductType = [
+    'exit',
+    ...(modo ? [modo] : []),
+    ...(dest ? [dest] : []),
+  ].join(':')
   return readThroughCache<ExitRecommendationResponse>(
-    productCacheKey(eventId, 'exit'),
+    productCacheKey(eventId, cacheProductType),
     PRODUCT_TTL_MS,
     async () => {
       const { data } = await apiClient.get<ExitRecommendationResponse>(
@@ -75,8 +82,13 @@ export function useExitRecommendations(
           ? { latitude: locationSnapshot[0], longitude: locationSnapshot[1] }
           : {}),
       }
+      const cacheProductType = [
+        'exit',
+        ...(mode ? [mode] : []),
+        ...(destinationId ? [destinationId] : []),
+      ].join(':')
       const data = await readThroughCache<ExitRecommendationResponse>(
-        productCacheKey(EVENT_ID, 'exit'),
+        productCacheKey(EVENT_ID, cacheProductType),
         PRODUCT_TTL_MS,
         async () => {
           const { data } = await apiClient.get<ExitRecommendationResponse>(
