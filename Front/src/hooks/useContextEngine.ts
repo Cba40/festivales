@@ -44,7 +44,8 @@ export function useTerritorialPrediction(eventId: string = EVENT_ID) {
           );
           return data;
         },
-        force
+        force,
+        true
       );
       setData(res);
     } catch (err: any) {

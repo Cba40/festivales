@@ -5,7 +5,7 @@ type CacheEntry<T> = {
 
 export const ZONES_TTL_MS = 60_000
 export const EVENT_DAY_TTL_MS = 60_000
-export const PREDICTION_TTL_MS = 15_000
+export const PREDICTION_TTL_MS = 60_000
 export const PRODUCT_TTL_MS = 30_000
 
 const cache = new Map<string, CacheEntry<unknown>>()

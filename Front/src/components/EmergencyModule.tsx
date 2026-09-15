@@ -14,7 +14,6 @@ import {
 } from 'lucide-react'
 import {
   getCities,
-  getEmergencies,
   getProtocols,
   getRecommendedResource,
   useEmergencyRecommendations,
@@ -108,21 +107,9 @@ export const EmergencyModule = ({ context, cityId }: EmergencyModuleProps) => {
           setResolvedCityId(null)
           setCityError('No hay ciudades configuradas')
         } else {
-          // Auto-descubrimiento con datos: se elige la primera ciudad que
-          // realmente tenga emergencias registradas, en el orden del backend.
-          const ciudadConDatos = (
-            await Promise.all(
-              cities.map(async (c) => {
-                try {
-                  const res = await getEmergencies(c.id, 1)
-                  return res.emergencies.length > 0 ? c : null
-                } catch {
-                  return null
-                }
-              })
-            )
-          ).find((c) => c !== null)
-          setResolvedCityId((ciudadConDatos ?? cities[0]).id)
+          // Usar directamente la primera ciudad disponible. La lista completa
+          // de emergencias ya se muestra vía useEmergencyRecommendations.
+          setResolvedCityId(cities[0].id)
           setCityError(null)
         }
       } catch {
@@ -241,7 +228,7 @@ export const EmergencyModule = ({ context, cityId }: EmergencyModuleProps) => {
     return (
       <div className="flex flex-col items-center justify-center p-8 text-slate-500 dark:text-slate-300 gap-2">
         <Loader2 size={28} className="animate-spin" />
-        <p className="text-sm font-semibold">Cargando ubicación...</p>
+        <p className="text-sm font-semibold">Cargando datos de emergencia...</p>
       </div>
     )
   }
