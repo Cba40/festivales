@@ -32,6 +32,25 @@ export interface BathroomRecommendationResponse {
   zonas: ZonaSanitaryItem[]
 }
 
+export async function getBathroomRecommendations(
+  eventId: string,
+  params: Record<string, unknown> = {}
+): Promise<BathroomRecommendationResponse> {
+  return readThroughCache<BathroomRecommendationResponse>(
+    productCacheKey(eventId, 'bathroom'),
+    PRODUCT_TTL_MS,
+    async () => {
+      const { data } = await apiClient.get<BathroomRecommendationResponse>(
+        endpoints.products.bathroom(eventId),
+        { params }
+      )
+      return data
+    },
+    false,
+    true
+  )
+}
+
 export function useBathroomRecommendations() {
   const [data, setData] = useState<BathroomRecommendationResponse | null>(null)
   const [loading, setLoading] = useState(false)

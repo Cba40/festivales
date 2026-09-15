@@ -29,6 +29,25 @@ export interface AccommodationRecommendationResponse {
   accommodations: AccommodationItem[]
 }
 
+export async function getAccommodationRecommendations(
+  eventId: string,
+  params: Record<string, unknown> = {}
+): Promise<AccommodationRecommendationResponse> {
+  return readThroughCache<AccommodationRecommendationResponse>(
+    productCacheKey(eventId, 'accommodation'),
+    PRODUCT_TTL_MS,
+    async () => {
+      const { data } = await apiClient.get<AccommodationRecommendationResponse>(
+        endpoints.products.accommodation(eventId),
+        { params }
+      )
+      return data
+    },
+    false,
+    true
+  )
+}
+
 export function useAccommodationRecommendations(
   type?: AccommodationType
 ) {

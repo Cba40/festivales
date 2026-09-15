@@ -32,6 +32,25 @@ export interface RestRecommendationResponse {
   zonas: ZonaRestItem[]
 }
 
+export async function getRestRecommendations(
+  eventId: string,
+  params: Record<string, unknown> = {}
+): Promise<RestRecommendationResponse> {
+  return readThroughCache<RestRecommendationResponse>(
+    productCacheKey(eventId, 'rest'),
+    PRODUCT_TTL_MS,
+    async () => {
+      const { data } = await apiClient.get<RestRecommendationResponse>(
+        endpoints.products.rest(eventId),
+        { params }
+      )
+      return data
+    },
+    false,
+    true
+  )
+}
+
 export function useRestRecommendations() {
   const [data, setData] = useState<RestRecommendationResponse | null>(null)
   const [loading, setLoading] = useState(false)

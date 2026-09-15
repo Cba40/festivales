@@ -32,6 +32,25 @@ export interface ExitRecommendationResponse {
   zonas: ExitZoneItem[]
 }
 
+export async function getExitRecommendations(
+  eventId: string,
+  params: Record<string, unknown> = {}
+): Promise<ExitRecommendationResponse> {
+  return readThroughCache<ExitRecommendationResponse>(
+    productCacheKey(eventId, 'exit'),
+    PRODUCT_TTL_MS,
+    async () => {
+      const { data } = await apiClient.get<ExitRecommendationResponse>(
+        endpoints.products.exit(eventId),
+        { params }
+      )
+      return data
+    },
+    false,
+    true
+  )
+}
+
 export function useExitRecommendations(
   destinationId?: string,
   mode?: TransporteMode

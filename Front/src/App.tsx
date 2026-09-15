@@ -6,6 +6,13 @@ import { useTerritorialPrediction } from './hooks/useContextEngine';
 import { loadEventDayContext } from './utils/contextoEvento';
 import { recargarFases } from './config/eventoConfig';
 import { getParkingRecommendations } from './services/parkingProduct';
+import { getGastronomyRecommendations } from './services/gastronomyProduct';
+import { getBathroomRecommendations } from './services/bathroomProduct';
+import { getRestRecommendations } from './services/restProduct';
+import { getHydrationRecommendations } from './services/hydrationProduct';
+import { getAccommodationRecommendations } from './services/accommodationProduct';
+import { getExitRecommendations } from './services/exitProduct';
+import { getCities, getProtocols } from './services/emergencyProduct';
 import ProtectedRoute from './shared/components/ProtectedRoute';
 
 const Home = lazy(() => import('./screens/Home'));
@@ -37,6 +44,18 @@ const MotorScreen = lazy(() =>
 );
 const LoginScreen = lazy(() => import('./features/auth/screens/LoginScreen'));
 
+function buildProductParams(): Record<string, unknown> {
+  const { userLocation, zones } = useAppStore.getState();
+  return {
+    speed: 1.5,
+    accessibility_required: false,
+    current_zone_id: zones[0]?.id || undefined,
+    user_id: '00000000-0000-0000-0000-000000000000',
+    access_level: 'STANDARD',
+    ...(userLocation ? { latitude: userLocation[0], longitude: userLocation[1] } : {}),
+  };
+}
+
 function ScreenLoading() {
   return (
     <div className="flex min-h-[40vh] items-center justify-center text-slate-500">
@@ -58,18 +77,44 @@ function AppLayout() {
   const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 
   const preloadParking = useCallback(() => {
-    const { userLocation, zones } = useAppStore.getState();
-    const zoneId = zones[0]?.id;
-    getParkingRecommendations(EVENT_ID, {
-      speed: 1.5,
-      accessibility_required: false,
-      limit: 4,
-      current_zone_id: zoneId || undefined,
-      user_id: '00000000-0000-0000-0000-000000000000',
-      access_level: 'STANDARD',
+    getParkingRecommendations(EVENT_ID, { ...buildProductParams(), limit: 4 }).catch(() => {});
+  }, [EVENT_ID]);
+
+  const preloadGastronomy = useCallback(() => {
+    getGastronomyRecommendations(EVENT_ID, { ...buildProductParams(), limit: 6 }).catch(() => {});
+  }, [EVENT_ID]);
+
+  const preloadBathroom = useCallback(() => {
+    getBathroomRecommendations(EVENT_ID, { ...buildProductParams(), limit: 10 }).catch(() => {});
+  }, [EVENT_ID]);
+
+  const preloadRest = useCallback(() => {
+    getRestRecommendations(EVENT_ID, { ...buildProductParams(), limit: 10 }).catch(() => {});
+  }, [EVENT_ID]);
+
+  const preloadHydration = useCallback(() => {
+    getHydrationRecommendations(EVENT_ID, { ...buildProductParams(), limit: 10 }).catch(() => {});
+  }, [EVENT_ID]);
+
+  const preloadAccommodation = useCallback(() => {
+    const { userLocation } = useAppStore.getState();
+    getAccommodationRecommendations(EVENT_ID, {
+      limit: 100,
       ...(userLocation ? { latitude: userLocation[0], longitude: userLocation[1] } : {}),
     }).catch(() => {});
   }, [EVENT_ID]);
+
+  const preloadExit = useCallback(() => {
+    const { userLocation } = useAppStore.getState();
+    getExitRecommendations(EVENT_ID, {
+      ...(userLocation ? { latitude: userLocation[0], longitude: userLocation[1] } : {}),
+    }).catch(() => {});
+  }, [EVENT_ID]);
+
+  const preloadEmergency = useCallback(() => {
+    getCities().catch(() => {});
+    getProtocols('festival').catch(() => {});
+  }, []);
 
   useEffect(() => {
     const onOnline = () => setIsOnline(true);
@@ -85,24 +130,55 @@ function AppLayout() {
   useEffect(() => {
     refresh();
     refreshPredictions();
-    preloadParking();
     loadEventDayContext(EVENT_ID).then(() => recargarFases());
-  }, [refresh, refreshPredictions, preloadParking, EVENT_ID]);
+    preloadParking();
+    preloadGastronomy();
+    preloadBathroom();
+    const t2 = setTimeout(() => {
+      preloadRest();
+      preloadHydration();
+      preloadAccommodation();
+      preloadExit();
+      preloadEmergency();
+    }, 500);
+    return () => clearTimeout(t2);
+  }, [refresh, refreshPredictions, preloadParking, preloadGastronomy, preloadBathroom, preloadRest, preloadHydration, preloadAccommodation, preloadExit, preloadEmergency, EVENT_ID]);
 
   useEffect(() => {
     const id = setInterval(() => {
       refresh();
       preloadParking();
+      preloadGastronomy();
+      preloadBathroom();
+      preloadRest();
+      preloadHydration();
+      preloadAccommodation();
+      preloadExit();
+      preloadEmergency();
     }, 30000);
     const onVisibility = () => {
       if (document.visibilityState === 'visible') {
         refresh();
         preloadParking();
+        preloadGastronomy();
+        preloadBathroom();
+        preloadRest();
+        preloadHydration();
+        preloadAccommodation();
+        preloadExit();
+        preloadEmergency();
       }
     };
     const onFocus = () => {
       refresh();
       preloadParking();
+      preloadGastronomy();
+      preloadBathroom();
+      preloadRest();
+      preloadHydration();
+      preloadAccommodation();
+      preloadExit();
+      preloadEmergency();
     };
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('focus', onFocus);
@@ -111,7 +187,7 @@ function AppLayout() {
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('focus', onFocus);
     };
-  }, [refresh, preloadParking]);
+  }, [refresh, preloadParking, preloadGastronomy, preloadBathroom, preloadRest, preloadHydration, preloadAccommodation, preloadExit, preloadEmergency]);
 
   // 1. Escuchar el estado de los permisos de geolocalización de manera reactiva
   useEffect(() => {

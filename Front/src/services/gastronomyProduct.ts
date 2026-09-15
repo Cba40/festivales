@@ -33,6 +33,25 @@ export interface GastronomyRecommendationResponse {
   zonas: ZonaGastronomicaItem[]
 }
 
+export async function getGastronomyRecommendations(
+  eventId: string,
+  params: Record<string, unknown> = {}
+): Promise<GastronomyRecommendationResponse> {
+  return readThroughCache<GastronomyRecommendationResponse>(
+    productCacheKey(eventId, 'gastronomy'),
+    PRODUCT_TTL_MS,
+    async () => {
+      const { data } = await apiClient.get<GastronomyRecommendationResponse>(
+        endpoints.products.gastronomy(eventId),
+        { params }
+      )
+      return data
+    },
+    false,
+    true
+  )
+}
+
 export function useGastronomyRecommendations() {
   const [data, setData] = useState<GastronomyRecommendationResponse | null>(null)
   const [loading, setLoading] = useState(false)

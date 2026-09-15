@@ -32,6 +32,25 @@ export interface HydrationRecommendationResponse {
   zonas: ZonaHidratacionItem[]
 }
 
+export async function getHydrationRecommendations(
+  eventId: string,
+  params: Record<string, unknown> = {}
+): Promise<HydrationRecommendationResponse> {
+  return readThroughCache<HydrationRecommendationResponse>(
+    productCacheKey(eventId, 'hydration'),
+    PRODUCT_TTL_MS,
+    async () => {
+      const { data } = await apiClient.get<HydrationRecommendationResponse>(
+        endpoints.products.hydration(eventId),
+        { params }
+      )
+      return data
+    },
+    false,
+    true
+  )
+}
+
 export function useHydrationRecommendations() {
   const [data, setData] = useState<HydrationRecommendationResponse | null>(null)
   const [loading, setLoading] = useState(false)
