@@ -107,9 +107,17 @@ export const EmergencyModule = ({ context, cityId }: EmergencyModuleProps) => {
           setResolvedCityId(null)
           setCityError('No hay ciudades configuradas')
         } else {
-          // Usar directamente la primera ciudad disponible. La lista completa
-          // de emergencias ya se muestra vía useEmergencyRecommendations.
-          setResolvedCityId(cities[0].id)
+          // Prioridad 1: ciudad con datos del festival (Jesús María).
+          const ciudadConDatos = cities.find(c =>
+            c.name?.toLowerCase().includes('jesus maria') ||
+            c.name?.toLowerCase().includes('jesús maría')
+          )
+          // Prioridad 2: si el usuario tiene GPS (evento en Jesús María), se
+          // confirma la misma ciudad.
+          const { userLocation } = useAppStore.getState()
+          const ciudadPorGps = userLocation && ciudadConDatos ? ciudadConDatos : undefined
+          // Fallback: primera ciudad disponible (compatibilidad con otros eventos).
+          setResolvedCityId((ciudadPorGps ?? ciudadConDatos ?? cities[0])?.id ?? null)
           setCityError(null)
         }
       } catch {

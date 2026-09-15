@@ -114,8 +114,8 @@ export async function getRecommendedResource(
           typeof err === 'object' &&
           'response' in err &&
           (err as { response?: { status?: unknown } }).response?.status
-        if (status === 404) return null
-        throw err
+        if (status === 404) throw err
+        return null
       }
     },
     false,
