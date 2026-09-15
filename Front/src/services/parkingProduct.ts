@@ -6,6 +6,25 @@ import { useAppStore } from '@/core/state/store'
 
 const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id'
 
+export async function getParkingRecommendations(
+  eventId: string,
+  params: Record<string, unknown> = {},
+): Promise<ParkingRecommendationResponse> {
+  return readThroughCache<ParkingRecommendationResponse>(
+    productCacheKey(eventId, 'parking'),
+    PRODUCT_TTL_MS,
+    async () => {
+      const { data } = await apiClient.get<ParkingRecommendationResponse>(
+        endpoints.products.parking(eventId),
+        { params },
+      )
+      return data
+    },
+    false,
+    true
+  )
+}
+
 export interface ZonaEstacionamientoItem {
   zone_id: string
   name: string

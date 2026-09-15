@@ -1,10 +1,11 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { useAppStore } from './core/state/store';
 import { useDashboardSync } from './features/dashboard/hooks/useDashboardSync';
 import { useTerritorialPrediction } from './hooks/useContextEngine';
 import { loadEventDayContext } from './utils/contextoEvento';
 import { recargarFases } from './config/eventoConfig';
+import { getParkingRecommendations } from './services/parkingProduct';
 import ProtectedRoute from './shared/components/ProtectedRoute';
 
 const Home = lazy(() => import('./screens/Home'));
@@ -54,6 +55,22 @@ function AppLayout() {
   const requestLocation = useAppStore(s => s.requestLocation);
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
 
+  const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
+
+  const preloadParking = useCallback(() => {
+    const { userLocation, zones } = useAppStore.getState();
+    const zoneId = zones[0]?.id;
+    getParkingRecommendations(EVENT_ID, {
+      speed: 1.5,
+      accessibility_required: false,
+      limit: 4,
+      current_zone_id: zoneId || undefined,
+      user_id: '00000000-0000-0000-0000-000000000000',
+      access_level: 'STANDARD',
+      ...(userLocation ? { latitude: userLocation[0], longitude: userLocation[1] } : {}),
+    }).catch(() => {});
+  }, [EVENT_ID]);
+
   useEffect(() => {
     const onOnline = () => setIsOnline(true);
     const onOffline = () => setIsOnline(false);
@@ -68,14 +85,25 @@ function AppLayout() {
   useEffect(() => {
     refresh();
     refreshPredictions();
-    const eventId = import.meta.env.VITE_EVENT_ID || 'default-event-id';
-    loadEventDayContext(eventId).then(() => recargarFases());
-  }, [refresh, refreshPredictions]);
+    preloadParking();
+    loadEventDayContext(EVENT_ID).then(() => recargarFases());
+  }, [refresh, refreshPredictions, preloadParking, EVENT_ID]);
 
   useEffect(() => {
-    const id = setInterval(refresh, 30000);
-    const onVisibility = () => { if (document.visibilityState === 'visible') refresh(); };
-    const onFocus = () => refresh();
+    const id = setInterval(() => {
+      refresh();
+      preloadParking();
+    }, 30000);
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        refresh();
+        preloadParking();
+      }
+    };
+    const onFocus = () => {
+      refresh();
+      preloadParking();
+    };
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('focus', onFocus);
     return () => {
@@ -83,7 +111,7 @@ function AppLayout() {
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('focus', onFocus);
     };
-  }, [refresh]);
+  }, [refresh, preloadParking]);
 
   // 1. Escuchar el estado de los permisos de geolocalización de manera reactiva
   useEffect(() => {
