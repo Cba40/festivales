@@ -69,7 +69,8 @@ export function useGastronomyRecommendations() {
           )
           return data
         },
-        force
+        force,
+        true
       )
       setData(data)
     } catch (err: any) {

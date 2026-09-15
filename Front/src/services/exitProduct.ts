@@ -66,7 +66,8 @@ export function useExitRecommendations(
           )
           return data
         },
-        force
+        force,
+        true
       )
       setData(data)
     } catch (err) {

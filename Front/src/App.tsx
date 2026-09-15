@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { useAppStore } from './core/state/store';
 import { useDashboardSync } from './features/dashboard/hooks/useDashboardSync';
+import { useTerritorialPrediction } from './hooks/useContextEngine';
 import { loadEventDayContext } from './utils/contextoEvento';
 import { recargarFases } from './config/eventoConfig';
 import ProtectedRoute from './shared/components/ProtectedRoute';
@@ -47,6 +48,7 @@ function AppLayout() {
   const location = useLocation();
   const isDashboard = location.pathname.startsWith('/dashboard');
   const { refresh } = useDashboardSync();
+  const { refresh: refreshPredictions } = useTerritorialPrediction();
   const setUserLocation = useAppStore(s => s.setUserLocation);
   const setLocationPermissionDenied = useAppStore(s => s.setLocationPermissionDenied);
   const requestLocation = useAppStore(s => s.requestLocation);
@@ -65,9 +67,10 @@ function AppLayout() {
 
   useEffect(() => {
     refresh();
+    refreshPredictions();
     const eventId = import.meta.env.VITE_EVENT_ID || 'default-event-id';
     loadEventDayContext(eventId).then(() => recargarFases());
-  }, [refresh]);
+  }, [refresh, refreshPredictions]);
 
   useEffect(() => {
     const id = setInterval(refresh, 30000);

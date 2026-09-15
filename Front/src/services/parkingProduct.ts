@@ -68,7 +68,8 @@ export function useParkingRecommendations() {
           )
           return data
         },
-        force
+        force,
+        true
       )
       setData(data)
     } catch (err: any) {

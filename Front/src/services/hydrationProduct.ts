@@ -68,7 +68,8 @@ export function useHydrationRecommendations() {
           )
           return data
         },
-        force
+        force,
+        true
       )
       setData(data)
     } catch (err: any) {

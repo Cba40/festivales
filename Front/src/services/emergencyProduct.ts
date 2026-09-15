@@ -1,7 +1,14 @@
 import { useState, useCallback } from 'react'
 import { apiClient } from '@/core/api/client'
 import { endpoints } from '@/core/api/endpoints'
+import { readThroughCache } from '@/core/cache/memoryCache'
 import { useAppStore } from '@/core/state/store'
+
+export const EMERGENCY_TTL_MS = 60_000
+
+export function emergencyCacheKey(...parts: string[]): string {
+  return `emergency:${parts.join(':')}`
+}
 
 export type EmergencyType =
   | 'policia'
@@ -59,15 +66,31 @@ export interface EmergencyProtocolResponse {
 }
 
 export async function getCities(): Promise<CityDTO[]> {
-  const { data } = await apiClient.get<CityDTO[]>(endpoints.emergency.cities())
-  return data
+  return readThroughCache<CityDTO[]>(
+    emergencyCacheKey('cities'),
+    EMERGENCY_TTL_MS,
+    async () => {
+      const { data } = await apiClient.get<CityDTO[]>(endpoints.emergency.cities())
+      return data
+    },
+    false,
+    true
+  )
 }
 
 export async function getProtocols(context: string): Promise<ProtocolDTO[]> {
-  const { data } = await apiClient.get<EmergencyProtocolResponse>(
-    endpoints.emergency.protocols(context)
+  return readThroughCache<ProtocolDTO[]>(
+    emergencyCacheKey('protocols', context),
+    EMERGENCY_TTL_MS,
+    async () => {
+      const { data } = await apiClient.get<EmergencyProtocolResponse>(
+        endpoints.emergency.protocols(context)
+      )
+      return data.protocols
+    },
+    false,
+    true
   )
-  return data.protocols
 }
 
 export async function getRecommendedResource(
@@ -76,20 +99,28 @@ export async function getRecommendedResource(
   lat?: number,
   lng?: number
 ): Promise<EmergencyItem | null> {
-  try {
-    const { data } = await apiClient.get<EmergencyItem>(
-      endpoints.emergency.recommendedResource(targetType, cityId, lat, lng)
-    )
-    return data
-  } catch (err) {
-    const status: unknown =
-      err &&
-      typeof err === 'object' &&
-      'response' in err &&
-      (err as { response?: { status?: unknown } }).response?.status
-    if (status === 404) return null
-    throw err
-  }
+  return readThroughCache<EmergencyItem | null>(
+    emergencyCacheKey('recommended', targetType, cityId),
+    EMERGENCY_TTL_MS,
+    async () => {
+      try {
+        const { data } = await apiClient.get<EmergencyItem>(
+          endpoints.emergency.recommendedResource(targetType, cityId, lat, lng)
+        )
+        return data
+      } catch (err) {
+        const status: unknown =
+          err &&
+          typeof err === 'object' &&
+          'response' in err &&
+          (err as { response?: { status?: unknown } }).response?.status
+        if (status === 404) return null
+        throw err
+      }
+    },
+    false,
+    true
+  )
 }
 
 export async function getEmergencies(
@@ -130,18 +161,27 @@ export function useEmergencyRecommendations(
     setLoading(true)
     setError(null)
     try {
-      const { data: res } = await apiClient.get<EmergencyRecommendationResponse>(
-        endpoints.emergency.list(),
-        {
-          params: {
-            city_id: cityId,
-            limit: 20,
-            ...(type && type !== 'todos' ? { type } : {}),
-            ...(userLocation
-              ? { latitude: userLocation[0], longitude: userLocation[1] }
-              : {}),
-          },
-        }
+      const res = await readThroughCache<EmergencyRecommendationResponse>(
+        emergencyCacheKey('recommendation', type || 'todos', cityId),
+        EMERGENCY_TTL_MS,
+        async () => {
+          const { data } = await apiClient.get<EmergencyRecommendationResponse>(
+            endpoints.emergency.list(),
+            {
+              params: {
+                city_id: cityId,
+                limit: 20,
+                ...(type && type !== 'todos' ? { type } : {}),
+                ...(userLocation
+                  ? { latitude: userLocation[0], longitude: userLocation[1] }
+                  : {}),
+              },
+            }
+          )
+          return data
+        },
+        false,
+        true
       )
       setData(res)
     } catch (err) {

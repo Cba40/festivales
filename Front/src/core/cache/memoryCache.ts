@@ -49,14 +49,6 @@ export function productCacheKey(
   return `product:${normalizedId}:${productType}:${JSON.stringify(normalizedParams)}`
 }
 
-function getValid<T>(key: string): { hit: true; data: T } | { hit: false } {
-  const entry = cache.get(key) as CacheEntry<T> | undefined
-  if (entry && Date.now() < entry.expiresAt) {
-    return { hit: true, data: entry.data }
-  }
-  return { hit: false }
-}
-
 function getStale<T>(key: string): T | undefined {
   const entry = cache.get(key) as CacheEntry<T> | undefined
   return entry?.data
@@ -66,11 +58,23 @@ export async function readThroughCache<T>(
   key: string,
   ttlMs: number,
   fetcher: () => Promise<T>,
-  force = false
+  force = false,
+  staleWhileRevalidate = false
 ): Promise<T> {
   if (!force) {
-    const valid = getValid<T>(key)
-    if (valid.hit) return valid.data
+    const entry = cache.get(key) as CacheEntry<T> | undefined
+    if (entry) {
+      const isExpired = Date.now() >= entry.expiresAt
+      if (!isExpired) return entry.data
+      if (staleWhileRevalidate) {
+        fetcher()
+          .then((fresh) => cache.set(key, { data: fresh, expiresAt: Date.now() + ttlMs }))
+          .catch(() => {
+            /* silenciar errores del refresco en background */
+          })
+        return entry.data
+      }
+    }
   }
 
   try {

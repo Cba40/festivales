@@ -68,7 +68,8 @@ export function useRestRecommendations() {
           )
           return data
         },
-        force
+        force,
+        true
       )
       setData(data)
     } catch (err: any) {
