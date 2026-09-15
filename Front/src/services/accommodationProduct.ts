@@ -33,8 +33,9 @@ export async function getAccommodationRecommendations(
   eventId: string,
   params: Record<string, unknown> = {}
 ): Promise<AccommodationRecommendationResponse> {
+  const cacheProductType = params.type ? `accommodation:${params.type}` : 'accommodation'
   return readThroughCache<AccommodationRecommendationResponse>(
-    productCacheKey(eventId, 'accommodation'),
+    productCacheKey(eventId, cacheProductType),
     PRODUCT_TTL_MS,
     async () => {
       const { data } = await apiClient.get<AccommodationRecommendationResponse>(
@@ -71,8 +72,9 @@ export function useAccommodationRecommendations(
           : {}),
         ...(type ? { type } : {}),
       }
+      const cacheProductType = type ? `accommodation:${type}` : 'accommodation'
       const data = await readThroughCache<AccommodationRecommendationResponse>(
-        productCacheKey(EVENT_ID, 'accommodation'),
+        productCacheKey(EVENT_ID, cacheProductType),
         PRODUCT_TTL_MS,
         async () => {
           const { data } = await apiClient.get<AccommodationRecommendationResponse>(
