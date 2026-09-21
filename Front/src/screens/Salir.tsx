@@ -118,8 +118,14 @@ const Salir = () => {
       </div>
 
       {zona.destinations.length > 0 && (
-        <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
-          ➡️ {zona.destinations.map(d => d.name).join(' · ')}
+        <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 flex items-center gap-1.5">
+          <span>➡️</span>
+          <span className="font-medium truncate">{zona.destinations[0].name}</span>
+          {zona.destinations.length > 1 && (
+            <span className="px-1.5 py-0.5 text-[10px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded">
+              +{zona.destinations.length - 1}
+            </span>
+          )}
         </p>
       )}
 
