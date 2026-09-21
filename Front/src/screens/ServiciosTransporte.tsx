@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/Header'
-import { Map, X } from 'lucide-react'
+import { Map, X, Clock } from 'lucide-react'
 import { useAppStore } from '@/core/state/store'
 import {
   useTransportRecommendations,
@@ -13,6 +13,7 @@ import { NearestBadge } from '@/components/ZonaCardsList'
 import { GpsModal } from '@/components/GpsModal'
 import { formatUpdatedAt } from '@/utils/formatTime'
 import { getDistancias } from '@/utils/geo'
+import { RouteScheduleModal } from '@/components/RouteScheduleModal'
 
 const TIPOS: { valor: TransportType; etiqueta: string; icono: string }[] = [
   { valor: 'urbano', etiqueta: 'Urbano', icono: '🚌' },
@@ -41,6 +42,7 @@ const ServiciosTransporte = () => {
   )
 
   const [selectedZona, setSelectedZona] = useState<ZonaTransporteItem | null>(null)
+  const [selectedZoneSchedules, setSelectedZoneSchedules] = useState<ZonaTransporteItem | null>(null)
   const [mostrarGpsModal, setMostrarGpsModal] = useState(true)
   const userLocation = useAppStore(s => s.userLocation)
   const requestLocation = useAppStore(s => s.requestLocation)
@@ -95,6 +97,7 @@ const ServiciosTransporte = () => {
 
   const renderCard = (zona: ZonaTransporteItem) => {
     const dist = getDistancias(zona.lat ?? 0, zona.lng ?? 0, userLocation, zona.distancia_min ?? 5)
+    const hasAllSchedules = zona.all_schedules && zona.all_schedules.length > 0
     return (
       <button
         key={zona.zone_id}
@@ -114,6 +117,20 @@ const ServiciosTransporte = () => {
             {zona.company ? ` · ${zona.company}` : ''}
           </p>
           {renderHorario(zona)}
+          {hasAllSchedules && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                setSelectedZoneSchedules(zona)
+              }}
+              className="mt-2 flex items-center gap-1.5 text-xs font-bold text-primary dark:text-blue-300 hover:opacity-80 transition-opacity px-2 py-1 rounded-lg"
+              aria-label={`Ver todos los horarios de ${zona.line_name}`}
+            >
+              <Clock size={14} />
+              Ver todos los horarios
+            </button>
+          )}
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex flex-wrap gap-x-2 gap-y-0.5 items-center">
             {zona.destination && <span>🎯 {zona.destination}</span>}
             {zona.distancia_min != null && <span>· 📏 {zona.distancia_min} m</span>}
@@ -323,6 +340,14 @@ const ServiciosTransporte = () => {
       </div>
 
       {renderBottomSheet}
+      {selectedZoneSchedules && (
+        <RouteScheduleModal
+          isOpen={true}
+          onClose={() => setSelectedZoneSchedules(null)}
+          schedules={selectedZoneSchedules.all_schedules || []}
+          lineName={selectedZoneSchedules.line_name || ''}
+        />
+      )}
     </div>
   )
 }

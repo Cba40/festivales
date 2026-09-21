@@ -35,6 +35,12 @@ class ZonaGastronomicaItem(ZonaItemBase):
     categoria: str = ""
 
 
+class ScheduleItem(BaseModel):
+    day_type: str
+    departure_time: str
+    destination: str
+
+
 class ZonaTransporteItem(ZonaItemBase):
     calle: str = ""
     line_name: str | None = None
@@ -43,6 +49,7 @@ class ZonaTransporteItem(ZonaItemBase):
     minutes_until_next: int | None = None
     destination: str | None = None
     is_tomorrow: bool = False
+    all_schedules: list[ScheduleItem] | None = None
 
 
 class GastronomyRecommendationResponse(BaseModel):

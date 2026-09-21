@@ -5,6 +5,12 @@ import { useAppStore } from '@/core/state/store'
 
 const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id'
 
+export interface ScheduleItem {
+  day_type: string
+  departure_time: string
+  destination: string
+}
+
 export interface ZonaTransporteItem {
   zone_id: string
   name: string
@@ -29,6 +35,7 @@ export interface ZonaTransporteItem {
   minutes_until_next: number | null
   destination: string | null
   is_tomorrow: boolean
+  all_schedules?: ScheduleItem[]
 }
 
 export interface TransportRecommendationResponse {

@@ -20,6 +20,7 @@ from app.models.zone import Zone
 from app.schemas.product import (
     TransportRecommendationResponse,
     ZonaTransporteItem,
+    ScheduleItem,
 )
 
 logger = logging.getLogger(__name__)
@@ -226,6 +227,7 @@ async def get_transport_product_adapter(
             minutes_until_next=mins_until,
             destination=destination,
             is_tomorrow=is_tomorrow,
+            all_schedules=_build_all_schedules(stop_scheds, stop_scheds_tomorrow),
         ))
 
     # --- 5. Sort by distance (None/inf last) ---
@@ -309,6 +311,29 @@ def _find_next_departure(
 
     # 3. No service today nor tomorrow
     return None, None, False
+
+
+def _build_all_schedules(
+    schedules_today: list,
+    schedules_tomorrow: list,
+) -> list[ScheduleItem]:
+    """Build a list of all schedules for the modal, combining today and tomorrow."""
+    all_scheds: list[ScheduleItem] = []
+    for s in schedules_today:
+        dep_time = _extract_time(s.departure_time)
+        all_scheds.append(ScheduleItem(
+            day_type=s.day_type,
+            departure_time=dep_time.strftime("%H:%M"),
+            destination=s.destination,
+        ))
+    for s in schedules_tomorrow:
+        dep_time = _extract_time(s.departure_time)
+        all_scheds.append(ScheduleItem(
+            day_type=s.day_type,
+            departure_time=dep_time.strftime("%H:%M"),
+            destination=s.destination,
+        ))
+    return all_scheds
 
 
 def _build_reasoning(
