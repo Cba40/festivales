@@ -76,7 +76,7 @@ export const AdminMapSelector = ({ lat, lng, onChangeLocation, showMarker = true
         📍 Hacé click en cualquier lugar del mapa o arrastrá el marcador para fijar las coordenadas exactas:
       </p>
       
-      <div className="w-full bg-white dark:bg-slate-800 rounded-lg border border-slate-300 dark:border-slate-600 aspect-[16/9] relative overflow-hidden shadow-sm h-[250px]">
+      <div className="w-full bg-white dark:bg-slate-800 rounded-lg border border-slate-300 dark:border-slate-600 aspect-[16/9] relative overflow-hidden shadow-sm h-[500px]">
         <MapContainer
           center={position}
           zoom={15}
