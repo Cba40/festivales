@@ -199,37 +199,6 @@ const Pernoctar = () => {
           })
         )}
 
-        {/* Paso 2 — CTA por cada alojamiento (botones grandes) */}
-        {!showMap && mostrados.map((p, index) => {
-          return (
-            <div key={`cta-${p.id}`} className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-md space-y-2">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="font-bold text-slate-800 dark:text-slate-100">{p.name}</p>
-                  <div className="text-sm font-semibold text-slate-500 dark:text-slate-300">
-                    {getCategoriaLabel(p.type).toUpperCase()}
-                  </div>
-                  <p className="text-sm text-slate-500 dark:text-slate-300">
-                    {p.reference || p.address || ''}
-                  </p>
-                </div>
-                {esMasCercano(p, index) && (
-                  <span className="px-2 py-1 rounded text-[10px] font-bold bg-success/20 text-success">
-                    📍 Más cercano
-                  </span>
-                )}
-              </div>
-
-              <p className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-1">
-                <Map size={14} /> {getDistancias(p.latitude ?? 0, p.longitude ?? 0, userLocation, 0).walking} · 🚗 {getDistancias(p.latitude ?? 0, p.longitude ?? 0, userLocation, 0).driving}
-              </p>
-              <p className="text-xs text-slate-400 dark:text-slate-300">
-                {formatUpdatedAt(Date.now())}
-              </p>
-            </div>
-          )
-        })}
-
         {/* Botón Ver más */}
         {!showMap && !mostrarTodos && alojamientos.length > 3 && (
           <button
