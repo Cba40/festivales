@@ -136,6 +136,10 @@ const Home = () => {
             Acceso Operador Municipal
           </button>
         </div>
+
+        <p className="text-xs text-slate-400 dark:text-slate-500 text-center mt-8 pb-4">
+          Desarrollado por CBA 4.0
+        </p>
       </div>
       <LocationPromptModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </div>

@@ -248,6 +248,10 @@ export function DashboardScreen() {
             ))}
           </div>
         </section>
+
+        <p className="text-[10px] text-slate-400 dark:text-slate-500 text-center mt-auto pt-4">
+          Desarrollado por CBA 4.0
+        </p>
       </main>
     </div>
   );
