@@ -201,7 +201,6 @@ const Pernoctar = () => {
 
         {/* Paso 2 — CTA por cada alojamiento (botones grandes) */}
         {!showMap && mostrados.map((p, index) => {
-          const urlInfo = getUrlMasInfo(p)
           return (
             <div key={`cta-${p.id}`} className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-md space-y-2">
               <div className="flex justify-between items-start">
@@ -227,19 +226,6 @@ const Pernoctar = () => {
               <p className="text-xs text-slate-400 dark:text-slate-300">
                 {formatUpdatedAt(Date.now())}
               </p>
-
-              <div className="flex gap-2 pt-2">
-                {urlInfo && (
-                  <a
-                    href={urlInfo}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1 flex items-center justify-center gap-1 bg-primary text-white hover:bg-primary/90 py-2 rounded-xl font-bold text-sm transition-colors shadow-lg shadow-primary/25"
-                  >
-                    <Globe size={16} /> Más info
-                  </a>
-                )}
-              </div>
             </div>
           )
         })}
