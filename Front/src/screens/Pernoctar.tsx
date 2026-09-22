@@ -229,15 +229,6 @@ const Pernoctar = () => {
               </p>
 
               <div className="flex gap-2 pt-2">
-                {p.phone && (
-                  <a
-                    href={`tel:${p.phone}`}
-                    className="flex-1 flex items-center justify-center gap-1 bg-success/15 dark:bg-success/25 hover:bg-success/25 dark:hover:bg-success/35 text-success font-bold py-2 rounded-xl text-sm transition-colors"
-                  >
-                    <Phone size={16} /> Llamar
-                  </a>
-                )}
-
                 {urlInfo && (
                   <a
                     href={urlInfo}
