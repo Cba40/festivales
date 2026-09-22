@@ -7,6 +7,7 @@ import {
   Lightbulb,
   Activity,
   Wifi,
+  Megaphone,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAppStore } from '../../../core/state/store';
@@ -70,6 +71,14 @@ const QUICK_ACTIONS: QuickAction[] = [
     iconBg: 'bg-amber-50 border-amber-100',
     path: '/dashboard/motor?tab=analytics',
     hint: 'Ir a Motor › Analytics',
+  },
+  {
+    icon: Megaphone,
+    title: 'Alertas y Mensajes',
+    description: 'Comunicar alertas y mensajes al público.',
+    accent: 'text-teal-600',
+    iconBg: 'bg-teal-50 border-teal-100',
+    path: '/dashboard/alerts',
   },
 ];
 
@@ -171,6 +180,12 @@ export function DashboardScreen() {
               className="text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"
             >
               Registrar Incidente
+            </button>
+            <button
+              onClick={() => navigate('/dashboard/alerts')}
+              className="text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"
+            >
+              Alertas y Mensajes
             </button>
             <button
               onClick={() => navigate('/dashboard/motor')}

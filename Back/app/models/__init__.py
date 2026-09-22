@@ -20,6 +20,8 @@ from app.models.accommodation import Accommodation, AccommodationType
 from app.models.city import City
 from app.models.emergency import Emergency, EmergencyType
 from app.models.emergency_protocol import EmergencyProtocol, EmergencyProtocolContext
+from app.models.transport_alert import TransportAlert, ALERT_TYPES
+from app.models.operator_message import OperatorMessage, MESSAGE_STATUSES, MESSAGE_PRIORITIES
 
 __all__ = [
     "Event",
@@ -46,4 +48,9 @@ __all__ = [
     "EmergencyType",
     "EmergencyProtocol",
     "EmergencyProtocolContext",
+    "TransportAlert",
+    "ALERT_TYPES",
+    "OperatorMessage",
+    "MESSAGE_STATUSES",
+    "MESSAGE_PRIORITIES",
 ]

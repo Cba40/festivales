@@ -42,6 +42,25 @@ from app.crud.event_day_phase import (
     update as update_event_day_phase,
     delete as delete_event_day_phase,
 )
+from app.crud.transport_alert import (
+    create as create_transport_alert,
+    deactivate as deactivate_transport_alert,
+    delete as delete_transport_alert,
+    get as get_transport_alert,
+    list_active as list_active_transport_alerts,
+    list_by_event as list_transport_alerts,
+    update as update_transport_alert,
+)
+from app.crud.operator_message import (
+    cancel as cancel_operator_message,
+    create as create_operator_message,
+    delete as delete_operator_message,
+    get as get_operator_message,
+    list_active as list_active_operator_messages,
+    list_by_event as list_operator_messages,
+    publish as publish_operator_message,
+    update as update_operator_message,
+)
 
 __all__ = [
     "create_operational_profile",
@@ -76,4 +95,19 @@ __all__ = [
     "list_phases_by_event_day",
     "update_event_day_phase",
     "delete_event_day_phase",
+    "create_transport_alert",
+    "get_transport_alert",
+    "list_transport_alerts",
+    "list_active_transport_alerts",
+    "update_transport_alert",
+    "deactivate_transport_alert",
+    "delete_transport_alert",
+    "create_operator_message",
+    "get_operator_message",
+    "list_operator_messages",
+    "list_active_operator_messages",
+    "update_operator_message",
+    "publish_operator_message",
+    "cancel_operator_message",
+    "delete_operator_message",
 ]

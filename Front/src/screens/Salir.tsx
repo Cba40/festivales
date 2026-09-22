@@ -17,6 +17,7 @@ import { NearestBadge } from '@/components/ZonaCardsList'
 import { GpsModal } from '@/components/GpsModal'
 import { formatUpdatedAt } from '@/utils/formatTime'
 import { getDistancias } from '@/utils/geo'
+import PublicAlertsBanner from '@/components/PublicAlertsBanner'
 
 const MODOS: { value: TransporteMode; label: string; icon: typeof Car }[] = [
   { value: 'vehicular', label: 'En auto', icon: Car },
@@ -238,6 +239,8 @@ const Salir = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
       <Header title="Salir del evento" showBack onBack={() => navigate('/')} />
+
+      <PublicAlertsBanner />
 
       <div className="flex-1 p-4 overflow-y-auto space-y-4 pb-24">
         {/* Paso 1: modo de salida */}

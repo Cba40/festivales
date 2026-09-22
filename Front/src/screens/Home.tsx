@@ -6,6 +6,7 @@ import { AlertTriangle, Car, LogOut, Bus, UtensilsCrossed, Hotel, Info, MessageC
 import { useAppStore } from '@/core/state/store';
 import { LocationPromptModal } from '@/components/LocationPromptModal';
 import { EventStatusBar } from '@/features/public/components/EventStatusBar';
+import PublicAlertsBanner from '@/components/PublicAlertsBanner';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -37,6 +38,8 @@ const Home = () => {
       <Header title="Festival Jesús María" ubicacion="Zona Centro" />
 
       <EventStatusBar />
+
+      <PublicAlertsBanner />
 
       {locationPermissionDenied && (
         <button

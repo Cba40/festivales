@@ -14,6 +14,7 @@ import { GpsModal } from '@/components/GpsModal'
 import { formatUpdatedAt } from '@/utils/formatTime'
 import { getDistancias } from '@/utils/geo'
 import { RouteScheduleModal } from '@/components/RouteScheduleModal'
+import PublicAlertsBanner from '@/components/PublicAlertsBanner'
 
 const TIPOS: { valor: TransportType; etiqueta: string; icono: string }[] = [
   { valor: 'urbano', etiqueta: 'Urbano', icono: '🚌' },
@@ -217,6 +218,8 @@ const ServiciosTransporte = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
       <Header title="Transporte" showBack onBack={() => navigate('/')} />
+
+      <PublicAlertsBanner />
 
       <div className="flex-1 p-4 overflow-y-auto space-y-4">
         {/* PASO 1: Selector de tipo */}

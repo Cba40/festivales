@@ -362,3 +362,101 @@ export interface AuditLogEntryDTO {
   operator_id: string | null;
   justification: string | null;
 }
+
+export type AlertType = 'info' | 'warning' | 'disruption' | 'closure';
+export type MessageStatus = 'draft' | 'published' | 'cancelled';
+export type MessagePriority = 'normal' | 'high' | 'urgent';
+
+export interface TransportAlertDTO {
+  id: string;
+  event_id: string;
+  line_id: string | null;
+  alert_type: AlertType;
+  title: string;
+  description: string;
+  valid_from: string;
+  valid_until: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TransportAlertCreatePayload {
+  event_id: string;
+  line_id?: string | null;
+  alert_type: AlertType;
+  title: string;
+  description: string;
+  valid_from: string;
+  valid_until: string;
+}
+
+export interface TransportAlertUpdatePayload {
+  line_id?: string | null;
+  alert_type?: AlertType;
+  title?: string;
+  description?: string;
+  valid_from?: string;
+  valid_until?: string;
+  is_active?: boolean;
+}
+
+export interface OperatorMessageDTO {
+  id: string;
+  event_id: string;
+  line_id: string | null;
+  status: MessageStatus;
+  priority: MessagePriority;
+  title: string;
+  description: string;
+  publish_at: string;
+  expires_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OperatorMessageCreatePayload {
+  event_id: string;
+  line_id?: string | null;
+  status?: MessageStatus;
+  priority?: MessagePriority;
+  title: string;
+  description: string;
+  publish_at: string;
+  expires_at?: string | null;
+}
+
+export interface OperatorMessageUpdatePayload {
+  line_id?: string | null;
+  status?: MessageStatus;
+  priority?: MessagePriority;
+  title?: string;
+  description?: string;
+  publish_at?: string;
+  expires_at?: string | null;
+}
+
+export interface PublicAlertItem {
+  id: string;
+  line_id: string | null;
+  alert_type: AlertType;
+  title: string;
+  description: string;
+  valid_from: string;
+  valid_until: string;
+}
+
+export interface PublicMessageItem {
+  id: string;
+  line_id: string | null;
+  priority: MessagePriority;
+  title: string;
+  description: string;
+  publish_at: string;
+  expires_at: string | null;
+}
+
+export interface PublicAlertsResponse {
+  alerts: PublicAlertItem[];
+  messages: PublicMessageItem[];
+}

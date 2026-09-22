@@ -24,6 +24,8 @@ import app.models.transport_schedule
 import app.models.city
 import app.models.emergency
 import app.models.emergency_protocol
+import app.models.transport_alert
+import app.models.operator_message
 
 config = context.config
 

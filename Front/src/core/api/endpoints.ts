@@ -118,6 +118,25 @@ export const endpoints = {
       `/events/${eventId}/products/hydration`,
     accommodation: (eventId: string) =>
       `/events/${eventId}/products/accommodation`,
+    alerts: (eventId: string) =>
+      `/events/${eventId}/alerts`,
+  },
+  adminAlerts: {
+    list: (eventId: string) => `/admin/events/${eventId}/alerts`,
+    byId: (eventId: string, id: string) => `/admin/events/${eventId}/alerts/${id}`,
+    create: (eventId: string) => `/admin/events/${eventId}/alerts`,
+    update: (eventId: string, id: string) => `/admin/events/${eventId}/alerts/${id}`,
+    delete: (eventId: string, id: string) => `/admin/events/${eventId}/alerts/${id}`,
+    deactivate: (eventId: string, id: string) => `/admin/events/${eventId}/alerts/${id}/deactivate`,
+  },
+  operatorMessages: {
+    list: (eventId: string) => `/admin/events/${eventId}/messages`,
+    byId: (eventId: string, id: string) => `/admin/events/${eventId}/messages/${id}`,
+    create: (eventId: string) => `/admin/events/${eventId}/messages`,
+    update: (eventId: string, id: string) => `/admin/events/${eventId}/messages/${id}`,
+    delete: (eventId: string, id: string) => `/admin/events/${eventId}/messages/${id}`,
+    publish: (eventId: string, id: string) => `/admin/events/${eventId}/messages/${id}/publish`,
+    cancel: (eventId: string, id: string) => `/admin/events/${eventId}/messages/${id}/cancel`,
   },
   exitAdmin: {
     destinations: {

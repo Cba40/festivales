@@ -39,6 +39,9 @@ const EventConfigScreen = lazy(() =>
 const OperationalEventScreen = lazy(() =>
   import('./features/dashboard/screens/OperationalEventScreen').then((m) => ({ default: m.OperationalEventScreen }))
 );
+const AlertManagementScreen = lazy(() =>
+  import('./features/dashboard/screens/AlertManagementScreen').then((m) => ({ default: m.AlertManagementScreen }))
+);
 const MotorScreen = lazy(() =>
   import('./features/dashboard/screens/MotorScreen').then((m) => ({ default: m.MotorScreen }))
 );
@@ -282,6 +285,7 @@ function AppLayout() {
           </ProtectedRoute>
         } />
         <Route path="/dashboard/operational-events" element={<OperationalEventScreen />} />
+        <Route path="/dashboard/alerts" element={<AlertManagementScreen />} />
         <Route path="/dashboard/motor" element={
           <ProtectedRoute>
             <MotorScreen />
