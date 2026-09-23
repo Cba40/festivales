@@ -1,0 +1,72 @@
+from datetime import date, datetime
+from typing import Optional
+
+from pydantic import BaseModel, Field
+
+
+class PeriodRange(BaseModel):
+    start: Optional[datetime] = Field(default=None, description="Inicio efectivo del período")
+    end: Optional[datetime] = Field(default=None, description="Fin efectivo del período")
+
+
+class ResultStatusCount(BaseModel):
+    result_status: str = Field(..., description="Estado del resultado: ok | empty | unavailable | error")
+    count: int = Field(..., description="Cantidad de consultas en ese estado")
+
+
+class EventSummaryResponse(BaseModel):
+    event_id: str = Field(..., description="ID del evento")
+    event_name: str = Field(..., description="Nombre del evento")
+    period: PeriodRange = Field(..., description="Período cubierto por el informe")
+    total_consultas: int = Field(..., description="Total de consultas registradas")
+    with_results: int = Field(..., description="Consultas con resultados (status ok)")
+    coverage_gaps_empty: int = Field(..., description="Consultas sin resultados por brecha de información (status empty)")
+    technical_errors: int = Field(..., description="Consultas con incidencia técnica (status error)")
+    breakdown: list[ResultStatusCount] = Field(..., description="Desglose por result_status")
+
+
+class ServiceBreakdownItem(BaseModel):
+    service_category: str = Field(..., description="Categoría de servicio municipal")
+    total_consultas: int = Field(..., description="Consultas registradas para la categoría")
+    percentage: float = Field(..., description="Porcentaje de consultas registradas (0-100)")
+
+
+class ServiceBreakdownResponse(BaseModel):
+    event_id: str = Field(..., description="ID del evento")
+    event_name: str = Field(..., description="Nombre del evento")
+    period: PeriodRange = Field(..., description="Período cubierto por el informe")
+    services: list[ServiceBreakdownItem] = Field(..., description="Agregación por service_category")
+
+
+class CoverageGapItem(BaseModel):
+    service_category: str = Field(..., description="Categoría de servicio municipal")
+    total_consultas: int = Field(..., description="Consultas registradas para la categoría")
+    empty_count: int = Field(..., description="Consultas con status empty")
+    empty_rate: float = Field(..., description="Proporción empty/total (0-1)")
+
+
+class TemporalBucket(BaseModel):
+    day: date = Field(..., description="Día agrupado (UTC)")
+    count: int = Field(..., description="Conteo del día")
+
+
+class CoverageGapsResponse(BaseModel):
+    event_id: str = Field(..., description="ID del evento")
+    event_name: str = Field(..., description="Nombre del evento")
+    period: PeriodRange = Field(..., description="Período cubierto por el informe")
+    services: list[CoverageGapItem] = Field(..., description="Brechas de información por service_category")
+    temporal_distribution: list[TemporalBucket] = Field(..., description="Distribución temporal de las brechas empty")
+
+
+class TechnicalIncidentItem(BaseModel):
+    service_category: str = Field(..., description="Categoría de servicio municipal")
+    error_count: int = Field(..., description="Consultas con status error")
+    error_rate: float = Field(..., description="Proporción error/total (0-1)")
+
+
+class TechnicalIncidentsResponse(BaseModel):
+    event_id: str = Field(..., description="ID del evento")
+    event_name: str = Field(..., description="Nombre del evento")
+    period: PeriodRange = Field(..., description="Período cubierto por el informe")
+    services: list[TechnicalIncidentItem] = Field(..., description="Incidencias técnicas por service_category")
+    temporal_distribution: list[TemporalBucket] = Field(..., description="Distribución temporal de las incidencias error")
