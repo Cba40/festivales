@@ -4,6 +4,7 @@ import { EventConfigPage } from '../../../pages/EventConfigPage';
 import { ObservationsScreen } from './ObservationsScreen';
 import { AnalyticsScreen } from './AnalyticsScreen';
 import { DashboardHeader } from '../components/DashboardHeader';
+import { AppFooter } from '@/components/AppFooter';
 import { SectionTabs } from '../components/ui';
 
 type Section = 'config' | 'predictions' | 'observations' | 'analytics';
@@ -43,6 +44,8 @@ export function MotorScreen() {
         {activeSection === 'observations' && <ObservationsScreen />}
         {activeSection === 'analytics' && <AnalyticsScreen />}
       </main>
+
+      <AppFooter variant="private" />
     </div>
   );
 }

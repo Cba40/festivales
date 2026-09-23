@@ -12,6 +12,7 @@ import {
   type AccommodationItem,
   type AccommodationType,
 } from '@/services/accommodationProduct'
+import { AppFooter } from '@/components/AppFooter'
 
 const CATEGORIAS: Array<{ tipo: AccommodationType | null; icono: string; label: string }> = [
   { tipo: null, icono: '🏨', label: 'Todos' },
@@ -75,6 +76,7 @@ const Pernoctar = () => {
         <div className="flex-1 flex items-center justify-center">
           <p className="text-slate-500 dark:text-slate-300">Buscando alojamientos...</p>
         </div>
+        <AppFooter variant="public" />
       </div>
     )
   }
@@ -93,6 +95,7 @@ const Pernoctar = () => {
             Reintentar
           </button>
         </div>
+        <AppFooter variant="public" />
       </div>
     )
   }
@@ -316,6 +319,7 @@ const Pernoctar = () => {
           onClose={() => setMostrarGpsModal(false)}
         />
       )}
+      <AppFooter variant="public" />
     </div>
   )
 }

@@ -3,6 +3,7 @@ import { apiClient } from '@/core/api/client';
 import { endpoints } from '@/core/api/endpoints';
 import { Ban, Megaphone, Plus, Pencil, Power, Search, Trash2, X } from 'lucide-react';
 import { DashboardHeader } from '../components/DashboardHeader';
+import { AppFooter } from '@/components/AppFooter';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -1003,6 +1004,8 @@ export function AlertManagementScreen() {
         onConfirm={() => { if (pendingDeleteMessageId) void handleDeleteMessage(pendingDeleteMessageId); }}
         onCancel={() => setPendingDeleteMessageId(null)}
       />
+
+      <AppFooter variant="private" />
     </div>
   );
 }

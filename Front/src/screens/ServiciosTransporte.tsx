@@ -15,6 +15,7 @@ import { formatUpdatedAt } from '@/utils/formatTime'
 import { getDistancias } from '@/utils/geo'
 import { RouteScheduleModal } from '@/components/RouteScheduleModal'
 import PublicAlertsBanner from '@/components/PublicAlertsBanner'
+import { AppFooter } from '@/components/AppFooter'
 
 const TIPOS: { valor: TransportType; etiqueta: string; icono: string }[] = [
   { valor: 'urbano', etiqueta: 'Urbano', icono: '🚌' },
@@ -351,6 +352,7 @@ const ServiciosTransporte = () => {
           lineName={selectedZoneSchedules.line_name || ''}
         />
       )}
+      <AppFooter variant="public" />
     </div>
   )
 }

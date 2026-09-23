@@ -7,6 +7,7 @@ import {
   type ZonaGastronomicaItem,
 } from '@/services/gastronomyProduct'
 import { formatUpdatedAt } from '@/utils/formatTime'
+import { AppFooter } from '@/components/AppFooter'
 
 interface CorredorGastronomico {
   id: string
@@ -140,6 +141,7 @@ const GastronomiaExpanded = () => {
         <div className="flex-1 flex items-center justify-center">
           <p className="text-slate-500">Cargando zonas gastronómicas...</p>
         </div>
+        <AppFooter variant="public" />
       </div>
     )
   }
@@ -158,6 +160,7 @@ const GastronomiaExpanded = () => {
             Reintentar
           </button>
         </div>
+        <AppFooter variant="public" />
       </div>
     )
   }
@@ -323,6 +326,7 @@ const GastronomiaExpanded = () => {
           </div>
         </>
       )}
+      <AppFooter variant="public" />
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Header } from '@/components/Header';
+import { AppFooter } from '@/components/AppFooter';
 import { QuickAction } from '@/components/ActionButton';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Car, LogOut, Bus, UtensilsCrossed, Hotel, Info, MessageCircle, MapPinOff } from 'lucide-react';
@@ -137,9 +138,7 @@ const Home = () => {
           </button>
         </div>
 
-        <p className="text-xs text-slate-400 dark:text-slate-500 text-center mt-8 pb-4">
-          Desarrollado por CBA 4.0
-        </p>
+        <AppFooter variant="public" />
       </div>
       <LocationPromptModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </div>

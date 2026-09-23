@@ -7,6 +7,7 @@ import { AccommodationManagementScreen } from './AccommodationManagementScreen';
 import { EmergencyManagementScreen } from './EmergencyManagementScreen';
 import { ProtocolManagementScreen } from './ProtocolManagementScreen';
 import { DashboardHeader } from '../components/DashboardHeader';
+import { AppFooter } from '@/components/AppFooter';
 import { SectionTabs } from '../components/ui';
 
 const DEFAULT_EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
@@ -49,6 +50,8 @@ export function InfrastructureScreen() {
         {activeSection === 'emergencias' && <EmergencyManagementScreen />}
         {activeSection === 'protocolos' && <ProtocolManagementScreen />}
       </main>
+
+      <AppFooter variant="private" />
     </div>
   );
 }

@@ -17,6 +17,7 @@ import { useBathroomRecommendations, type ZonaSanitaryItem } from '@/services/ba
 import { useRestRecommendations, type ZonaRestItem } from '@/services/restProduct'
 import { useHydrationRecommendations, type ZonaHidratacionItem } from '@/services/hydrationProduct'
 import { useCajeros } from '@/services/cajerosProduct'
+import { AppFooter } from '@/components/AppFooter'
 
 const opciones = [
   { icon: Bath, label: 'Baños', subtipo: 'banos', colorScheme: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' },
@@ -385,6 +386,7 @@ const ServiciosGenerales = () => {
             })}
           </div>
         </div>
+        <AppFooter variant="public" />
       </div>
     )
   }
@@ -403,6 +405,7 @@ const ServiciosGenerales = () => {
             Reintentar
           </button>
         </div>
+        <AppFooter variant="public" />
       </div>
     )
   }
@@ -414,6 +417,7 @@ const ServiciosGenerales = () => {
         <div className="flex-1 p-4 flex items-center justify-center" aria-live="polite">
           <p className="text-slate-500">Cargando recomendaciones...</p>
         </div>
+        <AppFooter variant="public" />
       </div>
     )
   }
@@ -460,6 +464,7 @@ const ServiciosGenerales = () => {
         </div>
 
         {renderBottomSheetBathroom}
+        <AppFooter variant="public" />
       </div>
     )
   }
@@ -506,6 +511,7 @@ const ServiciosGenerales = () => {
         )}
 
         {renderBottomSheetBathroom}
+        <AppFooter variant="public" />
       </div>
     )
   }
@@ -524,6 +530,7 @@ const ServiciosGenerales = () => {
             Reintentar
           </button>
         </div>
+        <AppFooter variant="public" />
       </div>
     )
   }
@@ -535,6 +542,7 @@ const ServiciosGenerales = () => {
         <div className="flex-1 p-4 flex items-center justify-center" aria-live="polite">
           <p className="text-slate-500">Cargando recomendaciones...</p>
         </div>
+        <AppFooter variant="public" />
       </div>
     )
   }
@@ -581,6 +589,7 @@ const ServiciosGenerales = () => {
         </div>
 
         {renderBottomSheetRest}
+        <AppFooter variant="public" />
       </div>
     )
   }
@@ -627,6 +636,7 @@ const ServiciosGenerales = () => {
         )}
 
         {renderBottomSheetRest}
+        <AppFooter variant="public" />
       </div>
     )
   }
@@ -645,6 +655,7 @@ const ServiciosGenerales = () => {
             Reintentar
           </button>
         </div>
+        <AppFooter variant="public" />
       </div>
     )
   }
@@ -656,6 +667,7 @@ const ServiciosGenerales = () => {
         <div className="flex-1 p-4 flex items-center justify-center" aria-live="polite">
           <p className="text-slate-500">Cargando recomendaciones...</p>
         </div>
+        <AppFooter variant="public" />
       </div>
     )
   }
@@ -702,6 +714,7 @@ const ServiciosGenerales = () => {
         </div>
 
         {renderBottomSheetHidratacion}
+        <AppFooter variant="public" />
       </div>
     )
   }
@@ -748,6 +761,7 @@ const ServiciosGenerales = () => {
         )}
 
         {renderBottomSheetHidratacion}
+        <AppFooter variant="public" />
       </div>
     )
   }
@@ -766,6 +780,7 @@ const ServiciosGenerales = () => {
             Reintentar
           </button>
         </div>
+        <AppFooter variant="public" />
       </div>
     )
   }
@@ -777,6 +792,7 @@ const ServiciosGenerales = () => {
         <div className="flex-1 p-4 flex items-center justify-center" aria-live="polite">
           <p className="text-slate-500">Cargando cajeros...</p>
         </div>
+        <AppFooter variant="public" />
       </div>
     )
   }
@@ -790,6 +806,7 @@ const ServiciosGenerales = () => {
             No hay cajeros registrados en esta zona
           </p>
         </div>
+        <AppFooter variant="public" />
       </div>
     )
   }
@@ -836,6 +853,7 @@ const ServiciosGenerales = () => {
         )}
 
         {renderBottomSheetCajero}
+        <AppFooter variant="public" />
       </div>
     )
   }

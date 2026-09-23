@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/Header'
 import { Bus, UtensilsCrossed, Bath, Droplets, Armchair, HeartPulse, ChevronRight } from 'lucide-react'
+import { AppFooter } from '@/components/AppFooter'
 
 const Servicios = () => {
   const navigate = useNavigate()
@@ -59,6 +60,7 @@ const Servicios = () => {
             </button>
           )
         })}
+        <AppFooter variant="public" />
       </div>
     </div>
   )

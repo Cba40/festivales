@@ -12,6 +12,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { useAppStore } from '../../../core/state/store';
 import { DashboardHeader } from '../components/DashboardHeader';
+import { AppFooter } from '@/components/AppFooter';
 import { useDashboardSync } from '../hooks/useDashboardSync';
 import { useEventDays } from '../hooks/useEventDays';
 import { useOperationalEvents } from '../hooks/useOperationalEvents';
@@ -249,9 +250,7 @@ export function DashboardScreen() {
           </div>
         </section>
 
-        <p className="text-[10px] text-slate-400 dark:text-slate-500 text-center mt-auto pt-4">
-          Desarrollado por CBA 4.0
-        </p>
+        <AppFooter variant="private" />
       </main>
     </div>
   );

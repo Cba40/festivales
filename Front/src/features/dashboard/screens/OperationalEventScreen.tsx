@@ -9,6 +9,7 @@ import { useOperationalEventMutations } from '../hooks/useOperationalEventMutati
 import { useEventDays } from '../hooks/useEventDays';
 import { FlowRestrictionSection } from '../components/FlowRestrictionSection';
 import { DashboardHeader } from '../components/DashboardHeader';
+import { AppFooter } from '@/components/AppFooter';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -988,6 +989,8 @@ export function OperationalEventScreen() {
         onConfirm={handleDeleteConfirm}
         onCancel={() => setPendingDeleteId(null)}
       />
+
+      <AppFooter variant="private" />
     </div>
   );
 }

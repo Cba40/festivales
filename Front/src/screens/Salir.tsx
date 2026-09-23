@@ -6,6 +6,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/Header'
+import { AppFooter } from '@/components/AppFooter'
 import { Car, Footprints, Bus, X, Map as MapIcon, ArrowRight } from 'lucide-react'
 import {
   useExitRecommendations,
@@ -346,6 +347,8 @@ const Salir = () => {
       )}
 
       {renderBottomSheet}
+
+      <AppFooter variant="public" />
     </div>
   )
 }

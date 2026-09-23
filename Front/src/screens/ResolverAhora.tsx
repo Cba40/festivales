@@ -4,6 +4,7 @@ import { Header } from '../components/Header'
 import { useAppStore } from '@/core/state/store'
 import { useTerritorialPrediction } from '@/hooks/useContextEngine'
 import type { Zone } from '@/features/dashboard/types'
+import { AppFooter } from '@/components/AppFooter'
 
 const SAT_ORDER: Record<string, number> = { bajo: 0, medio: 1, alto: 2, colapsado: 3 }
 
@@ -107,6 +108,7 @@ const ResolverAhora = () => {
         <div className="flex-1 flex items-center justify-center">
           <p className="text-slate-500">Cargando...</p>
         </div>
+        <AppFooter variant="public" />
       </div>
     )
   }
@@ -125,6 +127,7 @@ const ResolverAhora = () => {
             Reintentar
           </button>
         </div>
+        <AppFooter variant="public" />
       </div>
     )
   }
@@ -242,6 +245,7 @@ const ResolverAhora = () => {
             </div>
           </>
         )}
+        <AppFooter variant="public" />
       </div>
     )
   }
@@ -298,6 +302,7 @@ const ResolverAhora = () => {
           </button>
         </div>
       </div>
+      <AppFooter variant="public" />
     </div>
   )
 }

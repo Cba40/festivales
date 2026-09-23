@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { EventDayScreen } from './EventDayScreen';
 import { AttendanceLevelScreen } from './AttendanceLevelScreen';
 import { DashboardHeader } from '../components/DashboardHeader';
+import { AppFooter } from '@/components/AppFooter';
 
 type Section = 'days' | 'attendance';
 
@@ -36,6 +37,8 @@ export function EventConfigScreen() {
         {activeSection === 'days' && <EventDayScreen />}
         {activeSection === 'attendance' && <AttendanceLevelScreen />}
       </main>
+
+      <AppFooter variant="private" />
     </div>
   );
 }

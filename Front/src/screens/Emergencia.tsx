@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/Header'
 import { EmergencyModule } from '@/components/EmergencyModule'
+import { AppFooter } from '@/components/AppFooter'
 
 const Emergencia = () => {
   const navigate = useNavigate()
@@ -10,6 +11,7 @@ const Emergencia = () => {
       <Header title="Emergencia" showBack onBack={() => navigate('/')} />
       <div className="flex-1 p-4 space-y-4 overflow-y-auto pb-20">
         <EmergencyModule context="festival" />
+        <AppFooter variant="public" />
       </div>
     </div>
   )

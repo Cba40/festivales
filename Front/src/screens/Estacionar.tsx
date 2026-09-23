@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/Header'
+import { AppFooter } from '@/components/AppFooter'
 import { Map, X } from 'lucide-react'
 import { InteractiveMap } from '@/components/InteractiveMap'
 import { useAppStore } from '@/core/state/store'
@@ -399,6 +400,8 @@ const Estacionar = () => {
       )}
 
       {renderBottomSheet}
+
+      <AppFooter variant="public" />
     </div>
   )
 }
