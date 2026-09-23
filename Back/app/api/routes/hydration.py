@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_async_db
 from app.schemas.product import HydrationRecommendationResponse
+from app.services.service_interaction_log import log_service_interaction
 from src.domain.recommendation.mobility_context import MobilityContext
 from src.domain.recommendation.user_context import AccessLevel, UserContext
 from src.interfaces.rest.hydration_product import get_hydration_product_adapter
@@ -42,13 +43,35 @@ async def hydration_recommendations(
         longitude=longitude,
     )
 
-    result = await get_hydration_product_adapter(
-        db=db,
-        timestamp=now,
+    try:
+        result = await get_hydration_product_adapter(
+            db=db,
+            timestamp=now,
+            event_id=event_id,
+            user_context=user_ctx,
+            mobility_context=mobility_ctx,
+            limit=limit,
+        )
+    except Exception:
+        await log_service_interaction(
+            event_id=event_id,
+            timestamp=now,
+            service_category="hydration",
+            result_status="error",
+            result_count=0,
+            zone_ids=[],
+        )
+        raise
+
+    zonas = result.zonas or []
+    await log_service_interaction(
         event_id=event_id,
-        user_context=user_ctx,
-        mobility_context=mobility_ctx,
-        limit=limit,
+        timestamp=now,
+        service_category="hydration",
+        result_status="ok" if zonas else "empty",
+        result_count=len(zonas),
+        zone_ids=[z.zone_id for z in zonas],
+        request_mode=None,
     )
 
     return result

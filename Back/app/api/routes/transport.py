@@ -12,6 +12,7 @@ from app.models.transport_line import TransportLine
 from app.models.transport_line_stop import TransportLineStop
 from app.models.transport_schedule import TransportSchedule
 from app.schemas.product import TransportRecommendationResponse
+from app.services.service_interaction_log import log_service_interaction
 from src.interfaces.rest.transport_product import get_transport_product_adapter
 
 router = APIRouter(prefix="/api/events/{event_id}", tags=["Transport Product"])
@@ -56,15 +57,45 @@ async def transport_recommendations(
 ):
     now = datetime.now(timezone.utc)
 
-    result = await get_transport_product_adapter(
-        db=db,
-        timestamp=now,
+    request_mode_parts = []
+    if transport_type:
+        request_mode_parts.append(f"transport_type={transport_type}")
+    if destination:
+        request_mode_parts.append(f"destination={destination}")
+    request_mode = "&".join(request_mode_parts) if request_mode_parts else None
+
+    try:
+        result = await get_transport_product_adapter(
+            db=db,
+            timestamp=now,
+            event_id=event_id,
+            destination=destination,
+            transport_type=transport_type,
+            user_latitude=latitude,
+            user_longitude=longitude,
+            limit=limit,
+        )
+    except Exception:
+        await log_service_interaction(
+            event_id=event_id,
+            timestamp=now,
+            service_category="transport",
+            result_status="error",
+            result_count=0,
+            zone_ids=[],
+            request_mode=request_mode,
+        )
+        raise
+
+    zonas = result.zonas or []
+    await log_service_interaction(
         event_id=event_id,
-        destination=destination,
-        transport_type=transport_type,
-        user_latitude=latitude,
-        user_longitude=longitude,
-        limit=limit,
+        timestamp=now,
+        service_category="transport",
+        result_status="ok" if zonas else "empty",
+        result_count=len(zonas),
+        zone_ids=[z.zone_id for z in zonas],
+        request_mode=request_mode,
     )
 
     return result

@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_async_db
 from app.schemas.exit_product import ExitRecommendationResponse
+from app.services.service_interaction_log import log_service_interaction
 from src.interfaces.rest.exit_product import get_exit_product_adapter
 
 TransporteLiteral = Literal["peatonal", "vehicular", "transporte"]
@@ -29,12 +30,46 @@ async def exit_recommendations(
     longitude: float | None = Query(None, ge=-180.0, le=180.0),
     db: AsyncSession = Depends(get_async_db),
 ):
-    return await get_exit_product_adapter(
-        db=db,
+    now = datetime.now(timezone.utc)
+
+    request_mode_parts = []
+    if mode:
+        request_mode_parts.append(f"mode={mode}")
+    if destination_id:
+        request_mode_parts.append(f"destination_id={destination_id}")
+    request_mode = "&".join(request_mode_parts) if request_mode_parts else None
+
+    try:
+        result = await get_exit_product_adapter(
+            db=db,
+            event_id=event_id,
+            timestamp=now,
+            destination_id=destination_id,
+            mode=mode,
+            latitude=latitude,
+            longitude=longitude,
+        )
+    except Exception:
+        await log_service_interaction(
+            event_id=event_id,
+            timestamp=now,
+            service_category="exit",
+            result_status="error",
+            result_count=0,
+            zone_ids=[],
+            request_mode=request_mode,
+        )
+        raise
+
+    zonas = result.zonas or []
+    await log_service_interaction(
         event_id=event_id,
-        timestamp=datetime.now(timezone.utc),
-        destination_id=destination_id,
-        mode=mode,
-        latitude=latitude,
-        longitude=longitude,
+        timestamp=now,
+        service_category="exit",
+        result_status="ok" if zonas else "empty",
+        result_count=len(zonas),
+        zone_ids=[z.zone_id for z in zonas],
+        request_mode=request_mode,
     )
+
+    return result

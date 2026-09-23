@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_async_db
 from app.models.accommodation import AccommodationType
 from app.schemas.accommodation import AccommodationRecommendationResponse
+from app.services.service_interaction_log import log_service_interaction
 from src.interfaces.rest.accommodation_product import get_accommodation_product_adapter
 
 router = APIRouter(prefix="/api/events/{event_id}", tags=["Accommodation Product"])
@@ -25,13 +28,42 @@ async def accommodation_recommendations(
     Filtra por tipo canónico (``AccommodationType``), calcula distancia
     Haversine si se proveen coordenadas y ordena por distancia o nombre.
     """
-    result = await get_accommodation_product_adapter(
-        db=db,
+    now = datetime.now(timezone.utc)
+
+    request_mode = None
+    if type is not None:
+        request_mode = f"type={type.value}"
+
+    try:
+        result = await get_accommodation_product_adapter(
+            db=db,
+            event_id=event_id,
+            acc_type=type,
+            user_latitude=latitude,
+            user_longitude=longitude,
+            limit=limit,
+        )
+    except Exception:
+        await log_service_interaction(
+            event_id=event_id,
+            timestamp=now,
+            service_category="accommodation",
+            result_status="error",
+            result_count=0,
+            zone_ids=[],
+            request_mode=request_mode,
+        )
+        raise
+
+    accommodations = result.accommodations or []
+    await log_service_interaction(
         event_id=event_id,
-        acc_type=type,
-        user_latitude=latitude,
-        user_longitude=longitude,
-        limit=limit,
+        timestamp=now,
+        service_category="accommodation",
+        result_status="ok" if accommodations else "empty",
+        result_count=len(accommodations),
+        zone_ids=[],
+        request_mode=request_mode,
     )
 
     return result
