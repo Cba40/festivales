@@ -22,6 +22,7 @@ from app.models.emergency import Emergency, EmergencyType
 from app.models.emergency_protocol import EmergencyProtocol, EmergencyProtocolContext
 from app.models.transport_alert import TransportAlert, ALERT_TYPES
 from app.models.operator_message import OperatorMessage, MESSAGE_STATUSES, MESSAGE_PRIORITIES
+from app.models.service_interaction_log import ServiceInteractionLog, SERVICE_CATEGORIES, RESULT_STATUSES
 
 __all__ = [
     "Event",
@@ -53,4 +54,7 @@ __all__ = [
     "OperatorMessage",
     "MESSAGE_STATUSES",
     "MESSAGE_PRIORITIES",
+    "ServiceInteractionLog",
+    "SERVICE_CATEGORIES",
+    "RESULT_STATUSES",
 ]

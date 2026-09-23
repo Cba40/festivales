@@ -26,6 +26,7 @@ import app.models.emergency
 import app.models.emergency_protocol
 import app.models.transport_alert
 import app.models.operator_message
+import app.models.service_interaction_log
 
 config = context.config
 
