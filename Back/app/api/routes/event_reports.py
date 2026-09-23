@@ -1,3 +1,4 @@
+from bisect import bisect_right
 from datetime import date, datetime
 from typing import Literal, Optional
 from uuid import UUID
@@ -12,6 +13,7 @@ from app.db.session import get_async_db
 from app.models.event import Event
 from app.models.event_day import EventDay
 from app.models.event_day_phase import EventDayPhase
+from app.models.operational_event import OperationalEvent
 from app.models.operational_phase import OperationalPhase
 from app.models.service_interaction_log import RESULT_STATUSES, ServiceInteractionLog
 from app.models.zone import Zone
@@ -19,7 +21,14 @@ from app.schemas.event_reports import (
     CoverageGapItem,
     CoverageGapsResponse,
     EventSummaryResponse,
+    ObservationsPhase,
+    OperationalEventSummaryItem,
+    OperationalEventsPhase,
+    OperationalPhaseRef,
+    OperationalProfileResponse,
     PeriodRange,
+    PlatformQueriesPhase,
+    PredictionsPhase,
     RecommendedZoneItem,
     RecommendedZonesResponse,
     ResultStatusCount,
@@ -30,7 +39,13 @@ from app.schemas.event_reports import (
     TemporalBucket,
     TemporalDistributionBucket,
     TemporalDistributionResponse,
+    ZoneObservationSummary,
+    ZonePredictionSummary,
 )
+from src.infrastructure.persistence.models.operational_observation import (
+    OperationalObservationModel,
+)
+from src.infrastructure.persistence.models.prediction import PredictionModel
 
 router = APIRouter(prefix="/api/events/{event_id}/reports", tags=["Informes Municipales"])
 
@@ -478,4 +493,392 @@ async def event_report_recommended_zones(
         period=PeriodRange(start=period_start, end=period_end),
         service_category=service_category,
         zones=zones,
+    )
+
+
+def _resolve_phase_for_minute(
+    minute_of_day: int,
+    day_id: Optional[str],
+    phases_by_day_id: dict[str, tuple[list[int], list[tuple[int, int, UUID]]]],
+) -> Optional[UUID]:
+    """Resuelve la fase operativa de un minuto local (bisect, O(log ph))."""
+    bounds = phases_by_day_id.get(day_id)
+    if not bounds or not bounds[1]:
+        return None
+    starts, items = bounds
+    index = bisect_right(starts, minute_of_day) - 1
+    if index < 0:
+        return None
+    start_min, end_min, phase_id = items[index]
+    if start_min <= minute_of_day < end_min:
+        return phase_id
+    return None
+
+
+def _resolve_phase_for_datetime(
+    local_dt: datetime,
+    day_by_date: dict[date, EventDay],
+    phases_by_day_id: dict[str, tuple[list[int], list[tuple[int, int, UUID]]]],
+) -> Optional[UUID]:
+    day = day_by_date.get(local_dt.date())
+    if day is None:
+        return None
+    return _resolve_phase_for_minute(
+        local_dt.hour * 60 + local_dt.minute,
+        day.id,
+        phases_by_day_id,
+    )
+
+
+async def _load_event_day_phases(
+    db: AsyncSession,
+    day_ids: list[str],
+    event_days: list[EventDay],
+) -> tuple[dict[date, EventDay], dict[str, tuple[list[int], list[tuple[int, int, UUID]]]]]:
+    """Carga event_day_phases en 1 consulta y arma índices de resolución por día."""
+    day_by_date = {ed.date: ed for ed in event_days}
+    phases_by_day_id: dict[str, tuple[list[int], list[tuple[int, int, UUID]]]] = {}
+    if not day_ids:
+        return day_by_date, phases_by_day_id
+    row_result = await db.execute(
+        select(EventDayPhase).where(EventDayPhase.event_day_id.in_(day_ids))
+    )
+    for phase in row_result.scalars().all():
+        if phase.event_day_id not in phases_by_day_id:
+            phases_by_day_id[phase.event_day_id] = ([], [])
+        phases_by_day_id[phase.event_day_id][1].append(
+            (phase.start_min, phase.end_min, phase.operational_phase_id)
+        )
+    for bounds in phases_by_day_id.values():
+        bounds[1].sort(key=lambda item: item[0])
+        bounds[0][:] = [item[0] for item in bounds[1]]
+    return day_by_date, phases_by_day_id
+
+
+def _phase_sort_key(
+    phase_id: Optional[UUID],
+    sort_by_id: dict[UUID, int],
+    name_by_id: dict[UUID, str],
+) -> tuple:
+    if phase_id is None:
+        return (10**9, "")
+    return (sort_by_id.get(phase_id, 10**9), name_by_id.get(phase_id, str(phase_id)))
+
+
+@router.get("/operational_profile", response_model=OperationalProfileResponse)
+async def event_report_operational_profile(
+    event_id: str,
+    timezone: str = Query(
+        "America/Argentina/Buenos_Aires", description="Zona horaria local (IANA)"
+    ),
+    db: AsyncSession = Depends(get_async_db),
+    _: TokenPayload = Depends(verify_token),
+):
+    _validate_timezone(timezone)
+    event = await _get_event_or_404(db, event_id)
+    zi = ZoneInfo(timezone)
+
+    day_result = await db.execute(select(EventDay).where(EventDay.event_id == event_id))
+    event_days = day_result.scalars().all()
+    day_ids = [ed.id for ed in event_days]
+    profile_ids = {
+        ed.operational_profile_id for ed in event_days if ed.operational_profile_id is not None
+    }
+
+    day_by_date, phases_by_day_id = await _load_event_day_phases(db, day_ids, event_days)
+
+    op_phases: list = []
+    if profile_ids:
+        op_result = await db.execute(
+            select(OperationalPhase).where(
+                OperationalPhase.operational_profile_id.in_(list(profile_ids))
+            )
+        )
+        op_phases = list(op_result.scalars().all())
+
+    known_ids = {op.id for op in op_phases}
+    name_by_id: dict[UUID, str] = {op.id: op.name for op in op_phases}
+
+    predictions = []
+    if day_ids:
+        pred_result = await db.execute(
+            select(PredictionModel)
+            .where(PredictionModel.event_day_id.in_(day_ids))
+            .order_by(PredictionModel.timestamp)
+        )
+        predictions = pred_result.scalars().all()
+
+        missing_ids = {
+            pred.active_phase_id
+            for pred in predictions
+            if pred.active_phase_id not in known_ids
+        }
+        if missing_ids:
+            extra_result = await db.execute(
+                select(OperationalPhase).where(OperationalPhase.id.in_(list(missing_ids)))
+            )
+            op_phases = list(op_phases) + list(extra_result.scalars().all())
+            name_by_id = {op.id: op.name for op in op_phases}
+
+    observations = []
+    if day_ids:
+        obs_result = await db.execute(
+            select(OperationalObservationModel).where(
+                OperationalObservationModel.event_day_id.in_(day_ids)
+            )
+        )
+        observations = obs_result.scalars().all()
+
+    operational_events = []
+    if day_ids:
+        ev_result = await db.execute(
+            select(OperationalEvent).where(
+                OperationalEvent.event_day_id.in_(day_ids)
+            )
+        )
+        operational_events = ev_result.scalars().all()
+
+    zone_result = await db.execute(select(Zone).where(Zone.event_id == event_id))
+    zone_by_id = {zone.id: zone.name for zone in zone_result.scalars().all()}
+
+    local_ts = ServiceInteractionLog.timestamp.op("AT TIME ZONE")(timezone)
+    hour_expr = func.date_trunc("hour", local_ts).label("hour")
+    agg_result = await db.execute(
+        select(
+            hour_expr,
+            ServiceInteractionLog.service_category,
+            ServiceInteractionLog.result_status,
+            func.count(ServiceInteractionLog.id).label("count"),
+        )
+        .where(ServiceInteractionLog.event_id == event_id)
+        .group_by(
+            hour_expr,
+            ServiceInteractionLog.service_category,
+            ServiceInteractionLog.result_status,
+        )
+    )
+    agg_rows = agg_result.all()
+
+    sort_phases = sorted(op_phases, key=lambda op: (op.sort_order, op.name))
+    sort_by_id = {op.id: index for index, op in enumerate(sort_phases)}
+
+    platform_totals: dict[Optional[UUID], dict[str, int]] = {}
+    for row in agg_rows:
+        phase_id = _resolve_phase_for_datetime(row.hour, day_by_date, phases_by_day_id)
+        acc = platform_totals.setdefault(
+            phase_id, {"consultas_total": 0, "with_results": 0, "empty": 0, "unavailable": 0, "error": 0}
+        )
+        acc["consultas_total"] += row.count
+        status_key = {"ok": "with_results", "empty": "empty", "unavailable": "unavailable"}.get(
+            row.result_status, "error"
+        )
+        acc[status_key] += row.count
+
+    pred_counts: dict[Optional[UUID], int] = {}
+    zone_states: dict[tuple[Optional[UUID], Optional[str]], dict] = {}
+    for pred in predictions:
+        phase_id = pred.active_phase_id
+        pred_counts[phase_id] = pred_counts.get(phase_id, 0) + 1
+        zone_states_data = pred.zone_states_data
+        if isinstance(zone_states_data, str):
+            import json
+
+            zone_states_data = json.loads(zone_states_data)
+        for zone_state in zone_states_data or []:
+            zone_id = zone_state.get("zone_id")
+            if not zone_id:
+                continue
+            key = (phase_id, zone_id)
+            previous = zone_states.get(key)
+            if previous is None or pred.timestamp >= previous["timestamp"]:
+                zone_states[key] = {
+                    "timestamp": pred.timestamp,
+                    "projected_density": zone_state.get("projected_density"),
+                    "operational_state": zone_state.get("operational_state"),
+                }
+
+    obs_zone_agg: dict[tuple[Optional[UUID], Optional[str]], list[int]] = {}
+    obs_count: dict[Optional[UUID], int] = {}
+    obs_unassigned = 0
+    for obs in observations:
+        local_dt = obs.timestamp.astimezone(zi)
+        phase_id = _resolve_phase_for_datetime(local_dt, day_by_date, phases_by_day_id)
+        obs_count[phase_id] = obs_count.get(phase_id, 0) + 1
+        if phase_id is None:
+            obs_unassigned += 1
+        key = (phase_id, obs.zone_id)
+        acc = obs_zone_agg.setdefault(key, [0, 0])
+        acc[0] += 1
+        acc[1] += obs.observed_density
+
+    events_by_phase: dict[Optional[UUID], list] = {}
+    incidents_by_phase: dict[Optional[UUID], int] = {}
+    events_unassigned = 0
+    for operational_event in operational_events:
+        local_dt = operational_event.start_timestamp.astimezone(zi)
+        phase_id = _resolve_phase_for_datetime(local_dt, day_by_date, phases_by_day_id)
+        events_by_phase.setdefault(phase_id, []).append(operational_event)
+        incidents_by_phase[phase_id] = incidents_by_phase.get(phase_id, 0) + int(
+            operational_event.is_incident
+        )
+        if phase_id is None:
+            events_unassigned += 1
+
+    present_phase_ids = (
+        set(platform_totals) | set(pred_counts) | set(obs_count) | set(events_by_phase)
+    )
+    ordered_phase_ids = sorted(
+        present_phase_ids, key=lambda pid: _phase_sort_key(pid, sort_by_id, name_by_id)
+    )
+
+    def phase_name(phase_id: Optional[UUID]) -> str:
+        if phase_id is None:
+            return "unassigned"
+        return name_by_id.get(phase_id, str(phase_id))
+
+    phases = [
+        OperationalPhaseRef(
+            phase_id=str(phase_id) if phase_id is not None else None,
+            phase_name=phase_name(phase_id),
+        )
+        for phase_id in ordered_phase_ids
+    ]
+
+    platform_queries = [
+        PlatformQueriesPhase(
+            phase_id=str(phase_id) if phase_id is not None else None,
+            phase_name=phase_name(phase_id),
+            consultas_total=platform_totals[phase_id]["consultas_total"],
+            with_results=platform_totals[phase_id]["with_results"],
+            empty=platform_totals[phase_id]["empty"],
+            unavailable=platform_totals[phase_id]["unavailable"],
+            error=platform_totals[phase_id]["error"],
+        )
+        for phase_id in ordered_phase_ids
+        if phase_id in platform_totals
+    ]
+
+    predictions_summary = []
+    for phase_id in ordered_phase_ids:
+        if phase_id not in pred_counts:
+            continue
+        zones = []
+        for (zone_phase_id, zone_id), state in zone_states.items():
+            if zone_phase_id != phase_id:
+                continue
+            zones.append(
+                ZonePredictionSummary(
+                    zone_id=zone_id,
+                    zone_name=zone_by_id.get(zone_id, zone_id),
+                    projected_density=state["projected_density"],
+                    operational_state=state["operational_state"],
+                )
+            )
+        predictions_summary.append(
+            PredictionsPhase(
+                phase_id=str(phase_id) if phase_id is not None else None,
+                phase_name=phase_name(phase_id),
+                predictions_count=pred_counts[phase_id],
+                zones=sorted(zones, key=lambda z: z.zone_name),
+            )
+        )
+
+    observations_summary = []
+    for phase_id in ordered_phase_ids:
+        if phase_id not in obs_count:
+            continue
+        zones = []
+        for (zone_phase_id, zone_id), (count, total) in obs_zone_agg.items():
+            if zone_phase_id != phase_id:
+                continue
+            zones.append(
+                ZoneObservationSummary(
+                    zone_id=zone_id,
+                    zone_name=zone_by_id.get(zone_id, zone_id),
+                    observations_count=count,
+                    observed_density_total=total,
+                    observed_density_avg=round(total / count, 2) if count else None,
+                )
+            )
+        observations_summary.append(
+            ObservationsPhase(
+                phase_id=str(phase_id) if phase_id is not None else None,
+                phase_name=phase_name(phase_id),
+                observations_count=obs_count[phase_id],
+                zones=sorted(zones, key=lambda z: z.zone_name),
+            )
+        )
+
+    operational_events_summary = []
+    for phase_id in ordered_phase_ids:
+        if phase_id not in events_by_phase:
+            continue
+        phase_events = events_by_phase[phase_id]
+        events = sorted(
+            (
+                OperationalEventSummaryItem(
+                    operational_event_id=str(operational_event.id),
+                    event_type=operational_event.event_type,
+                    is_incident=operational_event.is_incident,
+                    zone_id=operational_event.zone_id,
+                    zone_name=zone_by_id.get(operational_event.zone_id),
+                    start_timestamp=operational_event.start_timestamp,
+                    end_timestamp=operational_event.end_timestamp,
+                    description=operational_event.description,
+                )
+                for operational_event in phase_events
+            ),
+            key=lambda item: item.start_timestamp,
+        )
+        operational_events_summary.append(
+            OperationalEventsPhase(
+                phase_id=str(phase_id) if phase_id is not None else None,
+                phase_name=phase_name(phase_id),
+                total_events=len(events),
+                incidents=incidents_by_phase.get(phase_id, 0),
+                events=events,
+            )
+        )
+
+    insufficient_data: list[str] = []
+    if not event_days:
+        insufficient_data.append(
+            "El evento no tiene jornadas operativas (event_days) configuradas."
+        )
+    if not predictions:
+        insufficient_data.append("No hay predicciones persistidas para las jornadas del evento.")
+    if not observations:
+        insufficient_data.append("No hay observaciones operativas para relacionar.")
+    if not operational_events:
+        insufficient_data.append("No hay eventos operativos registrados.")
+    platform_unassigned = platform_totals.get(None)
+    if platform_unassigned:
+        insufficient_data.append(
+            f"{platform_unassigned['consultas_total']} consultas de plataforma sin fase asignada (fuera de ventana operativa)."
+        )
+    if obs_unassigned:
+        insufficient_data.append(
+            f"{obs_unassigned} observaciones sin fase asignada (fuera de ventana operativa)."
+        )
+    if events_unassigned:
+        insufficient_data.append(
+            f"{events_unassigned} eventos operativos sin fase asignada (fuera de ventana operativa)."
+        )
+
+    distinct_profiles = {ed.operational_profile_id for ed in event_days if ed.operational_profile_id}
+    operational_profile_id = (
+        next(iter(distinct_profiles)) if len(distinct_profiles) == 1 else None
+    )
+
+    return OperationalProfileResponse(
+        event_id=event.id,
+        event_name=event.name,
+        timezone=timezone,
+        operational_profile_id=str(operational_profile_id) if operational_profile_id else None,
+        phases=phases,
+        platform_queries=platform_queries,
+        predictions_summary=predictions_summary,
+        observations_summary=observations_summary,
+        operational_events_summary=operational_events_summary,
+        insufficient_data=insufficient_data,
     )
