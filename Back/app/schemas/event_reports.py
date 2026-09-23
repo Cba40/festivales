@@ -70,3 +70,34 @@ class TechnicalIncidentsResponse(BaseModel):
     period: PeriodRange = Field(..., description="Período cubierto por el informe")
     services: list[TechnicalIncidentItem] = Field(..., description="Incidencias técnicas por service_category")
     temporal_distribution: list[TemporalBucket] = Field(..., description="Distribución temporal de las incidencias error")
+
+
+class TemporalDistributionBucket(BaseModel):
+    bucket: datetime = Field(..., description="Inicio del intervalo agrupado, en hora local")
+    count: int = Field(..., description="Cantidad de consultas en el intervalo")
+    phase: Optional[str] = Field(default=None, description="Fase operativa que cubre el intervalo (solo granularity=hour)")
+
+
+class TemporalDistributionResponse(BaseModel):
+    event_id: str = Field(..., description="ID del evento")
+    event_name: str = Field(..., description="Nombre del evento")
+    period: PeriodRange = Field(..., description="Período cubierto por el informe")
+    granularity: str = Field(..., description="Granularidad temporal: hour | day")
+    timezone: str = Field(..., description="Zona horaria local utilizada (IANA)")
+    service_category: Optional[str] = Field(default=None, description="Categoría de servicio filtrada (si se especificó)")
+    buckets: list[TemporalDistributionBucket] = Field(..., description="Distribución temporal de consultas registradas")
+
+
+class RecommendedZoneItem(BaseModel):
+    zone_id: str = Field(..., description="ID de la zona")
+    zone_name: str = Field(..., description="Nombre de la zona")
+    zone_type: str = Field(..., description="Tipo de la zona")
+    recommendations: int = Field(..., description="Cantidad de recomendaciones en las que aparece la zona")
+
+
+class RecommendedZonesResponse(BaseModel):
+    event_id: str = Field(..., description="ID del evento")
+    event_name: str = Field(..., description="Nombre del evento")
+    period: PeriodRange = Field(..., description="Período cubierto por el informe")
+    service_category: Optional[str] = Field(default=None, description="Categoría de servicio filtrada (si se especificó)")
+    zones: list[RecommendedZoneItem] = Field(..., description="Zonas ordenadas por cantidad de recomendaciones")
