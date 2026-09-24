@@ -1,12 +1,21 @@
 from datetime import date, datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
+
+PeriodMode = Literal["requested", "event", "accumulated"]
 
 
 class PeriodRange(BaseModel):
     start: Optional[datetime] = Field(default=None, description="Inicio efectivo del período")
     end: Optional[datetime] = Field(default=None, description="Fin efectivo del período")
+    mode: Optional[PeriodMode] = Field(
+        default=None,
+        description=(
+            "Origen del período efectivo: requested (start/end explícitos), "
+            "event (Event.start_date/end_date), accumulated (histórico, sin filtro de rango)"
+        ),
+    )
 
 
 class ResultStatusCount(BaseModel):

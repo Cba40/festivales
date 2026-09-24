@@ -1,6 +1,6 @@
 from bisect import bisect_right
 from datetime import date, datetime
-from typing import Literal, Optional
+from typing import Literal, NamedTuple, Optional
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
@@ -58,17 +58,51 @@ async def _get_event_or_404(db: AsyncSession, event_id: str) -> Event:
     return event
 
 
-def _scope_conditions(
-    event_id: str,
+PERIOD_MODE_REQUESTED = "requested"
+PERIOD_MODE_EVENT = "event"
+PERIOD_MODE_ACCUMULATED = "accumulated"
+
+
+class EffectivePeriod(NamedTuple):
+    """Período efectivo único: alimenta la respuesta y el filtro SQL."""
+
+    start: Optional[datetime]
+    end: Optional[datetime]
+    mode: str
+
+
+def _resolve_period(
+    event: Event,
     start: Optional[datetime],
     end: Optional[datetime],
+) -> EffectivePeriod:
+    """Resuelve el período efectivo sin consultar los datos a medir.
+
+    1. ``requested``: el llamador declaró al menos un extremo.
+    2. ``event``: no hay parámetros, pero el evento declara al menos un extremo.
+    3. ``accumulated``: no hay período declarado; histórico sin filtro de rango.
+
+    Ningún modo deriva el rango de ``service_interaction_log``: el histórico se
+    expresa como ausencia de predicado de timestamp, nunca como min/max del
+    mismo conjunto que luego se filtra.
+    """
+    if start is not None or end is not None:
+        return EffectivePeriod(start, end, PERIOD_MODE_REQUESTED)
+    if event.start_date is not None or event.end_date is not None:
+        return EffectivePeriod(event.start_date, event.end_date, PERIOD_MODE_EVENT)
+    return EffectivePeriod(None, None, PERIOD_MODE_ACCUMULATED)
+
+
+def _scope_conditions(
+    event_id: str,
+    period: EffectivePeriod,
     service_category: Optional[str] = None,
 ):
     conditions = [ServiceInteractionLog.event_id == event_id]
-    if start is not None:
-        conditions.append(ServiceInteractionLog.timestamp >= start)
-    if end is not None:
-        conditions.append(ServiceInteractionLog.timestamp <= end)
+    if period.start is not None:
+        conditions.append(ServiceInteractionLog.timestamp >= period.start)
+    if period.end is not None:
+        conditions.append(ServiceInteractionLog.timestamp <= period.end)
     if service_category is not None:
         conditions.append(ServiceInteractionLog.service_category == service_category)
     return conditions
@@ -82,11 +116,10 @@ USER_ACTIVITY_TYPES = ("screen_open", "filter_change")
 
 def _activity_conditions(
     event_id: str,
-    start: Optional[datetime],
-    end: Optional[datetime],
+    period: EffectivePeriod,
     service_category: Optional[str] = None,
 ):
-    conditions = _scope_conditions(event_id, start, end, service_category)
+    conditions = _scope_conditions(event_id, period, service_category)
     conditions.append(ServiceInteractionLog.interaction_type.in_(USER_ACTIVITY_TYPES))
     conditions.append(ServiceInteractionLog.origin == "user")
     return conditions
@@ -94,11 +127,10 @@ def _activity_conditions(
 
 def _request_conditions(
     event_id: str,
-    start: Optional[datetime],
-    end: Optional[datetime],
+    period: EffectivePeriod,
     service_category: Optional[str] = None,
 ):
-    conditions = _scope_conditions(event_id, start, end, service_category)
+    conditions = _scope_conditions(event_id, period, service_category)
     conditions.append(ServiceInteractionLog.interaction_type == "request")
     return conditions
 
@@ -108,30 +140,6 @@ def _validate_timezone(timezone_name: str) -> None:
         ZoneInfo(timezone_name)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid timezone")
-
-
-async def _resolve_period(
-    db: AsyncSession,
-    event: Event,
-    event_id: str,
-    start: Optional[datetime],
-    end: Optional[datetime],
-) -> tuple[Optional[datetime], Optional[datetime]]:
-    resolved_start = start if start is not None else event.start_date
-    resolved_end = end if end is not None else event.end_date
-    if resolved_start is None or resolved_end is None:
-        result = await db.execute(
-            select(
-                func.min(ServiceInteractionLog.timestamp).label("min_ts"),
-                func.max(ServiceInteractionLog.timestamp).label("max_ts"),
-            ).where(ServiceInteractionLog.event_id == event_id)
-        )
-        min_ts, max_ts = result.one()
-        if resolved_start is None:
-            resolved_start = min_ts
-        if resolved_end is None:
-            resolved_end = max_ts
-    return resolved_start, resolved_end
 
 
 def _as_date(value: datetime):
@@ -154,8 +162,8 @@ async def event_report_summary(
     _: TokenPayload = Depends(verify_token),
 ):
     event = await _get_event_or_404(db, event_id)
-    period_start, period_end = await _resolve_period(db, event, event_id, start, end)
-    conditions = _activity_conditions(event_id, start, end)
+    period = _resolve_period(event, start, end)
+    conditions = _activity_conditions(event_id, period)
 
     result = await db.execute(
         select(
@@ -179,7 +187,7 @@ async def event_report_summary(
     return EventSummaryResponse(
         event_id=event.id,
         event_name=event.name,
-        period=PeriodRange(start=period_start, end=period_end),
+        period=PeriodRange(start=period.start, end=period.end, mode=period.mode),
         total_consultas=total,
         with_results=counts.get("ok", 0),
         coverage_gaps_empty=counts.get("empty", 0),
@@ -197,8 +205,8 @@ async def event_report_service_breakdown(
     _: TokenPayload = Depends(verify_token),
 ):
     event = await _get_event_or_404(db, event_id)
-    period_start, period_end = await _resolve_period(db, event, event_id, start, end)
-    conditions = _activity_conditions(event_id, start, end)
+    period = _resolve_period(event, start, end)
+    conditions = _activity_conditions(event_id, period)
 
     total_expr = func.count(ServiceInteractionLog.id)
     result = await db.execute(
@@ -225,7 +233,7 @@ async def event_report_service_breakdown(
     return ServiceBreakdownResponse(
         event_id=event.id,
         event_name=event.name,
-        period=PeriodRange(start=period_start, end=period_end),
+        period=PeriodRange(start=period.start, end=period.end, mode=period.mode),
         services=services,
     )
 
@@ -239,8 +247,8 @@ async def event_report_coverage_gaps(
     _: TokenPayload = Depends(verify_token),
 ):
     event = await _get_event_or_404(db, event_id)
-    period_start, period_end = await _resolve_period(db, event, event_id, start, end)
-    conditions = _request_conditions(event_id, start, end)
+    period = _resolve_period(event, start, end)
+    conditions = _request_conditions(event_id, period)
 
     total_expr = func.count(ServiceInteractionLog.id)
     empty_expr = func.count(ServiceInteractionLog.id).filter(
@@ -285,7 +293,7 @@ async def event_report_coverage_gaps(
     return CoverageGapsResponse(
         event_id=event.id,
         event_name=event.name,
-        period=PeriodRange(start=period_start, end=period_end),
+        period=PeriodRange(start=period.start, end=period.end, mode=period.mode),
         services=services,
         temporal_distribution=temporal,
     )
@@ -300,8 +308,8 @@ async def event_report_technical_incidents(
     _: TokenPayload = Depends(verify_token),
 ):
     event = await _get_event_or_404(db, event_id)
-    period_start, period_end = await _resolve_period(db, event, event_id, start, end)
-    conditions = _request_conditions(event_id, start, end)
+    period = _resolve_period(event, start, end)
+    conditions = _request_conditions(event_id, period)
 
     total_expr = func.count(ServiceInteractionLog.id)
     error_expr = func.count(ServiceInteractionLog.id).filter(
@@ -345,7 +353,7 @@ async def event_report_technical_incidents(
     return TechnicalIncidentsResponse(
         event_id=event.id,
         event_name=event.name,
-        period=PeriodRange(start=period_start, end=period_end),
+        period=PeriodRange(start=period.start, end=period.end, mode=period.mode),
         services=services,
         temporal_distribution=temporal,
     )
@@ -423,8 +431,8 @@ async def event_report_temporal_distribution(
 ):
     _validate_timezone(timezone)
     event = await _get_event_or_404(db, event_id)
-    period_start, period_end = await _resolve_period(db, event, event_id, start, end)
-    conditions = _activity_conditions(event_id, start, end, service_category)
+    period = _resolve_period(event, start, end)
+    conditions = _activity_conditions(event_id, period, service_category)
 
     local_ts = ServiceInteractionLog.timestamp.op("AT TIME ZONE")(timezone)
     if granularity == "hour":
@@ -462,7 +470,7 @@ async def event_report_temporal_distribution(
     return TemporalDistributionResponse(
         event_id=event.id,
         event_name=event.name,
-        period=PeriodRange(start=period_start, end=period_end),
+        period=PeriodRange(start=period.start, end=period.end, mode=period.mode),
         granularity=granularity,
         timezone=timezone,
         service_category=service_category,
@@ -480,8 +488,8 @@ async def event_report_recommended_zones(
     _: TokenPayload = Depends(verify_token),
 ):
     event = await _get_event_or_404(db, event_id)
-    period_start, period_end = await _resolve_period(db, event, event_id, start, end)
-    conditions = _request_conditions(event_id, start, end, service_category)
+    period = _resolve_period(event, start, end)
+    conditions = _request_conditions(event_id, period, service_category)
 
     zone_id_expr = func.jsonb_array_elements_text(
         ServiceInteractionLog.zone_ids
@@ -519,7 +527,7 @@ async def event_report_recommended_zones(
     return RecommendedZonesResponse(
         event_id=event.id,
         event_name=event.name,
-        period=PeriodRange(start=period_start, end=period_end),
+        period=PeriodRange(start=period.start, end=period.end, mode=period.mode),
         service_category=service_category,
         zones=zones,
     )
