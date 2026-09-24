@@ -15,7 +15,7 @@ export function ReportCoverageGapsSection() {
   return (
     <ReportSection
       title="Brechas de Información"
-      subtitle="consultas sin resultados (cobertura informativa)"
+      subtitle="actividad sin resultados (cobertura informativa)"
       loading={isLoading}
       error={error}
       hasData={!!data}
@@ -29,7 +29,7 @@ export function ReportCoverageGapsSection() {
               <thead>
                 <tr className="text-left text-slate-500 border-b border-slate-200">
                   <th className="px-5 py-2 font-medium">Servicio</th>
-                  <th className="px-5 py-2 font-medium">Consultas</th>
+                  <th className="px-5 py-2 font-medium">Actividad</th>
                   <th className="px-5 py-2 font-medium">Sin resultados</th>
                   <th className="px-5 py-2 font-medium">Tasa de brecha</th>
                 </tr>

@@ -15,7 +15,7 @@ export function ReportTechnicalIncidentsSection() {
   return (
     <ReportSection
       title="Incidencias Técnicas"
-      subtitle="consultas con error en el servicio"
+      subtitle="actividad con error en el servicio"
       loading={isLoading}
       error={error}
       hasData={!!data}

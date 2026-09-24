@@ -316,11 +316,13 @@ const Salir = () => {
                     <button
                       key={destino.id}
                       onClick={() => {
-                        recordActivity({
-                          interaction_type: 'filter_change',
-                          service_category: 'exit',
-                          request_mode: `destination=${destino.name}`,
-                        })
+                        if (destinationId !== destino.id) {
+                          recordActivity({
+                            interaction_type: 'filter_change',
+                            service_category: 'exit',
+                            request_mode: `destination=${destino.name}`,
+                          })
+                        }
                         setDestinationId(prev => (prev === destino.id ? null : destino.id))
                       }}
                       className={`px-4 py-2 rounded-full text-sm font-bold border-2 transition-all active:scale-95 ${

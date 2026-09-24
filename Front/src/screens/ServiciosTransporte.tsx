@@ -282,11 +282,13 @@ const ServiciosTransporte = () => {
                   <button
                     key="todos"
                     onClick={() => {
-                      recordActivity({
-                        interaction_type: 'filter_change',
-                        service_category: 'transport',
-                        request_mode: 'destination=todos',
-                      })
+                      if (destino !== 'Todos') {
+                        recordActivity({
+                          interaction_type: 'filter_change',
+                          service_category: 'transport',
+                          request_mode: 'destination=todos',
+                        })
+                      }
                       setDestino('Todos')
                     }}
                     className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
@@ -301,11 +303,13 @@ const ServiciosTransporte = () => {
                     <button
                       key={d}
                       onClick={() => {
-                        recordActivity({
-                          interaction_type: 'filter_change',
-                          service_category: 'transport',
-                          request_mode: `destination=${d}`,
-                        })
+                        if (destino !== d) {
+                          recordActivity({
+                            interaction_type: 'filter_change',
+                            service_category: 'transport',
+                            request_mode: `destination=${d}`,
+                          })
+                        }
                         setDestino(d)
                       }}
                       className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${

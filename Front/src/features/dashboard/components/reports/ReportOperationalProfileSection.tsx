@@ -46,7 +46,7 @@ export function ReportOperationalProfileSection() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4">
                   {/* Platform queries */}
                   <section>
-                    <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Consultas</h4>
+                    <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Actividad</h4>
                     {platform ? (
                       <div className="grid grid-cols-2 gap-3">
                         <div className="p-3 bg-slate-50 rounded-lg">
@@ -71,7 +71,7 @@ export function ReportOperationalProfileSection() {
                         </div>
                       </div>
                     ) : (
-                      <p className="text-sm text-slate-400 italic">Sin datos de consultas.</p>
+                      <p className="text-sm text-slate-400 italic">Sin datos de actividad.</p>
                     )}
                   </section>
 

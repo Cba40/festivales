@@ -16,12 +16,12 @@ export function ReportSummarySection() {
 
   return (
     <ReportSection
-      title="Resumen de Consultas"
+      title="Resumen de Actividad"
       subtitle="interacciones digitales del evento"
       loading={isLoading}
       error={error}
       hasData={!!data}
-      emptyText="Sin consultas registradas para el evento."
+      emptyText="Sin actividad registrada para el evento."
       onRefresh={() => void refresh()}
     >
       {data && (
@@ -29,7 +29,7 @@ export function ReportSummarySection() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <MetricMini
               icon={Search}
-              label="Consultas totales"
+              label="Actividad total"
               value={data.total_consultas}
               accent="text-indigo-600"
               iconBg="bg-indigo-50 border-indigo-100"
@@ -62,7 +62,7 @@ export function ReportSummarySection() {
               <thead>
                 <tr className="text-left text-slate-500 border-b border-slate-200">
                   <th className="px-5 py-2 font-medium">Resultado</th>
-                  <th className="px-5 py-2 font-medium">Consultas</th>
+                  <th className="px-5 py-2 font-medium">Actividad</th>
                 </tr>
               </thead>
               <tbody>

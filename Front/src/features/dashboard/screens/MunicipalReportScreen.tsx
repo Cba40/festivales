@@ -36,7 +36,7 @@ export function MunicipalReportScreen() {
         period.end ? formatDateOnly(period.end) : 'fin no definido'
       }`
     : summary.data
-      ? 'Sin consultas registradas en el período'
+      ? 'Sin actividad registrada en el período'
       : '—';
 
   return (

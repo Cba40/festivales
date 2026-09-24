@@ -7,7 +7,19 @@
 import { apiClient } from '@/core/api/client'
 import { endpoints } from '@/core/api/endpoints'
 
-const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id'
+const EVENT_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+const configuredEventId: string = import.meta.env.VITE_EVENT_ID
+
+// El endpoint /activity exige un UUID estricto: sin event_id válido no se
+// registra nada (y no se intenta enviar un identificador ficticio).
+const EVENT_ID: string | null =
+  configuredEventId && EVENT_ID_PATTERN.test(configuredEventId)
+    ? configuredEventId
+    : null
+
+let invalidEventIdWarned = false
 
 export type ActivityInteractionType = 'screen_open' | 'filter_change'
 
@@ -29,6 +41,16 @@ export function recordActivity(params: {
   service_category: ActivityServiceCategory
   request_mode?: string
 }): void {
+  if (!EVENT_ID) {
+    if (!invalidEventIdWarned) {
+      invalidEventIdWarned = true
+      console.warn(
+        '[activity] VITE_EVENT_ID ausente o no es un UUID válido: no se registra actividad de usuario.'
+      )
+    }
+    return
+  }
+
   const requestMode = params.request_mode
     ? String(params.request_mode).slice(0, 50)
     : undefined

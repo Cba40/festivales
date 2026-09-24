@@ -17,12 +17,12 @@ export function ReportServiceBreakdownSection() {
 
   return (
     <ReportSection
-      title="Consultas por Servicio"
+      title="Actividad por Servicio"
       subtitle="distribución de interacciones digitales"
       loading={isLoading}
       error={error}
       hasData={!!data}
-      emptyText="Sin consultas registradas para el evento."
+      emptyText="Sin actividad registrada para el evento."
       onRefresh={() => void refresh()}
     >
       {data && data.services.length > 0 && (
@@ -30,7 +30,7 @@ export function ReportServiceBreakdownSection() {
           icon={Layers}
           label="Categorías de servicio"
           value={data.services.length}
-          sub={`${total} consultas en total`}
+          sub={`${total} actividades en total`}
           accent="text-indigo-600"
           iconBg="bg-indigo-50 border-indigo-100"
         />

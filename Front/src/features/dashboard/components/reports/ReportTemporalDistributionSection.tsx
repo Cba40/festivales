@@ -24,7 +24,7 @@ export function ReportTemporalDistributionSection() {
   return (
     <ReportSection
       title="Distribución Temporal"
-      subtitle="consultas registradas por intervalo"
+      subtitle="actividad registrada por intervalo"
       loading={isLoading}
       error={error}
       hasData={!!data}
@@ -54,7 +54,7 @@ export function ReportTemporalDistributionSection() {
 
           {data.buckets.length === 0 && (
             <p className="text-sm text-slate-500 text-center">
-              No hay consultas registradas para la granularidad seleccionada.
+              No hay actividad registrada para la granularidad seleccionada.
             </p>
           )}
 

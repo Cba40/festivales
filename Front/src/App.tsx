@@ -79,8 +79,6 @@ function ScreenLoading() {
 const SCREEN_OPEN_ROUTE_CATEGORY: Record<string, ActivityServiceCategory> = {
   '/estacionar': 'parking',
   '/emergencia': 'emergency',
-  '/salir': 'exit',
-  '/servicios/transporte': 'transport',
   '/servicios/comer': 'gastronomy',
   '/servicios/comer/mas': 'gastronomy',
   '/pernoctar': 'accommodation',
