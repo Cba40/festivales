@@ -39,6 +39,18 @@ RESULT_STATUSES = [
     "error",
 ]
 
+INTERACTION_TYPES = [
+    "request",
+    "screen_open",
+    "filter_change",
+]
+
+REQUEST_ORIGINS = [
+    "system",
+    "prefetch",
+    "user",
+]
+
 
 class ServiceInteractionLog(Base):
     """Interacción digital anónima con un servicio municipal a nivel request."""
@@ -56,6 +68,12 @@ class ServiceInteractionLog(Base):
         nullable=False,
         default=list,
         server_default=text("'[]'::jsonb"),
+    )
+    interaction_type: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="request", server_default=text("'request'")
+    )
+    origin: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="system", server_default=text("'system'")
     )
 
     __table_args__ = (
