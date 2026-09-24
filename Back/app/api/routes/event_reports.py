@@ -74,6 +74,35 @@ def _scope_conditions(
     return conditions
 
 
+# Filtro canónico de actividad real del usuario: eventos explícitos emitidos
+# por la PWA pública (apertura de pantalla / cambio de filtro), nunca requests
+# técnicas (las de los productos → interaction_type='request').
+USER_ACTIVITY_TYPES = ("screen_open", "filter_change")
+
+
+def _activity_conditions(
+    event_id: str,
+    start: Optional[datetime],
+    end: Optional[datetime],
+    service_category: Optional[str] = None,
+):
+    conditions = _scope_conditions(event_id, start, end, service_category)
+    conditions.append(ServiceInteractionLog.interaction_type.in_(USER_ACTIVITY_TYPES))
+    conditions.append(ServiceInteractionLog.origin == "user")
+    return conditions
+
+
+def _request_conditions(
+    event_id: str,
+    start: Optional[datetime],
+    end: Optional[datetime],
+    service_category: Optional[str] = None,
+):
+    conditions = _scope_conditions(event_id, start, end, service_category)
+    conditions.append(ServiceInteractionLog.interaction_type == "request")
+    return conditions
+
+
 def _validate_timezone(timezone_name: str) -> None:
     try:
         ZoneInfo(timezone_name)
@@ -126,7 +155,7 @@ async def event_report_summary(
 ):
     event = await _get_event_or_404(db, event_id)
     period_start, period_end = await _resolve_period(db, event, event_id, start, end)
-    conditions = _scope_conditions(event_id, start, end)
+    conditions = _activity_conditions(event_id, start, end)
 
     result = await db.execute(
         select(
@@ -169,7 +198,7 @@ async def event_report_service_breakdown(
 ):
     event = await _get_event_or_404(db, event_id)
     period_start, period_end = await _resolve_period(db, event, event_id, start, end)
-    conditions = _scope_conditions(event_id, start, end)
+    conditions = _activity_conditions(event_id, start, end)
 
     total_expr = func.count(ServiceInteractionLog.id)
     result = await db.execute(
@@ -211,7 +240,7 @@ async def event_report_coverage_gaps(
 ):
     event = await _get_event_or_404(db, event_id)
     period_start, period_end = await _resolve_period(db, event, event_id, start, end)
-    conditions = _scope_conditions(event_id, start, end)
+    conditions = _request_conditions(event_id, start, end)
 
     total_expr = func.count(ServiceInteractionLog.id)
     empty_expr = func.count(ServiceInteractionLog.id).filter(
@@ -272,7 +301,7 @@ async def event_report_technical_incidents(
 ):
     event = await _get_event_or_404(db, event_id)
     period_start, period_end = await _resolve_period(db, event, event_id, start, end)
-    conditions = _scope_conditions(event_id, start, end)
+    conditions = _request_conditions(event_id, start, end)
 
     total_expr = func.count(ServiceInteractionLog.id)
     error_expr = func.count(ServiceInteractionLog.id).filter(
@@ -395,7 +424,7 @@ async def event_report_temporal_distribution(
     _validate_timezone(timezone)
     event = await _get_event_or_404(db, event_id)
     period_start, period_end = await _resolve_period(db, event, event_id, start, end)
-    conditions = _scope_conditions(event_id, start, end, service_category)
+    conditions = _activity_conditions(event_id, start, end, service_category)
 
     local_ts = ServiceInteractionLog.timestamp.op("AT TIME ZONE")(timezone)
     if granularity == "hour":
@@ -452,7 +481,7 @@ async def event_report_recommended_zones(
 ):
     event = await _get_event_or_404(db, event_id)
     period_start, period_end = await _resolve_period(db, event, event_id, start, end)
-    conditions = _scope_conditions(event_id, start, end, service_category)
+    conditions = _request_conditions(event_id, start, end, service_category)
 
     zone_id_expr = func.jsonb_array_elements_text(
         ServiceInteractionLog.zone_ids
@@ -650,7 +679,11 @@ async def event_report_operational_profile(
             ServiceInteractionLog.result_status,
             func.count(ServiceInteractionLog.id).label("count"),
         )
-        .where(ServiceInteractionLog.event_id == event_id)
+        .where(
+            ServiceInteractionLog.event_id == event_id,
+            ServiceInteractionLog.interaction_type.in_(USER_ACTIVITY_TYPES),
+            ServiceInteractionLog.origin == "user",
+        )
         .group_by(
             hour_expr,
             ServiceInteractionLog.service_category,
@@ -854,7 +887,7 @@ async def event_report_operational_profile(
     platform_unassigned = platform_totals.get(None)
     if platform_unassigned:
         insufficient_data.append(
-            f"{platform_unassigned['consultas_total']} consultas de plataforma sin fase asignada (fuera de ventana operativa)."
+            f"{platform_unassigned['consultas_total']} actividades de usuario sin fase asignada (fuera de ventana operativa)."
         )
     if obs_unassigned:
         insufficient_data.append(

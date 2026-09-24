@@ -11,24 +11,24 @@ class PeriodRange(BaseModel):
 
 class ResultStatusCount(BaseModel):
     result_status: str = Field(..., description="Estado del resultado: ok | empty | unavailable | error")
-    count: int = Field(..., description="Cantidad de consultas en ese estado")
+    count: int = Field(..., description="Cantidad de actividades del usuario en ese estado")
 
 
 class EventSummaryResponse(BaseModel):
     event_id: str = Field(..., description="ID del evento")
     event_name: str = Field(..., description="Nombre del evento")
     period: PeriodRange = Field(..., description="Período cubierto por el informe")
-    total_consultas: int = Field(..., description="Total de consultas registradas")
-    with_results: int = Field(..., description="Consultas con resultados (status ok)")
-    coverage_gaps_empty: int = Field(..., description="Consultas sin resultados por brecha de información (status empty)")
-    technical_errors: int = Field(..., description="Consultas con incidencia técnica (status error)")
-    breakdown: list[ResultStatusCount] = Field(..., description="Desglose por result_status")
+    total_consultas: int = Field(..., description="Total de actividad real del usuario (screen_open/filter_change con origin=user)")
+    with_results: int = Field(..., description="Actividad de usuario con resultado ok")
+    coverage_gaps_empty: int = Field(..., description="Actividad de usuario sin resultados por brecha de información (status empty)")
+    technical_errors: int = Field(..., description="Actividad de usuario con status error")
+    breakdown: list[ResultStatusCount] = Field(..., description="Desglose de la actividad por result_status")
 
 
 class ServiceBreakdownItem(BaseModel):
     service_category: str = Field(..., description="Categoría de servicio municipal")
-    total_consultas: int = Field(..., description="Consultas registradas para la categoría")
-    percentage: float = Field(..., description="Porcentaje de consultas registradas (0-100)")
+    total_consultas: int = Field(..., description="Actividad real del usuario registrada para la categoría")
+    percentage: float = Field(..., description="Porcentaje de actividad del usuario registrada (0-100)")
 
 
 class ServiceBreakdownResponse(BaseModel):
@@ -40,8 +40,8 @@ class ServiceBreakdownResponse(BaseModel):
 
 class CoverageGapItem(BaseModel):
     service_category: str = Field(..., description="Categoría de servicio municipal")
-    total_consultas: int = Field(..., description="Consultas registradas para la categoría")
-    empty_count: int = Field(..., description="Consultas con status empty")
+    total_consultas: int = Field(..., description="Requests técnicas registradas para la categoría")
+    empty_count: int = Field(..., description="Requests con status empty")
     empty_rate: float = Field(..., description="Proporción empty/total (0-1)")
 
 
@@ -60,7 +60,7 @@ class CoverageGapsResponse(BaseModel):
 
 class TechnicalIncidentItem(BaseModel):
     service_category: str = Field(..., description="Categoría de servicio municipal")
-    error_count: int = Field(..., description="Consultas con status error")
+    error_count: int = Field(..., description="Requests con status error")
     error_rate: float = Field(..., description="Proporción error/total (0-1)")
 
 
@@ -74,7 +74,7 @@ class TechnicalIncidentsResponse(BaseModel):
 
 class TemporalDistributionBucket(BaseModel):
     bucket: datetime = Field(..., description="Inicio del intervalo agrupado, en hora local")
-    count: int = Field(..., description="Cantidad de consultas en el intervalo")
+    count: int = Field(..., description="Cantidad de actividades del usuario en el intervalo")
     phase: Optional[str] = Field(default=None, description="Fase operativa que cubre el intervalo (solo granularity=hour)")
 
 
@@ -85,14 +85,14 @@ class TemporalDistributionResponse(BaseModel):
     granularity: str = Field(..., description="Granularidad temporal: hour | day")
     timezone: str = Field(..., description="Zona horaria local utilizada (IANA)")
     service_category: Optional[str] = Field(default=None, description="Categoría de servicio filtrada (si se especificó)")
-    buckets: list[TemporalDistributionBucket] = Field(..., description="Distribución temporal de consultas registradas")
+    buckets: list[TemporalDistributionBucket] = Field(..., description="Distribución temporal de la actividad real del usuario")
 
 
 class RecommendedZoneItem(BaseModel):
     zone_id: str = Field(..., description="ID de la zona")
     zone_name: str = Field(..., description="Nombre de la zona")
     zone_type: str = Field(..., description="Tipo de la zona")
-    recommendations: int = Field(..., description="Cantidad de recomendaciones en las que aparece la zona")
+    recommendations: int = Field(..., description="Cantidad de requests técnicas en las que aparece la zona")
 
 
 class RecommendedZonesResponse(BaseModel):
@@ -109,11 +109,11 @@ class OperationalPhaseRef(BaseModel):
 
 
 class PlatformQueriesPhase(OperationalPhaseRef):
-    consultas_total: int = Field(..., description="Consultas de plataforma registradas en la fase")
-    with_results: int = Field(..., description="Consultas con resultados (status ok)")
-    empty: int = Field(..., description="Consultas sin resultados por brecha (status empty)")
-    unavailable: int = Field(..., description="Consultas sin servicio disponible (status unavailable)")
-    error: int = Field(..., description="Consultas con incidencia técnica (status error)")
+    consultas_total: int = Field(..., description="Actividad real del usuario registrada en la fase")
+    with_results: int = Field(..., description="Actividad de usuario con resultado ok")
+    empty: int = Field(..., description="Actividad de usuario sin resultados por brecha (status empty)")
+    unavailable: int = Field(..., description="Actividad de usuario sin servicio disponible (status unavailable)")
+    error: int = Field(..., description="Actividad de usuario con status error")
 
 
 class ZonePredictionSummary(BaseModel):
@@ -164,7 +164,7 @@ class OperationalProfileResponse(BaseModel):
     timezone: str = Field(..., description="Zona horaria local usada (IANA)")
     operational_profile_id: Optional[str] = Field(default=None, description="Perfil operativo si las jornadas comparten uno")
     phases: list[OperationalPhaseRef] = Field(..., description="Fases operativas presentes en el informe")
-    platform_queries: list[PlatformQueriesPhase] = Field(..., description="Consultas de plataforma por fase")
+    platform_queries: list[PlatformQueriesPhase] = Field(..., description="Actividad real del usuario por fase")
     predictions_summary: list[PredictionsPhase] = Field(..., description="Predicciones persistidas por fase")
     observations_summary: list[ObservationsPhase] = Field(..., description="Observaciones operativas por fase")
     operational_events_summary: list[OperationalEventsPhase] = Field(..., description="Eventos/incidencias operativas por fase")

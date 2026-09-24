@@ -316,7 +316,7 @@ class TestOperationalProfileFullData:
         assert events[0]["events"][0]["zone_name"] == "Escenario Norte"
 
         assert body["insufficient_data"] == [
-            "2 consultas de plataforma sin fase asignada (fuera de ventana operativa)."
+            "2 actividades de usuario sin fase asignada (fuera de ventana operativa)."
         ]
 
     def test_operational_phases_fallback_by_missing_id(
