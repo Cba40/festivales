@@ -4,6 +4,7 @@ import { DashboardHeader } from '../components/DashboardHeader';
 import { AppFooter } from '@/components/AppFooter';
 
 type Section =
+  | 'reporte'
   | 'summary'
   | 'services'
   | 'coverage'
@@ -14,6 +15,15 @@ type Section =
 
 const SECTIONS: { key: Section; label: string; Component: React.LazyExoticComponent<() => React.JSX.Element> }[] =
   [
+    {
+      key: 'reporte',
+      label: 'Informe del Evento',
+      Component: lazy(() =>
+        import('@/features/dashboard/screens/MunicipalReportScreen').then((m) => ({
+          default: m.MunicipalReportScreen,
+        }))
+      ),
+    },
     {
       key: 'summary',
       label: 'Resumen',
@@ -82,17 +92,19 @@ const SECTIONS: { key: Section; label: string; Component: React.LazyExoticCompon
 const TABS: { key: Section; label: string }[] = SECTIONS.map(({ key, label }) => ({ key, label }));
 
 export function ReportsScreen() {
-  const [activeSection, setActiveSection] = useState<Section>('summary');
+  const [activeSection, setActiveSection] = useState<Section>('reporte');
   const ActiveSectionComponent = SECTIONS.find((s) => s.key === activeSection)?.Component;
 
   return (
     <div className="min-h-screen bg-slate-50 w-full">
-      <DashboardHeader title="Informes del Evento" />
+      <div className="print:hidden">
+        <DashboardHeader title="Informes del Evento" />
+      </div>
       <SectionTabs
         sections={TABS}
         activeSection={activeSection}
         onChange={setActiveSection}
-        className="flex flex-wrap gap-2 px-4 sm:px-6 py-3"
+        className="print:hidden flex flex-wrap gap-2 px-4 sm:px-6 py-3"
       />
 
       <main className="p-4 sm:p-6">
@@ -101,7 +113,9 @@ export function ReportsScreen() {
         </Suspense>
       </main>
 
-      <AppFooter variant="private" />
+      <div className="print:hidden">
+        <AppFooter variant="private" />
+      </div>
     </div>
   );
 }

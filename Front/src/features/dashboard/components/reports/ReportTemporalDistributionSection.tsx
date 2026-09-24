@@ -33,7 +33,7 @@ export function ReportTemporalDistributionSection() {
     >
       {data && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="print:hidden flex items-center justify-between">
             <div>
               <span className="text-sm font-medium text-slate-700">
                 Granularidad:{" "}

@@ -265,7 +265,7 @@ function AppLayout() {
     return (
       <>
         {!isOnline && (
-          <div className="bg-yellow-500 text-black text-center text-sm p-1">
+          <div className="print:hidden bg-yellow-500 text-black text-center text-sm p-1">
             Modo sin conexión. Se mostrarán datos disponibles localmente.
           </div>
         )}
