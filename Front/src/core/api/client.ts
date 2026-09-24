@@ -29,3 +29,12 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   },
 );
+
+// Origen explícito de una request. NO se aplica globalmente ni como default:
+// solo los llamadores que lo eligen agregan el header (prefetch de App.tsx,
+// retry user explícito por whitelist). El resto queda sin header => system.
+export type RequestOrigin = 'prefetch' | 'user';
+
+export function originHeaders(origin: RequestOrigin): Record<string, string> {
+  return { 'X-Request-Origin': origin };
+}

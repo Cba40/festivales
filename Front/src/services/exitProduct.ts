@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
-import { apiClient } from '@/core/api/client'
+import { apiClient, originHeaders, type RequestOrigin } from '@/core/api/client'
 import { endpoints } from '@/core/api/endpoints'
 import { readThroughCache, productCacheKey, PRODUCT_TTL_MS } from '@/core/cache/memoryCache'
 import { useAppStore } from '@/core/state/store'
@@ -34,7 +34,8 @@ export interface ExitRecommendationResponse {
 
 export async function getExitRecommendations(
   eventId: string,
-  params: Record<string, unknown> = {}
+  params: Record<string, unknown> = {},
+  requestOrigin?: RequestOrigin,
 ): Promise<ExitRecommendationResponse> {
   const modo = typeof params.mode === 'string' ? params.mode : undefined
   const dest = typeof params.destination_id === 'string' ? params.destination_id : undefined
@@ -49,7 +50,10 @@ export async function getExitRecommendations(
     async () => {
       const { data } = await apiClient.get<ExitRecommendationResponse>(
         endpoints.products.exit(eventId),
-        { params }
+        {
+          params,
+          ...(requestOrigin ? { headers: originHeaders(requestOrigin) } : {}),
+        },
       )
       return data
     },

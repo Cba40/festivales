@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { apiClient } from '@/core/api/client'
+import { apiClient, originHeaders, type RequestOrigin } from '@/core/api/client'
 import { endpoints } from '@/core/api/endpoints'
 import { readThroughCache } from '@/core/cache/memoryCache'
 import { useAppStore } from '@/core/state/store'
@@ -65,12 +65,14 @@ export interface EmergencyProtocolResponse {
   protocols: ProtocolDTO[]
 }
 
-export async function getCities(): Promise<CityDTO[]> {
+export async function getCities(requestOrigin?: RequestOrigin): Promise<CityDTO[]> {
   return readThroughCache<CityDTO[]>(
     emergencyCacheKey('cities'),
     EMERGENCY_TTL_MS,
     async () => {
-      const { data } = await apiClient.get<CityDTO[]>(endpoints.emergency.cities())
+      const { data } = await apiClient.get<CityDTO[]>(endpoints.emergency.cities(), {
+        ...(requestOrigin ? { headers: originHeaders(requestOrigin) } : {}),
+      })
       return data
     },
     false,
@@ -78,13 +80,16 @@ export async function getCities(): Promise<CityDTO[]> {
   )
 }
 
-export async function getProtocols(context: string): Promise<ProtocolDTO[]> {
+export async function getProtocols(context: string, requestOrigin?: RequestOrigin): Promise<ProtocolDTO[]> {
   return readThroughCache<ProtocolDTO[]>(
     emergencyCacheKey('protocols', context),
     EMERGENCY_TTL_MS,
     async () => {
       const { data } = await apiClient.get<EmergencyProtocolResponse>(
-        endpoints.emergency.protocols(context)
+        endpoints.emergency.protocols(context),
+        {
+          ...(requestOrigin ? { headers: originHeaders(requestOrigin) } : {}),
+        }
       )
       return data.protocols
     },

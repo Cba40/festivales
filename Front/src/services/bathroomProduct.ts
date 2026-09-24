@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
-import { apiClient } from '@/core/api/client'
+import { apiClient, originHeaders, type RequestOrigin } from '@/core/api/client'
 import { endpoints } from '@/core/api/endpoints'
 import { readThroughCache, productCacheKey, PRODUCT_TTL_MS } from '@/core/cache/memoryCache'
 import { useAppStore } from '@/core/state/store'
@@ -34,7 +34,8 @@ export interface BathroomRecommendationResponse {
 
 export async function getBathroomRecommendations(
   eventId: string,
-  params: Record<string, unknown> = {}
+  params: Record<string, unknown> = {},
+  requestOrigin?: RequestOrigin,
 ): Promise<BathroomRecommendationResponse> {
   return readThroughCache<BathroomRecommendationResponse>(
     productCacheKey(eventId, 'bathroom'),
@@ -42,7 +43,10 @@ export async function getBathroomRecommendations(
     async () => {
       const { data } = await apiClient.get<BathroomRecommendationResponse>(
         endpoints.products.bathroom(eventId),
-        { params }
+        {
+          params,
+          ...(requestOrigin ? { headers: originHeaders(requestOrigin) } : {}),
+        },
       )
       return data
     },

@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
-import { apiClient } from '@/core/api/client'
+import { apiClient, originHeaders, type RequestOrigin } from '@/core/api/client'
 import { endpoints } from '@/core/api/endpoints'
 import { readThroughCache, productCacheKey, PRODUCT_TTL_MS } from '@/core/cache/memoryCache'
 import { useAppStore } from '@/core/state/store'
@@ -9,6 +9,7 @@ const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id'
 export async function getParkingRecommendations(
   eventId: string,
   params: Record<string, unknown> = {},
+  requestOrigin?: RequestOrigin,
 ): Promise<ParkingRecommendationResponse> {
   return readThroughCache<ParkingRecommendationResponse>(
     productCacheKey(eventId, 'parking'),
@@ -16,7 +17,10 @@ export async function getParkingRecommendations(
     async () => {
       const { data } = await apiClient.get<ParkingRecommendationResponse>(
         endpoints.products.parking(eventId),
-        { params },
+        {
+          params,
+          ...(requestOrigin ? { headers: originHeaders(requestOrigin) } : {}),
+        },
       )
       return data
     },

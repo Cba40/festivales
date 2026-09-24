@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
-import { apiClient } from '@/core/api/client'
+import { apiClient, originHeaders, type RequestOrigin } from '@/core/api/client'
 import { endpoints } from '@/core/api/endpoints'
 import { readThroughCache, productCacheKey, PRODUCT_TTL_MS } from '@/core/cache/memoryCache'
 import { useAppStore } from '@/core/state/store'
@@ -31,7 +31,8 @@ export interface AccommodationRecommendationResponse {
 
 export async function getAccommodationRecommendations(
   eventId: string,
-  params: Record<string, unknown> = {}
+  params: Record<string, unknown> = {},
+  requestOrigin?: RequestOrigin,
 ): Promise<AccommodationRecommendationResponse> {
   const cacheProductType = params.type ? `accommodation:${params.type}` : 'accommodation'
   return readThroughCache<AccommodationRecommendationResponse>(
@@ -40,7 +41,10 @@ export async function getAccommodationRecommendations(
     async () => {
       const { data } = await apiClient.get<AccommodationRecommendationResponse>(
         endpoints.products.accommodation(eventId),
-        { params }
+        {
+          params,
+          ...(requestOrigin ? { headers: originHeaders(requestOrigin) } : {}),
+        },
       )
       return data
     },

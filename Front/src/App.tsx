@@ -99,23 +99,23 @@ function AppLayout() {
   const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 
   const preloadParking = useCallback(() => {
-    getParkingRecommendations(EVENT_ID, { ...buildProductParams(), limit: 4 }).catch(() => {});
+    getParkingRecommendations(EVENT_ID, { ...buildProductParams(), limit: 4 }, 'prefetch').catch(() => {});
   }, [EVENT_ID]);
 
   const preloadGastronomy = useCallback(() => {
-    getGastronomyRecommendations(EVENT_ID, { ...buildProductParams(), limit: 6 }).catch(() => {});
+    getGastronomyRecommendations(EVENT_ID, { ...buildProductParams(), limit: 6 }, 'prefetch').catch(() => {});
   }, [EVENT_ID]);
 
   const preloadBathroom = useCallback(() => {
-    getBathroomRecommendations(EVENT_ID, { ...buildProductParams(), limit: 10 }).catch(() => {});
+    getBathroomRecommendations(EVENT_ID, { ...buildProductParams(), limit: 10 }, 'prefetch').catch(() => {});
   }, [EVENT_ID]);
 
   const preloadRest = useCallback(() => {
-    getRestRecommendations(EVENT_ID, { ...buildProductParams(), limit: 10 }).catch(() => {});
+    getRestRecommendations(EVENT_ID, { ...buildProductParams(), limit: 10 }, 'prefetch').catch(() => {});
   }, [EVENT_ID]);
 
   const preloadHydration = useCallback(() => {
-    getHydrationRecommendations(EVENT_ID, { ...buildProductParams(), limit: 10 }).catch(() => {});
+    getHydrationRecommendations(EVENT_ID, { ...buildProductParams(), limit: 10 }, 'prefetch').catch(() => {});
   }, [EVENT_ID]);
 
   const preloadAccommodation = useCallback(() => {
@@ -123,19 +123,19 @@ function AppLayout() {
     getAccommodationRecommendations(EVENT_ID, {
       limit: 100,
       ...(userLocation ? { latitude: userLocation[0], longitude: userLocation[1] } : {}),
-    }).catch(() => {});
+    }, 'prefetch').catch(() => {});
   }, [EVENT_ID]);
 
   const preloadExit = useCallback(() => {
     const { userLocation } = useAppStore.getState();
     getExitRecommendations(EVENT_ID, {
       ...(userLocation ? { latitude: userLocation[0], longitude: userLocation[1] } : {}),
-    }).catch(() => {});
+    }, 'prefetch').catch(() => {});
   }, [EVENT_ID]);
 
   const preloadEmergency = useCallback(() => {
-    getCities().catch(() => {});
-    getProtocols('festival').catch(() => {});
+    getCities('prefetch').catch(() => {});
+    getProtocols('festival', 'prefetch').catch(() => {});
   }, []);
 
   useEffect(() => {
