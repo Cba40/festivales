@@ -18,6 +18,7 @@ import { useRestRecommendations, type ZonaRestItem } from '@/services/restProduc
 import { useHydrationRecommendations, type ZonaHidratacionItem } from '@/services/hydrationProduct'
 import { useCajeros } from '@/services/cajerosProduct'
 import { AppFooter } from '@/components/AppFooter'
+import { recordActivity, type ActivityServiceCategory } from '@/services/activity'
 
 const opciones = [
   { icon: Bath, label: 'Baños', subtipo: 'banos', colorScheme: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' },
@@ -25,6 +26,14 @@ const opciones = [
   { icon: Armchair, label: 'Descanso', subtipo: 'descanso', colorScheme: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400' },
   { icon: CreditCard, label: 'Cajeros', subtipo: 'cajeros', colorScheme: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300' }
 ]
+
+// Cambio de subtipo con categoría contractual válida. 'cajeros' queda fuera
+// (sin categoría en el contrato) y no emite actividad.
+const SUBTIPO_CATEGORY: Record<string, ActivityServiceCategory> = {
+  banos: 'bathroom',
+  hidratacion: 'hydration',
+  descanso: 'rest',
+}
 
 
 
@@ -374,7 +383,18 @@ const ServiciosGenerales = () => {
               return (
                 <button
                   key={op.subtipo}
-                  onClick={() => setSubtipoActivo(op.subtipo)}
+                  onClick={() => {
+                    if (subtipoActivo === op.subtipo) return
+                    const category = SUBTIPO_CATEGORY[op.subtipo]
+                    if (category) {
+                      recordActivity({
+                        interaction_type: 'screen_open',
+                        service_category: category,
+                        request_mode: op.subtipo,
+                      })
+                    }
+                    setSubtipoActivo(op.subtipo)
+                  }}
                   className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-md hover:shadow-lg transition-all active:scale-95 flex flex-col items-center gap-2"
                 >
                   <div className={`w-12 h-12 rounded-xl ${op.colorScheme} flex items-center justify-center`}>

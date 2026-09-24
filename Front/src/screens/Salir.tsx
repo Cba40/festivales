@@ -14,6 +14,7 @@ import {
   type TransporteMode,
 } from '@/services/exitProduct'
 import { useAppStore } from '@/core/state/store'
+import { recordActivity } from '@/services/activity'
 import { NearestBadge } from '@/components/ZonaCardsList'
 import { GpsModal } from '@/components/GpsModal'
 import { formatUpdatedAt } from '@/utils/formatTime'
@@ -253,7 +254,16 @@ const Salir = () => {
             {MODOS.map(({ value, label, icon: Icon }) => (
               <button
                 key={value}
-                onClick={() => setMode(value)}
+                onClick={() => {
+                  if (mode !== value) {
+                    recordActivity({
+                      interaction_type: 'filter_change',
+                      service_category: 'exit',
+                      request_mode: `mode=${value}`,
+                    })
+                  }
+                  setMode(value)
+                }}
                 className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all active:scale-95 ${
                   mode === value
                     ? 'bg-primary text-white border-primary shadow-md'
@@ -305,9 +315,14 @@ const Salir = () => {
                   {destinosDisponibles.map(destino => (
                     <button
                       key={destino.id}
-                      onClick={() =>
+                      onClick={() => {
+                        recordActivity({
+                          interaction_type: 'filter_change',
+                          service_category: 'exit',
+                          request_mode: `destination=${destino.name}`,
+                        })
                         setDestinationId(prev => (prev === destino.id ? null : destino.id))
-                      }
+                      }}
                       className={`px-4 py-2 rounded-full text-sm font-bold border-2 transition-all active:scale-95 ${
                         destinationId === destino.id
                           ? 'bg-primary text-white border-primary shadow-md'

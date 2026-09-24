@@ -133,6 +133,9 @@ export const endpoints = {
     alerts: (eventId: string) =>
       `/events/${eventId}/alerts`,
   },
+  activity: {
+    create: (eventId: string) => `/events/${eventId}/activity`,
+  },
   adminAlerts: {
     list: (eventId: string) => `/admin/events/${eventId}/alerts`,
     byId: (eventId: string, id: string) => `/admin/events/${eventId}/alerts/${id}`,

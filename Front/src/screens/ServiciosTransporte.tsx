@@ -16,6 +16,7 @@ import { getDistancias } from '@/utils/geo'
 import { RouteScheduleModal } from '@/components/RouteScheduleModal'
 import PublicAlertsBanner from '@/components/PublicAlertsBanner'
 import { AppFooter } from '@/components/AppFooter'
+import { recordActivity } from '@/services/activity'
 
 const TIPOS: { valor: TransportType; etiqueta: string; icono: string }[] = [
   { valor: 'urbano', etiqueta: 'Urbano', icono: '🚌' },
@@ -239,7 +240,16 @@ const ServiciosTransporte = () => {
               {TIPOS.map(t => (
                 <button
                   key={t.valor}
-                  onClick={() => setTipo(t.valor)}
+                  onClick={() => {
+                    if (tipo !== t.valor) {
+                      recordActivity({
+                        interaction_type: 'filter_change',
+                        service_category: 'transport',
+                        request_mode: `transport_type=${t.valor}`,
+                      })
+                    }
+                    setTipo(t.valor)
+                  }}
                   className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 rounded-xl p-4 shadow-sm transition-colors flex flex-col items-center gap-1"
                 >
                   <span className="text-3xl">{t.icono}</span>
@@ -271,7 +281,14 @@ const ServiciosTransporte = () => {
                 <div className="flex flex-wrap gap-2 px-1">
                   <button
                     key="todos"
-                    onClick={() => setDestino('Todos')}
+                    onClick={() => {
+                      recordActivity({
+                        interaction_type: 'filter_change',
+                        service_category: 'transport',
+                        request_mode: 'destination=todos',
+                      })
+                      setDestino('Todos')
+                    }}
                     className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                       destino === 'Todos'
                         ? 'bg-primary text-white'
@@ -283,7 +300,14 @@ const ServiciosTransporte = () => {
                   {destinations.map(d => (
                     <button
                       key={d}
-                      onClick={() => setDestino(d)}
+                      onClick={() => {
+                        recordActivity({
+                          interaction_type: 'filter_change',
+                          service_category: 'transport',
+                          request_mode: `destination=${d}`,
+                        })
+                        setDestino(d)
+                      }}
                       className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                         destino === d
                           ? 'bg-primary text-white'

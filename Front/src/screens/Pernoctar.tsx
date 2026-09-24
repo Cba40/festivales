@@ -13,6 +13,7 @@ import {
   type AccommodationType,
 } from '@/services/accommodationProduct'
 import { AppFooter } from '@/components/AppFooter'
+import { recordActivity } from '@/services/activity'
 
 const CATEGORIAS: Array<{ tipo: AccommodationType | null; icono: string; label: string }> = [
   { tipo: null, icono: '🏨', label: 'Todos' },
@@ -116,7 +117,16 @@ const Pernoctar = () => {
             return (
               <button
                 key={cat.label}
-                onClick={() => setCategoriaActiva(cat.tipo)}
+                onClick={() => {
+                  if (categoriaActiva !== cat.tipo) {
+                    recordActivity({
+                      interaction_type: 'filter_change',
+                      service_category: 'accommodation',
+                      request_mode: `type=${cat.tipo ?? 'all'}`,
+                    })
+                  }
+                  setCategoriaActiva(cat.tipo)
+                }}
                 className={`flex flex-col items-center justify-center gap-1 p-3 rounded-xl border-2 transition-transform active:scale-95 ${
                   activa
                     ? 'bg-primary text-white border-primary shadow-lg shadow-primary/25'

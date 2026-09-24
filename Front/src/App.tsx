@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { useAppStore } from './core/state/store';
 import { useDashboardSync } from './features/dashboard/hooks/useDashboardSync';
@@ -13,6 +13,10 @@ import { getHydrationRecommendations } from './services/hydrationProduct';
 import { getAccommodationRecommendations } from './services/accommodationProduct';
 import { getExitRecommendations } from './services/exitProduct';
 import { getCities, getProtocols } from './services/emergencyProduct';
+import {
+  recordActivity,
+  type ActivityServiceCategory,
+} from './services/activity';
 import ProtectedRoute from './shared/components/ProtectedRoute';
 
 const Home = lazy(() => import('./screens/Home'));
@@ -69,6 +73,18 @@ function ScreenLoading() {
     </div>
   );
 }
+
+// Solamente rutas públicas con categoría contractual válida. El resto
+// (/servicios, /resolver-ahora, /asistente, '/') NO emiten screen_open.
+const SCREEN_OPEN_ROUTE_CATEGORY: Record<string, ActivityServiceCategory> = {
+  '/estacionar': 'parking',
+  '/emergencia': 'emergency',
+  '/salir': 'exit',
+  '/servicios/transporte': 'transport',
+  '/servicios/comer': 'gastronomy',
+  '/servicios/comer/mas': 'gastronomy',
+  '/pernoctar': 'accommodation',
+};
 
 function AppLayout() {
   const location = useLocation();
@@ -260,6 +276,28 @@ function AppLayout() {
 
     return () => navigator.geolocation.clearWatch(id);
   }, [setUserLocation, setLocationPermissionDenied, requestLocation]);
+
+  // screen_open: evento de navegación REAL (interna, URL directa, back, forward).
+  // Dedupe por pathname+tiempo para absorber renders y StrictMode sin duplicar.
+  const lastScreenOpen = useRef<{ path: string; at: number } | null>(null);
+
+  useEffect(() => {
+    if (isDashboard) {
+      lastScreenOpen.current = null;
+      return;
+    }
+    const category = SCREEN_OPEN_ROUTE_CATEGORY[location.pathname];
+    if (!category) return;
+    const now = Date.now();
+    const last = lastScreenOpen.current;
+    if (last && last.path === location.pathname && now - last.at < 1000) return;
+    lastScreenOpen.current = { path: location.pathname, at: now };
+    recordActivity({
+      interaction_type: 'screen_open',
+      service_category: category,
+      request_mode: location.pathname,
+    });
+  }, [location.pathname, isDashboard]);
 
   if (isDashboard) {
     return (
