@@ -45,6 +45,9 @@ const AlertManagementScreen = lazy(() =>
 const MotorScreen = lazy(() =>
   import('./features/dashboard/screens/MotorScreen').then((m) => ({ default: m.MotorScreen }))
 );
+const ReportsScreen = lazy(() =>
+  import('@/features/dashboard/screens/ReportsScreen').then((m) => ({ default: m.ReportsScreen }))
+);
 const LoginScreen = lazy(() => import('./features/auth/screens/LoginScreen'));
 
 function buildProductParams(): Record<string, unknown> {
@@ -291,6 +294,7 @@ function AppLayout() {
             <MotorScreen />
           </ProtectedRoute>
         } />
+        <Route path="/dashboard/reports" element={<ProtectedRoute><ReportsScreen /></ProtectedRoute>} />
         </Routes>
         </Suspense>
       </>

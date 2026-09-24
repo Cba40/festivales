@@ -97,6 +97,18 @@ export const endpoints = {
     auditLog: (recommendationId: string) =>
       `/analytics/audit-log?recommendation_id=${recommendationId}`,
   },
+  reports: {
+    summary: (eventId: string) => `/events/${eventId}/reports/summary`,
+    serviceBreakdown: (eventId: string) => `/events/${eventId}/reports/service_breakdown`,
+    coverageGaps: (eventId: string) => `/events/${eventId}/reports/coverage_gaps`,
+    technicalIncidents: (eventId: string) =>
+      `/events/${eventId}/reports/technical_incidents`,
+    temporalDistribution: (eventId: string) =>
+      `/events/${eventId}/reports/temporal_distribution`,
+    recommendedZones: (eventId: string) => `/events/${eventId}/reports/recommended_zones`,
+    operationalProfile: (eventId: string) =>
+      `/events/${eventId}/reports/operational_profile`,
+  },
   products: {
     parking: (eventId: string) =>
       `/events/${eventId}/products/parking`,

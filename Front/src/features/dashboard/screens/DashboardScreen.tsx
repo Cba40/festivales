@@ -81,6 +81,14 @@ const QUICK_ACTIONS: QuickAction[] = [
     iconBg: 'bg-teal-50 border-teal-100',
     path: '/dashboard/alerts',
   },
+  {
+    icon: BarChart3,
+    title: 'Informes del Evento',
+    description: 'Consultar informes municipales del evento (cobertura, zonas, incidencias).',
+    accent: 'text-blue-600',
+    iconBg: 'bg-blue-50 border-blue-100',
+    path: '/dashboard/reports',
+  },
 ];
 
 interface SystemMetric {
