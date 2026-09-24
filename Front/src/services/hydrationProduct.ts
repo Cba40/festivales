@@ -65,7 +65,7 @@ export function useHydrationRecommendations() {
 
   const ctxRef = useRef({ currentZoneId, userLocation })
 
-  const refresh = useCallback(async (force = false) => {
+  const refresh = useCallback(async (force = false, requestOrigin?: RequestOrigin) => {
     setLoading(true)
     setError(null)
     try {
@@ -87,7 +87,10 @@ export function useHydrationRecommendations() {
         async () => {
           const { data } = await apiClient.get<HydrationRecommendationResponse>(
             endpoints.products.hydration(EVENT_ID),
-            { params },
+            {
+              params,
+              ...(requestOrigin ? { headers: originHeaders(requestOrigin) } : {}),
+            },
           )
           return data
         },

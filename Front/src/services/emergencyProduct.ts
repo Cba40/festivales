@@ -156,7 +156,7 @@ export function useEmergencyRecommendations(
 
   const userLocation = useAppStore(s => s.userLocation)
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (requestOrigin?: RequestOrigin) => {
     if (!cityId) {
       setData(null)
       setLoading(false)
@@ -181,6 +181,7 @@ export function useEmergencyRecommendations(
                   ? { latitude: userLocation[0], longitude: userLocation[1] }
                   : {}),
               },
+              ...(requestOrigin ? { headers: originHeaders(requestOrigin) } : {}),
             }
           )
           return data

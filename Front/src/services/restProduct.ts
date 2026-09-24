@@ -65,7 +65,7 @@ export function useRestRecommendations() {
 
   const ctxRef = useRef({ currentZoneId, userLocation })
 
-  const refresh = useCallback(async (force = false) => {
+  const refresh = useCallback(async (force = false, requestOrigin?: RequestOrigin) => {
     setLoading(true)
     setError(null)
     try {
@@ -87,7 +87,10 @@ export function useRestRecommendations() {
         async () => {
           const { data } = await apiClient.get<RestRecommendationResponse>(
             endpoints.products.rest(EVENT_ID),
-            { params },
+            {
+              params,
+              ...(requestOrigin ? { headers: originHeaders(requestOrigin) } : {}),
+            },
           )
           return data
         },

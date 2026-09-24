@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
-import { apiClient } from '@/core/api/client'
+import { apiClient, originHeaders, type RequestOrigin } from '@/core/api/client'
 import { endpoints } from '@/core/api/endpoints'
 import { useAppStore } from '@/core/state/store'
 
@@ -60,7 +60,7 @@ export function useTransportRecommendations(
 
   const ctxRef = useRef({ currentZoneId, userLocation })
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (requestOrigin?: RequestOrigin) => {
     setLoading(true)
     setError(null)
     try {
@@ -81,6 +81,7 @@ export function useTransportRecommendations(
             ...(destination ? { destination } : {}),
             ...(transportType ? { transport_type: transportType } : {}),
           },
+          ...(requestOrigin ? { headers: originHeaders(requestOrigin) } : {}),
         }
       )
       setData(res)

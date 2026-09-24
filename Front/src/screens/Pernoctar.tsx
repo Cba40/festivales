@@ -90,7 +90,7 @@ const Pernoctar = () => {
           <p className="text-danger font-bold">Error al cargar</p>
           <p className="text-sm text-slate-500 text-center">{error}</p>
           <button
-            onClick={refresh}
+            onClick={() => refresh(false, 'user')}
             className="bg-primary text-white px-6 py-2 rounded-lg font-bold"
           >
             Reintentar

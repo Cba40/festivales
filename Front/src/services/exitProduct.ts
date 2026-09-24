@@ -74,7 +74,7 @@ export function useExitRecommendations(
 
   const ctxRef = useRef({ userLocation })
 
-  const refresh = useCallback(async (force = false) => {
+  const refresh = useCallback(async (force = false, requestOrigin?: RequestOrigin) => {
     setLoading(true)
     setError(null)
     try {
@@ -97,7 +97,10 @@ export function useExitRecommendations(
         async () => {
           const { data } = await apiClient.get<ExitRecommendationResponse>(
             endpoints.products.exit(EVENT_ID),
-            { params },
+            {
+              params,
+              ...(requestOrigin ? { headers: originHeaders(requestOrigin) } : {}),
+            },
           )
           return data
         },

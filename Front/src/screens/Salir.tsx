@@ -151,7 +151,7 @@ const Salir = () => {
           <p className="text-danger font-bold text-sm">Error al cargar</p>
           <p className="text-xs text-slate-500 text-center">{error}</p>
           <button
-            onClick={refresh}
+            onClick={() => refresh(false, 'user')}
             className="bg-primary text-white px-6 py-2 rounded-lg font-bold text-sm"
           >
             Reintentar

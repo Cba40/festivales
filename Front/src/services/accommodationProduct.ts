@@ -64,7 +64,7 @@ export function useAccommodationRecommendations(
 
   const ctxRef = useRef({ userLocation })
 
-  const refresh = useCallback(async (force = false) => {
+  const refresh = useCallback(async (force = false, requestOrigin?: RequestOrigin) => {
     setLoading(true)
     setError(null)
     try {
@@ -83,7 +83,10 @@ export function useAccommodationRecommendations(
         async () => {
           const { data } = await apiClient.get<AccommodationRecommendationResponse>(
             endpoints.products.accommodation(EVENT_ID),
-            { params },
+            {
+              params,
+              ...(requestOrigin ? { headers: originHeaders(requestOrigin) } : {}),
+            },
           )
           return data
         },

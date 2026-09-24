@@ -419,7 +419,7 @@ const ServiciosGenerales = () => {
           <p className="text-danger font-bold">Error al cargar</p>
           <p className="text-sm text-slate-500 text-center">{error}</p>
           <button
-            onClick={() => refresh(true)}
+            onClick={() => refresh(true, 'user')}
             className="bg-primary text-white px-6 py-2 rounded-lg font-bold"
           >
             Reintentar
@@ -544,7 +544,7 @@ const ServiciosGenerales = () => {
           <p className="text-danger font-bold">Error al cargar</p>
           <p className="text-sm text-slate-500 text-center">{restError}</p>
           <button
-            onClick={() => refreshRest(true)}
+            onClick={() => refreshRest(true, 'user')}
             className="bg-primary text-white px-6 py-2 rounded-lg font-bold"
           >
             Reintentar
@@ -669,7 +669,7 @@ const ServiciosGenerales = () => {
           <p className="text-danger font-bold">Error al cargar</p>
           <p className="text-sm text-slate-500 text-center">{hydrationError}</p>
           <button
-            onClick={() => refreshHydration(true)}
+            onClick={() => refreshHydration(true, 'user')}
             className="bg-primary text-white px-6 py-2 rounded-lg font-bold"
           >
             Reintentar

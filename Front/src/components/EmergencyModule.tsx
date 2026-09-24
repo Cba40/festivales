@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { RequestOrigin } from '@/core/api/client'
 import {
   AlertTriangle,
   ChevronDown,
@@ -85,6 +86,11 @@ export const EmergencyModule = ({ context, cityId }: EmergencyModuleProps) => {
 
   const userLocation = useAppStore(s => s.userLocation)
 
+  // Propagación mínima de origin=user: el handler del botón "Reintentar"
+  // marca este ref solo para la próxima corrida del effect de carga, que lo
+  // lee y lo limpia. No es estado global ni persiste.
+  const retryOriginRef = useRef<RequestOrigin | null>(null)
+
   // Auto-descubrimiento: si no se provee cityId explícito, se resuelve la
   // primera ciudad disponible para el módulo público (sin config externa).
   useEffect(() => {
@@ -99,9 +105,11 @@ export const EmergencyModule = ({ context, cityId }: EmergencyModuleProps) => {
 
     setResolvingCity(true)
     setCityError(null)
+    const retryOrigin = retryOriginRef.current === 'user' ? 'user' : undefined
+    retryOriginRef.current = null
     ;(async () => {
       try {
-        const cities = await getCities()
+        const cities = await getCities(retryOrigin)
         if (cancelled) return
         if (cities.length === 0) {
           setResolvedCityId(null)
@@ -139,9 +147,11 @@ export const EmergencyModule = ({ context, cityId }: EmergencyModuleProps) => {
     let cancelled = false
     setProtocols(null)
     setProtocolsError(null)
+    const retryOrigin = retryOriginRef.current === 'user' ? 'user' : undefined
+    retryOriginRef.current = null
     ;(async () => {
       try {
-        const list = await getProtocols(context)
+        const list = await getProtocols(context, retryOrigin)
         if (!cancelled) setProtocols(list)
       } catch {
         if (!cancelled) setProtocolsError('No se pudieron cargar los protocolos')
@@ -161,10 +171,12 @@ export const EmergencyModule = ({ context, cityId }: EmergencyModuleProps) => {
   }, [])
 
   const retryCities = useCallback(() => {
+    retryOriginRef.current = 'user'
     setCityAttempt(a => a + 1)
   }, [])
 
   const retryProtocols = useCallback(() => {
+    retryOriginRef.current = 'user'
     setProtocolsAttempt(a => a + 1)
   }, [])
 
@@ -373,7 +385,7 @@ export const EmergencyModule = ({ context, cityId }: EmergencyModuleProps) => {
                     <AlertTriangle size={16} /> {error}
                   </p>
                   <button
-                    onClick={() => refresh()}
+                    onClick={() => refresh('user')}
                     className="bg-primary text-white px-5 py-2 rounded-lg font-bold text-sm active:scale-95 transition-transform"
                   >
                     Reintentar
