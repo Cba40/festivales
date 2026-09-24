@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Header, Query
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,7 +12,11 @@ from app.models.transport_line import TransportLine
 from app.models.transport_line_stop import TransportLineStop
 from app.models.transport_schedule import TransportSchedule
 from app.schemas.product import TransportRecommendationResponse
-from app.services.service_interaction_log import log_service_interaction
+from app.services.service_interaction_log import (
+    REQUEST_ORIGIN_HEADER,
+    log_service_interaction,
+    resolve_request_origin,
+)
 from src.interfaces.rest.transport_product import get_transport_product_adapter
 
 router = APIRouter(prefix="/api/events/{event_id}", tags=["Transport Product"])
@@ -53,9 +57,11 @@ async def transport_recommendations(
     user_id: str | None = Query(None),
     access_level: str | None = Query(None),
     current_zone_id: str | None = Query(None),
+    x_request_origin: str | None = Header(default=None, alias=REQUEST_ORIGIN_HEADER),
     db: AsyncSession = Depends(get_async_db),
 ):
     now = datetime.now(timezone.utc)
+    origin = resolve_request_origin(x_request_origin)
 
     request_mode_parts = []
     if transport_type:
@@ -84,6 +90,7 @@ async def transport_recommendations(
             result_count=0,
             zone_ids=[],
             request_mode=request_mode,
+            origin=origin,
         )
         raise
 
@@ -96,6 +103,7 @@ async def transport_recommendations(
         result_count=len(zonas),
         zone_ids=[z.zone_id for z in zonas],
         request_mode=request_mode,
+        origin=origin,
     )
 
     return result

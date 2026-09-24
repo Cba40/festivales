@@ -2,13 +2,17 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Header, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_async_db
 from app.models.accommodation import AccommodationType
 from app.schemas.accommodation import AccommodationRecommendationResponse
-from app.services.service_interaction_log import log_service_interaction
+from app.services.service_interaction_log import (
+    REQUEST_ORIGIN_HEADER,
+    log_service_interaction,
+    resolve_request_origin,
+)
 from src.interfaces.rest.accommodation_product import get_accommodation_product_adapter
 
 router = APIRouter(prefix="/api/events/{event_id}", tags=["Accommodation Product"])
@@ -21,6 +25,7 @@ async def accommodation_recommendations(
     latitude: float | None = Query(None, ge=-90.0, le=90.0),
     longitude: float | None = Query(None, ge=-180.0, le=180.0),
     limit: int = Query(20, ge=1, le=100),
+    x_request_origin: str | None = Header(default=None, alias=REQUEST_ORIGIN_HEADER),
     db: AsyncSession = Depends(get_async_db),
 ):
     """Recomendaciones determinísticas de alojamiento para un evento.
@@ -29,6 +34,7 @@ async def accommodation_recommendations(
     Haversine si se proveen coordenadas y ordena por distancia o nombre.
     """
     now = datetime.now(timezone.utc)
+    origin = resolve_request_origin(x_request_origin)
 
     request_mode = None
     if type is not None:
@@ -52,6 +58,7 @@ async def accommodation_recommendations(
             result_count=0,
             zone_ids=[],
             request_mode=request_mode,
+            origin=origin,
         )
         raise
 
@@ -64,6 +71,7 @@ async def accommodation_recommendations(
         result_count=len(accommodations),
         zone_ids=[],
         request_mode=request_mode,
+        origin=origin,
     )
 
     return result

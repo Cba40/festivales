@@ -8,12 +8,16 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Header, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_async_db
 from app.schemas.exit_product import ExitRecommendationResponse
-from app.services.service_interaction_log import log_service_interaction
+from app.services.service_interaction_log import (
+    REQUEST_ORIGIN_HEADER,
+    log_service_interaction,
+    resolve_request_origin,
+)
 from src.interfaces.rest.exit_product import get_exit_product_adapter
 
 TransporteLiteral = Literal["peatonal", "vehicular", "transporte"]
@@ -28,9 +32,11 @@ async def exit_recommendations(
     mode: TransporteLiteral | None = Query(None),
     latitude: float | None = Query(None, ge=-90.0, le=90.0),
     longitude: float | None = Query(None, ge=-180.0, le=180.0),
+    x_request_origin: str | None = Header(default=None, alias=REQUEST_ORIGIN_HEADER),
     db: AsyncSession = Depends(get_async_db),
 ):
     now = datetime.now(timezone.utc)
+    origin = resolve_request_origin(x_request_origin)
 
     request_mode_parts = []
     if mode:
@@ -58,6 +64,7 @@ async def exit_recommendations(
             result_count=0,
             zone_ids=[],
             request_mode=request_mode,
+            origin=origin,
         )
         raise
 
@@ -70,6 +77,7 @@ async def exit_recommendations(
         result_count=len(zonas),
         zone_ids=[z.zone_id for z in zonas],
         request_mode=request_mode,
+        origin=origin,
     )
 
     return result

@@ -40,6 +40,7 @@ from app.api.routes.analytics import router as analytics_router
 from app.api.routes.operational_observations import router as operational_observations_router
 from app.api.routes.alert_admin import router as alert_admin_router
 from app.api.routes.alert_product import router as alert_product_router
+from app.api.routes.activity import router as activity_router
 from app.api.routes.event_reports import router as event_reports_router
 
 app = FastAPI(title="Territorial MVP", version="0.1.0")
@@ -90,6 +91,7 @@ app.include_router(operational_observations_router, prefix="/api")
 app.include_router(analytics_router)
 app.include_router(alert_admin_router)
 app.include_router(alert_product_router)
+app.include_router(activity_router)
 app.include_router(event_reports_router)
 
 

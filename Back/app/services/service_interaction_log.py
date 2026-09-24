@@ -18,6 +18,23 @@ from app.models.service_interaction_log import (
 
 logger = logging.getLogger(__name__)
 
+REQUEST_ORIGIN_HEADER = "X-Request-Origin"
+
+ALLOWED_CLIENT_ORIGINS = frozenset({"prefetch", "user"})
+
+
+def resolve_request_origin(x_request_origin: str | None) -> str:
+    """Resuelve el header ``X-Request-Origin`` al origin canónico.
+
+    Whitelist estricta: solo ``prefetch`` y ``user``. Cualquier valor
+    ausente, vacío o no permitido (incluido un ``system`` explícito del
+    cliente) resuelve a ``system``. El origin ``user`` no es alcanzable
+    por las rutas de producto: solo lo fuerza el endpoint de actividad.
+    """
+    if x_request_origin in ALLOWED_CLIENT_ORIGINS:
+        return x_request_origin
+    return "system"
+
 
 async def log_service_interaction(
     *,
