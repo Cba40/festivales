@@ -33,7 +33,10 @@ const BADGE_TYPE: Record<AccommodationType, string> = {
 const Pernoctar = () => {
   const navigate = useNavigate()
   const [categoriaActiva, setCategoriaActiva] = useState<AccommodationType | null>(null)
-  const { data, loading, error, refresh } = useAccommodationRecommendations(categoriaActiva ?? undefined)
+  // Distingue "todavía no eligió categoría" de la opción "Todos" (tipo null):
+  // en "Todos" hay que pedir la lista completa, igual que el resto.
+  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(false)
+  const { data, loading, error, refresh } = useAccommodationRecommendations(categoriaSeleccionada ? categoriaActiva ?? undefined : undefined)
   const [selectedPunto, setSelectedPunto] = useState<AccommodationItem | null>(null)
   const [showMap, setShowMap] = useState(false)
   const [mostrarTodos, setMostrarTodos] = useState(false)
@@ -42,8 +45,9 @@ const Pernoctar = () => {
   const requestLocation = useAppStore(s => s.requestLocation)
 
   useEffect(() => {
+    if (!categoriaSeleccionada) return
     refresh()
-  }, [refresh])
+  }, [refresh, categoriaSeleccionada])
 
   const alojamientos = data?.accommodations ?? []
   const mostrados = mostrarTodos ? alojamientos : alojamientos.slice(0, 3)
@@ -79,8 +83,7 @@ const Pernoctar = () => {
         </div>
         <AppFooter variant="public" />
       </div>
-    )
-  }
+    )  }
 
   if (error) {
     return (
@@ -101,44 +104,64 @@ const Pernoctar = () => {
     )
   }
 
+  const handleSelectCategory = (tipo: AccommodationType | null) => {
+    if (categoriaActiva !== tipo || !categoriaSeleccionada) {
+      recordActivity({
+        interaction_type: 'screen_open',
+        service_category: 'accommodation',
+        request_mode: `type=${tipo ?? 'all'}`,
+      })
+    }
+    setCategoriaActiva(tipo)
+    setCategoriaSeleccionada(true)
+  }
+
+  const categoryGrid = (
+    <div className="grid grid-cols-2 gap-2">
+      {CATEGORIAS.map(cat => {
+        const activa = categoriaSeleccionada && categoriaActiva === cat.tipo
+        return (
+          <button
+            key={cat.label}
+            onClick={() => handleSelectCategory(cat.tipo)}
+            className={`flex flex-col items-center justify-center gap-1 p-3 rounded-xl border-2 transition-transform active:scale-95 ${
+              activa
+                ? 'bg-primary text-white border-primary shadow-lg shadow-primary/25'
+                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500'
+            }`}
+          >
+            <span className="text-2xl">{cat.icono}</span>
+            <span className="text-sm font-bold">{cat.label}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+
+  if (!categoriaSeleccionada) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
+        <Header title="Hospedajes" showBack onBack={() => navigate('/')} />
+
+        <div className="flex-1 p-4 space-y-3 overflow-y-auto pb-20">
+          <p className="text-xs text-slate-500 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center gap-2">
+            <Info size={14} /> Elegí una categoría para ver los alojamientos disponibles
+          </p>
+
+          {categoryGrid}
+        </div>
+
+        <AppFooter variant="public" />
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
       <Header title="Hospedajes" showBack onBack={() => navigate('/')} />
 
       <div className="flex-1 p-4 space-y-3 overflow-y-auto pb-20">
-        <p className="text-xs text-slate-500 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center gap-2">
-          <Info size={14} /> Elegí una categoría para ver los alojamientos disponibles
-        </p>
-
-        {/* Paso 1 — Selector de categoría */}
-        <div className="grid grid-cols-2 gap-2">
-          {CATEGORIAS.map(cat => {
-            const activa = categoriaActiva === cat.tipo
-            return (
-              <button
-                key={cat.label}
-                onClick={() => {
-                  if (categoriaActiva !== cat.tipo) {
-                    recordActivity({
-                      interaction_type: 'filter_change',
-                      service_category: 'accommodation',
-                      request_mode: `type=${cat.tipo ?? 'all'}`,
-                    })
-                  }
-                  setCategoriaActiva(cat.tipo)
-                }}
-                className={`flex flex-col items-center justify-center gap-1 p-3 rounded-xl border-2 transition-transform active:scale-95 ${
-                  activa
-                    ? 'bg-primary text-white border-primary shadow-lg shadow-primary/25'
-                    : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500'
-                }`}
-              >
-                <span className="text-2xl">{cat.icono}</span>
-                <span className="text-sm font-bold">{cat.label}</span>
-              </button>
-            )
-          })}
-        </div>
+        {categoryGrid}
 
         {alojamientos.length === 0 && !loading && (
           <div className="text-center text-slate-500 dark:text-slate-300 py-8">
