@@ -4,7 +4,7 @@ import { useEventReport } from '@/hooks/useEventReports';
 import { endpoints } from '@/core/api/endpoints';
 import { Button } from '../components/ui';
 import type { EventDTO, EventSummaryDTO } from '../types';
-import { DEFAULT_TIMEZONE, formatLocalDate } from '../components/reports/reportFormat';
+import { DEFAULT_TIMEZONE, formatLocalDate, formatLocalDateTime } from '../components/reports/reportFormat';
 import { useEventDays } from '../hooks/useEventDays';
 import {
   eventDayRangeToPeriod,
@@ -79,13 +79,16 @@ export function MunicipalReportScreen() {
   const effectivePeriod = summary.data?.period ?? null;
   const effectiveMode = effectivePeriod?.mode ?? null;
 
-  const periodText = effectivePeriod?.start || effectivePeriod?.end
-    ? `${effectivePeriod.start ? formatLocalDate(effectivePeriod.start, DEFAULT_TIMEZONE) : 'inicio no definido'} – ${
-        effectivePeriod.end ? formatLocalDate(effectivePeriod.end, DEFAULT_TIMEZONE) : 'fin no definido'
-      }`
-    : summary.data
-      ? 'Sin actividad registrada en el período'
-      : '—';
+  const periodText =
+    effectiveMode === 'accumulated'
+      ? 'Histórico acumulado (todos los períodos disponibles)'
+      : effectivePeriod?.start || effectivePeriod?.end
+        ? `${effectivePeriod.start ? formatLocalDate(effectivePeriod.start, DEFAULT_TIMEZONE) : 'inicio no definido'} – ${
+            effectivePeriod.end ? formatLocalDate(effectivePeriod.end, DEFAULT_TIMEZONE) : 'fin no definido'
+          }`
+        : summary.data
+          ? 'Período sin definir'
+          : '—';
 
   const selectionText = {
     evento: 'Período del evento',
@@ -218,7 +221,7 @@ export function MunicipalReportScreen() {
               <dt className="text-slate-500 w-28 shrink-0">Período analizado</dt>
               <dd className="text-slate-700">
                 {periodText}
-                {effectiveMode && (
+                {effectiveMode && effectiveMode !== 'accumulated' && (
                   <span className="ml-2 text-xs text-slate-500">
                     ({PERIOD_MODE_LABELS[effectiveMode] ?? effectiveMode})
                   </span>
@@ -227,7 +230,9 @@ export function MunicipalReportScreen() {
             </div>
             <div className="flex gap-2">
               <dt className="text-slate-500 w-28 shrink-0">Fecha de generación</dt>
-              <dd className="text-slate-700">{generatedAt.toLocaleString('es-AR')}</dd>
+              <dd className="text-slate-700">
+                {formatLocalDateTime(generatedAt, DEFAULT_TIMEZONE)}
+              </dd>
             </div>
           </dl>
         </header>
@@ -243,7 +248,7 @@ export function MunicipalReportScreen() {
         </div>
 
         <footer className="mt-8 pt-4 border-t border-slate-300 text-xs text-slate-500">
-          Informe generado el {generatedAt.toLocaleString('es-AR')} · CBA 4.0
+          Informe generado el {formatLocalDateTime(generatedAt, DEFAULT_TIMEZONE)} · CBA 4.0
         </footer>
       </div>
     </div>

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatLocalBucket, formatLocalDate } from './reportFormat.ts';
+import { formatLocalBucket, formatLocalDate, formatLocalDateTime } from './reportFormat.ts';
 
 const ART = 'America/Argentina/Buenos_Aires';
 
@@ -53,4 +53,31 @@ test('formatLocalDate cubre el inicio exacto de la jornada', () => {
 
 test('formatLocalDate devuelve el valor original si no es una fecha', () => {
   assert.equal(formatLocalDate('no-es-fecha', ART), 'no-es-fecha');
+});
+
+test('formatLocalDateTime muestra la hora local sin el bug de ICU', () => {
+  // 23:30Z = 20:30 ART. Con toLocaleString('es-AR') el runtime devuelve
+  // "08:30" (convierte a 12 h sin AM/PM); formatToParts con h23 devuelve 20:30.
+  assert.equal(formatLocalDateTime('2026-07-20T23:30:00Z', ART), '20/07/2026 20:30');
+});
+
+test('formatLocalDateTime no corre la fecha local', () => {
+  // 02:30Z del 21/07 sigue siendo 20/07 23:30 en Argentina.
+  assert.equal(formatLocalDateTime('2026-07-21T02:30:00Z', ART), '20/07/2026 23:30');
+});
+
+test('formatLocalDateTime usa ciclo de 24 horas', () => {
+  const mediaNoche = formatLocalDateTime('2026-07-21T03:00:00Z', ART);
+  assert.equal(mediaNoche, '21/07/2026 00:00');
+  const mediodia = formatLocalDateTime('2026-07-21T15:00:00Z', ART);
+  assert.equal(mediodia, '21/07/2026 12:00');
+});
+
+test('formatLocalDateTime acepta un Date', () => {
+  const d = new Date('2026-07-21T15:00:00Z');
+  assert.equal(formatLocalDateTime(d, ART), '21/07/2026 12:00');
+});
+
+test('formatLocalDateTime devuelve el valor original si no es una fecha', () => {
+  assert.equal(formatLocalDateTime('no-es-fecha', ART), 'no-es-fecha');
 });
