@@ -25,6 +25,7 @@ import {
 } from '@/services/emergencyProduct'
 import { useAppStore } from '@/core/state/store'
 import { InteractiveMap, type InteractiveMapPoint } from '@/components/InteractiveMap'
+import { recordActivity } from '@/services/activity'
 
 interface EmergencyModuleProps {
   context: ProtocolContext
@@ -83,6 +84,7 @@ export const EmergencyModule = ({ context, cityId }: EmergencyModuleProps) => {
   const [resourceError, setResourceError] = useState<string | null>(null)
   const [showTerritorial, setShowTerritorial] = useState(false)
   const [selectedResource, setSelectedResource] = useState<EmergencyItem | null>(null)
+  const lastEmittedProtocol = useRef<string | null>(null)
 
   const userLocation = useAppStore(s => s.userLocation)
 
@@ -471,6 +473,14 @@ export const EmergencyModule = ({ context, cityId }: EmergencyModuleProps) => {
           <button
             key={p.id}
             onClick={() => {
+              if (lastEmittedProtocol.current !== p.id) {
+                lastEmittedProtocol.current = p.id
+                recordActivity({
+                  interaction_type: 'filter_change',
+                  service_category: 'emergency',
+                  request_mode: `protocolo=${p.id}`,
+                })
+              }
               setSelectedProtocol(p)
               setShowTerritorial(false)
             }}

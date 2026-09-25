@@ -30,6 +30,7 @@ SERVICE_CATEGORIES = [
     "exit",
     "accommodation",
     "emergency",
+    "cajeros",
 ]
 
 RESULT_STATUSES = [

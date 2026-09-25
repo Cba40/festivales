@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/Header'
 import { InteractiveMap } from '@/components/InteractiveMap'
@@ -33,6 +33,7 @@ const SUBTIPO_CATEGORY: Record<string, ActivityServiceCategory> = {
   banos: 'bathroom',
   hidratacion: 'hydration',
   descanso: 'rest',
+  cajeros: 'cajeros',
 }
 
 
@@ -53,6 +54,20 @@ const ServiciosGenerales = () => {
   const [selectedZonaRest, setSelectedZonaRest] = useState<ZonaRestItem | null>(null)
   const [selectedZonaHidratacion, setSelectedZonaHidratacion] = useState<ZonaHidratacionItem | null>(null)
   const [selectedCajero, setSelectedCajero] = useState<CajeroItem | null>(null)
+  const lastEmittedBathroomZone = useRef<string | null>(null)
+
+  // Elegir el punto de baño concreto permite ver dónde se desborda la demanda.
+  const handleSelectBathroom = (zona: ZonaSanitaryItem) => {
+    if (lastEmittedBathroomZone.current !== zona.zone_id) {
+      lastEmittedBathroomZone.current = zona.zone_id
+      recordActivity({
+        interaction_type: 'filter_change',
+        service_category: 'bathroom',
+        request_mode: `zona=${zona.zone_id}`,
+      })
+    }
+    setSelectedZona(zona)
+  }
 
   const isBanos = subtipoActivo === 'banos'
   const isDescanso = subtipoActivo === 'descanso'
@@ -463,7 +478,7 @@ const ServiciosGenerales = () => {
                 return (
                   <button
                     key={zona.zone_id}
-                    onClick={() => setSelectedZona(zona)}
+                    onClick={() => handleSelectBathroom(zona)}
                     className="w-full p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-left"
                   >
                     <span className="font-bold text-gray-900 dark:text-gray-100">{zona.name}</span>
@@ -507,7 +522,7 @@ const ServiciosGenerales = () => {
                 tipo: 'banos',
                 originalData: z
               }))}
-            onSelectPunto={(p) => setSelectedZona(p as ZonaSanitaryItem)}
+            onSelectPunto={(p) => handleSelectBathroom(p as ZonaSanitaryItem)}
             onUserLocationUpdate={() => {}}
           />
 
@@ -516,7 +531,7 @@ const ServiciosGenerales = () => {
             icon="🚻"
             label="baños disponibles"
             userLocation={userLocation}
-            onSelect={(z) => setSelectedZona(z)}
+            onSelect={(z) => handleSelectBathroom(z)}
           />
         </div>
 

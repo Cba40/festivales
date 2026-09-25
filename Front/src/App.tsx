@@ -80,7 +80,6 @@ const SCREEN_OPEN_ROUTE_CATEGORY: Record<string, ActivityServiceCategory> = {
   '/estacionar': 'parking',
   '/emergencia': 'emergency',
   '/servicios/comer': 'gastronomy',
-  '/servicios/comer/mas': 'gastronomy',
 };
 
 function AppLayout() {

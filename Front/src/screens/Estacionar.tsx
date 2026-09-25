@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/Header'
 import { AppFooter } from '@/components/AppFooter'
@@ -14,6 +14,7 @@ import {
   NearestBadge,
 } from '@/components/ZonaCardsList'
 import { GpsModal } from '@/components/GpsModal'
+import { recordActivity } from '@/services/activity'
 import { formatUpdatedAt } from '@/utils/formatTime'
 import { getDistancias } from '@/utils/geo'
 
@@ -24,6 +25,7 @@ const Estacionar = () => {
   const [mostrarGpsModal, setMostrarGpsModal] = useState(true)
   const userLocation = useAppStore(s => s.userLocation)
   const requestLocation = useAppStore(s => s.requestLocation)
+  const lastEmittedZone = useRef<string | null>(null)
 
   useEffect(() => {
     refresh()
@@ -37,6 +39,21 @@ const Estacionar = () => {
   const alternativa = zonas[1]
   const terceraOpcion = zonas[2]
   const cuartaOpcion = zonas[3]
+
+  // Elegir zona de estacionamiento es la decisión de mayor valor del módulo:
+  // habilita saber qué punto genera demanda. "Iniciar ruta" desde el detalle no
+  // vuelve a emitir: la zona ya quedó contada al abrir la tarjeta.
+  const handleSelectZona = (zona: ZonaEstacionamientoItem) => {
+    if (lastEmittedZone.current !== zona.zone_id) {
+      lastEmittedZone.current = zona.zone_id
+      recordActivity({
+        interaction_type: 'filter_change',
+        service_category: 'parking',
+        request_mode: `zona=${zona.zone_id}`,
+      })
+    }
+    setSelectedZona(zona)
+  }
 
   const abrirMapa = (zona: ZonaEstacionamientoItem) => {
     if (zona.lat && zona.lng) {
@@ -194,7 +211,7 @@ const Estacionar = () => {
                 return (
                   <button
                     key={zona.zone_id}
-                    onClick={() => setSelectedZona(zona)}
+                    onClick={() => handleSelectZona(zona)}
                     className="w-full p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-left"
                   >
                     <span className="font-bold text-gray-900 dark:text-gray-100">
@@ -236,7 +253,7 @@ const Estacionar = () => {
       <div className="flex-1 p-4 overflow-y-auto space-y-4">
         {!esTresOpciones && principal && (
           <button
-            onClick={() => abrirMapa(principal)}
+            onClick={() => { handleSelectZona(principal); abrirMapa(principal) }}
             className="w-full bg-primary hover:bg-primary-dark text-white p-6 rounded-2xl shadow-lg transition-transform active:scale-95"
           >
             <div className="flex items-center justify-between">
@@ -254,7 +271,7 @@ const Estacionar = () => {
         )}
 
         {esTresOpciones && principal && (
-          <button onClick={() => setSelectedZona(principal)} className="w-full">
+          <button onClick={() => handleSelectZona(principal)} className="w-full">
             <div className={modo === 'guiar'
               ? 'bg-primary text-white p-6 rounded-xl text-left shadow-lg'
               : 'bg-white dark:bg-slate-800 border-l-4 border-primary p-4 rounded-xl text-left shadow-md'}>
@@ -289,7 +306,7 @@ const Estacionar = () => {
         )}
 
         {esTresOpciones && alternativa && (
-          <button onClick={() => setSelectedZona(alternativa)} className="w-full">
+          <button onClick={() => handleSelectZona(alternativa)} className="w-full">
             <div className="bg-slate-100 dark:bg-slate-700 border-2 border-slate-300 dark:border-slate-600 p-4 rounded-xl text-left">
               <p className="font-bold text-slate-800 dark:text-slate-100">
                 {getTituloZona(1)}: {alternativa.name}
@@ -311,7 +328,7 @@ const Estacionar = () => {
         )}
 
         {esTresOpciones && terceraOpcion && (
-          <button onClick={() => setSelectedZona(terceraOpcion)} className="w-full">
+          <button onClick={() => handleSelectZona(terceraOpcion)} className="w-full">
             <div className="bg-white dark:bg-slate-800 border-2 border-blue-400 dark:border-blue-500 p-4 rounded-xl text-left">
               <p className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
                 <span>{terceraOpcion.name}</span>
@@ -334,7 +351,7 @@ const Estacionar = () => {
         )}
 
         {esTresOpciones && cuartaOpcion && (
-          <button onClick={() => setSelectedZona(cuartaOpcion)} className="w-full">
+          <button onClick={() => handleSelectZona(cuartaOpcion)} className="w-full">
             <div className="bg-white dark:bg-slate-800 border-2 border-emerald-400 dark:border-emerald-500 p-4 rounded-xl text-left">
               <p className="font-bold text-slate-800 dark:text-slate-100">
                 {cuartaOpcion.name}
@@ -367,7 +384,7 @@ const Estacionar = () => {
               tipo: 'estacionamiento',
               originalData: z
             }))}
-          onSelectPunto={(p) => setSelectedZona(p as ZonaEstacionamientoItem)}
+          onSelectPunto={(p) => handleSelectZona(p as ZonaEstacionamientoItem)}
           onUserLocationUpdate={() => {}}
         />
 
@@ -377,7 +394,7 @@ const Estacionar = () => {
             icon="🚗"
             label="zonas de estacionamiento disponibles"
             userLocation={userLocation}
-            onSelect={(z) => setSelectedZona(z)}
+            onSelect={(z) => handleSelectZona(z)}
           />
         )}
 

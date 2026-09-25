@@ -33,6 +33,7 @@ export type ActivityServiceCategory =
   | 'exit'
   | 'accommodation'
   | 'emergency'
+  | 'cajeros'
 
 // request_mode: valor semántico de la auditoría (ruta para screen_open,
 // clave=valor para filter_change). Se trunca a 50 para respetar el contrato.
