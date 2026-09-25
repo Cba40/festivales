@@ -39,6 +39,22 @@ export function formatDateOnly(value: string): string {
   return date.toLocaleDateString('es-AR', { timeZone: 'UTC' });
 }
 
+/**
+ * Formatea un bucket de `temporal_distribution`.
+ *
+ * El bucket llega como hora de pared LOCAL ya truncada por
+ * `date_trunc(... timestamp AT TIME ZONE ...)` y sin offset. No debe pasar por
+ * `new Date()` (lo interpretaría como hora del navegador) ni por
+ * `toLocaleString` con `timeZone` (en este runtime `es-AR` no respeta la hora).
+ * Se formatea desde sus componentes, sin ninguna conversión: muestra
+ * exactamente la hora local con la que se agrupó.
+ */
+export function formatLocalBucket(value: string): string {
+  const parts = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(value);
+  if (!parts) return value;
+  return `${parts[3]}/${parts[2]}/${parts[1]} ${parts[4]}:${parts[5]}`;
+}
+
 export function percentage(value: number): string {
   return `${(value * 100).toFixed(1)}%`;
 }

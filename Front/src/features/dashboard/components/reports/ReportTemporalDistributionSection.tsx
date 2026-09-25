@@ -2,7 +2,7 @@ import { useEventReport } from '../../../../hooks/useEventReports';
 import { endpoints } from '../../../../core/api/endpoints';
 import type { TemporalDistributionDTO } from '../../types';
 import { ReportSection } from './ReportSection';
-import { formatDateOnly, humanize, DEFAULT_TIMEZONE } from './reportFormat';
+import { formatLocalBucket, humanize, DEFAULT_TIMEZONE } from './reportFormat';
 import { useState, useMemo } from 'react';
 
 const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
@@ -64,7 +64,7 @@ export function ReportTemporalDistributionSection() {
                 <thead>
                   <tr className="text-left text-slate-500 border-b border-slate-200">
                     <th className="px-5 py-2 font-medium">Intervalo</th>
-                    <th className="px-5 py-2 font-medium">Consultas</th>
+                    <th className="px-5 py-2 font-medium">Actividad</th>
                     {granularity === 'hour' && (
                       <th className="px-5 py-2 font-medium">Fase</th>
                     )}
@@ -74,7 +74,7 @@ export function ReportTemporalDistributionSection() {
                   {data.buckets.map((bucket) => (
                     <tr key={bucket.bucket} className="border-b border-slate-100">
                       <td className="px-5 py-2 text-slate-600">
-                        {formatDateOnly(bucket.bucket)}
+                        {formatLocalBucket(bucket.bucket)}
                       </td>
                       <td className="px-5 py-2 text-slate-700">{bucket.count}</td>
                       {granularity === 'hour' && bucket.phase && (

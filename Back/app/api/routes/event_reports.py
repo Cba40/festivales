@@ -142,6 +142,32 @@ def _validate_timezone(timezone_name: str) -> None:
         raise HTTPException(status_code=400, detail="Invalid timezone")
 
 
+def _require_absolute_bounds(
+    start: Optional[datetime],
+    end: Optional[datetime],
+) -> None:
+    """Rechaza extremos de período sin offset.
+
+    ``service_interaction_log.timestamp`` es ``timestamptz``: un extremo naive
+    lo interpretaría Postgres en la zona de sesión y podría truncar o extender
+    el día local. El contrato es que el cliente convierta primero el día/período
+    local a instantes absolutos (UTC) y los envíe con offset.
+    """
+    naive = [
+        name
+        for name, value in (("start", start), ("end", end))
+        if value is not None and value.tzinfo is None
+    ]
+    if naive:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Period bounds must be absolute instants with a UTC offset "
+                f"(naive: {', '.join(naive)})."
+            ),
+        )
+
+
 def _as_date(value: datetime):
     if isinstance(value, datetime):
         return value.date()
@@ -443,6 +469,7 @@ async def event_report_temporal_distribution(
     _: TokenPayload = Depends(verify_token),
 ):
     _validate_timezone(timezone)
+    _require_absolute_bounds(start, end)
     event = await _get_event_or_404(db, event_id)
     period = _resolve_period(event, start, end)
     conditions = _activity_conditions(event_id, period, service_category)
