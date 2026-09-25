@@ -464,6 +464,7 @@ export interface PublicAlertsResponse {
 export interface ReportPeriodRange {
   start: string | null;
   end: string | null;
+  mode?: 'requested' | 'event' | 'accumulated' | null;
 }
 
 export interface ReportResultStatusCount {
@@ -618,6 +619,7 @@ export interface OperationalEventsPhaseDTO extends OperationalPhaseRefDTO {
 export interface OperationalProfileDTO {
   event_id: string;
   event_name: string;
+  period: ReportPeriodRange;
   timezone: string;
   operational_profile_id: string | null;
   phases: OperationalPhaseRefDTO[];

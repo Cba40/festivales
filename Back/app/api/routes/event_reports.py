@@ -148,6 +148,19 @@ def _as_date(value: datetime):
     return value
 
 
+def _local_date(value: Optional[datetime], zi: ZoneInfo) -> Optional[date]:
+    """Fecha local (IANA) de un extremo del período.
+
+    Se usa para acotar ``EventDay.date``, que es una fecha local, contra el
+    período efectivo. Un extremo naive se interpreta como fecha ya local.
+    """
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.date()
+    return value.astimezone(zi).date()
+
+
 def _status_order_key(status: str) -> tuple:
     canonical = {s: i for i, s in enumerate(RESULT_STATUSES)}
     return canonical.get(status, len(RESULT_STATUSES)), status
@@ -605,6 +618,8 @@ def _phase_sort_key(
 @router.get("/operational_profile", response_model=OperationalProfileResponse)
 async def event_report_operational_profile(
     event_id: str,
+    start: Optional[datetime] = Query(None, description="Inicio del período (ISO 8601)"),
+    end: Optional[datetime] = Query(None, description="Fin del período (ISO 8601)"),
     timezone: str = Query(
         "America/Argentina/Buenos_Aires", description="Zona horaria local (IANA)"
     ),
@@ -613,9 +628,17 @@ async def event_report_operational_profile(
 ):
     _validate_timezone(timezone)
     event = await _get_event_or_404(db, event_id)
+    period = _resolve_period(event, start, end)
     zi = ZoneInfo(timezone)
 
-    day_result = await db.execute(select(EventDay).where(EventDay.event_id == event_id))
+    day_conditions = [EventDay.event_id == event_id]
+    local_start_date = _local_date(period.start, zi)
+    if local_start_date is not None:
+        day_conditions.append(EventDay.date >= local_start_date)
+    local_end_date = _local_date(period.end, zi)
+    if local_end_date is not None:
+        day_conditions.append(EventDay.date <= local_end_date)
+    day_result = await db.execute(select(EventDay).where(*day_conditions))
     event_days = day_result.scalars().all()
     day_ids = [ed.id for ed in event_days]
     profile_ids = {
@@ -687,11 +710,7 @@ async def event_report_operational_profile(
             ServiceInteractionLog.result_status,
             func.count(ServiceInteractionLog.id).label("count"),
         )
-        .where(
-            ServiceInteractionLog.event_id == event_id,
-            ServiceInteractionLog.interaction_type.in_(USER_ACTIVITY_TYPES),
-            ServiceInteractionLog.origin == "user",
-        )
+        .where(*_activity_conditions(event_id, period))
         .group_by(
             hour_expr,
             ServiceInteractionLog.service_category,
@@ -914,6 +933,7 @@ async def event_report_operational_profile(
     return OperationalProfileResponse(
         event_id=event.id,
         event_name=event.name,
+        period=PeriodRange(start=period.start, end=period.end, mode=period.mode),
         timezone=timezone,
         operational_profile_id=str(operational_profile_id) if operational_profile_id else None,
         phases=phases,

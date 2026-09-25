@@ -170,6 +170,7 @@ class OperationalEventsPhase(OperationalPhaseRef):
 class OperationalProfileResponse(BaseModel):
     event_id: str = Field(..., description="ID del evento")
     event_name: str = Field(..., description="Nombre del evento")
+    period: PeriodRange = Field(..., description="Período efectivo del informe")
     timezone: str = Field(..., description="Zona horaria local usada (IANA)")
     operational_profile_id: Optional[str] = Field(default=None, description="Perfil operativo si las jornadas comparten uno")
     phases: list[OperationalPhaseRef] = Field(..., description="Fases operativas presentes en el informe")

@@ -28,8 +28,13 @@ PHASE_OTRA = "00000000-0000-0000-0000-000000000002"
 ZONE_1 = "z-escenario-norte"
 
 
-def _event():
-    return SimpleNamespace(id=EVENT_ID, name="Festival de la Primavera 2026")
+def _event(start_date=None, end_date=None):
+    return SimpleNamespace(
+        id=EVENT_ID,
+        name="Festival de la Primavera 2026",
+        start_date=start_date,
+        end_date=end_date,
+    )
 
 
 def _event_result(event=None):
@@ -86,6 +91,12 @@ def db_mock() -> AsyncMock:
 
 def _utc(y, mo, d, h, mi):
     return datetime(y, mo, d, h, mi, tzinfo=timezone.utc)
+
+
+def _compiled(db_mock: AsyncMock, index: int) -> tuple[str, dict]:
+    stmt = db_mock.execute.await_args_list[index].args[0]
+    compiled = stmt.compile()
+    return str(compiled), dict(compiled.params)
 
 
 class TestOperationalProfileAuth:
@@ -418,3 +429,165 @@ class TestOperationalProfileNoData:
             in body["insufficient_data"]
         )
         assert "No hay eventos operativos registrados." in body["insufficient_data"]
+
+
+class TestOperationalProfilePeriod:
+    """``operational_profile`` respeta el mismo período efectivo que ETAPA 2."""
+
+    EVENT_START = _utc(2026, 9, 20, 12, 0)
+    EVENT_END = _utc(2026, 9, 22, 23, 59)
+
+    def _side_effect(self, event):
+        return [
+            _event_result(event),
+            _scalars_result([]),
+            _scalars_result([SimpleNamespace(id=ZONE_1, name="Escenario Norte")]),
+            _all_result([]),
+        ]
+
+    def test_accumulated_mode_declared_and_unfiltered(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = self._side_effect(_event())
+
+        resp = client.get(
+            f"/api/events/{EVENT_ID}/reports/operational_profile",
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["period"] == {"start": None, "end": None, "mode": "accumulated"}
+        agg_sql, _ = _compiled(db_mock, 3)
+        assert "timestamp >=" not in agg_sql
+        assert "timestamp <=" not in agg_sql
+        days_sql, _ = _compiled(db_mock, 1)
+        assert "event_days.date >=" not in days_sql
+        assert "event_days.date <=" not in days_sql
+
+    def test_event_period_declared_and_applied(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = self._side_effect(
+            _event(self.EVENT_START, self.EVENT_END)
+        )
+
+        resp = client.get(
+            f"/api/events/{EVENT_ID}/reports/operational_profile",
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["period"] == {
+            "start": self.EVENT_START.isoformat().replace("+00:00", "Z"),
+            "end": self.EVENT_END.isoformat().replace("+00:00", "Z"),
+            "mode": "event",
+        }
+        agg_sql, agg_params = _compiled(db_mock, 3)
+        assert "timestamp >=" in agg_sql
+        assert "timestamp <=" in agg_sql
+        assert self.EVENT_START in agg_params.values()
+        assert self.EVENT_END in agg_params.values()
+        assert "interaction_type IN" in agg_sql
+        assert "origin" in agg_sql
+
+    def test_explicit_period_declared_and_applied(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        start = _utc(2026, 9, 21, 0, 0)
+        end = _utc(2026, 9, 21, 23, 59)
+        db_mock.execute.side_effect = self._side_effect(
+            _event(self.EVENT_START, self.EVENT_END)
+        )
+
+        resp = client.get(
+            f"/api/events/{EVENT_ID}/reports/operational_profile",
+            params={"start": start.isoformat(), "end": end.isoformat()},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["period"]["mode"] == "requested"
+        assert body["period"]["start"].startswith("2026-09-21T00:00:00")
+        assert body["period"]["end"].startswith("2026-09-21T23:59:00")
+        agg_sql, agg_params = _compiled(db_mock, 3)
+        assert start in agg_params.values()
+        assert end in agg_params.values()
+        assert self.EVENT_START not in agg_params.values()
+        assert self.EVENT_END not in agg_params.values()
+
+    def test_event_days_scoped_to_period_local_dates(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        start = _utc(2026, 9, 21, 3, 0)
+        end = _utc(2026, 9, 21, 23, 0)
+        db_mock.execute.side_effect = self._side_effect(
+            _event(self.EVENT_START, self.EVENT_END)
+        )
+
+        resp = client.get(
+            f"/api/events/{EVENT_ID}/reports/operational_profile",
+            params={"start": start.isoformat(), "end": end.isoformat()},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        days_sql, days_params = _compiled(db_mock, 1)
+        assert "event_days.date >=" in days_sql
+        assert "event_days.date <=" in days_sql
+        assert date(2026, 9, 21) in days_params.values()
+
+    def test_open_ended_period_scopes_only_declared_side(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        start = _utc(2026, 9, 21, 3, 0)
+        db_mock.execute.side_effect = self._side_effect(
+            _event(self.EVENT_START, self.EVENT_END)
+        )
+
+        resp = client.get(
+            f"/api/events/{EVENT_ID}/reports/operational_profile",
+            params={"start": start.isoformat()},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["period"]["mode"] == "requested"
+        assert body["period"]["end"] is None
+        agg_sql, _ = _compiled(db_mock, 3)
+        assert "timestamp >=" in agg_sql
+        assert "timestamp <=" not in agg_sql
+        days_sql, _ = _compiled(db_mock, 1)
+        assert "event_days.date >=" in days_sql
+        assert "event_days.date <=" not in days_sql
+
+    def test_event_days_not_scoped_in_accumulated_mode(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = self._side_effect(_event())
+
+        resp = client.get(
+            f"/api/events/{EVENT_ID}/reports/operational_profile",
+            params={"timezone": ARGENTINA},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        days_sql, days_params = _compiled(db_mock, 1)
+        assert "event_days.date" in days_sql
+        assert not any(isinstance(v, date) for v in days_params.values())

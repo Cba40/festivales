@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useEventReport } from '../../../../hooks/useEventReports';
 import { endpoints } from '../../../../core/api/endpoints';
 import type { OperationalProfileDTO } from '../../types';
@@ -11,10 +12,21 @@ import {
 
 const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 
-export function ReportOperationalProfileSection() {
+export interface ReportOperationalProfileSectionProps {
+  start?: string;
+  end?: string;
+}
+
+export function ReportOperationalProfileSection({
+  start,
+  end,
+}: ReportOperationalProfileSectionProps = {}) {
+  const params = useMemo(() => ({ start, end }), [start, end]);
+
   const { data, isLoading, error, refresh } = useEventReport<OperationalProfileDTO>(
     EVENT_ID,
-    endpoints.reports.operationalProfile(EVENT_ID)
+    endpoints.reports.operationalProfile(EVENT_ID),
+    { params }
   );
 
   const phases = data?.phases ?? [];
