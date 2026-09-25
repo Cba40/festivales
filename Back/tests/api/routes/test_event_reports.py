@@ -580,3 +580,88 @@ class TestResolvePeriodUnit:
 
         assert inspect.iscoroutinefunction(_resolve_period) is False
         assert "AsyncSession" not in inspect.signature(_resolve_period).parameters
+
+
+class TestTechnicalReportsReturnEmptyOutsidePeriod:
+    """Un período sin datos debe devolver cero, no el histórico del evento."""
+
+    DAY = datetime(2026, 9, 25, 3, 0, tzinfo=timezone.utc)
+    DAY_END = datetime(2026, 9, 26, 2, 59, 59, 999000, tzinfo=timezone.utc)
+
+    def test_coverage_gaps_vacio_con_periodo_sin_datos(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            _all_result([]),
+            _all_result([]),
+        ]
+
+        resp = client.get(
+            f"/api/events/{EVENT_ID}/reports/coverage_gaps",
+            params={"start": self.DAY.isoformat(), "end": self.DAY_END.isoformat()},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["services"] == []
+        assert body["temporal_distribution"] == []
+        assert body["period"]["mode"] == "requested"
+        for index in (1, 2):
+            sql, params = _compiled(db_mock, index)
+            assert "timestamp >=" in sql
+            assert "timestamp <=" in sql
+            assert self.DAY in params.values()
+
+    def test_recommended_zones_vacio_con_periodo_sin_datos(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            _all_result([]),
+        ]
+
+        resp = client.get(
+            f"/api/events/{EVENT_ID}/reports/recommended_zones",
+            params={"start": self.DAY.isoformat(), "end": self.DAY_END.isoformat()},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["zones"] == []
+        sql, params = _compiled(db_mock, 1)
+        assert "timestamp >=" in sql
+        assert "timestamp <=" in sql
+        assert self.DAY in params.values()
+        assert self.DAY_END in params.values()
+
+    def test_technical_reports_aceptan_rango_abierto_sin_fecha_final(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            _all_result([]),
+        ]
+
+        resp = client.get(
+            f"/api/events/{EVENT_ID}/reports/recommended_zones",
+            params={"start": self.DAY.isoformat()},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["zones"] == []
+        assert body["period"]["start"].startswith("2026-09-25T03:00:00")
+        assert body["period"]["end"] is None
+        sql, _params = _compiled(db_mock, 1)
+        assert "timestamp >=" in sql
+        assert "timestamp <=" not in sql

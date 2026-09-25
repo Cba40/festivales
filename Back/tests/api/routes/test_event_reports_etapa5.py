@@ -99,6 +99,16 @@ def _compiled(db_mock: AsyncMock, index: int) -> tuple[str, dict]:
     return str(compiled), dict(compiled.params)
 
 
+def _flatten(values) -> list:
+    flat: list = []
+    for value in values:
+        if isinstance(value, (list, tuple, set)):
+            flat.extend(_flatten(value))
+        else:
+            flat.append(value)
+    return flat
+
+
 class TestOperationalProfileAuth:
     def test_401_without_token(self, client: TestClient, db_mock: AsyncMock):
         resp = client.get(f"/api/events/{EVENT_ID}/reports/operational_profile")
@@ -591,3 +601,62 @@ class TestOperationalProfilePeriod:
         days_sql, days_params = _compiled(db_mock, 1)
         assert "event_days.date" in days_sql
         assert not any(isinstance(v, date) for v in days_params.values())
+
+    def test_observaciones_y_predicciones_se_acotan_a_las_jornadas_del_periodo(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        """Una jornada fuera del período no puede aportar observaciones.
+
+        El endpoint acota EventDay por fecha local y de ahí se derivan los
+        ``event_day_id`` que alimentan predicciones, observaciones y eventos
+        operativos. Si la jornada Historical queda fuera, sus observaciones no
+        se cargan, aunque pertenezcan al mismo evento.
+        """
+        start = _utc(2026, 9, 25, 3, 0)
+        end = _utc(2026, 9, 26, 2, 59)
+        db_mock.execute.side_effect = [
+            _event_result(_event(self.EVENT_START, self.EVENT_END)),
+            # Solo la jornada del período: la histórica queda fuera.
+            _scalars_result(
+                [SimpleNamespace(id="ed-25", date=date(2026, 9, 25), operational_profile_id=None)]
+            ),
+            _scalars_result([]),  # event_day_phases
+            _scalars_result([]),  # predictions
+            _scalars_result(
+                [
+                    SimpleNamespace(
+                        event_day_id="ed-25",
+                        zone_id=ZONE_1,
+                        timestamp=_utc(2026, 9, 25, 12, 0),
+                        observed_density=10.0,
+                    )
+                ]
+            ),  # observations
+            _scalars_result([]),  # operational_events
+            _scalars_result([]),  # zones
+            _all_result([]),  # actividad
+        ]
+
+        resp = client.get(
+            f"/api/events/{EVENT_ID}/reports/operational_profile",
+            params={"start": start.isoformat(), "end": end.isoformat()},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+
+        # La consulta de jornadas queda acotada a la ventana local.
+        _days_sql, days_params = _compiled(db_mock, 1)
+        flat = _flatten(days_params.values())
+        assert date(2026, 9, 25) in flat
+        assert date(2026, 7, 15) not in flat
+
+        # Observaciones y predicciones solo consultedan las jornadas devueltas.
+        for index in (3, 4, 5):
+            sql, params = _compiled(db_mock, index)
+            assert "event_day_id IN" in sql
+            values = _flatten(params.values())
+            assert "ed-25" in values
+            assert "ed-historico" not in values

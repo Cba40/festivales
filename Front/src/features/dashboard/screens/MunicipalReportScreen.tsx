@@ -7,8 +7,8 @@ import type { EventDTO, EventSummaryDTO } from '../types';
 import { DEFAULT_TIMEZONE, formatLocalDate, formatLocalDateTime } from '../components/reports/reportFormat';
 import { useEventDays } from '../hooks/useEventDays';
 import {
-  eventDayRangeToPeriod,
-  eventDayToPeriod,
+  isIncompleteSelection,
+  resolveReportPeriod,
 } from '../utils/eventDayPeriod';
 import {
   ReportSummarySection,
@@ -52,17 +52,25 @@ export function MunicipalReportScreen() {
     periodMode === 'personalizado' && Boolean(customStart) && Boolean(customEnd) && customEnd < customStart;
 
   // Origen único del período: las siete secciones reciben exactamente estos
-  // límites absolutos. Sin selección se omiten start/end y el backend resuelve
-  // el período del evento (o el histórico si el evento no declara fechas).
-  const period = useMemo<{ start?: string; end?: string }>(() => {
-    if (periodMode === 'evento') return {};
-    if (periodMode === 'dia') {
-      if (!eventDayDate) return {};
-      return eventDayToPeriod(eventDayDate, DEFAULT_TIMEZONE);
-    }
-    if (!customStart || !customEnd || customRangeInvalid) return {};
-    return eventDayRangeToPeriod(customStart, customEnd, DEFAULT_TIMEZONE);
-  }, [periodMode, eventDayDate, customStart, customEnd, customRangeInvalid]);
+  // límites absolutos. Solo el modo "evento" omite start/end; una selección
+  // explícita incompleta se envía como rango abierto en vez de caer al período
+  // del evento en silencio.
+  const period = useMemo(
+    () =>
+      resolveReportPeriod(periodMode, {
+        eventDayDate,
+        customStart,
+        customEnd,
+        timeZone: DEFAULT_TIMEZONE,
+      }),
+    [periodMode, eventDayDate, customStart, customEnd]
+  );
+
+  const selectionIncomplete = isIncompleteSelection(periodMode, {
+    eventDayDate,
+    customStart,
+    customEnd,
+  });
 
   const summary = useEventReport<EventSummaryDTO>(
     EVENT_ID,
@@ -97,7 +105,11 @@ export function MunicipalReportScreen() {
       : 'Día operativo (sin elegir)',
     personalizado: customStart && customEnd
       ? `Rango ${customStart} – ${customEnd}`
-      : 'Período personalizado (incompleto)',
+      : customStart
+        ? `Desde ${customStart} (sin fecha final)`
+        : customEnd
+          ? `Hasta ${customEnd} (sin fecha inicial)`
+          : 'Período personalizado (incompleto)',
   }[periodMode];
 
   return (
@@ -195,6 +207,13 @@ export function MunicipalReportScreen() {
             <p className="mt-3 text-xs text-red-600">
               El rango es inválido: la fecha final es anterior a la inicial. Se mantiene el
               período del evento.
+            </p>
+          )}
+
+          {selectionIncomplete && !customRangeInvalid && (
+            <p className="mt-3 text-xs text-amber-700">
+              No hay un período seleccionado para analizar. Mientras no completes la
+              selección, los informes usan el período del evento.
             </p>
           )}
         </div>

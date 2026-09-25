@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {
   eventDayToPeriod,
   eventDayRangeToPeriod,
+  resolveReportPeriod,
+  isIncompleteSelection,
   ACCUMULATED_PERIOD,
 } from './eventDayPeriod.ts';
 
@@ -79,5 +81,70 @@ test('eventDayRangeToPeriod rechaza un rango invertido', () => {
   assert.throws(
     () => eventDayRangeToPeriod('2026-07-26', '2026-07-15', ART),
     /Rango de fechas inválido/,
+  );
+});
+
+test('resolveReportPeriod: modo evento omite los extremos', () => {
+  assert.deepEqual(resolveReportPeriod('evento', { timeZone: ART }), {});
+});
+
+test('resolveReportPeriod: día operativo envía el rango completo', () => {
+  assert.deepEqual(
+    resolveReportPeriod('dia', { eventDayDate: '2026-09-25', timeZone: ART }),
+    eventDayToPeriod('2026-09-25', ART),
+  );
+});
+
+test('resolveReportPeriod: una sola fecha inicial envía rango abierto', () => {
+  const period = resolveReportPeriod('personalizado', {
+    customStart: '2026-09-25',
+    timeZone: ART,
+  });
+  assert.equal(period.start, '2026-09-25T03:00:00.000Z');
+  assert.equal(period.end, undefined);
+});
+
+test('resolveReportPeriod: una sola fecha final envía rango abierto', () => {
+  const period = resolveReportPeriod('personalizado', {
+    customEnd: '2026-09-25',
+    timeZone: ART,
+  });
+  assert.equal(period.start, undefined);
+  assert.equal(period.end, '2026-09-26T02:59:59.999Z');
+});
+
+test('resolveReportPeriod: nunca cae al período del evento en silencio', () => {
+  // Sin ninguna fecha el resultado es vacío, pero isIncompleteSelection avisa
+  // para que la interfaz no lo oculte.
+  const period = resolveReportPeriod('personalizado', { timeZone: ART });
+  assert.deepEqual(period, {});
+  assert.equal(isIncompleteSelection('personalizado', {}), true);
+  assert.equal(
+    isIncompleteSelection('personalizado', { customStart: '2026-09-25' }),
+    false,
+  );
+});
+
+test('resolveReportPeriod: rango completo usa ambos extremos', () => {
+  assert.deepEqual(
+    resolveReportPeriod('personalizado', {
+      customStart: '2026-07-15',
+      customEnd: '2026-07-26',
+      timeZone: ART,
+    }),
+    eventDayRangeToPeriod('2026-07-15', '2026-07-26', ART),
+  );
+});
+
+test('isIncompleteSelection refleja el estado del modo', () => {
+  assert.equal(isIncompleteSelection('evento', {}), false);
+  assert.equal(isIncompleteSelection('dia', {}), true);
+  assert.equal(isIncompleteSelection('dia', { eventDayDate: '2026-09-25' }), false);
+  assert.equal(
+    isIncompleteSelection('personalizado', {
+      customStart: '2026-09-26',
+      customEnd: '2026-09-25',
+    }),
+    true,
   );
 });

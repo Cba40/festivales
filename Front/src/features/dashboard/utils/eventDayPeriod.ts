@@ -127,3 +127,67 @@ export const ACCUMULATED_PERIOD: Readonly<{ start: null; end: null }> = Object.f
   start: null,
   end: null,
 });
+
+export type ReportPeriodMode = 'evento' | 'dia' | 'personalizado';
+
+export type ResolvedReportPeriod = {
+  start?: string;
+  end?: string;
+};
+
+/**
+ * Traduce la selección del dashboard a los límites que viajan a los endpoints.
+ *
+ * Devolver un objeto vacío significa "omitir start/end" y deja que el backend
+ * resuelva el período del evento. Eso solo es válido para el modo `evento`: si
+ * el usuario eligió un día o un rango, una selección incompleta NO puede caer
+ * silenciosamente al período del evento, porque mostraría un período distinto
+ * del solicitado. Por eso un extremo suelto se envía como rango abierto, que el
+ * backend soporta (`timestamp >= start` o `timestamp <= end`).
+ */
+export function resolveReportPeriod(
+  mode: ReportPeriodMode,
+  options: {
+    eventDayDate?: string;
+    customStart?: string;
+    customEnd?: string;
+    timeZone: string;
+  },
+): ResolvedReportPeriod {
+  const { eventDayDate = '', customStart = '', customEnd = '', timeZone } = options;
+
+  if (mode === 'evento') return {};
+
+  if (mode === 'dia') {
+    if (!eventDayDate) return {};
+    return eventDayToPeriod(eventDayDate, timeZone);
+  }
+
+  if (customStart && customEnd) {
+    return eventDayRangeToPeriod(customStart, customEnd, timeZone);
+  }
+  if (customStart) {
+    return { start: eventDayToPeriod(customStart, timeZone).start };
+  }
+  if (customEnd) {
+    return { end: eventDayToPeriod(customEnd, timeZone).end };
+  }
+  return {};
+}
+
+/** `true` cuando el modo elegido no puede producir un período utilizable. */
+export function isIncompleteSelection(
+  mode: ReportPeriodMode,
+  options: {
+    eventDayDate?: string;
+    customStart?: string;
+    customEnd?: string;
+  },
+): boolean {
+  if (mode === 'evento') return false;
+  if (mode === 'dia') return !options.eventDayDate;
+  if (options.customStart && options.customEnd) {
+    return options.customEnd < options.customStart;
+  }
+  return !options.customStart && !options.customEnd;
+}
