@@ -40,11 +40,23 @@ class ServiceBreakdownItem(BaseModel):
     percentage: float = Field(..., description="Porcentaje de actividad del usuario registrada (0-100)")
 
 
+class FilterBreakdownItem(BaseModel):
+    request_mode: Optional[str] = Field(
+        default=None,
+        description="Filtro aplicado (mode=peatonal, type=hotel, etc.) o None si la actividad no llevaba filtro",
+    )
+    total: int = Field(..., description="Cantidad de actividades con este filtro")
+
+
 class ServiceBreakdownResponse(BaseModel):
     event_id: str = Field(..., description="ID del evento")
     event_name: str = Field(..., description="Nombre del evento")
     period: PeriodRange = Field(..., description="Período cubierto por el informe")
     services: list[ServiceBreakdownItem] = Field(..., description="Agregación por service_category")
+    filters: Optional[list[FilterBreakdownItem]] = Field(
+        default=None,
+        description="Desglose de actividad por request_mode dentro del período",
+    )
 
 
 class CoverageGapItem(BaseModel):

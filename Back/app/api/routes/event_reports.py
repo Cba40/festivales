@@ -21,6 +21,7 @@ from app.schemas.event_reports import (
     CoverageGapItem,
     CoverageGapsResponse,
     EventSummaryResponse,
+    FilterBreakdownItem,
     ObservationsPhase,
     OperationalEventSummaryItem,
     OperationalEventsPhase,
@@ -269,11 +270,26 @@ async def event_report_service_breakdown(
         for row in rows
     ]
 
+    filter_result = await db.execute(
+        select(
+            ServiceInteractionLog.request_mode,
+            func.count(ServiceInteractionLog.id).label("total"),
+        )
+        .where(*conditions)
+        .group_by(ServiceInteractionLog.request_mode)
+        .order_by(func.count(ServiceInteractionLog.id).desc())
+    )
+    filters = [
+        FilterBreakdownItem(request_mode=row.request_mode, total=row.total)
+        for row in filter_result.all()
+    ]
+
     return ServiceBreakdownResponse(
         event_id=event.id,
         event_name=event.name,
         period=PeriodRange(start=period.start, end=period.end, mode=period.mode),
         services=services,
+        filters=filters,
     )
 
 

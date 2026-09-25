@@ -489,11 +489,17 @@ export interface ServiceBreakdownItemDTO {
   percentage: number;
 }
 
+export interface FilterBreakdownDTO {
+  request_mode: string | null;
+  total: number;
+}
+
 export interface ServiceBreakdownDTO {
   event_id: string;
   event_name: string;
   period: ReportPeriodRange;
   services: ServiceBreakdownItemDTO[];
+  filters?: FilterBreakdownDTO[] | null;
 }
 
 export interface CoverageGapItemDTO {

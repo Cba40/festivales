@@ -299,6 +299,7 @@ class TestServiceBreakdown:
                     SimpleNamespace(service_category="parking", total_consultas=4),
                 ]
             ),
+            _all_result([]),
         ]
 
         resp = client.get(
@@ -321,6 +322,7 @@ class TestServiceBreakdown:
         db_mock.execute.side_effect = [
             _event_result(_event(EVENT_START, EVENT_END)),
             _all_result([]),
+            _all_result([]),
         ]
 
         resp = client.get(
@@ -329,6 +331,110 @@ class TestServiceBreakdown:
         )
         assert resp.status_code == 200
         assert resp.json()["services"] == []
+
+
+class TestServiceBreakdownFilters:
+    """El desglose por request_mode expone los filtros que el usuario aplicó."""
+
+    def test_desglosa_por_request_mode(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            _all_result([SimpleNamespace(service_category="exit", total_consultas=7)]),
+            _all_result(
+                [
+                    SimpleNamespace(request_mode="mode=peatonal", total=4),
+                    SimpleNamespace(request_mode="mode=vehicular", total=2),
+                    SimpleNamespace(request_mode=None, total=1),
+                ]
+            ),
+        ]
+
+        resp = client.get(
+            f"/api/events/{EVENT_ID}/reports/service_breakdown",
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["services"] == [
+            {"service_category": "exit", "total_consultas": 7, "percentage": 100.0}
+        ]
+        assert body["filters"] == [
+            {"request_mode": "mode=peatonal", "total": 4},
+            {"request_mode": "mode=vehicular", "total": 2},
+            {"request_mode": None, "total": 1},
+        ]
+
+    def test_desglose_usa_el_periodo_efectivo(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        start = datetime(2026, 9, 25, 3, 0, tzinfo=timezone.utc)
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            _all_result([]),
+            _all_result([SimpleNamespace(request_mode="type=hotel", total=3)]),
+        ]
+
+        resp = client.get(
+            f"/api/events/{EVENT_ID}/reports/service_breakdown",
+            params={"start": start.isoformat()},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        sql, params = _compiled(db_mock, 2)
+        assert "request_mode" in sql
+        assert "timestamp >=" in sql
+        assert "timestamp <=" not in sql
+        assert start in params.values()
+
+    def test_sin_datos_devuelve_lista_vacia(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            _all_result([]),
+            _all_result([]),
+        ]
+
+        resp = client.get(
+            f"/api/events/{EVENT_ID}/reports/service_breakdown",
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["filters"] == []
+
+    def test_respuesta_conserva_los_campos_previos(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            _all_result([SimpleNamespace(service_category="gastronomy", total_consultas=5)]),
+            _all_result([]),
+        ]
+
+        resp = client.get(
+            f"/api/events/{EVENT_ID}/reports/service_breakdown",
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["event_id"] == EVENT_ID
+        assert body["event_name"] == "Festival de la Primavera 2026"
+        assert body["period"]["mode"] == "event"
+        assert body["services"][0]["percentage"] == 100.0
 
 
 class TestCoverageGaps:
@@ -413,7 +519,7 @@ class TestEffectivePeriodIsShared:
 
     EMPTY_SIDE_EFFECT = {
         "summary": 1,
-        "service_breakdown": 1,
+        "service_breakdown": 2,
         "coverage_gaps": 2,
         "technical_incidents": 2,
         "temporal_distribution": 1,

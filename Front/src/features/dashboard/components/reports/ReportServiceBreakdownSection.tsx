@@ -69,6 +69,31 @@ export function ReportServiceBreakdownSection({
           ))}
         </div>
       )}
+      {data && data.filters && data.filters.length > 0 && (
+        <div className="mt-5 border-t border-slate-200 pt-3">
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+            Desglose por filtro aplicado
+          </h4>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-left text-slate-500 border-b border-slate-200">
+                <th className="py-1.5 font-medium">Filtro</th>
+                <th className="py-1.5 font-medium text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.filters.map((filter) => (
+                <tr key={filter.request_mode ?? '__sin_filtro__'} className="border-b border-slate-100">
+                  <td className="py-1.5 font-mono text-slate-700">
+                    {filter.request_mode ?? 'sin filtro'}
+                  </td>
+                  <td className="py-1.5 text-right text-slate-700">{filter.total}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </ReportSection>
   );
 }
