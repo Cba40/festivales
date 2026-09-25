@@ -55,6 +55,30 @@ export function formatLocalBucket(value: string): string {
   return `${parts[3]}/${parts[2]}/${parts[1]} ${parts[4]}:${parts[5]}`;
 }
 
+/**
+ * Formatea un instante absoluto como fecha de la zona horaria operacional.
+ *
+ * El backend devuelve los límites del período como instantes UTC. Mostrarlos
+ * con UTC mostraría el día equivocado: el fin de la jornada del 21/07 llega como
+ * 22/07T02:59Z y se vería como 22/07. Se leen solo las partes de fecha, sin
+ * la hora, para no depender del formato de hora del runtime.
+ */
+export function formatLocalDate(value: string, timeZone: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const field: Record<string, string> = {};
+  for (const part of parts) {
+    if (part.type !== 'literal') field[part.type] = part.value;
+  }
+  return `${field.day}/${field.month}/${field.year}`;
+}
+
 export function percentage(value: number): string {
   return `${(value * 100).toFixed(1)}%`;
 }

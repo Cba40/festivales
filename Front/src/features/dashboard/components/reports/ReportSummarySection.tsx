@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { AlertTriangle, CheckCircle2, Search, WifiOff } from 'lucide-react';
 import { useEventReport } from '../../../../hooks/useEventReports';
 import { endpoints } from '../../../../core/api/endpoints';
@@ -8,10 +9,21 @@ import { RESULT_STATUS_LABELS } from './reportFormat';
 
 const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 
-export function ReportSummarySection() {
+export interface ReportSummarySectionProps {
+  start?: string;
+  end?: string;
+}
+
+export function ReportSummarySection({
+  start,
+  end,
+}: ReportSummarySectionProps = {}) {
+  const params = useMemo(() => ({ start, end }), [start, end]);
+
   const { data, isLoading, error, refresh } = useEventReport<EventSummaryDTO>(
     EVENT_ID,
-    endpoints.reports.summary(EVENT_ID)
+    endpoints.reports.summary(EVENT_ID),
+    { params }
   );
 
   return (

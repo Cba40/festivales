@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatLocalBucket } from './reportFormat.ts';
+import { formatLocalBucket, formatLocalDate } from './reportFormat.ts';
+
+const ART = 'America/Argentina/Buenos_Aires';
 
 test('formatLocalBucket muestra la hora local sin desplazamiento', () => {
   // El bucket llega como hora de pared local (23:30 ART), sin offset.
@@ -35,4 +37,20 @@ test('formatLocalBucket no aplica conversión de zona horaria', () => {
 test('formatLocalBucket devuelve el valor original si no es una fecha', () => {
   assert.equal(formatLocalBucket('no-es-fecha'), 'no-es-fecha');
   assert.equal(formatLocalBucket(''), '');
+});
+
+test('formatLocalDate muestra la fecha en la zona operacional, no en UTC', () => {
+  // El fin de la jornada del 21/07 ART llega como 22/07T02:59Z: mostrarlo en
+  // UTC daría 22/07, que es el día equivocado.
+  assert.equal(formatLocalDate('2026-07-22T02:59:59.999Z', ART), '21/07/2026');
+  assert.equal(formatLocalDate('2026-07-15T03:00:00.000Z', ART), '15/07/2026');
+});
+
+test('formatLocalDate cubre el inicio exacto de la jornada', () => {
+  // 00:00:00 ART del 21/07 = 03:00Z: sigue siendo 21/07 local.
+  assert.equal(formatLocalDate('2026-07-21T03:00:00.000Z', ART), '21/07/2026');
+});
+
+test('formatLocalDate devuelve el valor original si no es una fecha', () => {
+  assert.equal(formatLocalDate('no-es-fecha', ART), 'no-es-fecha');
 });

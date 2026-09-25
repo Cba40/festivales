@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useEventReport } from '../../../../hooks/useEventReports';
 import { endpoints } from '../../../../core/api/endpoints';
 import type { TechnicalIncidentsDTO } from '../../types';
@@ -6,10 +7,21 @@ import { formatDateOnly, percentage, serviceLabel } from './reportFormat';
 
 const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 
-export function ReportTechnicalIncidentsSection() {
+export interface ReportTechnicalIncidentsSectionProps {
+  start?: string;
+  end?: string;
+}
+
+export function ReportTechnicalIncidentsSection({
+  start,
+  end,
+}: ReportTechnicalIncidentsSectionProps = {}) {
+  const params = useMemo(() => ({ start, end }), [start, end]);
+
   const { data, isLoading, error, refresh } = useEventReport<TechnicalIncidentsDTO>(
     EVENT_ID,
-    endpoints.reports.technicalIncidents(EVENT_ID)
+    endpoints.reports.technicalIncidents(EVENT_ID),
+    { params }
   );
 
   return (

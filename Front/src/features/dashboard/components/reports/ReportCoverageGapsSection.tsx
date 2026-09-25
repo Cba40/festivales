@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useEventReport } from '../../../../hooks/useEventReports';
 import { endpoints } from '../../../../core/api/endpoints';
 import type { CoverageGapsDTO } from '../../types';
@@ -6,10 +7,21 @@ import { formatDateOnly, percentage, serviceLabel } from './reportFormat';
 
 const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 
-export function ReportCoverageGapsSection() {
+export interface ReportCoverageGapsSectionProps {
+  start?: string;
+  end?: string;
+}
+
+export function ReportCoverageGapsSection({
+  start,
+  end,
+}: ReportCoverageGapsSectionProps = {}) {
+  const params = useMemo(() => ({ start, end }), [start, end]);
+
   const { data, isLoading, error, refresh } = useEventReport<CoverageGapsDTO>(
     EVENT_ID,
-    endpoints.reports.coverageGaps(EVENT_ID)
+    endpoints.reports.coverageGaps(EVENT_ID),
+    { params }
   );
 
   return (

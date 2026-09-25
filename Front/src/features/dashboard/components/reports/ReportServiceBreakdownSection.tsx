@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Layers } from 'lucide-react';
 import { useEventReport } from '../../../../hooks/useEventReports';
 import { endpoints } from '../../../../core/api/endpoints';
@@ -8,10 +9,21 @@ import { serviceLabel } from './reportFormat';
 
 const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 
-export function ReportServiceBreakdownSection() {
+export interface ReportServiceBreakdownSectionProps {
+  start?: string;
+  end?: string;
+}
+
+export function ReportServiceBreakdownSection({
+  start,
+  end,
+}: ReportServiceBreakdownSectionProps = {}) {
+  const params = useMemo(() => ({ start, end }), [start, end]);
+
   const { data, isLoading, error, refresh } = useEventReport<ServiceBreakdownDTO>(
     EVENT_ID,
-    endpoints.reports.serviceBreakdown(EVENT_ID)
+    endpoints.reports.serviceBreakdown(EVENT_ID),
+    { params }
   );
   const total = data?.services.reduce((sum, service) => sum + service.total_consultas, 0) ?? 0;
 

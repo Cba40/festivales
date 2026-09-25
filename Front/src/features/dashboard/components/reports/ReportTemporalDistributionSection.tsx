@@ -7,12 +7,20 @@ import { useState, useMemo } from 'react';
 
 const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 
-export function ReportTemporalDistributionSection() {
+export interface ReportTemporalDistributionSectionProps {
+  start?: string;
+  end?: string;
+}
+
+export function ReportTemporalDistributionSection({
+  start,
+  end,
+}: ReportTemporalDistributionSectionProps = {}) {
   const [granularity, setGranularity] = useState<'hour' | 'day'>('hour');
 
   const params = useMemo(
-    () => ({ granularity, timezone: DEFAULT_TIMEZONE }),
-    [granularity]
+    () => ({ granularity, timezone: DEFAULT_TIMEZONE, start, end }),
+    [granularity, start, end]
   );
 
   const { data, isLoading, error, refresh } = useEventReport<TemporalDistributionDTO>(

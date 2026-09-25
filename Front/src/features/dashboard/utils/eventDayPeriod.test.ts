@@ -1,6 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { eventDayToPeriod, ACCUMULATED_PERIOD } from './eventDayPeriod.ts';
+import {
+  eventDayToPeriod,
+  eventDayRangeToPeriod,
+  ACCUMULATED_PERIOD,
+} from './eventDayPeriod.ts';
 
 const ART = 'America/Argentina/Buenos_Aires';
 const UTC = 'UTC';
@@ -56,4 +60,24 @@ test('eventDayToPeriod rechaza una zona horaria inválida', () => {
 
 test('el período acumulado no declara extremos', () => {
   assert.deepEqual(ACCUMULATED_PERIOD, { start: null, end: null });
+});
+
+test('eventDayRangeToPeriod abre el primer día y cierra el último', () => {
+  const period = eventDayRangeToPeriod('2026-07-15', '2026-07-26', ART);
+  assert.equal(period.start, '2026-07-15T03:00:00.000Z');
+  assert.equal(period.end, '2026-07-27T02:59:59.999Z');
+});
+
+test('eventDayRangeToPeriod con un solo día equivale a eventDayToPeriod', () => {
+  assert.deepEqual(
+    eventDayRangeToPeriod('2026-07-21', '2026-07-21', ART),
+    eventDayToPeriod('2026-07-21', ART),
+  );
+});
+
+test('eventDayRangeToPeriod rechaza un rango invertido', () => {
+  assert.throws(
+    () => eventDayRangeToPeriod('2026-07-26', '2026-07-15', ART),
+    /Rango de fechas inválido/,
+  );
 });

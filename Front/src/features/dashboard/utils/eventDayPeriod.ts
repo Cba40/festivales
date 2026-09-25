@@ -105,6 +105,23 @@ export function eventDayToPeriod(date: string, timeZone: string): EventDayPeriod
   return { start: start.toISOString(), end: end.toISOString() };
 }
 
+/**
+ * Período personalizado: desde las 00:00:00.000 del primer día local hasta
+ * las 23:59:59.999 del último día local, ambos inclusivos.
+ */
+export function eventDayRangeToPeriod(
+  startDate: string,
+  endDate: string,
+  timeZone: string,
+): EventDayPeriod {
+  const from = eventDayToPeriod(startDate, timeZone);
+  const to = eventDayToPeriod(endDate, timeZone);
+  if (Date.parse(to.end) < Date.parse(from.start)) {
+    throw new Error(`Rango de fechas inválido: ${startDate} → ${endDate}`);
+  }
+  return { start: from.start, end: to.end };
+}
+
 /** Período acumulado: el contrato de "sin rango" (ausencia de filtro). */
 export const ACCUMULATED_PERIOD: Readonly<{ start: null; end: null }> = Object.freeze({
   start: null,

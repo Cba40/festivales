@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useEventReport } from '../../../../hooks/useEventReports';
 import { endpoints } from '../../../../core/api/endpoints';
 import type { RecommendedZonesDTO } from '../../types';
@@ -5,10 +6,21 @@ import { ReportSection } from './ReportSection';
 
 const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 
-export function ReportRecommendedZonesSection() {
+export interface ReportRecommendedZonesSectionProps {
+  start?: string;
+  end?: string;
+}
+
+export function ReportRecommendedZonesSection({
+  start,
+  end,
+}: ReportRecommendedZonesSectionProps = {}) {
+  const params = useMemo(() => ({ start, end }), [start, end]);
+
   const { data, isLoading, error, refresh } = useEventReport<RecommendedZonesDTO>(
     EVENT_ID,
-    endpoints.reports.recommendedZones(EVENT_ID)
+    endpoints.reports.recommendedZones(EVENT_ID),
+    { params }
   );
 
   return (
