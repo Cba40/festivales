@@ -1,8 +1,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatLocalBucket, formatLocalDate, formatLocalDateTime } from './reportFormat.ts';
+import {
+  formatLocalBucket,
+  formatLocalDate,
+  formatLocalDateTime,
+  buildFilterGroups,
+} from './reportFormat.ts';
 
 const ART = 'America/Argentina/Buenos_Aires';
+
+const SVC = (service_category: string, total_consultas: number) => ({
+  service_category,
+  total_consultas,
+});
+const FIL = (request_mode: string | null, total: number) => ({ request_mode, total });
 
 test('formatLocalBucket muestra la hora local sin desplazamiento', () => {
   // El bucket llega como hora de pared local (23:30 ART), sin offset.
@@ -80,4 +91,144 @@ test('formatLocalDateTime acepta un Date', () => {
 
 test('formatLocalDateTime devuelve el valor original si no es una fecha', () => {
   assert.equal(formatLocalDateTime('no-es-fecha', ART), 'no-es-fecha');
+});
+
+test('buildFilterGroups agrupa los modos de salida dentro de Salidas', () => {
+  const groups = buildFilterGroups(
+    [SVC('exit', 9)],
+    [FIL('mode=peatonal', 4), FIL('mode=vehicular', 3), FIL('mode=transporte', 2)],
+  );
+  assert.equal(groups.length, 1);
+  const salidas = groups.find((g) => g.key === 'exit')!;
+  assert.equal(salidas.label, 'Salidas');
+  assert.deepEqual(
+    salidas.children.map((c) => [c.label, c.total]),
+    [['Peatonal', 4], ['Vehicular', 3], ['Transporte Público', 2]],
+  );
+});
+
+test('buildFilterGroups separa urbano de interurbano en Transporte', () => {
+  const groups = buildFilterGroups(
+    [SVC('transport', 5)],
+    [FIL('transport_type=urbano', 3), FIL('transport_type=interurbano', 2)],
+  );
+  const transporte = groups.find((g) => g.key === 'transport')!;
+  assert.deepEqual(
+    transporte.children.map((c) => c.label),
+    ['Urbano', 'Interurbano'],
+  );
+});
+
+test('buildFilterGroups mapea los tipos de hospedaje', () => {
+  const groups = buildFilterGroups(
+    [SVC('accommodation', 6)],
+    [FIL('type=hotel', 2), FIL('type=camping', 1), FIL('type=hostel', 1), FIL('type=other', 1), FIL('type=all', 1)],
+  );
+  const hospedaje = groups.find((g) => g.key === 'accommodation')!;
+  assert.deepEqual(
+    hospedaje.children.map((c) => c.label).sort(),
+    ['Camping', 'Hostel', 'Hotel', 'Otros', 'Todos'],
+  );
+});
+
+test('buildFilterGroups usa el catálogo para nombrar los protocolos', () => {
+  const groups = buildFilterGroups(
+    [SVC('emergency', 2)],
+    [FIL('protocolo=abc-123', 1), FIL('protocolo=def-456', 1)],
+    { 'abc-123': 'Niño perdido', 'def-456': 'Persona herida' },
+  );
+  const emergencias = groups.find((g) => g.key === 'emergency')!;
+  assert.deepEqual(
+    emergencias.children.map((c) => c.label).sort(),
+    ['Niño perdido', 'Persona herida'],
+  );
+});
+
+test('buildFilterGroups cae a un identificador corto si no hay catálogo', () => {
+  const groups = buildFilterGroups([SVC('emergency', 1)], [FIL('protocolo=abc-123456', 1)]);
+  const emergencias = groups.find((g) => g.key === 'emergency')!;
+  assert.equal(emergencias.children[0].label, 'Protocolo abc-1234');
+});
+
+test('buildFilterGroups suma los cuatro subtipos en Servicios Generales', () => {
+  const groups = buildFilterGroups(
+    [SVC('bathroom', 5), SVC('hydration', 3), SVC('rest', 2), SVC('cajeros', 1), SVC('parking', 4)],
+    [FIL('banos', 5), FIL('hidratacion', 3), FIL('descanso', 2), FIL('cajeros', 1)],
+  );
+  const generales = groups.find((g) => g.key === 'Servicios Generales')!;
+  assert.equal(generales.label, 'Servicios Generales');
+  assert.equal(generales.total, 11);
+  assert.deepEqual(
+    generales.children.map((c) => [c.label, c.total]),
+    [['Baños', 5], ['Hidratación', 3], ['Descanso', 2], ['Cajeros', 1]],
+  );
+  // Los subtipos crudos no deben aparecer como filtros sueltos FUERA del grupo
+  // virtual: ya son sus hijos, y sumarlos otra vez duplicaría el total.
+  const outsideVirtual = groups
+    .filter((g) => g.key !== 'Servicios Generales')
+    .flatMap((g) => g.children);
+  for (const raw of ['banos', 'hidratacion', 'descanso', 'cajeros']) {
+    assert.equal(
+      outsideVirtual.filter((c) => c.key === raw).length,
+      0,
+      `el subtipo ${raw} no debe aparecer fuera de Servicios Generales`,
+    );
+  }
+  // Parking conserva su propio grupo.
+  assert.ok(groups.some((g) => g.key === 'parking'));
+});
+
+test('buildFilterGroups no duplica destinos compartidos entre Salidas y Transporte', () => {
+  const groups = buildFilterGroups(
+    [SVC('exit', 4), SVC('transport', 2)],
+    [FIL('mode=peatonal', 4), FIL('destination=Plaza', 2), FIL('transport_type=urbano', 2)],
+  );
+  const destinos = groups.find((g) => g.key === 'shared-destinations')!;
+  assert.equal(destinos.label, 'Destinos (salidas y transporte)');
+  assert.equal(destinos.total, 2);
+  assert.deepEqual(destinos.children, [{ key: 'destination=Plaza', label: 'Plaza', total: 2 }]);
+  // El destino NO aparece dentro de Salidas ni de Transporte.
+  assert.equal(
+    groups
+      .filter((g) => g.key === 'exit' || g.key === 'transport')
+      .flatMap((g) => g.children)
+      .filter((c) => c.key.startsWith('destination=')).length,
+    0,
+  );
+});
+
+test('buildFilterGroups agrupa zonas compartidas y las conserva sin duplicar', () => {
+  const groups = buildFilterGroups(
+    [SVC('parking', 3), SVC('bathroom', 2)],
+    [FIL('zona=z-1', 3), FIL('zona=z-2', 2)],
+  );
+  const zonas = groups.find((g) => g.key === 'shared-zones')!;
+  assert.equal(zonas.label, 'Zonas (estacionamiento y baños)');
+  assert.equal(zonas.total, 5);
+  assert.deepEqual(
+    zonas.children.map((c) => [c.label, c.total]),
+    [['z-1', 3], ['z-2', 2]],
+  );
+  assert.equal(
+    groups.find((g) => g.key === 'parking')!.children.length,
+    0,
+  );
+});
+
+test('buildFilterGroups ordena los grupos por total descendente', () => {
+  const groups = buildFilterGroups(
+    [SVC('parking', 1), SVC('exit', 10), SVC('gastronomy', 5)],
+    [],
+  );
+  assert.deepEqual(
+    groups.map((g) => g.key),
+    ['exit', 'gastronomy', 'parking'],
+  );
+});
+
+test('buildFilterGroups tolera filtros ausentes', () => {
+  const groups = buildFilterGroups([SVC('exit', 3)], null);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].children.length, 0);
+  assert.deepEqual(buildFilterGroups([], undefined), []);
 });
