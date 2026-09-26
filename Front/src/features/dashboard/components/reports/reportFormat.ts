@@ -171,8 +171,25 @@ const FILTER_OWNER: Record<string, string> = {
 };
 
 const PROTOCOL_PREFIX = 'protocolo=';
+const LEGACY_DESTINATION_GROUP = 'legacy-destinations';
+const SALIDA_PATTERN = /^salida_(.+?)=(.+)$/;
+const TRANSPORTE_PATTERN = /^transporte_(.+?)=(.+)$/;
 
-const DESTINATIONS_GROUP = 'shared-destinations';
+const MODALITY_LABELS: Record<string, string> = {
+  vehicular: 'Vehicular',
+  peatonal: 'Peatonal',
+  transporte: 'Transporte Público',
+  urbano: 'Urbano',
+  interurbano: 'Interurbano',
+  todos: 'Todos',
+  sin_modo: 'Sin modo',
+};
+
+function modalityLabel(value: string): string {
+  return MODALITY_LABELS[value] ?? value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+
 const ZONES_GROUP = 'shared-zones';
 const UNFILTERED_GROUP = 'unfiltered';
 
@@ -230,7 +247,9 @@ export function buildFilterGroups(
   }
 
   const shared: Record<string, { label: string }> = {
-    [DESTINATIONS_GROUP]: { label: 'Destinos (salidas y transporte)' },
+    [LEGACY_DESTINATION_GROUP]: {
+      label: 'Destinos sin atribución (registros previos)',
+    },
     [ZONES_GROUP]: { label: 'Zonas (estacionamiento y baños)' },
     [UNFILTERED_GROUP]: { label: 'Sin filtro' },
   };
@@ -247,7 +266,9 @@ export function buildFilterGroups(
     }
     if (GENERAL_CATEGORIES.includes(mode)) continue;
     if (mode.startsWith('destination=')) {
-      ensureGroup(DESTINATIONS_GROUP, shared[DESTINATIONS_GROUP].label, 0).children.push({
+      // Registros anteriores a los prefijos por modalidad: no se puede saber si
+      // pertenecen a Salidas o a Transporte, así que no se atribuyen a ninguna.
+      ensureGroup(LEGACY_DESTINATION_GROUP, shared[LEGACY_DESTINATION_GROUP].label, 0).children.push({
         key: mode,
         label: mode.slice('destination='.length),
         total: filter.total,
@@ -260,6 +281,30 @@ export function buildFilterGroups(
         label: mode.slice('zona='.length),
         total: filter.total,
       });
+      continue;
+    }
+    const salida = SALIDA_PATTERN.exec(mode);
+    if (salida) {
+      const owner = groups.get('exit');
+      if (owner) {
+        owner.children.push({
+          key: mode,
+          label: `${modalityLabel(salida[1])}: ${salida[2]}`,
+          total: filter.total,
+        });
+      }
+      continue;
+    }
+    const transporte = TRANSPORTE_PATTERN.exec(mode);
+    if (transporte) {
+      const owner = groups.get('transport');
+      if (owner) {
+        owner.children.push({
+          key: mode,
+          label: `${modalityLabel(transporte[1])}: ${transporte[2]}`,
+          total: filter.total,
+        });
+      }
       continue;
     }
     const exact = FILTER_LABELS[mode];

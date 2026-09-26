@@ -444,3 +444,70 @@ class TestAbsoluteBoundsRequired:
         assert resp.status_code == 200
         body = resp.json()
         assert body["period"]["mode"] == "event"
+
+
+class TestRequestModePrefixFilter:
+    """El filtro por prefijo permite leer la hora pico de un destino concreto."""
+
+    def test_filtra_por_prefijo_de_request_mode(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            _all_result([SimpleNamespace(bucket=datetime(2026, 7, 21, 2, 0), count=9)]),
+            _scalars_result([]),
+        ]
+
+        resp = client.get(
+            ENDPOINT,
+            params={
+                "granularity": "day",
+                "request_mode_prefix": "salida_vehicular=",
+            },
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        sql, params = _compiled(db_mock, 1)
+        assert "request_mode LIKE" in sql
+        # El "_" es comodín de LIKE: se escapa para que el prefijo sea literal.
+        assert r"salida\_vehicular=%" in params.values()
+        assert resp.json()["buckets"][0]["count"] == 9
+
+    def test_escapa_comodines_like_del_prefijo(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            _all_result([]),
+        ]
+
+        resp = client.get(
+            ENDPOINT,
+            params={"granularity": "day", "request_mode_prefix": "100%_a"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        _sql, params = _compiled(db_mock, 1)
+        assert r"100\%\_a%" in params.values()
+
+    def test_sin_prefijo_no_agrega_predicado(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            _all_result([]),
+        ]
+
+        resp = client.get(ENDPOINT, params={"granularity": "day"}, headers=auth_headers)
+        assert resp.status_code == 200
+        sql, _params = _compiled(db_mock, 1)
+        assert "request_mode" not in sql

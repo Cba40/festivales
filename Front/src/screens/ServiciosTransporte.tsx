@@ -286,7 +286,7 @@ const ServiciosTransporte = () => {
                         recordActivity({
                           interaction_type: 'filter_change',
                           service_category: 'transport',
-                          request_mode: 'destination=todos',
+                          request_mode: `transporte_${tipo ?? 'todos'}=todos`,
                         })
                       }
                       setDestino('Todos')
@@ -307,7 +307,7 @@ const ServiciosTransporte = () => {
                           recordActivity({
                             interaction_type: 'filter_change',
                             service_category: 'transport',
-                            request_mode: `destination=${d}`,
+                            request_mode: `transporte_${tipo ?? 'todos'}=${d}`,
                           })
                         }
                         setDestino(d)

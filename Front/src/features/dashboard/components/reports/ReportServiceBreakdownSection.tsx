@@ -140,7 +140,7 @@ export function ReportServiceBreakdownSection({
                           key={child.key}
                           className="flex items-center gap-2 pl-6 text-xs text-slate-600"
                         >
-                          <span className="flex-1 truncate" title={child.label}>
+                          <span className="flex-1 truncate" title={`${child.label} (${child.key})`}>
                             {child.label}
                           </span>
                           <span className="shrink-0 text-slate-500">{child.total}</span>

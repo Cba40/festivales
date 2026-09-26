@@ -17,10 +17,17 @@ export function ReportTemporalDistributionSection({
   end,
 }: ReportTemporalDistributionSectionProps = {}) {
   const [granularity, setGranularity] = useState<'hour' | 'day'>('hour');
+  const [requestModePrefix, setRequestModePrefix] = useState('');
 
   const params = useMemo(
-    () => ({ granularity, timezone: DEFAULT_TIMEZONE, start, end }),
-    [granularity, start, end]
+    () => ({
+      granularity,
+      timezone: DEFAULT_TIMEZONE,
+      start,
+      end,
+      ...(requestModePrefix ? { request_mode_prefix: requestModePrefix } : {}),
+    }),
+    [granularity, start, end, requestModePrefix]
   );
 
   const { data, isLoading, error, refresh } = useEventReport<TemporalDistributionDTO>(
@@ -41,7 +48,7 @@ export function ReportTemporalDistributionSection({
     >
       {data && (
         <div className="space-y-4">
-          <div className="print:hidden flex items-center justify-between">
+          <div className="print:hidden flex flex-wrap items-end justify-between gap-3">
             <div>
               <span className="text-sm font-medium text-slate-700">
                 Granularidad:{" "}
@@ -54,6 +61,21 @@ export function ReportTemporalDistributionSection({
                 <option value="hour">Por hora</option>
                 <option value="day">Por día</option>
               </select>
+            </div>
+            <div className="w-64">
+              <label
+                className="block text-sm font-medium text-slate-700"
+                htmlFor="temporal-prefix"
+              >
+                Filtro aplicado (hora pico)
+              </label>
+              <input
+                id="temporal-prefix"
+                className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="salida_vehicular="
+                value={requestModePrefix}
+                onChange={(e) => setRequestModePrefix(e.target.value)}
+              />
             </div>
             <span className="text-xs text-slate-500">
               TZ: {DEFAULT_TIMEZONE}

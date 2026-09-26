@@ -178,23 +178,75 @@ test('buildFilterGroups suma los cuatro subtipos en Servicios Generales', () => 
   assert.ok(groups.some((g) => g.key === 'parking'));
 });
 
-test('buildFilterGroups no duplica destinos compartidos entre Salidas y Transporte', () => {
+test('buildFilterGroups agrupa destinos de salida por modalidad', () => {
+  const groups = buildFilterGroups(
+    [SVC('exit', 9)],
+    [
+      FIL('mode=vehicular', 1),
+      FIL('salida_vehicular=Norte', 5),
+      FIL('salida_peatonal=Plaza', 3),
+    ],
+  );
+  const salidas = groups.find((g) => g.key === 'exit')!;
+  assert.deepEqual(
+    salidas.children.map((c) => [c.label, c.total]),
+    [['Vehicular: Norte', 5], ['Peatonal: Plaza', 3], ['Vehicular', 1]],
+  );
+  // El destino ya NO vive en un grupo compartido.
+  assert.equal(groups.some((g) => g.key.includes('destinations')), false);
+});
+
+test('buildFilterGroups agrupa destinos de transporte por tipo', () => {
+  const groups = buildFilterGroups(
+    [SVC('transport', 12)],
+    [
+      FIL('transporte_urbano=Los Nogales', 5),
+      FIL('transporte_interurbano=Córdoba', 7),
+    ],
+  );
+  const transporte = groups.find((g) => g.key === 'transport')!;
+  assert.deepEqual(
+    transporte.children.map((c) => [c.label, c.total]),
+    [['Interurbano: Córdoba', 7], ['Urbano: Los Nogales', 5]],
+  );
+});
+
+test('buildFilterGroups normaliza modalidades desconocidas', () => {
+  const groups = buildFilterGroups([SVC('exit', 1)], [FIL('salida_moto=Santa Rosa', 1)]);
+  const salidas = groups.find((g) => g.key === 'exit')!;
+  assert.equal(salidas.children[0].label, 'Moto: Santa Rosa');
+});
+
+test('buildFilterGroups separa los destinos por prefijo sin duplicarlos', () => {
+  const groups = buildFilterGroups(
+    [SVC('exit', 5), SVC('transport', 7)],
+    [FIL('salida_peatonal=Centro', 5), FIL('transporte_urbano=Norte', 7)],
+  );
+  const salidas = groups.find((g) => g.key === 'exit')!;
+  const transporte = groups.find((g) => g.key === 'transport')!;
+  assert.equal(salidas.children.length, 1);
+  assert.equal(salidas.children[0].label, 'Peatonal: Centro');
+  assert.equal(transporte.children.length, 1);
+  assert.equal(transporte.children[0].label, 'Urbano: Norte');
+  // Ningún destino aparece en el grupo equivocado.
+  assert.equal(
+    salidas.children.some((c) => c.key.startsWith('transporte_')),
+    false,
+  );
+});
+
+test('buildFilterGroups conserva los destinos legacy sin atribuirlos', () => {
   const groups = buildFilterGroups(
     [SVC('exit', 4), SVC('transport', 2)],
-    [FIL('mode=peatonal', 4), FIL('destination=Plaza', 2), FIL('transport_type=urbano', 2)],
+    [FIL('destination=Plaza', 2)],
   );
-  const destinos = groups.find((g) => g.key === 'shared-destinations')!;
-  assert.equal(destinos.label, 'Destinos (salidas y transporte)');
-  assert.equal(destinos.total, 2);
-  assert.deepEqual(destinos.children, [{ key: 'destination=Plaza', label: 'Plaza', total: 2 }]);
-  // El destino NO aparece dentro de Salidas ni de Transporte.
-  assert.equal(
-    groups
-      .filter((g) => g.key === 'exit' || g.key === 'transport')
-      .flatMap((g) => g.children)
-      .filter((c) => c.key.startsWith('destination=')).length,
-    0,
-  );
+  const legacy = groups.find((g) => g.key === 'legacy-destinations')!;
+  assert.equal(legacy.label, 'Destinos sin atribución (registros previos)');
+  assert.equal(legacy.children[0].label, 'Plaza');
+  assert.equal(legacy.total, 2);
+  // No se imputan a Salidas ni a Transporte.
+  assert.equal(groups.find((g) => g.key === 'exit')!.children.length, 0);
+  assert.equal(groups.find((g) => g.key === 'transport')!.children.length, 0);
 });
 
 test('buildFilterGroups agrupa zonas compartidas y las conserva sin duplicar', () => {

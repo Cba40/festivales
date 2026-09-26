@@ -477,6 +477,10 @@ async def event_report_temporal_distribution(
     start: Optional[datetime] = Query(None, description="Inicio del período (ISO 8601)"),
     end: Optional[datetime] = Query(None, description="Fin del período (ISO 8601)"),
     service_category: Optional[str] = Query(None, description="Filtrar por categoría de servicio"),
+    request_mode_prefix: Optional[str] = Query(
+        None,
+        description="Filtrar por prefijo de request_mode (ej: salida_vehicular=)",
+    ),
     granularity: Literal["hour", "day"] = Query("hour", description="Granularidad temporal"),
     timezone: str = Query(
         "America/Argentina/Buenos_Aires", description="Zona horaria local (IANA)"
@@ -489,6 +493,15 @@ async def event_report_temporal_distribution(
     event = await _get_event_or_404(db, event_id)
     period = _resolve_period(event, start, end)
     conditions = _activity_conditions(event_id, period, service_category)
+    if request_mode_prefix is not None:
+        escaped = (
+            request_mode_prefix.replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_")
+        )
+        conditions.append(
+            ServiceInteractionLog.request_mode.like(f"{escaped}%", escape="\\")
+        )
 
     local_ts = ServiceInteractionLog.timestamp.op("AT TIME ZONE")(timezone)
     if granularity == "hour":

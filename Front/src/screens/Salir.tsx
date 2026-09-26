@@ -320,7 +320,7 @@ const Salir = () => {
                           recordActivity({
                             interaction_type: 'filter_change',
                             service_category: 'exit',
-                            request_mode: `destination=${destino.name}`,
+                            request_mode: `salida_${mode ?? 'sin_modo'}=${destino.name}`,
                           })
                         }
                         setDestinationId(prev => (prev === destino.id ? null : destino.id))
