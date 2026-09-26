@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import TokenPayload, verify_token
 from app.db.session import get_async_db
+from app.models.emergency_protocol import EmergencyProtocol
 from app.models.event import Event
 from app.models.event_day import EventDay
 from app.models.event_day_phase import EventDayPhase
@@ -122,6 +123,16 @@ USER_ACTIVITY_TYPES = ("screen_open", "filter_change")
 # (Estacionar.handleSelectZona y ServiciosGenerales.handleSelectBathroom).
 # El valor completo es `zona=<zone_id>`; de ahí se extrae el id con split_part.
 ZONE_SELECT_PREFIX = "zona="
+
+# Prefijo de los protocolos de emergencia (EmergencyModule emite
+# `request_mode='protocolo=<id>'`). OJO: un protocolo NO es una zona. Vive en
+# `emergency_protocols` con su propio UUID y no tiene columna `zone_id`, así que
+# su id nunca resuelve contra `zones.id`. Por eso la demanda de protocolos se
+# resuelve aparte; si se mezclara en el mismo JOIN se descartaría en silencio.
+PROTOCOL_SELECT_PREFIX = "protocolo="
+
+# `zone_type` que se le asigna a los protocolos cuando se anexan al análisis.
+PROTOCOL_ITEM_TYPE = "protocolo"
 
 
 def _activity_conditions(
@@ -682,16 +693,22 @@ async def event_report_zone_analysis(
     event = await _get_event_or_404(db, event_id)
     period = _resolve_period(event, start, end)
 
-    # --- Demanda real: la zona sale del propio request_mode, no de zone_ids ---
+    # --- Demanda real: el id sale del request_mode; puede ser zona o protocolo ---
     choice_conditions = _activity_conditions(event_id, period, service_category)
-    zone_from_mode = func.split_part(ServiceInteractionLog.request_mode, "=", 2).label("zone_id")
+    item_from_mode = func.split_part(ServiceInteractionLog.request_mode, "=", 2).label("item_id")
     real_choices_sq = (
         select(
-            zone_from_mode.label("zone_id"),
+            item_from_mode.label("item_id"),
             func.count(ServiceInteractionLog.id).label("real_choices"),
         )
-        .where(*choice_conditions, ServiceInteractionLog.request_mode.like(f"{ZONE_SELECT_PREFIX}%"))
-        .group_by(zone_from_mode)
+        .where(
+            *choice_conditions,
+            or_(
+                ServiceInteractionLog.request_mode.like(f"{ZONE_SELECT_PREFIX}%"),
+                ServiceInteractionLog.request_mode.like(f"{PROTOCOL_SELECT_PREFIX}%"),
+            ),
+        )
+        .group_by(item_from_mode)
         .subquery()
     )
 
@@ -724,7 +741,7 @@ async def event_report_zone_analysis(
             avg_position_col,
         )
         .select_from(
-            join(Zone, real_choices_sq, Zone.id == real_choices_sq.c.zone_id, isouter=True).join(
+            join(Zone, real_choices_sq, Zone.id == real_choices_sq.c.item_id, isouter=True).join(
                 coverage_sq, Zone.id == coverage_sq.c.zone_id, isouter=True
             )
         )
@@ -755,6 +772,34 @@ async def event_report_zone_analysis(
         )
         for row in result.all()
     ]
+
+    # --- Demanda de protocolos de emergencia ---
+    # Los protocolos no son zonas: viven en `emergency_protocols` con UUID propio
+    # y sin `zone_id`, así que el LEFT JOIN de arriba los descarta. Se resuelven
+    # en su propia consulta y se anexan. Los dos conjuntos son disjuntos por
+    # construcción (un id está en un catálogo o en el otro), no hay doble conteo.
+    if service_category in (None, "emergency"):
+        protocols_result = await db.execute(
+            select(
+                real_choices_sq.c.item_id.label("zone_id"),
+                EmergencyProtocol.title.label("zone_name"),
+                real_choices_sq.c.real_choices.label("real_choices"),
+            ).select_from(
+                join(real_choices_sq, EmergencyProtocol, EmergencyProtocol.id == real_choices_sq.c.item_id)
+            )
+        )
+        zones.extend(
+            ZoneAnalysisItem(
+                zone_id=row.zone_id,
+                zone_name=row.zone_name,
+                zone_type=PROTOCOL_ITEM_TYPE,
+                real_choices=row.real_choices,
+                recommendation_count=0,
+                avg_position=None,
+            )
+            for row in protocols_result.all()
+        )
+
     # Demanda primero; después, las más recomendadas arriba. Las zonas que nunca
     # se recomendaron (avg_position nulo) quedan al final en vez de ir primero.
     zones.sort(

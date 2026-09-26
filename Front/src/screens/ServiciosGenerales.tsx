@@ -16,7 +16,7 @@ import { GpsModal } from '@/components/GpsModal'
 import { useBathroomRecommendations, type ZonaSanitaryItem } from '@/services/bathroomProduct'
 import { useRestRecommendations, type ZonaRestItem } from '@/services/restProduct'
 import { useHydrationRecommendations, type ZonaHidratacionItem } from '@/services/hydrationProduct'
-import { useCajeros } from '@/services/cajerosProduct'
+import { useCajeros, type CajeroItem } from '@/services/cajerosProduct'
 import { AppFooter } from '@/components/AppFooter'
 import { recordActivity, type ActivityServiceCategory } from '@/services/activity'
 
@@ -55,6 +55,7 @@ const ServiciosGenerales = () => {
   const [selectedZonaHidratacion, setSelectedZonaHidratacion] = useState<ZonaHidratacionItem | null>(null)
   const [selectedCajero, setSelectedCajero] = useState<CajeroItem | null>(null)
   const lastEmittedBathroomZone = useRef<string | null>(null)
+  const lastEmittedCajeroZone = useRef<string | null>(null)
 
   // Elegir el punto de baño concreto permite ver dónde se desborda la demanda.
   const handleSelectBathroom = (zona: ZonaSanitaryItem) => {
@@ -67,6 +68,20 @@ const ServiciosGenerales = () => {
       })
     }
     setSelectedZona(zona)
+  }
+
+  // Mismo criterio para cajeros: el cajero elegido es demanda real. Sin esto la
+  // columna "Elecciones Reales" de Análisis de Zonas queda en 0 para 'cajeros'.
+  const handleSelectCajero = (cajero: CajeroItem) => {
+    if (lastEmittedCajeroZone.current !== cajero.zone_id) {
+      lastEmittedCajeroZone.current = cajero.zone_id
+      recordActivity({
+        interaction_type: 'filter_change',
+        service_category: 'cajeros',
+        request_mode: `zona=${cajero.zone_id}`,
+      })
+    }
+    setSelectedCajero(cajero)
   }
 
   const isBanos = subtipoActivo === 'banos'
@@ -864,7 +879,7 @@ const ServiciosGenerales = () => {
                 tipo: 'cajeros',
                 originalData: z
               }))}
-            onSelectPunto={(p) => setSelectedCajero(p as CajeroItem)}
+            onSelectPunto={(p) => handleSelectCajero(p as CajeroItem)}
             onUserLocationUpdate={() => {}}
           />
 
@@ -873,7 +888,7 @@ const ServiciosGenerales = () => {
             icon="💳"
             label="cajeros disponibles"
             userLocation={userLocation}
-            onSelect={(z) => setSelectedCajero(z)}
+            onSelect={(z) => handleSelectCajero(z)}
           />
         </div>
 

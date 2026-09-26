@@ -5,6 +5,8 @@ import {
   formatLocalDate,
   formatLocalDateTime,
   buildFilterGroups,
+  SERVICE_CATEGORY_LABELS,
+  ZONE_ANALYSIS_CATEGORIES,
 } from './reportFormat.ts';
 
 const ART = 'America/Argentina/Buenos_Aires';
@@ -314,4 +316,36 @@ test('buildFilterGroups tolera filtros ausentes', () => {
   assert.equal(groups.length, 1);
   assert.equal(groups[0].children.length, 0);
   assert.deepEqual(buildFilterGroups([], undefined), []);
+});
+
+// El dropdown de Análisis de Zonas es un espejo manual de SERVICE_CATEGORIES del
+// backend. Si se olvida una categoría, el operador no puede filtrar por ella.
+const BACKEND_SERVICE_CATEGORIES = [
+  'parking',
+  'gastronomy',
+  'bathroom',
+  'hydration',
+  'rest',
+  'transport',
+  'exit',
+  'accommodation',
+  'emergency',
+  'cajeros',
+];
+
+test('el filtro de zone_analysis cubre todas las categorías del backend', () => {
+  assert.deepEqual([...ZONE_ANALYSIS_CATEGORIES].sort(), [...BACKEND_SERVICE_CATEGORIES].sort());
+});
+
+test('todas las categorías del filtro tienen etiqueta en español', () => {
+  for (const category of ZONE_ANALYSIS_CATEGORIES) {
+    const label = SERVICE_CATEGORY_LABELS[category];
+    assert.ok(label, `sin etiqueta para ${category}`);
+    assert.ok(!label.includes('_'), `etiqueta sin traducir para ${category}: ${label}`);
+  }
+});
+
+test('cajeros y emergency tienen etiqueta visible', () => {
+  assert.equal(SERVICE_CATEGORY_LABELS.cajeros, 'Cajeros');
+  assert.equal(SERVICE_CATEGORY_LABELS.emergency, 'Emergencias');
 });

@@ -13,6 +13,27 @@ export const SERVICE_CATEGORY_LABELS: Record<string, string> = {
   alerts: 'Alertas',
 };
 
+/**
+ * Espejo de SERVICE_CATEGORIES del backend (app/models/service_interaction_log.py).
+ *
+ * El endpoint `zone_analysis` acepta cualquier categoría sin lista blanca, así
+ * que si una falta acá el efecto es que el operador simplemente no puede
+ * filtrar por ella. Vive junto a SERVICE_CATEGORY_LABELS a propósito: son las
+ * dos caras del mismo contrato y `reportFormat.test.ts` verifica que no deriven.
+ */
+export const ZONE_ANALYSIS_CATEGORIES = [
+  'parking',
+  'gastronomy',
+  'bathroom',
+  'hydration',
+  'rest',
+  'transport',
+  'exit',
+  'accommodation',
+  'emergency',
+  'cajeros',
+] as const;
+
 export const RESULT_STATUS_LABELS: Record<string, string> = {
   ok: 'Con resultados',
   empty: 'Brecha de información',

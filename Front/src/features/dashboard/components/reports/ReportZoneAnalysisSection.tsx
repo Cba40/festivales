@@ -5,22 +5,11 @@ import { endpoints } from '../../../../core/api/endpoints';
 import type { ZoneAnalysisDTO } from '../../types';
 import { ReportSection } from './ReportSection';
 import { MetricMini } from './MetricMini';
-import { serviceLabel } from './reportFormat';
+import { serviceLabel, ZONE_ANALYSIS_CATEGORIES } from './reportFormat';
 
 const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 
-const CATEGORIES = [
-  'parking',
-  'bathroom',
-  'gastronomy',
-  'transport',
-  'exit',
-  'accommodation',
-  'hydration',
-  'rest',
-  'cajeros',
-] as const;
-
+// Las categorías disponibles viven en reportFormat (ZONE_ANALYSIS_CATEGORIES).
 export interface ReportZoneAnalysisSectionProps {
   start?: string;
   end?: string;
@@ -78,7 +67,7 @@ export function ReportZoneAnalysisSection({
             onChange={(e) => setCategory(e.target.value)}
           >
             <option value="">Todos los servicios</option>
-            {CATEGORIES.map((item) => (
+            {ZONE_ANALYSIS_CATEGORIES.map((item) => (
               <option key={item} value={item}>
                 {serviceLabel(item)}
               </option>
@@ -115,7 +104,7 @@ export function ReportZoneAnalysisSection({
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-slate-500 border-b border-slate-200">
-                <th className="px-3 py-2 font-medium">Zona</th>
+                <th className="px-3 py-2 font-medium">Zona / Protocolo</th>
                 <th className="px-3 py-2 font-medium">Tipo</th>
                 <th className="px-3 py-2 font-medium text-right">Elecciones Reales</th>
                 <th className="px-3 py-2 font-medium text-right">Veces Recomendada</th>
@@ -153,7 +142,8 @@ export function ReportZoneAnalysisSection({
         <p className="mt-2 text-[11px] text-slate-400">
           La posición promedio es el lugar que ocupa la zona en la lista de recomendadas
           (1 = primera). Solo hay datos de elecciones reales en los módulos que registran
-          el clic en la zona.
+          el clic: los tipos <span className="font-medium">protocolo</span> son emergencias,
+          que no tienen zonas físicas sino protocolos.
         </p>
       )}
     </ReportSection>

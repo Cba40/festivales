@@ -894,6 +894,14 @@ class TestZoneAnalysis:
             ]
         )
 
+    def _protocols(self, rows):
+        return _all_result(
+            [
+                SimpleNamespace(zone_id=zone_id, zone_name=name, real_choices=count)
+                for zone_id, name, count in rows
+            ]
+        )
+
     def test_une_demanda_y_cobertura(
         self,
         client: TestClient,
@@ -909,6 +917,7 @@ class TestZoneAnalysis:
                     ("zC", "Baños Centro", "bathroom", 0, 385, 2.0),
                 ]
             ),
+            self._protocols([]),
         ]
 
         resp = client.get(self.URL, headers=auth_headers)
@@ -927,6 +936,94 @@ class TestZoneAnalysis:
         # zC solo tiene cobertura: fue recomendada pero nunca elegida.
         assert zones["zC"]["real_choices"] == 0
         assert zones["zC"]["recommendation_count"] == 385
+
+    def test_demanda_de_protocolos_de_emergencia(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        """Emergencias no tiene zonas: tiene protocolos.
+
+        Los protocolos viven en ``emergency_protocols`` con UUID propio y sin
+        ``zone_id``, así que el LEFT JOIN sobre ``zones`` los descartaría. Se
+        resuelven en una consulta aparte y se anexan con ``zone_type``
+        ``'protocolo'``.
+        """
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            self._zones([]),
+            self._protocols(
+                [
+                    ("pr-1", "Niño perdido", 4),
+                    ("pr-2", "Persona herida", 1),
+                ]
+            ),
+        ]
+
+        resp = client.get(self.URL, headers=auth_headers)
+        assert resp.status_code == 200
+        zones = {z["zone_id"]: z for z in resp.json()["zones"]}
+
+        assert zones["pr-1"] == {
+            "zone_id": "pr-1",
+            "zone_name": "Niño perdido",
+            "zone_type": "protocolo",
+            "real_choices": 4,
+            "recommendation_count": 0,
+            "avg_position": None,
+        }
+        assert zones["pr-2"]["real_choices"] == 1
+        # La demanda manda el orden: 4 antes que 1.
+        assert [z["zone_id"] for z in resp.json()["zones"]] == ["pr-1", "pr-2"]
+
+    def test_demanda_acepta_zona_y_protocolo_en_la_misma_consulta(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        from app.api.routes.event_reports import PROTOCOL_SELECT_PREFIX, ZONE_SELECT_PREFIX
+
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            self._zones([]),
+            self._protocols([]),
+        ]
+
+        resp = client.get(self.URL, headers=auth_headers)
+        assert resp.status_code == 200
+
+        sql, params = _compiled(db_mock, 1)
+        # Ambos prefijos entran en el mismo OR.
+        assert sql.count("OR") >= 1
+        assert f"{ZONE_SELECT_PREFIX}%" in str(params.values())
+        assert f"{PROTOCOL_SELECT_PREFIX}%" in str(params.values())
+        assert params["interaction_type_1"] == ["screen_open", "filter_change"]
+        assert params["origin_1"] == "user"
+
+    def test_demandas_acepta_emergencia_en_el_parametro(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        """Con service_category=emergency solo se consultan zonas (rama de
+        protocolos embebida en la consulta base)."""
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            self._zones([]),
+            self._protocols([("pr-1", "Niño perdido", 2)]),
+        ]
+
+        resp = client.get(
+            self.URL,
+            params={"service_category": "emergency"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["zones"][0]["real_choices"] == 2
+        assert resp.json()["zones"][0]["zone_type"] == "protocolo"
 
     def test_zona_con_demanda_sin_cobertura_no_se_descarta(
         self,
@@ -949,6 +1046,7 @@ class TestZoneAnalysis:
                     ("zTop", "Siempre primera", "parking", 0, 50, 1.0),
                 ]
             ),
+            self._protocols([]),
         ]
 
         resp = client.get(self.URL, headers=auth_headers)
@@ -980,6 +1078,7 @@ class TestZoneAnalysis:
         db_mock.execute.side_effect = [
             _event_result(_event(EVENT_START, EVENT_END)),
             self._zones([]),
+            self._protocols([]),
         ]
 
         resp = client.get(self.URL, headers=auth_headers)
@@ -1006,6 +1105,7 @@ class TestZoneAnalysis:
                     ("zC", "C", "parking", 0, 10, 2.0),
                 ]
             ),
+            self._protocols([]),
         ]
 
         resp = client.get(self.URL, headers=auth_headers)
@@ -1027,6 +1127,7 @@ class TestZoneAnalysis:
                     ("zTop", "Primera siempre", "parking", 0, 50, 1.0),
                 ]
             ),
+            self._protocols([]),
         ]
 
         resp = client.get(self.URL, headers=auth_headers)
@@ -1071,6 +1172,7 @@ class TestZoneAnalysis:
         db_mock.execute.side_effect = [
             _event_result(_event(EVENT_START, EVENT_END)),
             self._zones([]),
+            self._protocols([]),
         ]
 
         resp = client.get(self.URL, headers=auth_headers)
@@ -1099,6 +1201,7 @@ class TestZoneAnalysis:
         db_mock.execute.side_effect = [
             _event_result(_event(EVENT_START, EVENT_END)),
             self._zones([]),
+            self._protocols([]),
         ]
 
         resp = client.get(self.URL, headers=auth_headers)
@@ -1154,6 +1257,7 @@ class TestZoneAnalysis:
         db_mock.execute.side_effect = [
             _event_result(_event(EVENT_START, EVENT_END)),
             self._zones([]),
+            self._protocols([]),
         ]
 
         resp = client.get(self.URL, headers=auth_headers)
