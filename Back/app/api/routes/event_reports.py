@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, join, select
 from sqlalchemy.ext.compiler import compiles
-from sqlalchemy.sql.functions import FunctionElement
+from sqlalchemy.sql.functions import Function
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import TokenPayload, verify_token
@@ -145,7 +145,7 @@ def _request_conditions(
     return conditions
 
 
-class _JsonbOrdinality(FunctionElement):
+class _JsonbOrdinality(Function):
     """``jsonb_array_elements_text(x) WITH ORDINALITY`` sin alias.
 
     La posición en el array ``zone_ids`` es el ranking que el recomendador
@@ -153,9 +153,18 @@ class _JsonbOrdinality(FunctionElement):
     mismo set de la misma respuesta) quedan con idéntico conteo y la tabla no
     discrimina nada.
 
-    El alias lo emite ``table_valued(name="t")``. Acá NO se escribe a mano: si el
-    render incluye su propio ``AS t(...)``, ``table_valued`` agrega después su
-    ``AS anon_N`` y Postgres rechaza la sentencia con un error de sintaxis.
+    Dos trampas de SQLAlchemy 2.0 que esta clase tiene que evitar:
+
+    1. El alias lo emite ``table_valued(name="t")``. Acá NO se escribe a mano: si
+       el render incluye su propio ``AS t(...)``, ``table_valued`` agrega después
+       un ``AS anon_N`` y Postgres responde ``syntax error at or near "AS"``.
+    2. El ``super().__init__`` es obligatorio. Sin él, ``clause_expr`` nunca se
+       crea y el generador de claves de caché revienta con
+       ``AttributeError: Neither '_JsonbOrdinality' object nor 'Comparator'
+       object has an attribute 'clause_expr'``. Ojo: ``str(stmt.compile())``
+       sigue funcionando, así que el fallo solo aparece cuando el engine real
+       arma la clave de caché.
+
     Los nombres ``value`` y ``ordinality`` son los que Postgres asigna por
     defecto a esta función; no hace falta declararlos.
 
@@ -165,7 +174,8 @@ class _JsonbOrdinality(FunctionElement):
 
     inherit_cache = True
 
-    def __init__(self, arg):
+    def __init__(self, arg, **kwargs):
+        super().__init__(arg, **kwargs)
         self.arg = arg
 
 

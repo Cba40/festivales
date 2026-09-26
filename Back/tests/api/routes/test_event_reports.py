@@ -14,10 +14,13 @@ import re
 import pytest
 from fastapi.testclient import TestClient
 from jose import jwt
+from sqlalchemy import func, join, select
 
 from app.core.config import settings
 from app.db.session import get_async_db
 from app.main import app
+from app.models.service_interaction_log import ServiceInteractionLog
+from app.models.zone import Zone
 
 ENDPOINT = "/api/events/{event_id}/reports/{report}"
 EVENT_ID = "test-event-1"
@@ -1048,6 +1051,28 @@ class TestZoneAnalysis:
         assert sql.count("WITH ORDINALITY AS") == 1
         # Ningún alias inmediatamente seguido de otro sobre la misma función.
         assert re.search(r"WITH ORDINALITY AS \w+\s*(\([^)]*\))?\s*AS \w+", sql) is None
+
+    def test_ordinality_sobrevive_al_calculo_de_cache_key(self):
+        """Regresión: ``str(stmt.compile())`` pasa aunque falte ``clause_expr``.
+
+        El engine real arma una clave de caché antes de ejecutar, y ese recorrido
+        es el que revienta con ``AttributeError: ... has no attribute
+        'clause_expr'`` si el ``FunctionElement`` no inicializó su estado interno.
+        Compilar a mano no alcanza para detectarlo.
+        """
+        from app.api.routes.event_reports import _expanded_zone_positions
+
+        expanded = _expanded_zone_positions(
+            [ServiceInteractionLog.interaction_type == "request"]
+        ).subquery()
+        stmt = (
+            select(Zone.id, func.avg(expanded.c.position).label("avg_position"))
+            .select_from(join(Zone, expanded, Zone.id == expanded.c.zone_id))
+            .group_by(Zone.id)
+        )
+
+        assert "WITH ORDINALITY" in str(stmt.compile())
+        assert stmt._generate_cache_key() is not None
 
     def test_rechaza_periodo_naive(
         self,
