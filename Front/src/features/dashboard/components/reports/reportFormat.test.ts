@@ -400,3 +400,38 @@ test('el protocolo se nombra con el mapa y cae a un id corto sin él', () => {
     'Protocolo 153a712a',
   );
 });
+
+test('las aperturas historicas de /(emergencia) conservan su etiqueta', () => {
+  // App.tsx ya no emite screen_open para /emergencia, pero las filas que
+  // quedaron en la base tienen que seguir mostrándose. Si se borrara la entrada
+  // de FILTER_LABELS, caerían en 'unknown' y desaparecerían del desglose.
+  const groups = buildFilterGroups(
+    [SVC('emergency', 2)],
+    [FIL('/emergencia', 2), FIL('protocolo=abc-123', 1)],
+    { 'abc-123': 'Persona herida' },
+  );
+  const emergencias = groups.find((g) => g.key === 'emergency')!;
+  assert.deepEqual(
+    emergencias.children.map((c) => [c.label, c.total]).sort(),
+    [
+      ['Apertura de Emergencias', 2],
+      ['Persona herida', 1],
+    ],
+  );
+});
+
+test('un desglose solo de protocolos no inventa aperturas', () => {
+  // Con la emision corregida, emergencias solo trae elecciones de protocolo.
+  const groups = buildFilterGroups(
+    [SVC('emergency', 3)],
+    [FIL('protocolo=abc-123', 2), FIL('protocolo=def-456', 1)],
+    { 'abc-123': 'Persona herida', 'def-456': 'Niño perdido' },
+  );
+  const emergencias = groups.find((g) => g.key === 'emergency')!;
+  assert.equal(emergencias.children.length, 2);
+  assert.ok(
+    emergencias.children.every((c) => !c.label.startsWith('Apertura')),
+    'no debe aparecer ninguna apertura de pantalla',
+  );
+  assert.equal(emergencias.total, 3);
+});

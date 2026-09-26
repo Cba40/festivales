@@ -76,9 +76,18 @@ function ScreenLoading() {
 
 // Solamente rutas públicas con categoría contractual válida. El resto
 // (/servicios, /resolver-ahora, /asistente, '/') NO emiten screen_open.
+//
+// '/emergencia' está deliberadamente ausente: esa pantalla no es una consulta
+// de servicio sino un catálogo de protocolos. Emitir screen_open ahí mezclaba
+// "abrieron la pantalla" con "eligieron un protocolo" dentro de la misma
+// categoría y diluía la demanda real. La única señal de emergencias ahora es el
+// `filter_change` con `protocolo=<id>` de EmergencyModule.
+//
+// Ojo: las filas `screen_open` con request_mode='/emergencia' que YA están en
+// la base siguen renderizándose con su etiqueta gracias a FILTER_LABELS, por
+// eso no se quitó esa entrada del formateador.
 const SCREEN_OPEN_ROUTE_CATEGORY: Record<string, ActivityServiceCategory> = {
   '/estacionar': 'parking',
-  '/emergencia': 'emergency',
   '/servicios/comer': 'gastronomy',
 };
 
