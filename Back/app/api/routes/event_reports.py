@@ -5,7 +5,7 @@ from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, join, select
+from sqlalchemy import func, join, or_, select
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.functions import Function
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -668,8 +668,15 @@ async def event_report_zone_analysis(
     * ``recommendation_count`` y ``avg_position`` miden oferta: cuántas requests
       técnicas la devolvieron y en qué posición del ranking, 1-based.
 
-    Antes vivían separadas y la de cobertura, al no tener posición, producía el
-    mismo número para todas las zonas que siempre viajan en la misma respuesta.
+    Antes vivían separadas y la de cobertura, al no tener posición, producía
+    el mismo número para todas las zonas que siempre viajan en la misma respuesta.
+
+    Las dos métricas se resuelven en UNA consulta con LEFT JOIN desde ``zones``.
+    Armar la lista iterando solo la cobertura descartaba las zonas con demanda
+    pero sin oferta dentro del período (elegidas por usuarios que nevertheless
+    no fueron recomendadas en esa ventana) y sus elecciones se perdían en
+    silencio. El LEFT JOIN es la unión; el WHERE final la recorta a las zonas
+    que tienen algo que mostrar.
     """
     _require_absolute_bounds(start, end)
     event = await _get_event_or_404(db, event_id)
@@ -678,43 +685,75 @@ async def event_report_zone_analysis(
     # --- Demanda real: la zona sale del propio request_mode, no de zone_ids ---
     choice_conditions = _activity_conditions(event_id, period, service_category)
     zone_from_mode = func.split_part(ServiceInteractionLog.request_mode, "=", 2).label("zone_id")
-    choices_result = await db.execute(
-        select(zone_from_mode, func.count(ServiceInteractionLog.id).label("real_choices"))
+    real_choices_sq = (
+        select(
+            zone_from_mode.label("zone_id"),
+            func.count(ServiceInteractionLog.id).label("real_choices"),
+        )
         .where(*choice_conditions, ServiceInteractionLog.request_mode.like(f"{ZONE_SELECT_PREFIX}%"))
         .group_by(zone_from_mode)
+        .subquery()
     )
-    real_choices = {row.zone_id: row.real_choices for row in choices_result.all()}
 
     # --- Cobertura: posición real dentro del array zone_ids de cada request ---
     request_conditions = _request_conditions(event_id, period, service_category)
     expanded = _expanded_zone_positions(request_conditions).subquery()
-    coverage_result = await db.execute(
+    coverage_sq = (
+        select(
+            expanded.c.zone_id.label("zone_id"),
+            func.count(func.distinct(expanded.c.log_id)).label("recommendation_count"),
+            func.avg(expanded.c.position).label("avg_position"),
+        )
+        .group_by(expanded.c.zone_id)
+        .subquery()
+    )
+
+    real_choices_col = func.coalesce(real_choices_sq.c.real_choices, 0).label("real_choices")
+    recommendation_col = func.coalesce(
+        coverage_sq.c.recommendation_count, 0
+    ).label("recommendation_count")
+    avg_position_col = coverage_sq.c.avg_position.label("avg_position")
+
+    result = await db.execute(
         select(
             Zone.id.label("zone_id"),
             Zone.name.label("zone_name"),
             Zone.type.label("zone_type"),
-            func.count(func.distinct(expanded.c.log_id)).label("recommendation_count"),
-            func.avg(expanded.c.position).label("avg_position"),
+            real_choices_col,
+            recommendation_col,
+            avg_position_col,
         )
-        .select_from(join(Zone, expanded, Zone.id == expanded.c.zone_id))
-        .where(Zone.event_id == event_id)
-        .group_by(Zone.id, Zone.name, Zone.type)
+        .select_from(
+            join(Zone, real_choices_sq, Zone.id == real_choices_sq.c.zone_id, isouter=True).join(
+                coverage_sq, Zone.id == coverage_sq.c.zone_id, isouter=True
+            )
+        )
+        .where(
+            Zone.event_id == event_id,
+            or_(
+                real_choices_col > 0,
+                recommendation_col > 0,
+            ),
+        )
+        .order_by(
+            real_choices_col.desc(),
+            # Postgres ya pone los NULL al final en ASC; se explicita por
+            # legibilidad del ORDER BY.
+            avg_position_col.asc().nullslast(),
+            Zone.name.asc(),
+        )
     )
-    coverage = {
-        row.zone_id: (row.zone_name, row.zone_type, row.recommendation_count, row.avg_position)
-        for row in coverage_result.all()
-    }
 
     zones = [
         ZoneAnalysisItem(
-            zone_id=zone_id,
-            zone_name=name,
-            zone_type=zone_type,
-            real_choices=real_choices.get(zone_id, 0),
-            recommendation_count=recommendation_count,
-            avg_position=avg_position,
+            zone_id=row.zone_id,
+            zone_name=row.zone_name,
+            zone_type=row.zone_type,
+            real_choices=row.real_choices,
+            recommendation_count=row.recommendation_count,
+            avg_position=row.avg_position,
         )
-        for zone_id, (name, zone_type, recommendation_count, avg_position) in coverage.items()
+        for row in result.all()
     ]
     # Demanda primero; después, las más recomendadas arriba. Las zonas que nunca
     # se recomendaron (avg_position nulo) quedan al final en vez de ir primero.

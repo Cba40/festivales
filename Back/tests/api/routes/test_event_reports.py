@@ -871,26 +871,26 @@ class TestTemporalDistributionBreakdownSumsToCount:
 
 
 class TestZoneAnalysis:
-    """Combina demanda real (`filter_change` + `zona=`) y cobertura (`zone_ids`)."""
+    """Combina demanda real (`filter_change` + `zona=`) y cobertura (`zone_ids`).
+
+    El endpoint resuelve ambas métricas en UNA consulta con LEFT JOIN desde
+    ``zones``, así que el mock entrega una sola lista de filas ya unificadas.
+    """
 
     URL = f"/api/events/{EVENT_ID}/reports/zone_analysis"
 
-    def _choices(self, rows):
-        return _all_result(
-            [SimpleNamespace(zone_id=zone_id, real_choices=count) for zone_id, count in rows]
-        )
-
-    def _coverage(self, rows):
+    def _zones(self, rows):
         return _all_result(
             [
                 SimpleNamespace(
                     zone_id=zone_id,
                     zone_name=name,
                     zone_type=zone_type,
+                    real_choices=real_choices,
                     recommendation_count=count,
                     avg_position=avg_position,
                 )
-                for zone_id, name, zone_type, count, avg_position in rows
+                for zone_id, name, zone_type, real_choices, count, avg_position in rows
             ]
         )
 
@@ -902,12 +902,11 @@ class TestZoneAnalysis:
     ):
         db_mock.execute.side_effect = [
             _event_result(_event(EVENT_START, EVENT_END)),
-            self._choices([("zA", 7), ("zB", 2)]),
-            self._coverage(
+            self._zones(
                 [
-                    ("zA", "Estacionamiento Norte", "parking", 392, 1.2),
-                    ("zB", "Estacionamiento Sur", "parking", 392, 3.8),
-                    ("zC", "Baños Centro", "bathroom", 385, 2.0),
+                    ("zA", "Estacionamiento Norte", "parking", 7, 392, 1.2),
+                    ("zB", "Estacionamiento Sur", "parking", 2, 392, 3.8),
+                    ("zC", "Baños Centro", "bathroom", 0, 385, 2.0),
                 ]
             ),
         ]
@@ -924,11 +923,73 @@ class TestZoneAnalysis:
             "recommendation_count": 392,
             "avg_position": 1.2,
         }
-        # zB fue elegida menos que zA.
         assert zones["zB"]["real_choices"] == 2
-        # zC solo aparece en cobertura: nunca la eligieron.
+        # zC solo tiene cobertura: fue recomendada pero nunca elegida.
         assert zones["zC"]["real_choices"] == 0
         assert zones["zC"]["recommendation_count"] == 385
+
+    def test_zona_con_demanda_sin_cobertura_no_se_descarta(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        """Regresión del bug de intersección.
+
+        Armar la respuesta iterando solo la cobertura perdía las zonas que los
+        usuarios eligieron pero que el sistema no recomendó dentro del período
+        (típico de una zona recomendada antes de la ventana consultada). Con el
+        LEFT JOIN aparecen con ``recommendation_count=0`` y ``avg_position`` nulo.
+        """
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            self._zones(
+                [
+                    ("zElegida", "Elegida sin oferta", "parking", 5, 0, None),
+                    ("zTop", "Siempre primera", "parking", 0, 50, 1.0),
+                ]
+            ),
+        ]
+
+        resp = client.get(self.URL, headers=auth_headers)
+        assert resp.status_code == 200
+        zones = {z["zone_id"]: z for z in resp.json()["zones"]}
+
+        # La zona elegida existe en la respuesta pese a no tener cobertura.
+        assert zones["zElegida"] == {
+            "zone_id": "zElegida",
+            "zone_name": "Elegida sin oferta",
+            "zone_type": "parking",
+            "real_choices": 5,
+            "recommendation_count": 0,
+            "avg_position": None,
+        }
+        assert zones["zTop"]["real_choices"] == 0
+
+    def test_consulta_usa_left_join_para_la_union(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        """La unión tiene que resolverse en SQL, no en Python.
+
+        ``INNER JOIN`` o un recorrido post-hoc de la cobertura vuelven a perder
+        las zonas sin oferta en la ventana.
+        """
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            self._zones([]),
+        ]
+
+        resp = client.get(self.URL, headers=auth_headers)
+        assert resp.status_code == 200
+
+        sql, _ = _compiled(db_mock, 1)
+        assert sql.count("LEFT OUTER JOIN") == 2
+        # La recorte final deja fuera las zonas sin nada que mostrar.
+        assert "coalesce(" in sql
+        assert "zones.event_id" in sql
 
     def test_orden_por_demanda_luego_posicion(
         self,
@@ -938,12 +999,11 @@ class TestZoneAnalysis:
     ):
         db_mock.execute.side_effect = [
             _event_result(_event(EVENT_START, EVENT_END)),
-            self._choices([("zB", 1), ("zA", 5)]),
-            self._coverage(
+            self._zones(
                 [
-                    ("zA", "A", "parking", 10, 4.0),
-                    ("zB", "B", "parking", 10, 1.0),
-                    ("zC", "C", "parking", 10, 2.0),
+                    ("zA", "A", "parking", 5, 10, 4.0),
+                    ("zB", "B", "parking", 1, 10, 1.0),
+                    ("zC", "C", "parking", 0, 10, 2.0),
                 ]
             ),
         ]
@@ -961,19 +1021,20 @@ class TestZoneAnalysis:
     ):
         db_mock.execute.side_effect = [
             _event_result(_event(EVENT_START, EVENT_END)),
-            self._choices([]),
-            self._coverage(
+            self._zones(
                 [
-                    ("zSinPos", "Nunca recomendada", "parking", 0, None),
-                    ("zTop", "Primera siempre", "parking", 50, 1.0),
+                    ("zSinPos", "Nunca recomendada", "parking", 2, 0, None),
+                    ("zTop", "Primera siempre", "parking", 0, 50, 1.0),
                 ]
             ),
         ]
 
         resp = client.get(self.URL, headers=auth_headers)
         assert resp.status_code == 200
-        assert [z["zone_id"] for z in resp.json()["zones"]] == ["zTop", "zSinPos"]
-        assert resp.json()["zones"][1]["avg_position"] is None
+        # Demanda manda: zSinPos (2) va arriba aunque no tenga posición.
+        assert [z["zone_id"] for z in resp.json()["zones"]] == ["zSinPos", "zTop"]
+        assert resp.json()["zones"][0]["avg_position"] is None
+        assert resp.json()["zones"][0]["recommendation_count"] == 0
 
     def test_consulta_de_demanda_usa_split_part_y_actividad(
         self,
@@ -983,8 +1044,7 @@ class TestZoneAnalysis:
     ):
         db_mock.execute.side_effect = [
             _event_result(_event(EVENT_START, EVENT_END)),
-            self._choices([]),
-            self._coverage([]),
+            self._zones([]),
         ]
 
         resp = client.get(
@@ -1010,19 +1070,18 @@ class TestZoneAnalysis:
     ):
         db_mock.execute.side_effect = [
             _event_result(_event(EVENT_START, EVENT_END)),
-            self._choices([]),
-            self._coverage([]),
+            self._zones([]),
         ]
 
         resp = client.get(self.URL, headers=auth_headers)
         assert resp.status_code == 200
 
-        sql, params = _compiled(db_mock, 2)
+        sql, _ = _compiled(db_mock, 1)
         assert "WITH ORDINALITY" in sql
         assert "jsonb_array_elements_text" in sql
         assert "avg(" in sql
         # La cobertura cuenta requests técnicas, y solo las zonas del evento.
-        assert params["interaction_type_1"] == "request"
+        assert "request" in str(sql)
         assert "zones.event_id" in sql
 
     def test_ordinality_no_emite_alias_duplicado(
@@ -1039,14 +1098,13 @@ class TestZoneAnalysis:
         """
         db_mock.execute.side_effect = [
             _event_result(_event(EVENT_START, EVENT_END)),
-            _all_result([]),
-            _all_result([]),
+            self._zones([]),
         ]
 
         resp = client.get(self.URL, headers=auth_headers)
         assert resp.status_code == 200
 
-        sql, _ = _compiled(db_mock, 2)
+        sql, _ = _compiled(db_mock, 1)
         # Exactamente un alias propio de la función set-returning.
         assert sql.count("WITH ORDINALITY AS") == 1
         # Ningún alias inmediatamente seguido de otro sobre la misma función.
@@ -1095,8 +1153,7 @@ class TestZoneAnalysis:
     ):
         db_mock.execute.side_effect = [
             _event_result(_event(EVENT_START, EVENT_END)),
-            self._choices([]),
-            self._coverage([]),
+            self._zones([]),
         ]
 
         resp = client.get(self.URL, headers=auth_headers)

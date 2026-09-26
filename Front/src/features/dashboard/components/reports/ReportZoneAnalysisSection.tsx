@@ -16,6 +16,9 @@ const CATEGORIES = [
   'transport',
   'exit',
   'accommodation',
+  'hydration',
+  'rest',
+  'cajeros',
 ] as const;
 
 export interface ReportZoneAnalysisSectionProps {
