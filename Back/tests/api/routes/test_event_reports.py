@@ -5,7 +5,7 @@ El acceso a BD se simula por completo (misma técnica que
 autenticación JWT existente y la lógica de agregaciones.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -476,6 +476,151 @@ class TestCoverageGaps:
             {"day": "2026-09-21", "count": 5},
             {"day": "2026-09-22", "count": 3},
         ]
+
+
+class TestCoverageGapsOriginAndTimezone:
+    """El bloque de cobertura filtra por origen y bucketea en hora local."""
+
+    def _side_effect(self):
+        return [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            _all_result(
+                [
+                    SimpleNamespace(
+                        service_category="bathroom", total_consultas=10, empty_count=7
+                    ),
+                ]
+            ),
+            _all_result([SimpleNamespace(day=date(2026, 7, 21), count=7)]),
+        ]
+
+    def test_sin_origin_no_agrega_predicado_de_origen(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = self._side_effect()
+
+        resp = client.get(
+            f"/api/events/{EVENT_ID}/reports/coverage_gaps",
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        for index in (1, 2):
+            sql, _params = _compiled(db_mock, index)
+            assert "origin" not in sql
+
+    def test_filtra_por_origin_user(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = self._side_effect()
+
+        resp = client.get(
+            f"/api/events/{EVENT_ID}/reports/coverage_gaps",
+            params={"origin": "user"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        for index in (1, 2):
+            sql, params = _compiled(db_mock, index)
+            assert "origin" in sql
+            assert "user" in params.values()
+
+    @pytest.mark.parametrize("origin", ["prefetch", "system"])
+    def test_filtra_por_cualquier_origin_valido(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+        origin: str,
+    ):
+        db_mock.execute.side_effect = self._side_effect()
+
+        resp = client.get(
+            f"/api/events/{EVENT_ID}/reports/coverage_gaps",
+            params={"origin": origin},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        _sql, params = _compiled(db_mock, 1)
+        assert origin in params.values()
+
+    def test_rechaza_origin_invalido(
+        self,
+        client: TestClient,
+        auth_headers: dict[str, str],
+    ):
+        resp = client.get(
+            f"/api/events/{EVENT_ID}/reports/coverage_gaps",
+            params={"origin": "inventado"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 422
+
+    def test_rechaza_timezone_invalida(
+        self,
+        client: TestClient,
+        auth_headers: dict[str, str],
+    ):
+        resp = client.get(
+            f"/api/events/{EVENT_ID}/reports/coverage_gaps",
+            params={"timezone": "Not/AZone"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 400
+
+    def test_bucketing_diario_usa_zona_local(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = self._side_effect()
+
+        resp = client.get(
+            f"/api/events/{EVENT_ID}/reports/coverage_gaps",
+            params={"timezone": "America/Argentina/Buenos_Aires"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        sql, params = _compiled(db_mock, 2)
+        # El día se trunca en hora local: un request de las 23:00 ART pertenece a
+        # su día local y no al siguiente por usar UTC.
+        assert "AT TIME ZONE" in sql
+        assert "America/Argentina/Buenos_Aires" in params.values()
+        assert "date_trunc" in sql
+        # La agregación por categoría no lleva bucketing temporal.
+        first_sql, _ = _compiled(db_mock, 1)
+        assert "AT TIME ZONE" not in first_sql
+
+    def test_los_totales_no_cambian_con_origin_ni_timezone(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = self._side_effect()
+
+        resp = client.get(
+            f"/api/events/{EVENT_ID}/reports/coverage_gaps",
+            params={"origin": "system", "timezone": "UTC"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["services"] == [
+            {
+                "service_category": "bathroom",
+                "total_consultas": 10,
+                "empty_count": 7,
+                "empty_rate": 0.7,
+            }
+        ]
+        assert body["temporal_distribution"] == [{"day": "2026-07-21", "count": 7}]
 
 
 class TestTechnicalIncidents:

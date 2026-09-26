@@ -298,12 +298,25 @@ async def event_report_coverage_gaps(
     event_id: str,
     start: Optional[datetime] = Query(None, description="Inicio del período (ISO 8601)"),
     end: Optional[datetime] = Query(None, description="Fin del período (ISO 8601)"),
+    origin: Optional[Literal["user", "prefetch", "system"]] = Query(
+        None,
+        description=(
+            "Filtrar por origen del request: user (intención), prefetch (precarga) "
+            "o system (polling/SWR). Sin valor, incluye todos."
+        ),
+    ),
+    timezone: str = Query(
+        "America/Argentina/Buenos_Aires", description="Zona horaria local (IANA)"
+    ),
     db: AsyncSession = Depends(get_async_db),
     _: TokenPayload = Depends(verify_token),
 ):
+    _validate_timezone(timezone)
     event = await _get_event_or_404(db, event_id)
     period = _resolve_period(event, start, end)
     conditions = _request_conditions(event_id, period)
+    if origin is not None:
+        conditions.append(ServiceInteractionLog.origin == origin)
 
     total_expr = func.count(ServiceInteractionLog.id)
     empty_expr = func.count(ServiceInteractionLog.id).filter(
@@ -333,7 +346,10 @@ async def event_report_coverage_gaps(
         for row in rows
     ]
 
-    day_expr = func.date_trunc("day", ServiceInteractionLog.timestamp)
+    # Bucketing en hora local: un request de las 23:00 ART debe caer en su día
+    # local, no en el siguiente por usar UTC.
+    local_ts = ServiceInteractionLog.timestamp.op("AT TIME ZONE")(timezone)
+    day_expr = func.date_trunc("day", local_ts)
     temporal_result = await db.execute(
         select(day_expr.label("day"), empty_expr.label("count"))
         .where(*conditions)
