@@ -210,6 +210,30 @@ function modalityLabel(value: string): string {
   return MODALITY_LABELS[value] ?? value.charAt(0).toUpperCase() + value.slice(1);
 }
 
+/**
+ * Convierte la respuesta de `/emergency-protocols` en un mapa `id -> title`.
+ *
+ * El endpoint responde `{ context, protocols: [...] }`, NO una lista pelada.
+ * Iterar la respuesta completa lanza "not iterable"; si eso cae dentro de un
+ * `.catch(() => {})` el mapa queda vacío y todo protocolo se degrada a
+ * "Protocolo 153a712a" sin ningún error visible. Acepta ambas formas para no
+ * depender de cuál capa hizo el unwrap.
+ */
+export function buildProtocolTitleMap(response: unknown): Record<string, string> {
+  const titles: Record<string, string> = {};
+  const list = Array.isArray(response)
+    ? response
+    : (response as { protocols?: unknown } | null)?.protocols;
+  if (!Array.isArray(list)) return titles;
+  for (const item of list) {
+    const entry = item as { id?: unknown; title?: unknown };
+    if (typeof entry?.id === 'string' && typeof entry?.title === 'string') {
+      titles[entry.id] = entry.title;
+    }
+  }
+  return titles;
+}
+
 export type RequestModeKind =
   | 'unfiltered'
   | 'legacy-destination'

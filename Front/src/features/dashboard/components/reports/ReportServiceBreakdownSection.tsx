@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Layers, BarChart3 } from 'lucide-react';
+import { getProtocols } from '@/services/emergencyProduct';
 import { useEventReport } from '../../../../hooks/useEventReports';
 import { apiClient } from '../../../../core/api/client';
 import { endpoints } from '../../../../core/api/endpoints';
@@ -8,6 +9,7 @@ import { MetricMini } from './MetricMini';
 import { ReportSection } from './ReportSection';
 import {
   buildFilterGroups,
+  buildProtocolTitleMap,
   DEFAULT_TIMEZONE,
   formatLocalBucket,
   humanize,
@@ -17,10 +19,9 @@ import {
 
 const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 
-interface ProtocolOption {
-  id: string;
-  title: string;
-}
+// La PWA pública monta el módulo de emergencias con este contexto (Emergencia.tsx),
+// así que es el único que puede haber emitted `protocolo=<id>`.
+const PROTOCOL_CONTEXT = 'festival';
 
 interface ZoneCatalogItem {
   id: string;
@@ -211,13 +212,15 @@ export function ReportServiceBreakdownSection({
   // permite mostrarlos con su título real ("Niño perdido", "Persona herida").
   useEffect(() => {
     let cancelled = false;
-    apiClient
-      .get<ProtocolOption[]>(endpoints.emergency.protocols('festival'))
-      .then(({ data: list }) => {
+    // `getProtocols` (y no un get crudo) porque `/emergency-protocols` responde
+    // `{ context, protocols: [...] }`, NO una lista pelada. Iterar la respuesta
+    // completa lanzaba "not iterable" y el catch lo silenciaba, dejando el mapa
+    // vacío y todos los protocolos como "Protocolo 153a712a".
+    // Reutilizar el servicio además evita duplicar la request: trae caché.
+    getProtocols(PROTOCOL_CONTEXT)
+      .then((list) => {
         if (cancelled) return;
-        const titles: Record<string, string> = {};
-        for (const protocol of list ?? []) titles[protocol.id] = protocol.title;
-        setProtocolTitles(titles);
+        setProtocolTitles(buildProtocolTitleMap(list));
       })
       .catch(() => {});
     return () => {

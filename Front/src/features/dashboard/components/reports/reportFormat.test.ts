@@ -5,6 +5,7 @@ import {
   formatLocalDate,
   formatLocalDateTime,
   buildFilterGroups,
+  buildProtocolTitleMap,
   SERVICE_CATEGORY_LABELS,
   ZONE_ANALYSIS_CATEGORIES,
 } from './reportFormat.ts';
@@ -348,4 +349,54 @@ test('todas las categorías del filtro tienen etiqueta en español', () => {
 test('cajeros y emergency tienen etiqueta visible', () => {
   assert.equal(SERVICE_CATEGORY_LABELS.cajeros, 'Cajeros');
   assert.equal(SERVICE_CATEGORY_LABELS.emergency, 'Emergencias');
+});
+
+test('buildProtocolTitleMap desenvuelve la respuesta real del endpoint', () => {
+  // GET /emergency-protocols?context=festival -> { context, protocols: [...] }
+  const payload = {
+    context: 'festival',
+    protocols: [
+      { id: '153a712a-1111-2222-3333-444455556666', title: 'Persona herida' },
+      { id: '9f2b0000-1111-2222-3333-444455556666', title: 'Niño perdido' },
+    ],
+  };
+  const titles = buildProtocolTitleMap(payload);
+  assert.equal(titles['153a712a-1111-2222-3333-444455556666'], 'Persona herida');
+  assert.equal(Object.keys(titles).length, 2);
+});
+
+test('buildProtocolTitleMap acepta también una lista pelada', () => {
+  const titles = buildProtocolTitleMap([{ id: 'a1', title: 'Pérdida de elemento' }]);
+  assert.deepEqual(titles, { a1: 'Pérdida de elemento' });
+});
+
+test('buildProtocolTitleMap devuelve vacío antepayloads inesperados', () => {
+  assert.deepEqual(buildProtocolTitleMap(null), {});
+  assert.deepEqual(buildProtocolTitleMap(undefined), {});
+  assert.deepEqual(buildProtocolTitleMap({}), {});
+  assert.deepEqual(buildProtocolTitleMap({ protocols: null }), {});
+  assert.deepEqual(buildProtocolTitleMap({ protocols: [{ id: 'x' }] }), {});
+  assert.deepEqual(buildProtocolTitleMap('texto'), {});
+});
+
+test('el protocolo se nombra con el mapa y cae a un id corto sin él', () => {
+  const conCatalogo = buildFilterGroups(
+    [SVC('emergency', 1)],
+    [FIL('protocolo=153a712a-1111-2222-3333-444455556666', 1)],
+    { '153a712a-1111-2222-3333-444455556666': 'Persona herida' },
+  );
+  assert.equal(
+    conCatalogo.find((g) => g.key === 'emergency')!.children[0].label,
+    'Persona herida',
+  );
+
+  const sinCatalogo = buildFilterGroups(
+    [SVC('emergency', 1)],
+    [FIL('protocolo=153a712a-1111-2222-3333-444455556666', 1)],
+    {},
+  );
+  assert.equal(
+    sinCatalogo.find((g) => g.key === 'emergency')!.children[0].label,
+    'Protocolo 153a712a',
+  );
 });
