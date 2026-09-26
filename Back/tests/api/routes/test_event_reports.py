@@ -9,6 +9,8 @@ from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
+import re
+
 import pytest
 from fastapi.testclient import TestClient
 from jose import jwt
@@ -1019,6 +1021,33 @@ class TestZoneAnalysis:
         # La cobertura cuenta requests técnicas, y solo las zonas del evento.
         assert params["interaction_type_1"] == "request"
         assert "zones.event_id" in sql
+
+    def test_ordinality_no_emite_alias_duplicado(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        """Regresión: el alias lo emite ``table_valued``, no el render.
+
+        Si el ``@compiles`` incluye su propio ``AS t(...)``, ``table_valued``
+        agrega ``AS anon_N`` detrás y Postgres responde
+        ``syntax error at or near "AS"``.
+        """
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            _all_result([]),
+            _all_result([]),
+        ]
+
+        resp = client.get(self.URL, headers=auth_headers)
+        assert resp.status_code == 200
+
+        sql, _ = _compiled(db_mock, 2)
+        # Exactamente un alias propio de la función set-returning.
+        assert sql.count("WITH ORDINALITY AS") == 1
+        # Ningún alias inmediatamente seguido de otro sobre la misma función.
+        assert re.search(r"WITH ORDINALITY AS \w+\s*(\([^)]*\))?\s*AS \w+", sql) is None
 
     def test_rechaza_periodo_naive(
         self,

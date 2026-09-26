@@ -5,9 +5,8 @@ from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import Integer, String, func, join, select
+from sqlalchemy import func, join, select
 from sqlalchemy.ext.compiler import compiles
-from sqlalchemy.sql import column
 from sqlalchemy.sql.functions import FunctionElement
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -146,13 +145,19 @@ def _request_conditions(
     return conditions
 
 
-class _JsonbElementsWithOrdinality(FunctionElement):
-    """``jsonb_array_elements_text(x) WITH ORDINALITY AS t(v, ord)``.
+class _JsonbOrdinality(FunctionElement):
+    """``jsonb_array_elements_text(x) WITH ORDINALITY`` sin alias.
 
     La posición en el array ``zone_ids`` es el ranking que el recomendador
-    asignó a cada zona. Sin ella, todas las zonas que siempre viajan juntas
-    (''el mismo set de la misma respuesta'') quedan con idéntico conteo y la
-    tabla no discrimina nada.
+    asignó a cada zona. Sin ella, todas las zonas que siempre viajan juntas (el
+    mismo set de la misma respuesta) quedan con idéntico conteo y la tabla no
+    discrimina nada.
+
+    El alias lo emite ``table_valued(name="t")``. Acá NO se escribe a mano: si el
+    render incluye su propio ``AS t(...)``, ``table_valued`` agrega después su
+    ``AS anon_N`` y Postgres rechaza la sentencia con un error de sintaxis.
+    Los nombres ``value`` y ``ordinality`` son los que Postgres asigna por
+    defecto a esta función; no hace falta declararlos.
 
     Nota: ``CAST(zone_ids AS text[])`` NO sirve; Postgres responde CannotCoerce
     porque jsonb no castea a array de forma implícita.
@@ -161,28 +166,23 @@ class _JsonbElementsWithOrdinality(FunctionElement):
     inherit_cache = True
 
     def __init__(self, arg):
-        super().__init__(arg)
-
-    @property
-    def columns(self):
-        return [column("v", String), column("ord", Integer)]
+        self.arg = arg
 
 
-@compiles(_JsonbElementsWithOrdinality)
-def _compile_jsonb_elements_ordinality(element, compiler, **kw):
-    return (
-        f"jsonb_array_elements_text({compiler.process(element.clauses, **kw)}) "
-        "WITH ORDINALITY AS t(v, ord)"
-    )
+@compiles(_JsonbOrdinality)
+def _compile_jsonb_ordinality(element, compiler, **kw):
+    return f"jsonb_array_elements_text({compiler.process(element.arg, **kw)}) WITH ORDINALITY"
 
 
 def _expanded_zone_positions(conditions):
     """Expande ``zone_ids`` en una fila por (request, zona) con su posición."""
-    elements = _JsonbElementsWithOrdinality(ServiceInteractionLog.zone_ids).table_valued("v", "ord")
+    elements = _JsonbOrdinality(ServiceInteractionLog.zone_ids).table_valued(
+        "value", "ordinality", name="t"
+    )
     return select(
         ServiceInteractionLog.id.label("log_id"),
-        elements.c.v.label("zone_id"),
-        elements.c.ord.label("position"),
+        elements.c.value.label("zone_id"),
+        elements.c.ordinality.label("position"),
     ).where(*conditions)
 
 
