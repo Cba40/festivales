@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -97,6 +97,13 @@ class TemporalDistributionBucket(BaseModel):
     bucket: datetime = Field(..., description="Inicio del intervalo agrupado, en hora local")
     count: int = Field(..., description="Cantidad de actividades del usuario en el intervalo")
     phase: Optional[str] = Field(default=None, description="Fase operativa que cubre el intervalo (solo granularity=hour)")
+    breakdown: Optional[list[dict[str, Any]]] = Field(
+        default=None,
+        description=(
+            "Desglose por request_mode dentro del intervalo. Solo se incluye cuando "
+            "se filtra por service_category; la suma de count coincide con count."
+        ),
+    )
 
 
 class TemporalDistributionResponse(BaseModel):

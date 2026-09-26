@@ -540,6 +540,12 @@ export interface TemporalDistributionBucketDTO {
   bucket: string;
   count: number;
   phase: string | null;
+  breakdown?: TemporalBreakdownItemDTO[] | null;
+}
+
+export interface TemporalBreakdownItemDTO {
+  request_mode: string | null;
+  count: number;
 }
 
 export interface TemporalDistributionDTO {

@@ -52,6 +52,12 @@ def _one_result(value):
     return res
 
 
+def _scalars_result(rows):
+    res = MagicMock()
+    res.scalars.return_value.all.return_value = rows
+    return res
+
+
 def _parse_iso(value: str) -> datetime:
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
@@ -621,6 +627,242 @@ class TestCoverageGapsOriginAndTimezone:
             }
         ]
         assert body["temporal_distribution"] == [{"day": "2026-07-21", "count": 7}]
+
+
+class TestTemporalDistributionRequestModeBreakdown:
+    """El detalle por request_mode solo se calcula al filtrar por categoría."""
+
+    BUCKET_1 = datetime(2026, 9, 26, 8, 0)
+    BUCKET_2 = datetime(2026, 9, 26, 17, 0)
+
+    URL = f"/api/events/{EVENT_ID}/reports/temporal_distribution"
+
+    def _agg(self):
+        return _all_result(
+            [
+                SimpleNamespace(bucket=self.BUCKET_1, count=2),
+                SimpleNamespace(bucket=self.BUCKET_2, count=1),
+            ]
+        )
+
+    def test_incluye_desglose_cuando_filtra_categoria(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            self._agg(),
+            _all_result(
+                [
+                    SimpleNamespace(
+                        bucket=self.BUCKET_1,
+                        request_mode="transporte_interurbano=Córdoba",
+                        count=1,
+                    ),
+                    SimpleNamespace(
+                        bucket=self.BUCKET_1,
+                        request_mode="transporte_urbano=Los Nogales",
+                        count=1,
+                    ),
+                    SimpleNamespace(
+                        bucket=self.BUCKET_2,
+                        request_mode="transporte_interurbano=Córdoba",
+                        count=1,
+                    ),
+                ]
+            ),
+            _scalars_result([]),
+        ]
+
+        resp = client.get(
+            self.URL,
+            params={"granularity": "hour", "service_category": "transport"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        buckets = resp.json()["buckets"]
+
+        assert buckets[0]["count"] == 2
+        assert buckets[0]["breakdown"] == [
+            {"request_mode": "transporte_interurbano=Córdoba", "count": 1},
+            {"request_mode": "transporte_urbano=Los Nogales", "count": 1},
+        ]
+        assert buckets[1]["breakdown"] == [
+            {"request_mode": "transporte_interurbano=Córdoba", "count": 1}
+        ]
+
+    def test_sin_desglose_sin_filtro_de_categoria(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            self._agg(),
+            _scalars_result([]),
+        ]
+
+        resp = client.get(
+            self.URL,
+            params={"granularity": "hour"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        for bucket in resp.json()["buckets"]:
+            assert bucket["breakdown"] is None
+
+    def test_no_consulta_el_desglose_si_no_filtra_categoria(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            self._agg(),
+            _scalars_result([]),
+        ]
+
+        resp = client.get(
+            self.URL,
+            params={"granularity": "hour"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        # event + agregación + EventDay: la consulta de detalle no se ejecuta.
+        assert db_mock.execute.await_count == 3
+
+    def test_desglose_agrupado_por_bucket_y_request_mode(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            self._agg(),
+            _all_result([]),
+            _scalars_result([]),
+        ]
+
+        resp = client.get(
+            self.URL,
+            params={"granularity": "hour", "service_category": "transport"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+
+        sql, params = _compiled(db_mock, 2)
+        assert "service_interaction_log.request_mode" in sql
+        assert "request_mode" in sql
+        assert params["service_category_1"] == "transport"
+        # Sigue acotado a la actividad de usuario.
+        assert params["interaction_type_1"] == ["screen_open", "filter_change"]
+        assert params["origin_1"] == "user"
+
+    def test_desglose_por_dia_tambien_se_emite(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            _all_result([SimpleNamespace(bucket=self.BUCKET_1, count=1)]),
+            _all_result(
+                [
+                    SimpleNamespace(
+                        bucket=self.BUCKET_1,
+                        request_mode="zona=Estacionamiento Central",
+                        count=1,
+                    )
+                ]
+            ),
+        ]
+
+        resp = client.get(
+            self.URL,
+            params={"granularity": "day", "service_category": "parking"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["buckets"][0]["breakdown"] == [
+            {"request_mode": "zona=Estacionamiento Central", "count": 1}
+        ]
+
+    def test_bucket_sin_desglose_devuelve_none(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            self._agg(),
+            _all_result(
+                [
+                    SimpleNamespace(
+                        bucket=self.BUCKET_1,
+                        request_mode="transporte_interurbano=Córdoba",
+                        count=1,
+                    )
+                ]
+            ),
+            _scalars_result([]),
+        ]
+
+        resp = client.get(
+            self.URL,
+            params={"granularity": "hour", "service_category": "transport"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        buckets = resp.json()["buckets"]
+        # BUCKET_1 tiene 2 eventos pero el desglose mockeado solo reporta 1: el
+        # contrato no inventa datos, expone lo que devolvió la consulta.
+        assert buckets[0]["breakdown"] == [
+            {"request_mode": "transporte_interurbano=Córdoba", "count": 1}
+        ]
+        assert buckets[1]["breakdown"] is None
+
+
+class TestTemporalDistributionBreakdownSumsToCount:
+    """Invariante: la suma del desglose por bucket debe igualar su conteo."""
+
+    def test_suma_coincide_con_el_total_del_bucket(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        rows = [
+            ("transporte_interurbano=Córdoba", 3),
+            ("transporte_urbano=Los Nogales", 1),
+            ("transporte_urbano=Córdoba", 2),
+        ]
+        bucket = datetime(2026, 9, 26, 17, 0)
+        total = sum(count for _, count in rows)
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            _all_result([SimpleNamespace(bucket=bucket, count=total)]),
+            _all_result(
+                [SimpleNamespace(bucket=bucket, request_mode=mode, count=count) for mode, count in rows]
+            ),
+            _scalars_result([]),
+        ]
+
+        resp = client.get(
+            f"/api/events/{EVENT_ID}/reports/temporal_distribution",
+            params={"granularity": "hour", "service_category": "transport"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        data = resp.json()["buckets"][0]
+        assert sum(item["count"] for item in data["breakdown"]) == data["count"]
+        assert data["count"] == 6
 
 
 class TestTechnicalIncidents:

@@ -11,6 +11,7 @@ import {
   DEFAULT_TIMEZONE,
   formatLocalBucket,
   humanize,
+  requestModeLabel,
   serviceLabel,
 } from './reportFormat';
 
@@ -25,13 +26,13 @@ interface TemporalBreakdownProps {
   start?: string;
   end?: string;
   categories: string[];
+  protocolTitles: Record<string, string>;
 }
 
 // Sub-bloque "cuándo" que acompaña al desglose "cuántas". Comparte período con
 // la sección padre y reutiliza los mismos request_mode del desglose por filtro:
 // el operador copia el prefijo crudo del acordeón y obtiene su curva horaria.
-function TemporalBreakdown({ start, end, categories }: TemporalBreakdownProps) {
-  const [prefix, setPrefix] = useState('');
+function TemporalBreakdown({ start, end, categories, protocolTitles }: TemporalBreakdownProps) {
   const [category, setCategory] = useState('');
 
   const params = useMemo(
@@ -40,10 +41,9 @@ function TemporalBreakdown({ start, end, categories }: TemporalBreakdownProps) {
       end,
       granularity: 'hour' as const,
       timezone: DEFAULT_TIMEZONE,
-      ...(prefix ? { request_mode_prefix: prefix } : {}),
       ...(category ? { service_category: category } : {}),
     }),
-    [start, end, prefix, category]
+    [start, end, category]
   );
 
   const { data, isLoading, error } = useEventReport<TemporalDistributionDTO>(
@@ -82,17 +82,6 @@ function TemporalBreakdown({ start, end, categories }: TemporalBreakdownProps) {
               </option>
             ))}
           </select>
-          <label className="sr-only" htmlFor="breakdown-timeline-prefix">
-            Filtro aplicado
-          </label>
-          <input
-            id="breakdown-timeline-prefix"
-            className="px-2 py-1 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 w-40"
-            placeholder="salida_vehicular="
-            title="Prefijo de request_mode (copialo del desglose por filtro)"
-            value={prefix}
-            onChange={(e) => setPrefix(e.target.value)}
-          />
         </div>
       </div>
 
@@ -106,7 +95,7 @@ function TemporalBreakdown({ start, end, categories }: TemporalBreakdownProps) {
 
       {!error && !isLoading && buckets.length === 0 && (
         <p className="text-xs text-slate-500">
-          Sin actividad registrada para el filtro y la categoría seleccionados.
+          Sin actividad registrada para la categoría seleccionada.
         </p>
       )}
 
@@ -120,9 +109,9 @@ function TemporalBreakdown({ start, end, categories }: TemporalBreakdownProps) {
                 <th className="px-3 py-1.5 font-medium">Fase</th>
               </tr>
             </thead>
-            <tbody>
-              {buckets.map((bucket) => (
-                <tr key={bucket.bucket} className="border-b border-slate-100">
+            {buckets.map((bucket) => (
+              <tbody key={bucket.bucket}>
+                <tr className="border-b border-slate-100">
                   <td className="px-3 py-1.5 text-slate-600">{formatLocalBucket(bucket.bucket)}</td>
                   <td className="px-3 py-1.5 font-medium text-slate-700">{bucket.count}</td>
                   <td className="px-3 py-1.5">
@@ -141,8 +130,24 @@ function TemporalBreakdown({ start, end, categories }: TemporalBreakdownProps) {
                     )}
                   </td>
                 </tr>
-              ))}
-            </tbody>
+                {bucket.breakdown?.map((item, index) => (
+                  <tr
+                    key={`${bucket.bucket}-${item.request_mode ?? 'sin-filtro'}-${index}`}
+                    className="border-b border-slate-100 bg-slate-50/40"
+                  >
+                    <td
+                      className="pl-6 pr-3 py-1 text-slate-500 truncate"
+                      title={item.request_mode ?? 'Sin request_mode'}
+                    >
+                      <span className="text-slate-300">↳</span>{' '}
+                      {requestModeLabel(item.request_mode, protocolTitles)}
+                    </td>
+                    <td className="px-3 py-1 text-slate-500">{item.count}</td>
+                    <td />
+                  </tr>
+                ))}
+              </tbody>
+            ))}
             <tfoot>
               <tr className="text-slate-600">
                 <td className="px-3 py-1.5 font-medium">Total</td>
@@ -156,8 +161,14 @@ function TemporalBreakdown({ start, end, categories }: TemporalBreakdownProps) {
 
       {buckets.length > 0 && (
         <p className="mt-1.5 text-[11px] text-slate-400">
-          Zona horaria {DEFAULT_TIMEZONE}. El filtro acepta el prefijo crudo del desglose
-          (ej.: <span className="font-mono">salida_vehicular=</span>).
+          Zona horaria {DEFAULT_TIMEZONE}.
+          {category && !buckets.some((bucket) => bucket.breakdown?.length) && (
+            <span>
+              {' '}
+              El detalle por filtro no está disponible: requiere una versión del backend
+              con el desglose por intervalo.
+            </span>
+          )}
         </p>
       )}
     </div>
@@ -308,6 +319,7 @@ export function ReportServiceBreakdownSection({
           start={start}
           end={end}
           categories={data.services.map((service) => service.service_category)}
+          protocolTitles={protocolTitles}
         />
       )}
     </ReportSection>

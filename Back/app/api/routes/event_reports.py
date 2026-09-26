@@ -1,6 +1,6 @@
 from bisect import bisect_right
 from datetime import date, datetime
-from typing import Literal, NamedTuple, Optional
+from typing import Any, Literal, NamedTuple, Optional
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
@@ -534,6 +534,23 @@ async def event_report_temporal_distribution(
     )
     rows = agg_result.all()
 
+    # El detalle por request_mode solo se calcula cuando el operador ya eligió un
+    # servicio: sobre el total general la respuesta sería demasiado pesada y los
+    # modos no son comparables entre categorías.
+    breakdown_by_bucket: Optional[dict[datetime, list[dict[str, Any]]]] = None
+    if service_category is not None:
+        detail_result = await db.execute(
+            select(bucket_expr, ServiceInteractionLog.request_mode, count_expr)
+            .where(*conditions)
+            .group_by(bucket_expr, ServiceInteractionLog.request_mode)
+            .order_by(bucket_expr, count_expr.desc())
+        )
+        breakdown_by_bucket = {}
+        for detail in detail_result.all():
+            breakdown_by_bucket.setdefault(detail.bucket, []).append(
+                {"request_mode": detail.request_mode, "count": detail.count}
+            )
+
     if granularity == "hour":
         phase_by_bucket = await _resolve_operational_phases(
             db, event_id, [row.bucket for row in rows]
@@ -543,12 +560,21 @@ async def event_report_temporal_distribution(
                 bucket=row.bucket,
                 count=row.count,
                 phase=phase_by_bucket.get(row.bucket),
+                breakdown=(
+                    breakdown_by_bucket.get(row.bucket) if breakdown_by_bucket is not None else None
+                ),
             )
             for row in rows
         ]
     else:
         buckets = [
-            TemporalDistributionBucket(bucket=row.bucket, count=row.count)
+            TemporalDistributionBucket(
+                bucket=row.bucket,
+                count=row.count,
+                breakdown=(
+                    breakdown_by_bucket.get(row.bucket) if breakdown_by_bucket is not None else None
+                ),
+            )
             for row in rows
         ]
 

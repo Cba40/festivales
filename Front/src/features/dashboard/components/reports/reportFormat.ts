@@ -189,6 +189,77 @@ function modalityLabel(value: string): string {
   return MODALITY_LABELS[value] ?? value.charAt(0).toUpperCase() + value.slice(1);
 }
 
+export type RequestModeKind =
+  | 'unfiltered'
+  | 'legacy-destination'
+  | 'zones'
+  | 'salida'
+  | 'transporte'
+  | 'exact'
+  | 'protocolo'
+  | 'unknown';
+
+export interface RequestModeDescriptor {
+  kind: RequestModeKind;
+  label: string;
+  /** Grupo del acordeón al que pertenece el modo, si alguno. */
+  owner?: string;
+}
+
+/**
+ * Describe un `request_mode` crudo: cómo se muestra y a qué categoría pertenece.
+ *
+ * Única fuente de verdad del etiquetado. La usan tanto la vista jerárquica del
+ * desglose como las sub-filas de la distribución temporal, para que el mismo
+ * `request_mode` nunca se lea de dos maneras.
+ */
+export function describeRequestMode(
+  mode: string | null | undefined,
+  protocolTitles: Record<string, string> = {},
+): RequestModeDescriptor {
+  if (mode === null || mode === undefined) {
+    return { kind: 'unfiltered', label: 'Sin filtro' };
+  }
+  if (mode.startsWith('destination=')) {
+    return { kind: 'legacy-destination', label: mode.slice('destination='.length) };
+  }
+  if (mode.startsWith('zona=')) {
+    return { kind: 'zones', label: mode.slice('zona='.length) };
+  }
+  const salida = SALIDA_PATTERN.exec(mode);
+  if (salida) {
+    return { kind: 'salida', label: `${modalityLabel(salida[1])}: ${salida[2]}`, owner: 'exit' };
+  }
+  const transporte = TRANSPORTE_PATTERN.exec(mode);
+  if (transporte) {
+    return {
+      kind: 'transporte',
+      label: `${modalityLabel(transporte[1])}: ${transporte[2]}`,
+      owner: 'transport',
+    };
+  }
+  const exact = FILTER_LABELS[mode];
+  if (exact) {
+    return { kind: 'exact', label: exact, owner: FILTER_OWNER[mode] };
+  }
+  if (mode.startsWith(PROTOCOL_PREFIX)) {
+    const id = mode.slice(PROTOCOL_PREFIX.length);
+    return {
+      kind: 'protocolo',
+      label: protocolTitles[id] ?? `Protocolo ${id.slice(0, 8)}`,
+      owner: FILTER_OWNER[PROTOCOL_PREFIX],
+    };
+  }
+  return { kind: 'unknown', label: mode };
+}
+
+export function requestModeLabel(
+  mode: string | null | undefined,
+  protocolTitles: Record<string, string> = {},
+): string {
+  return describeRequestMode(mode, protocolTitles).label;
+}
+
 
 const ZONES_GROUP = 'shared-zones';
 const UNFILTERED_GROUP = 'unfiltered';
@@ -256,77 +327,52 @@ export function buildFilterGroups(
 
   for (const filter of filters ?? []) {
     const mode = filter.request_mode;
-    if (mode === null || mode === undefined) {
-      ensureGroup(UNFILTERED_GROUP, shared[UNFILTERED_GROUP].label, 0).children.push({
-        key: 'sin-filtro',
-        label: 'Sin filtro',
-        total: filter.total,
-      });
-      continue;
-    }
-    if (GENERAL_CATEGORIES.includes(mode)) continue;
-    if (mode.startsWith('destination=')) {
-      // Registros anteriores a los prefijos por modalidad: no se puede saber si
-      // pertenecen a Salidas o a Transporte, así que no se atribuyen a ninguna.
-      ensureGroup(LEGACY_DESTINATION_GROUP, shared[LEGACY_DESTINATION_GROUP].label, 0).children.push({
-        key: mode,
-        label: mode.slice('destination='.length),
-        total: filter.total,
-      });
-      continue;
-    }
-    if (mode.startsWith('zona=')) {
-      ensureGroup(ZONES_GROUP, shared[ZONES_GROUP].label, 0).children.push({
-        key: mode,
-        label: mode.slice('zona='.length),
-        total: filter.total,
-      });
-      continue;
-    }
-    const salida = SALIDA_PATTERN.exec(mode);
-    if (salida) {
-      const owner = groups.get('exit');
-      if (owner) {
-        owner.children.push({
-          key: mode,
-          label: `${modalityLabel(salida[1])}: ${salida[2]}`,
+    if (mode !== null && mode !== undefined && GENERAL_CATEGORIES.includes(mode)) continue;
+
+    const described = describeRequestMode(mode, protocolTitles);
+    const push = (key: string, groupKey: string) => {
+      const owner = groups.get(groupKey);
+      if (!owner) return;
+      owner.children.push({ key, label: described.label, total: filter.total });
+    };
+
+    switch (described.kind) {
+      case 'unfiltered':
+        ensureGroup(UNFILTERED_GROUP, shared[UNFILTERED_GROUP].label, 0).children.push({
+          key: 'sin-filtro',
+          label: described.label,
           total: filter.total,
         });
-      }
-      continue;
-    }
-    const transporte = TRANSPORTE_PATTERN.exec(mode);
-    if (transporte) {
-      const owner = groups.get('transport');
-      if (owner) {
-        owner.children.push({
-          key: mode,
-          label: `${modalityLabel(transporte[1])}: ${transporte[2]}`,
+        break;
+      case 'legacy-destination':
+        // Registros anteriores a los prefijos por modalidad: no se puede saber si
+        // pertenecen a Salidas o a Transporte, así que no se atribuyen a ninguna.
+        ensureGroup(LEGACY_DESTINATION_GROUP, shared[LEGACY_DESTINATION_GROUP].label, 0).children.push(
+          { key: mode as string, label: described.label, total: filter.total },
+        );
+        break;
+      case 'zones':
+        ensureGroup(ZONES_GROUP, shared[ZONES_GROUP].label, 0).children.push({
+          key: mode as string,
+          label: described.label,
           total: filter.total,
         });
-      }
-      continue;
-    }
-    const exact = FILTER_LABELS[mode];
-    if (exact) {
-      const owner = FILTER_OWNER[mode];
-      const target = owner ? groups.get(owner) : undefined;
-      if (target) {
-        target.children.push({ key: mode, label: exact, total: filter.total });
-      }
-      continue;
-    }
-    if (mode.startsWith(PROTOCOL_PREFIX)) {
-      const owner = groups.get(FILTER_OWNER[PROTOCOL_PREFIX]);
-      const id = mode.slice(PROTOCOL_PREFIX.length);
-      if (owner) {
-        owner.children.push({
-          key: mode,
-          label: protocolTitles[id] ?? `Protocolo ${id.slice(0, 8)}`,
-          total: filter.total,
-        });
-      }
-      continue;
+        break;
+      case 'salida':
+        push(mode as string, 'exit');
+        break;
+      case 'transporte':
+        push(mode as string, 'transport');
+        break;
+      case 'exact':
+        if (described.owner) push(mode as string, described.owner);
+        break;
+      case 'protocolo':
+        if (described.owner) push(mode as string, described.owner);
+        break;
+      case 'unknown':
+        // Sin categoría conocida: el modo no se lista para no inventar atribución.
+        break;
     }
   }
 
