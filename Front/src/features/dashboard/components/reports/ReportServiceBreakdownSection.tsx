@@ -1,18 +1,167 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Layers } from 'lucide-react';
+import { ChevronDown, ChevronRight, Layers, BarChart3 } from 'lucide-react';
 import { useEventReport } from '../../../../hooks/useEventReports';
 import { apiClient } from '../../../../core/api/client';
 import { endpoints } from '../../../../core/api/endpoints';
-import type { ServiceBreakdownDTO } from '../../types';
+import type { ServiceBreakdownDTO, TemporalDistributionDTO } from '../../types';
 import { MetricMini } from './MetricMini';
 import { ReportSection } from './ReportSection';
-import { buildFilterGroups, serviceLabel } from './reportFormat';
+import {
+  buildFilterGroups,
+  DEFAULT_TIMEZONE,
+  formatLocalBucket,
+  humanize,
+  serviceLabel,
+} from './reportFormat';
 
 const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 
 interface ProtocolOption {
   id: string;
   title: string;
+}
+
+interface TemporalBreakdownProps {
+  start?: string;
+  end?: string;
+  categories: string[];
+}
+
+// Sub-bloque "cuándo" que acompaña al desglose "cuántas". Comparte período con
+// la sección padre y reutiliza los mismos request_mode del desglose por filtro:
+// el operador copia el prefijo crudo del acordeón y obtiene su curva horaria.
+function TemporalBreakdown({ start, end, categories }: TemporalBreakdownProps) {
+  const [prefix, setPrefix] = useState('');
+  const [category, setCategory] = useState('');
+
+  const params = useMemo(
+    () => ({
+      start,
+      end,
+      granularity: 'hour' as const,
+      timezone: DEFAULT_TIMEZONE,
+      ...(prefix ? { request_mode_prefix: prefix } : {}),
+      ...(category ? { service_category: category } : {}),
+    }),
+    [start, end, prefix, category]
+  );
+
+  const { data, isLoading, error } = useEventReport<TemporalDistributionDTO>(
+    EVENT_ID,
+    endpoints.reports.temporalDistribution(EVENT_ID),
+    { params }
+  );
+
+  const buckets = data?.buckets ?? [];
+  const total = buckets.reduce((sum, bucket) => sum + bucket.count, 0);
+  const title = category
+    ? `¿Cuándo buscaron ${serviceLabel(category).toLowerCase()}?`
+    : '¿Cuándo se consultaron los servicios?';
+
+  return (
+    <div className="mt-4 border-t border-slate-200 pt-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+        <h4 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <BarChart3 size={14} className="text-indigo-500" />
+          {title}
+        </h4>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="sr-only" htmlFor="breakdown-timeline-category">
+            Servicio
+          </label>
+          <select
+            id="breakdown-timeline-category"
+            className="px-2 py-1 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+          >
+            <option value="">Todos los servicios</option>
+            {categories.map((item) => (
+              <option key={item} value={item}>
+                {serviceLabel(item)}
+              </option>
+            ))}
+          </select>
+          <label className="sr-only" htmlFor="breakdown-timeline-prefix">
+            Filtro aplicado
+          </label>
+          <input
+            id="breakdown-timeline-prefix"
+            className="px-2 py-1 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 w-40"
+            placeholder="salida_vehicular="
+            title="Prefijo de request_mode (copialo del desglose por filtro)"
+            value={prefix}
+            onChange={(e) => setPrefix(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {error && (
+        <p className="text-xs text-red-600">No se pudo cargar la distribución horaria.</p>
+      )}
+
+      {!error && isLoading && buckets.length === 0 && (
+        <p className="text-xs text-slate-500">Calculando distribución horaria…</p>
+      )}
+
+      {!error && !isLoading && buckets.length === 0 && (
+        <p className="text-xs text-slate-500">
+          Sin actividad registrada para el filtro y la categoría seleccionados.
+        </p>
+      )}
+
+      {buckets.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-left text-slate-500 border-b border-slate-200">
+                <th className="px-3 py-1.5 font-medium">Intervalo</th>
+                <th className="px-3 py-1.5 font-medium">Actividad</th>
+                <th className="px-3 py-1.5 font-medium">Fase</th>
+              </tr>
+            </thead>
+            <tbody>
+              {buckets.map((bucket) => (
+                <tr key={bucket.bucket} className="border-b border-slate-100">
+                  <td className="px-3 py-1.5 text-slate-600">{formatLocalBucket(bucket.bucket)}</td>
+                  <td className="px-3 py-1.5 font-medium text-slate-700">{bucket.count}</td>
+                  <td className="px-3 py-1.5">
+                    {bucket.phase ? (
+                      <span
+                        className={`inline-flex items-center px-1.5 py-0.5 rounded font-medium ${
+                          bucket.phase === 'unassigned'
+                            ? 'bg-slate-100 text-slate-700 border-slate-200'
+                            : 'bg-indigo-100 text-indigo-800 border-indigo-200'
+                        }`}
+                      >
+                        {bucket.phase === 'unassigned' ? 'Sin fase' : humanize(bucket.phase)}
+                      </span>
+                    ) : (
+                      <span className="text-slate-300">—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="text-slate-600">
+                <td className="px-3 py-1.5 font-medium">Total</td>
+                <td className="px-3 py-1.5 font-semibold text-slate-800">{total}</td>
+                <td />
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+
+      {buckets.length > 0 && (
+        <p className="mt-1.5 text-[11px] text-slate-400">
+          Zona horaria {DEFAULT_TIMEZONE}. El filtro acepta el prefijo crudo del desglose
+          (ej.: <span className="font-mono">salida_vehicular=</span>).
+        </p>
+      )}
+    </div>
+  );
 }
 
 export interface ReportServiceBreakdownSectionProps {
@@ -153,6 +302,13 @@ export function ReportServiceBreakdownSection({
             })}
           </ul>
         </div>
+      )}
+      {data && data.services.length > 0 && (
+        <TemporalBreakdown
+          start={start}
+          end={end}
+          categories={data.services.map((service) => service.service_category)}
+        />
       )}
     </ReportSection>
   );

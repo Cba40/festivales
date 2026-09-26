@@ -14,7 +14,6 @@ import {
   ReportSummarySection,
   ReportServiceBreakdownSection,
   ReportCoverageGapsSection,
-  ReportTemporalDistributionSection,
   ReportRecommendedZonesSection,
   ReportTechnicalIncidentsSection,
   ReportOperationalProfileSection,
@@ -260,7 +259,6 @@ export function MunicipalReportScreen() {
           <ReportSummarySection start={period.start} end={period.end} />
           <ReportServiceBreakdownSection start={period.start} end={period.end} />
           <ReportCoverageGapsSection start={period.start} end={period.end} />
-          <ReportTemporalDistributionSection start={period.start} end={period.end} />
           <ReportRecommendedZonesSection start={period.start} end={period.end} />
           <ReportTechnicalIncidentsSection start={period.start} end={period.end} />
           <ReportOperationalProfileSection start={period.start} end={period.end} />
