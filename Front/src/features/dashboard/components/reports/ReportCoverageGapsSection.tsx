@@ -56,7 +56,6 @@ export function ReportCoverageGapsSection({
                 onChange={(e) => setOriginFilter(e.target.value)}
               >
                 <option value="">Todos (incluye automático)</option>
-                <option value="user">Solo usuario (intención real)</option>
                 <option value="prefetch">Solo prefetch</option>
                 <option value="system">Solo sistema (polling, SWR)</option>
               </select>
