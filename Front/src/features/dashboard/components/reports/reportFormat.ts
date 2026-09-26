@@ -216,6 +216,7 @@ export interface RequestModeDescriptor {
 export function describeRequestMode(
   mode: string | null | undefined,
   protocolTitles: Record<string, string> = {},
+  zoneNames: Record<string, string> = {},
 ): RequestModeDescriptor {
   if (mode === null || mode === undefined) {
     return { kind: 'unfiltered', label: 'Sin filtro' };
@@ -224,7 +225,10 @@ export function describeRequestMode(
     return { kind: 'legacy-destination', label: mode.slice('destination='.length) };
   }
   if (mode.startsWith('zona=')) {
-    return { kind: 'zones', label: mode.slice('zona='.length) };
+    // La PWA emite `zona=<zone_id>`: sin resolver, el tablero muestra UUIDs.
+    // Si el catálogo no está cargado se cae al id crudo, nunca a una etiqueta inventada.
+    const zoneId = mode.slice('zona='.length);
+    return { kind: 'zones', label: zoneNames[zoneId] ?? zoneId };
   }
   const salida = SALIDA_PATTERN.exec(mode);
   if (salida) {
@@ -256,8 +260,9 @@ export function describeRequestMode(
 export function requestModeLabel(
   mode: string | null | undefined,
   protocolTitles: Record<string, string> = {},
+  zoneNames: Record<string, string> = {},
 ): string {
-  return describeRequestMode(mode, protocolTitles).label;
+  return describeRequestMode(mode, protocolTitles, zoneNames).label;
 }
 
 
@@ -279,6 +284,7 @@ export function buildFilterGroups(
   services: ReportBreakdownService[],
   filters: ReportBreakdownFilter[] | null | undefined,
   protocolTitles: Record<string, string> = {},
+  zoneNames: Record<string, string> = {},
 ): ReportFilterGroup[] {
   const totalsByCategory = new Map<string, number>();
   for (const service of services ?? []) {
@@ -329,7 +335,7 @@ export function buildFilterGroups(
     const mode = filter.request_mode;
     if (mode !== null && mode !== undefined && GENERAL_CATEGORIES.includes(mode)) continue;
 
-    const described = describeRequestMode(mode, protocolTitles);
+    const described = describeRequestMode(mode, protocolTitles, zoneNames);
     const push = (key: string, groupKey: string) => {
       const owner = groups.get(groupKey);
       if (!owner) return;

@@ -105,6 +105,7 @@ export const endpoints = {
       `/events/${eventId}/reports/technical_incidents`,
     temporalDistribution: (eventId: string) =>
       `/events/${eventId}/reports/temporal_distribution`,
+    zoneAnalysis: (eventId: string) => `/events/${eventId}/reports/zone_analysis`,
     recommendedZones: (eventId: string) => `/events/${eventId}/reports/recommended_zones`,
     operationalProfile: (eventId: string) =>
       `/events/${eventId}/reports/operational_profile`,

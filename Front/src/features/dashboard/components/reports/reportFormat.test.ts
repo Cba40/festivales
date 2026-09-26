@@ -267,6 +267,37 @@ test('buildFilterGroups agrupa zonas compartidas y las conserva sin duplicar', (
   );
 });
 
+test('buildFilterGroups resuelve el nombre de zona del catálogo', () => {
+  const groups = buildFilterGroups(
+    [SVC('parking', 3), SVC('bathroom', 2)],
+    [FIL('zona=z-1', 3), FIL('zona=z-2', 2)],
+    {},
+    { 'z-1': 'Estacionamiento Norte', 'z-2': 'Baños Centro' },
+  );
+  const zonas = groups.find((g) => g.key === 'shared-zones')!;
+  assert.deepEqual(
+    zonas.children.map((c) => [c.label, c.total]),
+    [
+      ['Estacionamiento Norte', 3],
+      ['Baños Centro', 2],
+    ],
+  );
+});
+
+test('buildFilterGroups cae al id crudo si el catálogo no tiene la zona', () => {
+  const groups = buildFilterGroups(
+    [SVC('parking', 1)],
+    [FIL('zona=z-desconocida', 1)],
+    {},
+    { 'z-1': 'Otra zona' },
+  );
+  const zonas = groups.find((g) => g.key === 'shared-zones')!;
+  assert.deepEqual(
+    zonas.children.map((c) => c.label),
+    ['z-desconocida'],
+  );
+});
+
 test('buildFilterGroups ordena los grupos por total descendente', () => {
   const groups = buildFilterGroups(
     [SVC('parking', 1), SVC('exit', 10), SVC('gastronomy', 5)],

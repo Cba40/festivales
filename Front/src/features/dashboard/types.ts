@@ -558,6 +558,23 @@ export interface TemporalDistributionDTO {
   buckets: TemporalDistributionBucketDTO[];
 }
 
+export interface ZoneAnalysisItemDTO {
+  zone_id: string;
+  zone_name: string;
+  zone_type: string;
+  real_choices: number;
+  recommendation_count: number;
+  avg_position: number | null;
+}
+
+export interface ZoneAnalysisDTO {
+  event_id: string;
+  event_name: string;
+  period: ReportPeriodRange;
+  service_category: string | null;
+  zones: ZoneAnalysisItemDTO[];
+}
+
 export interface RecommendedZoneItemDTO {
   zone_id: string;
   zone_name: string;

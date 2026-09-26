@@ -5,7 +5,10 @@ from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import Integer, String, func, join, select
+from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.sql import column
+from sqlalchemy.sql.functions import FunctionElement
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import TokenPayload, verify_token
@@ -40,6 +43,8 @@ from app.schemas.event_reports import (
     TemporalBucket,
     TemporalDistributionBucket,
     TemporalDistributionResponse,
+    ZoneAnalysisItem,
+    ZoneAnalysisResponse,
     ZoneObservationSummary,
     ZonePredictionSummary,
 )
@@ -114,6 +119,11 @@ def _scope_conditions(
 # técnicas (las de los productos → interaction_type='request').
 USER_ACTIVITY_TYPES = ("screen_open", "filter_change")
 
+# Prefijo que emite la PWA cuando el usuario elige una zona concreta
+# (Estacionar.handleSelectZona y ServiciosGenerales.handleSelectBathroom).
+# El valor completo es `zona=<zone_id>`; de ahí se extrae el id con split_part.
+ZONE_SELECT_PREFIX = "zona="
+
 
 def _activity_conditions(
     event_id: str,
@@ -134,6 +144,46 @@ def _request_conditions(
     conditions = _scope_conditions(event_id, period, service_category)
     conditions.append(ServiceInteractionLog.interaction_type == "request")
     return conditions
+
+
+class _JsonbElementsWithOrdinality(FunctionElement):
+    """``jsonb_array_elements_text(x) WITH ORDINALITY AS t(v, ord)``.
+
+    La posición en el array ``zone_ids`` es el ranking que el recomendador
+    asignó a cada zona. Sin ella, todas las zonas que siempre viajan juntas
+    (''el mismo set de la misma respuesta'') quedan con idéntico conteo y la
+    tabla no discrimina nada.
+
+    Nota: ``CAST(zone_ids AS text[])`` NO sirve; Postgres responde CannotCoerce
+    porque jsonb no castea a array de forma implícita.
+    """
+
+    inherit_cache = True
+
+    def __init__(self, arg):
+        super().__init__(arg)
+
+    @property
+    def columns(self):
+        return [column("v", String), column("ord", Integer)]
+
+
+@compiles(_JsonbElementsWithOrdinality)
+def _compile_jsonb_elements_ordinality(element, compiler, **kw):
+    return (
+        f"jsonb_array_elements_text({compiler.process(element.clauses, **kw)}) "
+        "WITH ORDINALITY AS t(v, ord)"
+    )
+
+
+def _expanded_zone_positions(conditions):
+    """Expande ``zone_ids`` en una fila por (request, zona) con su posición."""
+    elements = _JsonbElementsWithOrdinality(ServiceInteractionLog.zone_ids).table_valued("v", "ord")
+    return select(
+        ServiceInteractionLog.id.label("log_id"),
+        elements.c.v.label("zone_id"),
+        elements.c.ord.label("position"),
+    ).where(*conditions)
 
 
 def _validate_timezone(timezone_name: str) -> None:
@@ -586,6 +636,92 @@ async def event_report_temporal_distribution(
         timezone=timezone,
         service_category=service_category,
         buckets=buckets,
+    )
+
+
+@router.get("/zone_analysis", response_model=ZoneAnalysisResponse)
+async def event_report_zone_analysis(
+    event_id: str,
+    start: Optional[datetime] = Query(None, description="Inicio del período (ISO 8601)"),
+    end: Optional[datetime] = Query(None, description="Fin del período (ISO 8601)"),
+    service_category: Optional[str] = Query(None, description="Filtrar por categoría de servicio"),
+    db: AsyncSession = Depends(get_async_db),
+    _: TokenPayload = Depends(verify_token),
+):
+    """Combina demanda real del usuario y cobertura del sistema por zona.
+
+    Son dos preguntas distintas sobre el mismo catálogo de zonas:
+
+    * ``real_choices`` mide demanda: cuántos usuarios eligieron la zona
+      (``filter_change`` con ``origin=user`` y ``request_mode='zona=<id>'``).
+      Solo existe para los módulos que instrumentaron el clic.
+    * ``recommendation_count`` y ``avg_position`` miden oferta: cuántas requests
+      técnicas la devolvieron y en qué posición del ranking, 1-based.
+
+    Antes vivían separadas y la de cobertura, al no tener posición, producía el
+    mismo número para todas las zonas que siempre viajan en la misma respuesta.
+    """
+    _require_absolute_bounds(start, end)
+    event = await _get_event_or_404(db, event_id)
+    period = _resolve_period(event, start, end)
+
+    # --- Demanda real: la zona sale del propio request_mode, no de zone_ids ---
+    choice_conditions = _activity_conditions(event_id, period, service_category)
+    zone_from_mode = func.split_part(ServiceInteractionLog.request_mode, "=", 2).label("zone_id")
+    choices_result = await db.execute(
+        select(zone_from_mode, func.count(ServiceInteractionLog.id).label("real_choices"))
+        .where(*choice_conditions, ServiceInteractionLog.request_mode.like(f"{ZONE_SELECT_PREFIX}%"))
+        .group_by(zone_from_mode)
+    )
+    real_choices = {row.zone_id: row.real_choices for row in choices_result.all()}
+
+    # --- Cobertura: posición real dentro del array zone_ids de cada request ---
+    request_conditions = _request_conditions(event_id, period, service_category)
+    expanded = _expanded_zone_positions(request_conditions).subquery()
+    coverage_result = await db.execute(
+        select(
+            Zone.id.label("zone_id"),
+            Zone.name.label("zone_name"),
+            Zone.type.label("zone_type"),
+            func.count(func.distinct(expanded.c.log_id)).label("recommendation_count"),
+            func.avg(expanded.c.position).label("avg_position"),
+        )
+        .select_from(join(Zone, expanded, Zone.id == expanded.c.zone_id))
+        .where(Zone.event_id == event_id)
+        .group_by(Zone.id, Zone.name, Zone.type)
+    )
+    coverage = {
+        row.zone_id: (row.zone_name, row.zone_type, row.recommendation_count, row.avg_position)
+        for row in coverage_result.all()
+    }
+
+    zones = [
+        ZoneAnalysisItem(
+            zone_id=zone_id,
+            zone_name=name,
+            zone_type=zone_type,
+            real_choices=real_choices.get(zone_id, 0),
+            recommendation_count=recommendation_count,
+            avg_position=avg_position,
+        )
+        for zone_id, (name, zone_type, recommendation_count, avg_position) in coverage.items()
+    ]
+    # Demanda primero; después, las más recomendadas arriba. Las zonas que nunca
+    # se recomendaron (avg_position nulo) quedan al final en vez de ir primero.
+    zones.sort(
+        key=lambda zone: (
+            -zone.real_choices,
+            zone.avg_position if zone.avg_position is not None else float("inf"),
+            zone.zone_name,
+        )
+    )
+
+    return ZoneAnalysisResponse(
+        event_id=event.id,
+        event_name=event.name,
+        period=PeriodRange(start=period.start, end=period.end, mode=period.mode),
+        service_category=service_category,
+        zones=zones,
     )
 
 

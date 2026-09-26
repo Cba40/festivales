@@ -865,6 +865,191 @@ class TestTemporalDistributionBreakdownSumsToCount:
         assert data["count"] == 6
 
 
+class TestZoneAnalysis:
+    """Combina demanda real (`filter_change` + `zona=`) y cobertura (`zone_ids`)."""
+
+    URL = f"/api/events/{EVENT_ID}/reports/zone_analysis"
+
+    def _choices(self, rows):
+        return _all_result(
+            [SimpleNamespace(zone_id=zone_id, real_choices=count) for zone_id, count in rows]
+        )
+
+    def _coverage(self, rows):
+        return _all_result(
+            [
+                SimpleNamespace(
+                    zone_id=zone_id,
+                    zone_name=name,
+                    zone_type=zone_type,
+                    recommendation_count=count,
+                    avg_position=avg_position,
+                )
+                for zone_id, name, zone_type, count, avg_position in rows
+            ]
+        )
+
+    def test_une_demanda_y_cobertura(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            self._choices([("zA", 7), ("zB", 2)]),
+            self._coverage(
+                [
+                    ("zA", "Estacionamiento Norte", "parking", 392, 1.2),
+                    ("zB", "Estacionamiento Sur", "parking", 392, 3.8),
+                    ("zC", "Baños Centro", "bathroom", 385, 2.0),
+                ]
+            ),
+        ]
+
+        resp = client.get(self.URL, headers=auth_headers)
+        assert resp.status_code == 200
+        zones = {z["zone_id"]: z for z in resp.json()["zones"]}
+
+        assert zones["zA"] == {
+            "zone_id": "zA",
+            "zone_name": "Estacionamiento Norte",
+            "zone_type": "parking",
+            "real_choices": 7,
+            "recommendation_count": 392,
+            "avg_position": 1.2,
+        }
+        # zB fue elegida menos que zA.
+        assert zones["zB"]["real_choices"] == 2
+        # zC solo aparece en cobertura: nunca la eligieron.
+        assert zones["zC"]["real_choices"] == 0
+        assert zones["zC"]["recommendation_count"] == 385
+
+    def test_orden_por_demanda_luego_posicion(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            self._choices([("zB", 1), ("zA", 5)]),
+            self._coverage(
+                [
+                    ("zA", "A", "parking", 10, 4.0),
+                    ("zB", "B", "parking", 10, 1.0),
+                    ("zC", "C", "parking", 10, 2.0),
+                ]
+            ),
+        ]
+
+        resp = client.get(self.URL, headers=auth_headers)
+        assert resp.status_code == 200
+        # zA (5) arriba; después los que no tienen demanda, por posición.
+        assert [z["zone_id"] for z in resp.json()["zones"]] == ["zA", "zB", "zC"]
+
+    def test_zona_sin_posicion_queda_al_final(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            self._choices([]),
+            self._coverage(
+                [
+                    ("zSinPos", "Nunca recomendada", "parking", 0, None),
+                    ("zTop", "Primera siempre", "parking", 50, 1.0),
+                ]
+            ),
+        ]
+
+        resp = client.get(self.URL, headers=auth_headers)
+        assert resp.status_code == 200
+        assert [z["zone_id"] for z in resp.json()["zones"]] == ["zTop", "zSinPos"]
+        assert resp.json()["zones"][1]["avg_position"] is None
+
+    def test_consulta_de_demanda_usa_split_part_y_actividad(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            self._choices([]),
+            self._coverage([]),
+        ]
+
+        resp = client.get(
+            self.URL,
+            params={"service_category": "parking"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+
+        sql, params = _compiled(db_mock, 1)
+        assert "split_part" in sql
+        assert "request_mode LIKE" in sql
+        # La demanda exige intención del usuario, no requests técnicas.
+        assert params["interaction_type_1"] == ["screen_open", "filter_change"]
+        assert params["origin_1"] == "user"
+        assert params["service_category_1"] == "parking"
+
+    def test_cobertura_usa_ordinality_y_acota_al_evento(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            self._choices([]),
+            self._coverage([]),
+        ]
+
+        resp = client.get(self.URL, headers=auth_headers)
+        assert resp.status_code == 200
+
+        sql, params = _compiled(db_mock, 2)
+        assert "WITH ORDINALITY" in sql
+        assert "jsonb_array_elements_text" in sql
+        assert "avg(" in sql
+        # La cobertura cuenta requests técnicas, y solo las zonas del evento.
+        assert params["interaction_type_1"] == "request"
+        assert "zones.event_id" in sql
+
+    def test_rechaza_periodo_naive(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        resp = client.get(
+            self.URL,
+            params={"start": "2026-07-15T00:00:00", "end": "2026-07-21T00:00:00"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 400
+
+    def test_sin_zonas_devuelve_lista_vacia(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            self._choices([]),
+            self._coverage([]),
+        ]
+
+        resp = client.get(self.URL, headers=auth_headers)
+        assert resp.status_code == 200
+        assert resp.json()["zones"] == []
+
+
 class TestTechnicalIncidents:
     def test_errors_per_service_and_temporal(
         self,

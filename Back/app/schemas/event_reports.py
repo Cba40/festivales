@@ -131,6 +131,35 @@ class RecommendedZonesResponse(BaseModel):
     zones: list[RecommendedZoneItem] = Field(..., description="Zonas ordenadas por cantidad de recomendaciones")
 
 
+class ZoneAnalysisItem(BaseModel):
+    zone_id: str = Field(..., description="ID de la zona")
+    zone_name: str = Field(..., description="Nombre de la zona (resuelto en el backend)")
+    zone_type: str = Field(..., description="Tipo de la zona")
+    real_choices: int = Field(
+        default=0,
+        description="Veces que el usuario eligió esta zona (filter_change origin=user con request_mode 'zona=<id>')",
+    )
+    recommendation_count: int = Field(
+        default=0,
+        description="Requests técnicos que devolvieron la zona entre las recomendadas",
+    )
+    avg_position: Optional[float] = Field(
+        default=None,
+        description="Posición promedio dentro de la lista de recomendadas (1 = primera). Null si nunca fue recomendada",
+    )
+
+
+class ZoneAnalysisResponse(BaseModel):
+    event_id: str = Field(..., description="ID del evento")
+    event_name: str = Field(..., description="Nombre del evento")
+    period: PeriodRange = Field(..., description="Período efectivo del informe")
+    service_category: Optional[str] = Field(default=None, description="Categoría de servicio filtrada (si se especificó)")
+    zones: list[ZoneAnalysisItem] = Field(
+        ...,
+        description="Zonas ordenadas por demanda real y luego por posición promedio",
+    )
+
+
 class OperationalPhaseRef(BaseModel):
     phase_id: Optional[str] = Field(default=None, description="ID de la fase operativa (null = no asignable)")
     phase_name: str = Field(..., description="Nombre de la fase (o 'unassigned')")

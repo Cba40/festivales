@@ -22,17 +22,29 @@ interface ProtocolOption {
   title: string;
 }
 
+interface ZoneCatalogItem {
+  id: string;
+  name: string;
+}
+
 interface TemporalBreakdownProps {
   start?: string;
   end?: string;
   categories: string[];
   protocolTitles: Record<string, string>;
+  zoneNames: Record<string, string>;
 }
 
 // Sub-bloque "cuándo" que acompaña al desglose "cuántas". Comparte período con
 // la sección padre y reutiliza los mismos request_mode del desglose por filtro:
 // el operador copia el prefijo crudo del acordeón y obtiene su curva horaria.
-function TemporalBreakdown({ start, end, categories, protocolTitles }: TemporalBreakdownProps) {
+function TemporalBreakdown({
+  start,
+  end,
+  categories,
+  protocolTitles,
+  zoneNames,
+}: TemporalBreakdownProps) {
   const [category, setCategory] = useState('');
 
   const params = useMemo(
@@ -140,7 +152,7 @@ function TemporalBreakdown({ start, end, categories, protocolTitles }: TemporalB
                       title={item.request_mode ?? 'Sin request_mode'}
                     >
                       <span className="text-slate-300">↳</span>{' '}
-                      {requestModeLabel(item.request_mode, protocolTitles)}
+                      {requestModeLabel(item.request_mode, protocolTitles, zoneNames)}
                     </td>
                     <td className="px-3 py-1 text-slate-500">{item.count}</td>
                     <td />
@@ -187,6 +199,7 @@ export function ReportServiceBreakdownSection({
   const params = useMemo(() => ({ start, end }), [start, end]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [protocolTitles, setProtocolTitles] = useState<Record<string, string>>({});
+  const [zoneNames, setZoneNames] = useState<Record<string, string>>({});
 
   const { data, isLoading, error, refresh } = useEventReport<ServiceBreakdownDTO>(
     EVENT_ID,
@@ -212,10 +225,28 @@ export function ReportServiceBreakdownSection({
     };
   }, []);
 
+  // El clic en una zona se emite como `request_mode='zona=<zone_id>'`. Sin este
+  // catálogo el desglose muestra UUIDs crudos al operador.
+  useEffect(() => {
+    let cancelled = false;
+    apiClient
+      .get<ZoneCatalogItem[]>(endpoints.zones.list(EVENT_ID))
+      .then(({ data: list }) => {
+        if (cancelled) return;
+        const names: Record<string, string> = {};
+        for (const zone of list ?? []) names[zone.id] = zone.name;
+        setZoneNames(names);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const total = data?.services.reduce((sum, service) => sum + service.total_consultas, 0) ?? 0;
   const filterGroups = useMemo(
-    () => buildFilterGroups(data?.services ?? [], data?.filters, protocolTitles),
-    [data, protocolTitles]
+    () => buildFilterGroups(data?.services ?? [], data?.filters, protocolTitles, zoneNames),
+    [data, protocolTitles, zoneNames]
   );
 
   return (
@@ -320,6 +351,7 @@ export function ReportServiceBreakdownSection({
           end={end}
           categories={data.services.map((service) => service.service_category)}
           protocolTitles={protocolTitles}
+          zoneNames={zoneNames}
         />
       )}
     </ReportSection>
