@@ -740,19 +740,25 @@ async def event_report_field_census(
     #
     # El cast a JSONB es explícito porque el modelo declara la columna como
     # `JSON` mientras que en la base es `jsonb`, y
-    # `jsonb_array_elements_text` necesita jsonb. El LATERAL es inner a
-    # propósito: las observaciones sin warnings (o con metadata nulo) no aportan
-    # filas, y la zona queda con la lista vacía.
+    # `jsonb_array_elements_text` necesita jsonb.
+    #
+    # El nombre de la columna interna DEBE ser `value`, el que Postgres le
+    # asigna a `jsonb_array_elements_text`. `table_valued` renderiza
+    # `... AS anon_2` sin lista de columnas, así que el nombre vive solo en el
+    # modelo de SQLAlchemy: si se declara otro, el SQL referencia un alias que
+    # en Postgres no existe y la consulta falla con
+    # `column anon_2.<nombre> does not exist`. Misma trampa que
+    # WITH ORDINALITY (value / ordinality).
     obs_table = OperationalObservationModel.__table__
     warning_elements = (
         func.jsonb_array_elements_text(cast(obs_table.c["metadata"], JSONB)["warnings"])
-        .table_valued("warning")
+        .table_valued("value")
         .lateral()
     )
     warning_flags_sq = (
         select(
             obs_table.c.zone_id.label("zone_id"),
-            func.array_agg(func.distinct(warning_elements.c.warning)).label("warning_flags"),
+            func.array_agg(func.distinct(warning_elements.c.value)).label("warning_flags"),
         )
         .select_from(join(obs_table, warning_elements, and_(True)))
         .where(*obs_conditions)

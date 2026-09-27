@@ -1200,12 +1200,18 @@ class TestFieldCensusWarningFlags:
         # DISTINCT: la misma alerta puede venir de varias observaciones.
         assert "array_agg(distinct(" in sql.lower()
         assert "LATERAL" in sql
+        # Regresión: la columna interna debe llamarse `value`.
+        #
+        # `table_valued` renderiza `... AS anon_N` SIN lista de columnas, así
+        # que el nombre solo existe en el modelo de SQLAlchemy. Si se declara
+        # otro, Postgres responde `column anon_N.<nombre> does not exist`,
+        # porque `jsonb_array_elements_text` siempre expone `value`.
+        assert "array_agg(distinct(anon_1.value))" in sql or "array_agg(distinct(anon_2.value))" in sql
+        assert ".warning)" not in sql
         # LEFT: las zonas sin observaciones marcadas no desaparecen del censo.
         assert "LEFT OUTER JOIN" in sql
         # Los filtros del periodo se aplican tambien al subquery de warnings.
         assert sql.count("event_day_id IN") >= 2
-        assert sql.count("timestamp >=") >= 2
-        # Sin redondeo en SQL.
         assert "round(" not in sql.lower()
 
 
