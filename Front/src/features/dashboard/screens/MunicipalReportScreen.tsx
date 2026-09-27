@@ -15,6 +15,7 @@ import {
   ReportServiceBreakdownSection,
   ReportCoverageGapsSection,
   ReportZoneAnalysisSection,
+  ReportFieldCensusSection,
 } from '../components/reports';
 
 const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
@@ -257,6 +258,7 @@ export function MunicipalReportScreen() {
           <ReportSummarySection start={period.start} end={period.end} />
           <ReportServiceBreakdownSection start={period.start} end={period.end} />
           <ReportZoneAnalysisSection start={period.start} end={period.end} />
+          <ReportFieldCensusSection start={period.start} end={period.end} />
           <ReportCoverageGapsSection start={period.start} end={period.end} />
         </div>
 

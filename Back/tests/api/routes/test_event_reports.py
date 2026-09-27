@@ -870,6 +870,134 @@ class TestTemporalDistributionBreakdownSumsToCount:
         assert data["count"] == 6
 
 
+class TestFieldCensus:
+    """Censo de campo: densidad observada por zona (conteos manuales)."""
+
+    URL = f"/api/events/{EVENT_ID}/reports/field_census"
+
+    def _rows(self, rows):
+        return _all_result(
+            [
+                SimpleNamespace(
+                    zone_id=zone_id,
+                    zone_name=name,
+                    zone_type=zone_type,
+                    capacity=capacity,
+                    observations_count=count,
+                    observed_density_avg=avg_density,
+                    observed_density_max=max_density,
+                    last_observed_at=last,
+                    occupancy_pct=occupancy,
+                )
+                for zone_id, name, zone_type, capacity, count, avg_density, max_density, last, occupancy in rows
+            ]
+        )
+
+    def test_devuelve_zonas_con_ocupacion(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        last = datetime(2026, 9, 26, 14, 0, tzinfo=timezone.utc)
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            self._rows(
+                [
+                    ("zA", "Baños Centro", "bathroom", 200, 3, 120.0, 150, last, 60.0),
+                    ("zB", "Estacionamiento Norte", "parking", 400, 2, 90.0, 110, last, 22.5),
+                ]
+            ),
+        ]
+
+        resp = client.get(self.URL, headers=auth_headers)
+        assert resp.status_code == 200
+        zones = {z["zone_id"]: z for z in resp.json()["zones"]}
+
+        assert zones["zA"]["observed_density_avg"] == 120.0
+        assert zones["zA"]["observed_density_max"] == 150
+        assert zones["zA"]["observations_count"] == 3
+        assert zones["zA"]["occupancy_percent"] == 60.0
+        assert zones["zA"]["capacity"] == 200
+        assert zones["zB"]["occupancy_percent"] == 22.5
+
+    def test_capacity_cero_no_divide(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        """capacity=0 significa 'no declarada': occupancy NULL, no 0% ni error."""
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            self._rows(
+                [("zSinCap", "Zona sin capacidad", "cajeros", 0, 1, 42.0, 42, None, None)]
+            ),
+        ]
+
+        resp = client.get(self.URL, headers=auth_headers)
+        assert resp.status_code == 200
+        zone = resp.json()["zones"][0]
+        assert zone["capacity"] == 0
+        assert zone["occupancy_percent"] is None
+        # El conteo sigue siendo valido aunque no haya porcentaje.
+        assert zone["observations_count"] == 1
+        assert zone["observed_density_avg"] == 42.0
+
+    def test_consulta_usa_case_para_la_capacidad_y_no_convierte_zona(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            self._rows([]),
+        ]
+
+        resp = client.get(self.URL, headers=auth_headers)
+        assert resp.status_code == 200
+
+        sql, _ = _compiled(db_mock, 1)
+        # El CASE evita la division por cero: no alcanza con un COALESCE.
+        assert "CASE WHEN (zones.capacity >" in sql
+        # La columna en Neon es timestamptz: aplicar AT TIME ZONE correria.
+        assert "AT TIME ZONE" not in sql
+        # INNER JOIN: las FKs reales garantizan que no hay observaciones huerfanas.
+        assert "JOIN operational_observations" in sql
+        assert "LEFT OUTER JOIN" not in sql
+
+    def test_sin_observaciones_devuelve_lista_vacia(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            self._rows([]),
+        ]
+
+        resp = client.get(self.URL, headers=auth_headers)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["zones"] == []
+        assert body["period"]["mode"] == "event"
+
+    def test_rechaza_periodo_naive(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        resp = client.get(
+            self.URL,
+            params={"start": "2026-09-24T00:00:00", "end": "2026-09-26T00:00:00"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 400
+
+
 class TestZoneAnalysis:
     """Combina demanda real (`filter_change` + `zona=`) y cobertura (`zone_ids`).
 

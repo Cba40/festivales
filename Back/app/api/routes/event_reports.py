@@ -5,7 +5,7 @@ from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, join, or_, select
+from sqlalchemy import case, func, join, or_, select
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.functions import Function
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +24,8 @@ from app.schemas.event_reports import (
     CoverageGapItem,
     CoverageGapsResponse,
     EventSummaryResponse,
+    FieldCensusItem,
+    FieldCensusResponse,
     FilterBreakdownItem,
     ObservationsPhase,
     OperationalEventSummaryItem,
@@ -657,6 +659,106 @@ async def event_report_temporal_distribution(
         timezone=timezone,
         service_category=service_category,
         buckets=buckets,
+    )
+
+
+@router.get("/field_census", response_model=FieldCensusResponse)
+async def event_report_field_census(
+    event_id: str,
+    start: Optional[datetime] = Query(None, description="Inicio del período (ISO 8601)"),
+    end: Optional[datetime] = Query(None, description="Fin del período (ISO 8601)"),
+    db: AsyncSession = Depends(get_async_db),
+    _: TokenPayload = Depends(verify_token),
+):
+    """Censo de campo: cuántas personas contaron un operador en cada zona.
+
+    A diferencia del resto de los informes, la fuente no son los clicks de los
+    usuarios sino ``operational_observations``: conteos manuales que un operador
+    registra sobre el terreno. No es un dato automático ni infalible, es una
+    medición de campo.
+
+    Dos decisiones que conviene no volver a tocar:
+
+    * ``capacity = 0`` significa "capacidad no declarada", no "cero personas".
+      El ``CASE`` devuelve ``NULL`` en ese caso para que la UI pueda decirlo, en
+      lugar de mostrar un 0% que parece una zona vacía. El cortocircuito del
+      ``CASE`` evita la división por cero sin ``NULLIF``.
+    * No se aplica ``AT TIME ZONE``. En Neon la columna es ``timestamptz`` y la
+      comparación contra un bound también ``timestamptz`` resuelve instantes
+      absolutos, inmune al ``TimeZone`` de la sesión. Aplicarla correria.
+    """
+    _require_absolute_bounds(start, end)
+    event = await _get_event_or_404(db, event_id)
+    period = _resolve_period(event, start, end)
+
+    # Se resuelve por subconsulta (y no por lista) para que un evento sin
+    # jornadas en el período devuelva un IN vacío y una lista vacía, sin el
+    # caso especial de un .in_([]) que SQLAlchemy degrada a warning.
+    zi = ZoneInfo("America/Argentina/Buenos_Aires")
+    day_conditions = [EventDay.event_id == event_id]
+    local_start_date = _local_date(period.start, zi)
+    if local_start_date is not None:
+        day_conditions.append(EventDay.date >= local_start_date)
+    local_end_date = _local_date(period.end, zi)
+    if local_end_date is not None:
+        day_conditions.append(EventDay.date <= local_end_date)
+    event_day_ids = select(EventDay.id).where(*day_conditions)
+
+    avg_density = func.avg(OperationalObservationModel.observed_density)
+    occupancy_pct = case(
+        (Zone.capacity > 0, func.round(100.0 * avg_density / Zone.capacity, 1)),
+        else_=None,
+    ).label("occupancy_pct")
+
+    result = await db.execute(
+        select(
+            Zone.id.label("zone_id"),
+            Zone.name.label("zone_name"),
+            Zone.type.label("zone_type"),
+            Zone.capacity.label("capacity"),
+            func.count(OperationalObservationModel.id).label("observations_count"),
+            avg_density.label("observed_density_avg"),
+            func.max(OperationalObservationModel.observed_density).label("observed_density_max"),
+            func.max(OperationalObservationModel.timestamp).label("last_observed_at"),
+            occupancy_pct,
+        )
+        .select_from(
+            Zone.__table__.join(
+                OperationalObservationModel.__table__,
+                OperationalObservationModel.zone_id == Zone.id,
+            )
+        )
+        .where(
+            OperationalObservationModel.event_day_id.in_(event_day_ids),
+            OperationalObservationModel.timestamp >= period.start,
+            OperationalObservationModel.timestamp <= period.end,
+        )
+        .group_by(Zone.id, Zone.name, Zone.type, Zone.capacity)
+        .order_by(func.max(OperationalObservationModel.observed_density).desc())
+    )
+
+    zones = [
+        FieldCensusItem(
+            zone_id=row.zone_id,
+            zone_name=row.zone_name,
+            zone_type=row.zone_type,
+            capacity=row.capacity,
+            observations_count=row.observations_count,
+            observed_density_avg=(
+                round(row.observed_density_avg, 1) if row.observed_density_avg is not None else None
+            ),
+            observed_density_max=row.observed_density_max,
+            last_observed_at=row.last_observed_at,
+            occupancy_percent=row.occupancy_pct,
+        )
+        for row in result.all()
+    ]
+
+    return FieldCensusResponse(
+        event_id=event.id,
+        event_name=event.name,
+        period=PeriodRange(start=period.start, end=period.end, mode=period.mode),
+        zones=zones,
     )
 
 

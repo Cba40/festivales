@@ -160,6 +160,45 @@ class ZoneAnalysisResponse(BaseModel):
     )
 
 
+class FieldCensusItem(BaseModel):
+    zone_id: str = Field(..., description="ID de la zona")
+    zone_name: str = Field(..., description="Nombre de la zona")
+    zone_type: str = Field(..., description="Tipo de la zona")
+    capacity: Optional[int] = Field(
+        default=None,
+        description=(
+            "Capacidad declarada de la zona. 0 significa 'capacidad no declarada', "
+            "no 'cero personas'."
+        ),
+    )
+    observations_count: int = Field(..., description="Cantidad de observaciones en el período")
+    observed_density_avg: Optional[float] = Field(
+        default=None, description="Densidad observada promedio (personas por observación)"
+    )
+    observed_density_max: Optional[int] = Field(
+        default=None, description="Máxima densidad observada"
+    )
+    last_observed_at: Optional[datetime] = Field(
+        default=None, description="Momento de la última observación del período"
+    )
+    occupancy_percent: Optional[float] = Field(
+        default=None,
+        description=(
+            "Densidad promedio como % de la capacidad. Null cuando capacity <= 0 "
+            "o no hay observaciones: no se divide por cero."
+        ),
+    )
+
+
+class FieldCensusResponse(BaseModel):
+    event_id: str = Field(..., description="ID del evento")
+    event_name: str = Field(..., description="Nombre del evento")
+    period: PeriodRange = Field(..., description="Período efectivo del informe")
+    zones: list[FieldCensusItem] = Field(
+        ..., description="Zonas con observaciones, ordenadas por densidad máxima"
+    )
+
+
 class OperationalPhaseRef(BaseModel):
     phase_id: Optional[str] = Field(default=None, description="ID de la fase operativa (null = no asignable)")
     phase_name: str = Field(..., description="Nombre de la fase (o 'unassigned')")

@@ -558,6 +558,25 @@ export interface TemporalDistributionDTO {
   buckets: TemporalDistributionBucketDTO[];
 }
 
+export interface FieldCensusItemDTO {
+  zone_id: string;
+  zone_name: string;
+  zone_type: string;
+  capacity: number | null;
+  observations_count: number;
+  observed_density_avg: number | null;
+  observed_density_max: number | null;
+  last_observed_at: string | null;
+  occupancy_percent: number | null;
+}
+
+export interface FieldCensusDTO {
+  event_id: string;
+  event_name: string;
+  period: ReportPeriodRange;
+  zones: FieldCensusItemDTO[];
+}
+
 export interface ZoneAnalysisItemDTO {
   zone_id: string;
   zone_name: string;
