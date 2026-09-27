@@ -705,8 +705,14 @@ async def event_report_field_census(
     event_day_ids = select(EventDay.id).where(*day_conditions)
 
     avg_density = func.avg(OperationalObservationModel.observed_density)
+    # El redondeo va en Python, no en SQL. `func.round(x, 1)` aquí falla con
+    # `function round(double precision, integer) does not exist`: el literal
+    # 100.0 se envía como float8 y `float8 * numeric` resuelve a float8, que no
+    # tiene firma de round() con dos argumentos. (El avg() en sí devuelve
+    # numeric; el problema es el 100.0, no el avg.) Además, redondear acá evita
+    # depender de la firma de round de cada dialecto.
     occupancy_pct = case(
-        (Zone.capacity > 0, func.round(100.0 * avg_density / Zone.capacity, 1)),
+        (Zone.capacity > 0, 100.0 * avg_density / Zone.capacity),
         else_=None,
     ).label("occupancy_pct")
 
@@ -749,7 +755,9 @@ async def event_report_field_census(
             ),
             observed_density_max=row.observed_density_max,
             last_observed_at=row.last_observed_at,
-            occupancy_percent=row.occupancy_pct,
+            occupancy_percent=(
+                round(row.occupancy_pct, 1) if row.occupancy_pct is not None else None
+            ),
         )
         for row in result.all()
     ]

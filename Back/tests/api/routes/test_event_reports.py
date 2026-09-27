@@ -904,8 +904,11 @@ class TestFieldCensus:
             _event_result(_event(EVENT_START, EVENT_END)),
             self._rows(
                 [
-                    ("zA", "Baños Centro", "bathroom", 200, 3, 120.0, 150, last, 60.0),
-                    ("zB", "Estacionamiento Norte", "parking", 400, 2, 90.0, 110, last, 22.5),
+                    # Valores SIN redondear a propósito: el mock representa lo que
+                    # devuelve Postgres, y el redondeo a 1 decimal lo hace el
+                    # endpoint en Python.
+                    ("zA", "Baños Centro", "bathroom", 200, 3, 120.04, 150, last, 60.037),
+                    ("zB", "Estacionamiento Norte", "parking", 400, 2, 90.049, 110, last, 22.4612),
                 ]
             ),
         ]
@@ -919,6 +922,7 @@ class TestFieldCensus:
         assert zones["zA"]["observations_count"] == 3
         assert zones["zA"]["occupancy_percent"] == 60.0
         assert zones["zA"]["capacity"] == 200
+        assert zones["zB"]["observed_density_avg"] == 90.0
         assert zones["zB"]["occupancy_percent"] == 22.5
 
     def test_capacity_cero_no_divide(
@@ -966,6 +970,9 @@ class TestFieldCensus:
         # INNER JOIN: las FKs reales garantizan que no hay observaciones huerfanas.
         assert "JOIN operational_observations" in sql
         assert "LEFT OUTER JOIN" not in sql
+        # El redondeo NO va en SQL: round(float8, int) no existe en Postgres y
+        # el literal 100.0 se envía como float8. Se redondea en Python.
+        assert "round(" not in sql.lower()
 
     def test_sin_observaciones_devuelve_lista_vacia(
         self,
