@@ -568,6 +568,7 @@ export interface FieldCensusItemDTO {
   observed_density_max: number | null;
   last_observed_at: string | null;
   occupancy_percent: number | null;
+  warning_flags: string[];
 }
 
 export interface FieldCensusDTO {

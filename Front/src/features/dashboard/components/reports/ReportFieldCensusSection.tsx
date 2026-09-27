@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { ClipboardList } from 'lucide-react';
+import { AlertTriangle, ClipboardList } from 'lucide-react';
 import { useEventReport } from '../../../../hooks/useEventReports';
 import { endpoints } from '../../../../core/api/endpoints';
 import type { FieldCensusDTO } from '../../types';
@@ -8,6 +8,16 @@ import { MetricMini } from './MetricMini';
 import { DEFAULT_TIMEZONE, formatLocalDateTime, percentage, serviceLabel } from './reportFormat';
 
 const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
+
+/** Traduccion de las alertas del protocolo de muestreo (ver crud/operational_observation). */
+const WARNING_LABELS: Record<string, string> = {
+  variacion_extrema: 'Variación extrema',
+  posible_error_tipeo: 'Posible error de tipeo',
+};
+
+function warningLabel(flag: string): string {
+  return WARNING_LABELS[flag] ?? flag.replace(/_/g, ' ');
+}
 
 export interface ReportFieldCensusSectionProps {
   start?: string;
@@ -35,6 +45,7 @@ export function ReportFieldCensusSection({
 
   const zones = data?.zones ?? [];
   const withObservations = zones.reduce((sum, zone) => sum + zone.observations_count, 0);
+  const flagged = zones.filter((zone) => zone.warning_flags.length > 0);
   const withoutCapacity = zones.filter(
     (zone) => zone.occupancy_percent === null
   ).length;
@@ -69,6 +80,18 @@ export function ReportFieldCensusSection({
             Conteos manuales registrados por un operador sobre el terreno. Reflejan lo que
             ese observador vio, no un sensor.
           </p>
+          {flagged.length > 0 && (
+            <p className="mt-2 flex items-start gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-600" />
+              <span>
+                <span className="font-semibold">
+                  {flagged.length} de {zones.length} zonas
+                </span>{' '}
+                tienen observaciones con alertas de calidad que conviene revisar. La
+                observación sigue contando: está marcada, no descartada.
+              </span>
+            </p>
+          )}
           {withoutCapacity > 0 && (
             <p className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
               {withoutCapacity} {withoutCapacity === 1 ? 'zona no tiene' : 'zonas no tienen'}{' '}
@@ -90,6 +113,7 @@ export function ReportFieldCensusSection({
                 <th className="px-3 py-2 font-medium text-right">Densidad Máxima</th>
                 <th className="px-3 py-2 font-medium text-right">Ocupación %</th>
                 <th className="px-3 py-2 font-medium">Última observación</th>
+                <th className="px-3 py-2 font-medium">Calidad</th>
               </tr>
             </thead>
             <tbody>
@@ -137,6 +161,24 @@ export function ReportFieldCensusSection({
                     {zone.last_observed_at
                       ? formatLocalDateTime(zone.last_observed_at, DEFAULT_TIMEZONE)
                       : '—'}
+                  </td>
+                  <td className="px-3 py-2">
+                    {zone.warning_flags.length > 0 ? (
+                      <span
+                        className="inline-flex items-center gap-1 cursor-help text-amber-600"
+                        title={`Esta zona tiene observaciones con: ${zone.warning_flags
+                          .map(warningLabel)
+                          .join(', ')}`}
+                      >
+                        <AlertTriangle size={14} />
+                        <span className="text-xs">
+                          {zone.warning_flags.length}{' '}
+                          {zone.warning_flags.length === 1 ? 'alerta' : 'alertas'}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-xs text-slate-300">ok</span>
+                    )}
                   </td>
                 </tr>
               ))}

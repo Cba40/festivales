@@ -188,6 +188,13 @@ class FieldCensusItem(BaseModel):
             "o no hay observaciones: no se divide por cero."
         ),
     )
+    warning_flags: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Alertas de calidad presentes en las observaciones de la zona, unicas y "
+            "ordenadas. Vacio si ninguna observacion fue marcada."
+        ),
+    )
 
 
 class FieldCensusResponse(BaseModel):

@@ -5,7 +5,8 @@ from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import case, func, join, or_, select
+from sqlalchemy import JSON, String, and_, case, cast, func, join, or_, select
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.functions import Function
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -716,6 +717,43 @@ async def event_report_field_census(
         else_=None,
     ).label("occupancy_pct")
 
+    # Los filtros de observación se escriben una sola vez y se reutilizan en el
+    # JOIN principal y en el subquery de warnings: si divergieran, la fila
+    # marcaría alertas de observaciones fuera del período pedido.
+    obs_conditions = [
+        OperationalObservationModel.event_day_id.in_(event_day_ids),
+        OperationalObservationModel.timestamp >= period.start,
+        OperationalObservationModel.timestamp <= period.end,
+    ]
+
+    # Warnings de calidad: unión DISTINCT de los arrays `metadata.warnings` de
+    # las observaciones de la zona en el período. Se resuelve en un subquery
+    # aparte (no un correlated scalar subquery) para no repetir los filtros por
+    # fila y aprovechar el índice de zone_id.
+    #
+    # El cast a JSONB es explícito porque el modelo declara la columna como
+    # `JSON` mientras que en la base es `jsonb`, y
+    # `jsonb_array_elements_text` necesita jsonb. El LATERAL es inner a
+    # propósito: las observaciones sin warnings (o con metadata nulo) no aportan
+    # filas, y la zona queda con la lista vacía.
+    obs_table = OperationalObservationModel.__table__
+    warning_elements = (
+        func.jsonb_array_elements_text(cast(obs_table.c["metadata"], JSONB)["warnings"])
+        .table_valued("warning")
+        .lateral()
+    )
+    warning_flags_sq = (
+        select(
+            obs_table.c.zone_id.label("zone_id"),
+            func.array_agg(func.distinct(warning_elements.c.warning)).label("warning_flags"),
+        )
+        .select_from(join(obs_table, warning_elements, and_(True)))
+        .where(*obs_conditions)
+        .group_by(obs_table.c.zone_id)
+        .subquery()
+    )
+    warning_flags_col = warning_flags_sq.c.warning_flags.label("warning_flags")
+
     result = await db.execute(
         select(
             Zone.id.label("zone_id"),
@@ -727,19 +765,23 @@ async def event_report_field_census(
             func.max(OperationalObservationModel.observed_density).label("observed_density_max"),
             func.max(OperationalObservationModel.timestamp).label("last_observed_at"),
             occupancy_pct,
+            warning_flags_col,
         )
         .select_from(
-            Zone.__table__.join(
+            join(
+                Zone.__table__,
                 OperationalObservationModel.__table__,
                 OperationalObservationModel.zone_id == Zone.id,
-            )
+            ).outerjoin(warning_flags_sq, warning_flags_sq.c.zone_id == Zone.id)
         )
-        .where(
-            OperationalObservationModel.event_day_id.in_(event_day_ids),
-            OperationalObservationModel.timestamp >= period.start,
-            OperationalObservationModel.timestamp <= period.end,
+        .where(*obs_conditions)
+        .group_by(
+            Zone.id,
+            Zone.name,
+            Zone.type,
+            Zone.capacity,
+            warning_flags_sq.c.warning_flags,
         )
-        .group_by(Zone.id, Zone.name, Zone.type, Zone.capacity)
         .order_by(func.max(OperationalObservationModel.observed_density).desc())
     )
 
@@ -758,6 +800,7 @@ async def event_report_field_census(
             occupancy_percent=(
                 round(row.occupancy_pct, 1) if row.occupancy_pct is not None else None
             ),
+            warning_flags=list(row.warning_flags) if row.warning_flags else [],
         )
         for row in result.all()
     ]

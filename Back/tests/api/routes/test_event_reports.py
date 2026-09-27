@@ -888,8 +888,9 @@ class TestFieldCensus:
                     observed_density_max=max_density,
                     last_observed_at=last,
                     occupancy_pct=occupancy,
+                    warning_flags=flags,
                 )
-                for zone_id, name, zone_type, capacity, count, avg_density, max_density, last, occupancy in rows
+                for zone_id, name, zone_type, capacity, count, avg_density, max_density, last, occupancy, flags in rows
             ]
         )
 
@@ -907,8 +908,8 @@ class TestFieldCensus:
                     # Valores SIN redondear a propósito: el mock representa lo que
                     # devuelve Postgres, y el redondeo a 1 decimal lo hace el
                     # endpoint en Python.
-                    ("zA", "Baños Centro", "bathroom", 200, 3, 120.04, 150, last, 60.037),
-                    ("zB", "Estacionamiento Norte", "parking", 400, 2, 90.049, 110, last, 22.4612),
+                    ("zA", "Baños Centro", "bathroom", 200, 3, 120.04, 150, last, 60.037, []),
+                    ("zB", "Estacionamiento Norte", "parking", 400, 2, 90.049, 110, last, 22.4612, []),
                 ]
             ),
         ]
@@ -935,7 +936,7 @@ class TestFieldCensus:
         db_mock.execute.side_effect = [
             _event_result(_event(EVENT_START, EVENT_END)),
             self._rows(
-                [("zSinCap", "Zona sin capacidad", "cajeros", 0, 1, 42.0, 42, None, None)]
+                [("zSinCap", "Zona sin capacidad", "cajeros", 0, 1, 42.0, 42, None, None, [])]
             ),
         ]
 
@@ -967,9 +968,12 @@ class TestFieldCensus:
         assert "CASE WHEN (zones.capacity >" in sql
         # La columna en Neon es timestamptz: aplicar AT TIME ZONE correria.
         assert "AT TIME ZONE" not in sql
-        # INNER JOIN: las FKs reales garantizan que no hay observaciones huerfanas.
+        # INNER JOIN para las observaciones: las FKs reales garantizan que no hay
+        # observaciones huerfanas, asi que un outer solo traeria zonas sin datos.
+        # (Puede haber un LEFT OUTER JOIN aparte: el del subquery de warnings.)
         assert "JOIN operational_observations" in sql
-        assert "LEFT OUTER JOIN" not in sql
+        assert "FROM zones JOIN operational_observations" in sql
+        assert "LEFT OUTER JOIN operational_observations" not in sql
         # El redondeo NO va en SQL: round(float8, int) no existe en Postgres y
         # el literal 100.0 se envía como float8. Se redondea en Python.
         assert "round(" not in sql.lower()
@@ -1003,6 +1007,104 @@ class TestFieldCensus:
             headers=auth_headers,
         )
         assert resp.status_code == 400
+
+
+class TestFieldCensusWarningFlags:
+    """Alertas de calidad (metadata.warnings) agregadas por zona."""
+
+    URL = f"/api/events/{EVENT_ID}/reports/field_census"
+
+    def _rows(self, rows):
+        return _all_result(
+            [
+                SimpleNamespace(
+                    zone_id=zone_id,
+                    zone_name=name,
+                    zone_type=zone_type,
+                    capacity=capacity,
+                    observations_count=count,
+                    observed_density_avg=avg_density,
+                    observed_density_max=max_density,
+                    last_observed_at=None,
+                    occupancy_pct=occupancy,
+                    warning_flags=flags,
+                )
+                for zone_id, name, zone_type, capacity, count, avg_density, max_density, occupancy, flags in rows
+            ]
+        )
+
+    def test_expone_las_alertas_por_zona(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            self._rows(
+                [
+                    ("zA", "Baños Centro", "bathroom", 200, 3, 120.0, 150, 60.0,
+                     ["variacion_extrema", "posible_error_tipeo"]),
+                    ("zB", "Estacionamiento Norte", "parking", 400, 2, 90.0, 110, 22.5, []),
+                ]
+            ),
+        ]
+
+        resp = client.get(self.URL, headers=auth_headers)
+        assert resp.status_code == 200
+        zones = {z["zone_id"]: z for z in resp.json()["zones"]}
+        assert zones["zA"]["warning_flags"] == ["variacion_extrema", "posible_error_tipeo"]
+        assert zones["zB"]["warning_flags"] == []
+
+    def test_alertas_nulas_se_convierten_en_lista_vacia(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        """Una zona sin warnings llega con NULL desde el LEFT JOIN, no con [].
+
+        La respuesta tiene que ser [] para que el frontend no tenga que
+        distinguir null de lista vacia.
+        """
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            self._rows([("zC", "Zona limpia", "bathroom", 100, 1, 10.0, 10, 10.0, None)]),
+        ]
+
+        resp = client.get(self.URL, headers=auth_headers)
+        assert resp.status_code == 200
+        assert resp.json()["zones"][0]["warning_flags"] == []
+
+    def test_consulta_agrega_warnings_con_lateral_y_deduplica(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            self._rows([]),
+        ]
+
+        resp = client.get(self.URL, headers=auth_headers)
+        assert resp.status_code == 200
+
+        sql, _ = _compiled(db_mock, 1)
+        # jsonb_array_elements_text necesita jsonb: el modelo declara JSON, la
+        # columna real es jsonb, asi que el cast debe estar explicito.
+        assert "jsonb_array_elements_text" in sql
+        assert "CAST(operational_observations.metadata AS JSONB)" in sql
+        # DISTINCT: la misma alerta puede venir de varias observaciones.
+        assert "array_agg(distinct(" in sql.lower()
+        assert "LATERAL" in sql
+        # LEFT: las zonas sin observaciones marcadas no desaparecen del censo.
+        assert "LEFT OUTER JOIN" in sql
+        # Los filtros del periodo se aplican tambien al subquery de warnings.
+        assert sql.count("event_day_id IN") >= 2
+        assert sql.count("timestamp >=") >= 2
+        # Sin redondeo en SQL.
+        assert "round(" not in sql.lower()
 
 
 class TestZoneAnalysis:
