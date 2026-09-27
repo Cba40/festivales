@@ -720,11 +720,18 @@ async def event_report_field_census(
     # Los filtros de observación se escriben una sola vez y se reutilizan en el
     # JOIN principal y en el subquery de warnings: si divergieran, la fila
     # marcaría alertas de observaciones fuera del período pedido.
-    obs_conditions = [
-        OperationalObservationModel.event_day_id.in_(event_day_ids),
-        OperationalObservationModel.timestamp >= period.start,
-        OperationalObservationModel.timestamp <= period.end,
-    ]
+    #
+    # Los extremos se agregan solo si hay valor. El modo `accumulated`
+    # (histórico sin filtro de rango) llega con start y end en None, y
+    # `columna <= None` revienta con
+    # "Only '=', '!=', 'is_()' ... can be used with None/True/False".
+    # `_require_absolute_bounds` no cubre esto: solo rechaza extremos naive.
+    # El patrón condicional es el mismo de `_scope_conditions`.
+    obs_conditions = [OperationalObservationModel.event_day_id.in_(event_day_ids)]
+    if period.start is not None:
+        obs_conditions.append(OperationalObservationModel.timestamp >= period.start)
+    if period.end is not None:
+        obs_conditions.append(OperationalObservationModel.timestamp <= period.end)
 
     # Warnings de calidad: unión DISTINCT de los arrays `metadata.warnings` de
     # las observaciones de la zona en el período. Se resuelve en un subquery

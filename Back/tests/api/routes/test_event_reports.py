@@ -1009,6 +1009,108 @@ class TestFieldCensus:
         assert resp.status_code == 400
 
 
+class TestFieldCensusPeriodModes:
+    """Los tres modos de período, incluido `accumulated` sin rango."""
+
+    URL = f"/api/events/{EVENT_ID}/reports/field_census"
+
+    def _empty(self):
+        return _all_result([])
+
+    def test_accumulated_sin_rango_no_rompe(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        """Regresión: `timestamp <= None` reventaba con ArgumentError.
+
+        `accumulated` es un modo soportado (el frontend ofrece "Histórico
+        acumulado"), no un error: un evento sin fechas y sin parámetros debe
+        devolver el histórico completo, no un 500.
+        """
+        # Evento sin fechas -> _resolve_period devuelve (None, None, accumulated).
+        db_mock.execute.side_effect = [_event_result(_event(None, None)), self._empty()]
+
+        resp = client.get(self.URL, headers=auth_headers)
+        assert resp.status_code == 200
+        assert resp.json()["period"] == {"start": None, "end": None, "mode": "accumulated"}
+
+        sql, _ = _compiled(db_mock, 1)
+        # Sin predicados de timestamp: solo el filtro de jornadas.
+        assert "timestamp >=" not in sql
+        assert "timestamp <=" not in sql
+        assert "event_day_id IN" in sql
+
+    def test_periodo_del_evento_aplica_ambos_extremos(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            self._empty(),
+        ]
+
+        resp = client.get(self.URL, headers=auth_headers)
+        assert resp.status_code == 200
+        assert resp.json()["period"]["mode"] == "event"
+
+        sql, _ = _compiled(db_mock, 1)
+        assert "timestamp >=" in sql
+        assert "timestamp <=" in sql
+        # Los dos filtros (principal y subquery de warnings) llevan el período.
+        assert sql.count("timestamp >=") >= 2
+        assert sql.count("timestamp <=") >= 2
+
+    def test_periodo_solo_con_start(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        """Un solo extremo es válido: filtra por el bajo, no por el alto."""
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            self._empty(),
+        ]
+
+        resp = client.get(
+            self.URL,
+            params={"start": "2026-09-24T03:00:00Z"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["period"]["mode"] == "requested"
+
+        sql, _ = _compiled(db_mock, 1)
+        assert "timestamp >=" in sql
+        assert "timestamp <=" not in sql
+
+    def test_periodo_solo_con_end(
+        self,
+        client: TestClient,
+        db_mock: AsyncMock,
+        auth_headers: dict[str, str],
+    ):
+        db_mock.execute.side_effect = [
+            _event_result(_event(EVENT_START, EVENT_END)),
+            self._empty(),
+        ]
+
+        resp = client.get(
+            self.URL,
+            params={"end": "2026-09-26T03:00:00Z"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+
+        sql, _ = _compiled(db_mock, 1)
+        assert "timestamp >=" not in sql
+        assert "timestamp <=" in sql
+
+
 class TestFieldCensusWarningFlags:
     """Alertas de calidad (metadata.warnings) agregadas por zona."""
 
