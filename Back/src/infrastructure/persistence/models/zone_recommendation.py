@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, ForeignKey, String, func
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, String, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -19,7 +19,8 @@ class ZoneRecommendationModel(Base):
         ForeignKey("event_days.id"),
         nullable=False,
     )
-    timestamp: Mapped[datetime] = mapped_column(nullable=False)
+    # Neon (y p92, que creo la tabla) lo tienen como timestamptz.
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     zone_id: Mapped[str] = mapped_column(
         String(36),
         ForeignKey("zones.id"),
@@ -33,7 +34,10 @@ class ZoneRecommendationModel(Base):
     metadata_json: Mapped[dict | None] = mapped_column(
         "metadata", JSONB, nullable=True
     )
+    # La migracion p92 crea esta columna como timestamptz; el modelo declaraba
+    # DateTime naive y quedaba desalineado.
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         server_default=func.now(),
     )
 
