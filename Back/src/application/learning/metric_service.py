@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,6 +32,25 @@ SUBTIPO_TO_ZONE_TYPE_SLUG = {
     "hidratacion": "hidratacion",
     "descanso": "descanso",
 }
+
+
+def _as_utc(value: datetime) -> datetime:
+    """Devuelve ``value`` con timezone, interpretando los naive como UTC.
+
+    Sin esto, restar dos datetimes de tablas distintas revienta: en Neon
+    ``operational_observations.timestamp`` es ``timestamptz`` (llega aware del
+    driver) mientras que ``predictions.timestamp`` es ``timestamp without time
+    zone`` (llega naive), y Python se niega a restar uno contra el otro con
+    ``can't subtract offset-naive and offset-aware datetimes``.
+
+    El lado naive se interpreta como UTC porque es como lo escribe la propia
+    aplicacion: los valores de ``timestamp`` en ``predictions`` se producen con
+    ``datetime.now(timezone.utc)`` y las columnas sin timezone de Postgres
+    guardan UTC cuando la sesion esta en UTC, que es el default de Neon.
+    """
+    if value.tzinfo is None or value.utcoffset() is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value
 
 
 class MetricService:
@@ -92,7 +111,10 @@ class MetricService:
                 for observation in observations:
                     if observation.zone_id != zone_key:
                         continue
-                    delta = observation.timestamp - prediction.timestamp
+                    delta = (
+                        _as_utc(observation.timestamp)
+                        - _as_utc(prediction.timestamp)
+                    )
                     if abs(delta.total_seconds()) > window.total_seconds():
                         continue
                     deviations.append(
