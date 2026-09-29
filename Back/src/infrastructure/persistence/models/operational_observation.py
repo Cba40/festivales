@@ -31,3 +31,8 @@ class OperationalObservationModel(Base):
     source: Mapped[str] = mapped_column(String(50), nullable=False, server_default="manual")
     metadata_: Mapped[dict | None] = mapped_column("metadata", JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Auditoría de corrección. Nullable y sin default: NULL significa "nunca se
+    # corrigió", que es el caso de la overwhelming mayoría de las filas. Se
+    # escribe solo desde el PATCH, no desde el alta.
+    corrected_by: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    corrected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

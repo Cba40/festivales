@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import re
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
@@ -15,6 +15,7 @@ from app.models.zone import Zone
 from app.schemas.operational_observation import (
     OperationalObservationCreate,
     OperationalObservationResponse,
+    OperationalObservationUpdate,
 )
 from src.infrastructure.persistence.models import OperationalObservationModel
 
@@ -29,6 +30,19 @@ MIN_INTERVAL_MINUTES = 15
 
 WARNING_VARIATION = "variacion_extrema"
 WARNING_TYPO = "posible_error_tipeo"
+
+# Claves de `metadata` que escribe el sistema, no el operador. Se separan de las
+# que sí edita el operador (notas, etc.) para que un PATCH de `metadata` nunca
+# pueda dejar un warning viejo pegado, ni inventarse uno.
+COMPUTED_METADATA_KEYS = frozenset(
+    {
+        "warnings",
+        "variacion_pct",
+        "densidad_anterior",
+        "capacidad",
+        "densidad_observada",
+    }
+)
 
 _UUID_RE = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
@@ -47,6 +61,7 @@ async def _find_observation_window(
     since: datetime | None = None,
     until: datetime | None = None,
     limit: int = 1,
+    exclude_id: UUID | None = None,
 ) -> list[OperationalObservationModel]:
     """Observaciones de una zona dentro de una ventana temporal, más reciente primero."""
     conditions = [OperationalObservationModel.zone_id == zone_id]
@@ -54,6 +69,11 @@ async def _find_observation_window(
         conditions.append(OperationalObservationModel.timestamp >= since)
     if until is not None:
         conditions.append(OperationalObservationModel.timestamp <= until)
+    if exclude_id is not None:
+        # En la corrección la fila editada cae dentro de su propia ventana
+        # (`until == su timestamp`), así que sin esto "la observación previa"
+        # sería la propia fila y toda variación daría 0%.
+        conditions.append(OperationalObservationModel.id != exclude_id)
     result = await db.execute(
         select(OperationalObservationModel)
         .where(*conditions)
@@ -107,6 +127,7 @@ async def _collect_quality_warnings(
     zone: Zone,
     new_density: int,
     new_timestamp: datetime,
+    exclude_id: UUID | None = None,
 ) -> dict:
     """Warnings de calidad del muestreo. Nunca rechazan: solo informan.
 
@@ -117,7 +138,7 @@ async def _collect_quality_warnings(
     # La referencia se acota con `until=new_timestamp` para que, al cargar una
     # observación retroactiva, sea una observación previa y no una futura.
     previous = await _find_observation_window(
-        db, zone_id=zone.id, until=new_timestamp, limit=1
+        db, zone_id=zone.id, until=new_timestamp, limit=1, exclude_id=exclude_id
     )
     return _evaluate_quality(
         new_density=new_density,
@@ -148,6 +169,8 @@ def _to_response(model: OperationalObservationModel) -> OperationalObservationRe
         source=model.source,
         metadata=model.metadata_,
         created_at=model.created_at,
+        corrected_by=model.corrected_by,
+        corrected_at=model.corrected_at,
     )
 
 
@@ -263,3 +286,94 @@ async def find_all(
     result = await db.execute(stmt)
     models = result.scalars().all()
     return [_to_response(m) for m in models]
+
+
+async def update_observation(
+    db: AsyncSession,
+    observation_id: UUID,
+    observation_in: OperationalObservationUpdate,
+    *,
+    corrected_by: str,
+) -> OperationalObservationResponse | None:
+    """Corrige una observación in-place. Devuelve None si no existe.
+
+    `timestamp`, `zone_id` y `event_day_id` no se tocan: son inmutables por
+    decisión de diseño y además el schema de update los rechaza con 422, así que
+    acá nunca llegan.
+
+    Solo recalcula warnings si `observed_density` cambió de verdad. Si el
+    operador corrige las notas o el observador, los warnings que ya estaban
+    calculados siguen siendo válidos y se preservan tal cual: recomputarlos
+    sin necesidad los dejaría distintos de cómo seilotaron en su momento, sin
+    ganar nada.
+
+    Lo que NO se recalcula es el warning de la observación *siguiente* de la
+    misma zona, que usa a esta como referencia. Sigue siendo un hueco conocido
+    del MVP: corregir la fila N deja obsoleto el `variacion_pct` de la fila N+1.
+    """
+    model = await db.get(OperationalObservationModel, observation_id)
+    if model is None:
+        return None
+
+    if observation_in.observer_id is not None and not _is_valid_uuid(observation_in.observer_id):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "observer_id inválido: debe ser un UUID de 36 caracteres "
+                "o dejarse en blanco"
+            ),
+        )
+
+    new_density = (
+        observation_in.observed_density
+        if observation_in.observed_density is not None
+        else model.observed_density
+    )
+    density_changed = new_density != model.observed_density
+
+    # `metadata` del body es la nueva base de las claves del operador; las
+    # calculadas por el sistema se sacan y se vuelven a poner después, para que
+    # un PATCH de notas no borre warnings ni pueda inyectarlos.
+    previous_metadata = dict(model.metadata_ or {})
+    base = dict(
+        observation_in.metadata
+        if observation_in.metadata is not None
+        else previous_metadata
+    )
+    preserved_computed = {
+        key: previous_metadata[key]
+        for key in COMPUTED_METADATA_KEYS
+        if key in previous_metadata
+    }
+    for key in COMPUTED_METADATA_KEYS:
+        base.pop(key, None)
+
+    if density_changed:
+        zone = await db.get(Zone, model.zone_id)
+        if zone is None:
+            raise ValueError(f"Zone with id '{model.zone_id}' not found")
+        base.update(
+            await _collect_quality_warnings(
+                db,
+                zone=zone,
+                new_density=new_density,
+                new_timestamp=model.timestamp,
+                exclude_id=model.id,
+            )
+        )
+    else:
+        base.update(preserved_computed)
+
+    model.observed_density = new_density
+    if observation_in.observer_id is not None:
+        model.observer_id = observation_in.observer_id
+    if observation_in.source is not None:
+        model.source = observation_in.source
+    model.metadata_ = base or None
+    model.corrected_by = corrected_by
+    model.corrected_at = datetime.now(timezone.utc)
+
+    await db.flush()
+    await db.commit()
+    await db.refresh(model)
+    return _to_response(model)

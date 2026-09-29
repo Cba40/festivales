@@ -1,11 +1,16 @@
 import { useEffect, useCallback, useMemo, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Pencil, Plus } from 'lucide-react';
 import { EVENT_ID } from '@/components/context-engine/constants';
 import { apiClient } from '@/core/api/client';
 import { endpoints } from '@/core/api/endpoints';
 import { useOperationalObservations } from '@/hooks/useOperationalObservations';
-import { Button, Card, RefreshButton } from '@/features/dashboard/components/ui';
+import { Badge, Button, Card, RefreshButton } from '@/features/dashboard/components/ui';
+import { ObservationEditModal } from '@/features/dashboard/components/ObservationEditModal';
 import { truncateId } from '@/features/dashboard/utils/format';
+import type {
+  OperationalObservationDTO,
+  OperationalObservationUpdatePayload,
+} from '@/features/dashboard/types';
 
 const SOURCES = [
   { value: 'manual', label: 'Manual' },
@@ -83,9 +88,45 @@ function defaultTimestampForDay(day: EventDaySummary): string {
   return `${day.date}T${formatOperationalTime(day.operational_start_min)}`;
 }
 
+/**
+ * Warnings de calidad que escribe el backend en `metadata.warnings`
+ * (app/crud/operational_observation.py). Se muestran porque son el aviso de
+ * "esto puede estar mal": hasta ahora la tabla los escondía y el inspector no
+ * tenía forma de saber cuáles de sus conteos habían sido marcados.
+ */
+const WARNING_LABELS: Record<string, string> = {
+  variacion_extrema: 'Variación extrema',
+  posible_error_tipeo: 'Posible error de tipeo',
+};
+
+function warningsDe(obs: OperationalObservationDTO): string[] {
+  const raw = obs.metadata?.warnings;
+  return Array.isArray(raw) ? raw.filter((w): w is string => typeof w === 'string') : [];
+}
+
+function formatCorrectionDate(value: string): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString('es-AR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export function ObservationsScreen() {
-  const { observations, isLoading, isSubmitting, error, fetchObservations, createObservation } =
-    useOperationalObservations();
+  const {
+    observations,
+    isLoading,
+    isSubmitting,
+    isUpdating,
+    error,
+    fetchObservations,
+    createObservation,
+    updateObservation,
+  } = useOperationalObservations();
 
   const [zones, setZones] = useState<ZoneInfo[]>([]);
   const [eventDays, setEventDays] = useState<EventDaySummary[]>([]);
@@ -101,6 +142,8 @@ export function ObservationsScreen() {
   const [notas, setNotas] = useState('');
   const [formMessage, setFormMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<OperationalObservationDTO | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchObservations();
@@ -209,6 +252,26 @@ export function ObservationsScreen() {
       );
     }
   }, [eventDayId, zoneId, timestamp, observedDensity, observerId, source, notas, createObservation, error, timeInRange, selectedDay]);
+
+  const handleSaveEdit = useCallback(
+    async (
+      obs: OperationalObservationDTO,
+      payload: Required<Pick<OperationalObservationUpdatePayload, 'observed_density' | 'source'>> &
+        OperationalObservationUpdatePayload
+    ) => {
+      setEditError(null);
+      const saved = await updateObservation(obs.id, payload);
+      if (saved) {
+        setEditing(null);
+        setFormMessage('Observación corregida correctamente.');
+      } else {
+        setEditError(
+          'No se pudo guardar la corrección. Revisá los datos e intentá de nuevo.'
+        );
+      }
+    },
+    [updateObservation]
+  );
 
   return (
     <main className="max-w-5xl mx-auto space-y-6">
@@ -342,6 +405,11 @@ export function ObservationsScreen() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-bold text-slate-800">Observaciones recientes ({observations.length})</h2>
         </div>
+        {editError && (
+          <div className="p-3 mb-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+            {editError}
+          </div>
+        )}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -351,27 +419,63 @@ export function ObservationsScreen() {
                 <th className="px-5 py-2 font-medium">Densidad</th>
                 <th className="px-5 py-2 font-medium">Observador</th>
                 <th className="px-5 py-2 font-medium">Fuente</th>
+                <th className="px-5 py-2 font-medium text-right">Acciones</th>
               </tr>
             </thead>
             <tbody>
               {observations.length === 0 && !isLoading && (
                 <tr>
-                  <td colSpan={5} className="px-5 py-8 text-center text-slate-400 italic">
+                  <td colSpan={6} className="px-5 py-8 text-center text-slate-400 italic">
                     Sin observaciones registradas todavía.
                   </td>
                 </tr>
               )}
               {observations.map((obs) => {
                 const zona = zonesById[obs.zone_id];
+                const warnings = warningsDe(obs);
                 return (
-                  <tr key={obs.id} className="border-b border-slate-100">
+                  <tr key={obs.id} className="border-b border-slate-100 align-top">
                     <td className="px-5 py-2 text-slate-600">{formatTimestamp(obs.timestamp)}</td>
                     <td className="px-5 py-2 text-slate-700">
                       {zona ? zona.name : truncateId(obs.zone_id)}
                     </td>
-                    <td className="px-5 py-2 text-slate-700">{obs.observed_density}</td>
+                    <td className="px-5 py-2 text-slate-700">
+                      <div>{obs.observed_density}</div>
+                      {warnings.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {warnings.map((w) => (
+                            <Badge key={w} variant={w === 'variacion_extrema' ? 'warning' : 'error'}>
+                              {WARNING_LABELS[w] ?? w}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-5 py-2 text-slate-600">{obs.observer_id || '—'}</td>
-                    <td className="px-5 py-2 text-slate-600">{obs.source}</td>
+                    <td className="px-5 py-2 text-slate-600">
+                      <div>{obs.source}</div>
+                      {obs.corrected_by && (
+                        <div className="mt-1" title={`${obs.corrected_by}${
+                          obs.corrected_at ? ` · ${formatCorrectionDate(obs.corrected_at)}` : ''
+                        }`}>
+                          <Badge variant="info">Corregido</Badge>
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-5 py-2 text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setEditError(null);
+                          setEditing(obs);
+                        }}
+                        disabled={isUpdating}
+                      >
+                        <Pencil className="w-3 h-3" />
+                        Editar
+                      </Button>
+                    </td>
                   </tr>
                 );
               })}
@@ -379,6 +483,13 @@ export function ObservationsScreen() {
           </table>
         </div>
       </Card>
+
+      <ObservationEditModal
+        observation={editing}
+        isSaving={isUpdating}
+        onSave={handleSaveEdit}
+        onClose={() => setEditing(null)}
+      />
     </main>
   );
 }

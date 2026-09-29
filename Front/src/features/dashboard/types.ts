@@ -284,6 +284,10 @@ export interface OperationalObservationDTO {
   source: string;
   metadata: Record<string, unknown> | null;
   created_at: string;
+  /** Usuario que corrigió la observación. null = nunca fue corregida. */
+  corrected_by?: string | null;
+  /** Momento de la corrección. */
+  corrected_at?: string | null;
 }
 
 export interface OperationalObservationCreatePayload {
@@ -291,6 +295,20 @@ export interface OperationalObservationCreatePayload {
   zone_id: string;
   timestamp: string;
   observed_density: number;
+  observer_id?: string;
+  source?: string;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Corrección in-place. Deliberadamente NO incluye `timestamp`, `zone_id` ni
+ * `event_day_id`: el backend los rechaza con 422 (`extra="forbid"`), así que
+ * mandarlos desde acá solo produciría un error de validación.
+ *
+ * Tampoco incluye `corrected_by`: lo escribe el servidor con el `sub` del token.
+ */
+export interface OperationalObservationUpdatePayload {
+  observed_density?: number;
   observer_id?: string;
   source?: string;
   metadata?: Record<string, unknown>;

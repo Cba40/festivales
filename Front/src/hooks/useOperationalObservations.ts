@@ -4,16 +4,22 @@ import { endpoints } from '../core/api/endpoints';
 import type {
   OperationalObservationCreatePayload,
   OperationalObservationDTO,
+  OperationalObservationUpdatePayload,
 } from '../features/dashboard/types';
 
 interface UseOperationalObservationsResult {
   observations: OperationalObservationDTO[];
   isLoading: boolean;
   isSubmitting: boolean;
+  isUpdating: boolean;
   error: string | null;
   fetchObservations: () => Promise<void>;
   createObservation: (
     payload: OperationalObservationCreatePayload
+  ) => Promise<OperationalObservationDTO | null>;
+  updateObservation: (
+    id: string,
+    payload: OperationalObservationUpdatePayload
   ) => Promise<OperationalObservationDTO | null>;
 }
 
@@ -23,6 +29,7 @@ export function useOperationalObservations(): UseOperationalObservationsResult {
   const [observations, setObservations] = useState<OperationalObservationDTO[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchObservations = useCallback(async () => {
@@ -78,5 +85,47 @@ export function useOperationalObservations(): UseOperationalObservationsResult {
     []
   );
 
-  return { observations, isLoading, isSubmitting, error, fetchObservations, createObservation };
+  const updateObservation = useCallback(
+    async (id: string, payload: OperationalObservationUpdatePayload) => {
+      setIsUpdating(true);
+      setError(null);
+      try {
+        const { data } = await apiClient.patch<OperationalObservationDTO>(
+          endpoints.operationalObservations.update(id),
+          payload
+        );
+        // Se reemplaza la fila en lugar de recargar la lista: el PATCH devuelve
+        // el registro completo ya con los warnings recalculados, y las notas y
+        // la densidad corregidas. Volver a pedir la lista entera seria un viaje
+        // extra por algo que ya tenemos en la respuesta.
+        setObservations((prev) =>
+          prev.map((obs) => (obs.id === id ? data : obs))
+        );
+        return data;
+      } catch (err: unknown) {
+        const msg =
+          (err as { response?: { data?: { detail?: string } } })?.response?.data
+            ?.detail ||
+          (err instanceof Error
+            ? err.message
+            : 'Error al corregir la observación');
+        setError(msg);
+        return null;
+      } finally {
+        setIsUpdating(false);
+      }
+    },
+    []
+  );
+
+  return {
+    observations,
+    isLoading,
+    isSubmitting,
+    isUpdating,
+    error,
+    fetchObservations,
+    createObservation,
+    updateObservation,
+  };
 }

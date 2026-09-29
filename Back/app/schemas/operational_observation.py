@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class OperationalObservationCreate(BaseModel):
@@ -20,6 +20,40 @@ class OperationalObservationCreate(BaseModel):
         return value
 
 
+class OperationalObservationUpdate(BaseModel):
+    """Corrección in-place de una observación (RFC-006).
+
+    `extra="forbid"` no es cosmético: `timestamp`, `zone_id` y `event_day_id` son
+    inmutables por decisión de diseño (cambiar el timestamp evadiría la ventana
+    operativa de la jornada y la ventana anti-spam, que solo se validan en el
+    alta). Con `forbid`, mandar cualquiera de esos campos es un 422 explícito en
+    vez de un ignore silencioso que el cliente interpreta como un éxito.
+
+    `corrected_by` NO se acepta desde el body: lo escribe el servidor con el
+    `sub` del token. Aceptarlo acá haría que un campo de auditoría fuera
+    arbitrariamente seteable por el cliente, que es justo lo que un campo de
+    auditoría no puede ser.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    observed_density: Optional[int] = Field(None, ge=0, description="Densidad observada (>= 0)")
+    observer_id: Optional[str] = Field(None, description="ID del observador")
+    source: Optional[str] = Field(None, description="Fuente: manual, sensor, official_report")
+    metadata: Optional[dict] = Field(None, description="Metadatos rewritten por el operador")
+
+    @model_validator(mode="after")
+    def at_least_one_field(self) -> "OperationalObservationUpdate":
+        if (
+            self.observed_density is None
+            and self.observer_id is None
+            and self.source is None
+            and self.metadata is None
+        ):
+            raise ValueError("PATCH vacío: indicá al menos un campo a corregir")
+        return self
+
+
 class OperationalObservationResponse(BaseModel):
     id: str = Field(..., description="ID de la observación")
     event_day_id: str = Field(..., description="ID del event day")
@@ -30,5 +64,11 @@ class OperationalObservationResponse(BaseModel):
     source: str = Field(default="manual", description="Fuente de la observación")
     metadata: Optional[dict] = Field(default=None, description="Metadatos adicionales")
     created_at: datetime = Field(..., description="Fecha de creación")
+    corrected_by: Optional[str] = Field(
+        default=None, description="Usuario que corrigió la observación (sub del token)"
+    )
+    corrected_at: Optional[datetime] = Field(
+        default=None, description="Momento de la corrección"
+    )
 
     model_config = ConfigDict(from_attributes=True)

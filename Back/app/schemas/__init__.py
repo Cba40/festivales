@@ -18,7 +18,11 @@ from app.schemas.configuration_recommendation import (
 )
 from app.schemas.recommendation_supporting_metrics import SupportingMetricsSchema
 from app.schemas.recommendation_historic_trace import HistoricTraceSchema
-from app.schemas.operational_observation import OperationalObservationCreate, OperationalObservationResponse
+from app.schemas.operational_observation import (
+    OperationalObservationCreate,
+    OperationalObservationUpdate,
+    OperationalObservationResponse,
+)
 from app.schemas.transport_alert import (
     TransportAlertCreate,
     TransportAlertUpdate,
@@ -50,6 +54,7 @@ __all__ = [
     "SupportingMetricsSchema",
     "HistoricTraceSchema",
     "OperationalObservationCreate",
+    "OperationalObservationUpdate",
     "OperationalObservationResponse",
     "TransportAlertCreate",
     "TransportAlertUpdate",

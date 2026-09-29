@@ -87,7 +87,10 @@ export const endpoints = {
     list: () => '/operational-phases/',
   },
   operationalObservations: {
+    // El router del backend es `/operational-observations` con `prefix="/api"`,
+    // sin segmento de eventId: el filtrado por jornada se hace por query param.
     list: '/operational-observations/',
+    update: (id: string) => `/operational-observations/${id}`,
   },
   analytics: {
     evaluate: '/analytics/evaluate',
