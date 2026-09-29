@@ -1,7 +1,18 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { SectionTabs } from '../components/ui';
 import { DashboardHeader } from '../components/DashboardHeader';
 import { AppFooter } from '@/components/AppFooter';
+import { ReportPeriodFilter } from '../components/reports/ReportPeriodFilter';
+import type { ReportPeriodSelection } from '../components/reports/ReportPeriodFilter';
+import { useEventDays } from '../hooks/useEventDays';
+import {
+  isIncompleteSelection,
+  resolveReportPeriod,
+  type ReportPeriodMode,
+} from '../utils/eventDayPeriod';
+import { DEFAULT_TIMEZONE } from '../components/reports/reportFormat';
+
+const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 
 type Section =
   | 'reporte'
@@ -13,7 +24,17 @@ type Section =
   | 'incidents'
   | 'operational';
 
-const SECTIONS: { key: Section; label: string; Component: React.LazyExoticComponent<() => React.JSX.Element> }[] =
+interface ReportPeriodProps {
+  start?: string;
+  end?: string;
+}
+
+/** Todos los informes aceptan el mismo par de límites absolutos. */
+type ReportSectionComponent = React.LazyExoticComponent<
+  React.ComponentType<ReportPeriodProps>
+>;
+
+const SECTIONS: { key: Section; label: string; Component: ReportSectionComponent }[] =
   [
     {
       key: 'reporte',
@@ -95,10 +116,63 @@ export function ReportsScreen() {
   const [activeSection, setActiveSection] = useState<Section>('reporte');
   const ActiveSectionComponent = SECTIONS.find((s) => s.key === activeSection)?.Component;
 
+  // El período vive acá y no dentro de un informe: antes vivía en
+  // MunicipalReportScreen, que se desmonta al cambiar de tab, así que la
+  // selección se perdía. Ahora sobrevive al cambio de tab y además la
+  // comparten los ocho informes, que antes la recibían como `undefined` y
+  // consultaban sin rango.
+  const [selection, setSelection] = useState<ReportPeriodSelection>({
+    mode: 'evento' as ReportPeriodMode,
+    eventDayDate: '',
+    customStart: '',
+    customEnd: '',
+  });
+
+  const { eventDays, loading: loadingDays } = useEventDays(EVENT_ID);
+
+  useEffect(() => {
+    if (selection.mode === 'dia' && !selection.eventDayDate && eventDays.length > 0) {
+      setSelection((prev) => ({ ...prev, eventDayDate: eventDays[0].date }));
+    }
+  }, [selection.mode, selection.eventDayDate, eventDays]);
+
+  const period = useMemo(
+    () =>
+      resolveReportPeriod(selection.mode, {
+        eventDayDate: selection.eventDayDate,
+        customStart: selection.customStart,
+        customEnd: selection.customEnd,
+        timeZone: DEFAULT_TIMEZONE,
+      }),
+    [selection.mode, selection.eventDayDate, selection.customStart, selection.customEnd]
+  );
+
+  const customRangeInvalid =
+    selection.mode === 'personalizado' &&
+    Boolean(selection.customStart) &&
+    Boolean(selection.customEnd) &&
+    selection.customEnd < selection.customStart;
+
+  const selectionIncomplete = isIncompleteSelection(selection.mode, {
+    eventDayDate: selection.eventDayDate,
+    customStart: selection.customStart,
+    customEnd: selection.customEnd,
+  });
+
   return (
     <div className="min-h-screen bg-slate-50 w-full">
       <div className="print:hidden">
         <DashboardHeader title="Informes del Evento" />
+      </div>
+      <div className="px-4 sm:px-6">
+        <ReportPeriodFilter
+          selection={selection}
+          onChange={setSelection}
+          eventDays={eventDays}
+          loadingDays={loadingDays}
+          customRangeInvalid={customRangeInvalid}
+          selectionIncomplete={selectionIncomplete}
+        />
       </div>
       <SectionTabs
         sections={TABS}
@@ -109,7 +183,9 @@ export function ReportsScreen() {
 
       <main className="p-4 sm:p-6">
         <Suspense fallback={<div className="p-6 text-center text-slate-500">Cargando informe…</div>}>
-          {ActiveSectionComponent ? <ActiveSectionComponent /> : null}
+          {ActiveSectionComponent ? (
+            <ActiveSectionComponent start={period.start} end={period.end} />
+          ) : null}
         </Suspense>
       </main>
 
