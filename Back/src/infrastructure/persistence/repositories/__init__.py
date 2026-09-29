@@ -1,11 +1,5 @@
 from __future__ import annotations
 
-from src.infrastructure.persistence.repositories.event_day_repository import (
-    SQLEventDayRepository,
-)
-from src.infrastructure.persistence.repositories.operational_event_repository import (
-    SQLOperationalEventRepository,
-)
 from src.infrastructure.persistence.repositories.configuration_recommendation_repository import (
     SQLConfigurationRecommendationRepository,
 )
