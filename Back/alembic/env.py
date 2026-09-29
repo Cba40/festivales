@@ -34,20 +34,23 @@ import app.models.zone_subtype
 # no en app.db.session.Base. Sin importarlos aca, Alembic no los ve y los propone
 # como tablas sobrantes -> op.drop_table sobre operational_observations,
 # predictions, knowledge_model_versions y zone_recommendations.
+#
+# Antes este import traia tambien los 9 modelos fantasma de `src/`
+# (AttendanceLevelModel, EventDayModel, EventDayPhaseModel, OperationalEventModel,
+# OperationalPhaseModel, OperationalProfileModel, ZoneModel, ZoneBehaviorModel,
+# ZoneTypeModel). Eran un diseno P3.0 abandonado que nunca llego a las
+# migraciones, y por eso el merge de `target_metadata` (mas abajo) necesitaba una
+# regla de desempate por nombre de tabla. Con la deuda saldada ya no hay
+# solapamiento entre las dos capas y el merge es directo.
+#
+# Las dos tablas que quedan fuera de este import se traen por su modulo porque el
+# barrel de models/ no las reexporta: son de dominios distintos (recomendaciones y
+# auditoria) y sus repositorios las importan por ruta directa.
 from src.infrastructure.persistence.models import (
-    AttendanceLevelModel,
-    EventDayModel,
-    EventDayPhaseModel,
     KnowledgeModelVersionModel,
-    OperationalEventModel,
     OperationalObservationModel,
-    OperationalPhaseModel,
-    OperationalProfileModel,
     PredictionModel,
-    ZoneBehaviorModel,
-    ZoneModel,
     ZoneRecommendationModel,
-    ZoneTypeModel,
 )
 from src.infrastructure.persistence.models.configuration_recommendation import (
     ConfigurationRecommendation,
@@ -64,8 +67,14 @@ if config.config_file_name is not None:
 # target_metadata es un unico MetaData, pero el proyecto tiene dos bases de
 # declarativos. Se fusionan en una copia nueva (no se muta app.db.session.Base)
 # para que --autogenerate vea la union y no produzca drop_table de lo que no ve.
-# Ante nombres compartidos (9 tablas presentes en ambas capas) gana la capa app:
-# es la que describe el esquema que las migraciones de este arbol materializan.
+#
+# Hoy las dos capas no comparten ninguna tabla: app/ aporta 26 y src/ aporta 6, y
+# el conjunto es disjunto. Antes hubo 9 nombres compartidos y por eso hacia falta
+# un desempate explicito; con la deuda saldada, copiar en cualquier orden daria lo
+# mismo. El `if` se conserva como red de seguridad: si alguien reintrodujera una
+# tabla duplicada, salta por encima en vez de romper el merge, y ademas
+# tests/infrastructure/test_model_drift.py falla explicitamente. Que se avise en
+# el log de Alembic y en el test es preferible a que el merge se rompa en silencio.
 target_metadata = MetaData()
 for _table in AppBase.metadata.tables.values():
     _table.to_metadata(target_metadata)

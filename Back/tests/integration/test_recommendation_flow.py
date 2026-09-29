@@ -200,12 +200,10 @@ def _ensure_test_schema() -> None:
 
             from app.models.event_day_phase import EventDayPhase as AppEventDayPhase
 
-            from src.infrastructure.persistence.models.event_day_phase import (
-                EventDayPhaseModel as InfraEventDayPhaseModel,
-            )
-
-            for model in (AppEventDayPhase, InfraEventDayPhaseModel):
-                model.__table__.c.intensity.server_default = DefaultClause(text("1.0"))
+            # Antes esto tambien parcheaba `EventDayPhaseModel` de la capa src/,
+            # que ya no existe: era uno de los 9 modelos fantasma P3.0. Ahora
+            # EventDayPhase vive solo en app/ y hay un solo lugar que parchear.
+            AppEventDayPhase.__table__.c.intensity.server_default = DefaultClause(text("1.0"))
 
             # Las tablas events/zones/points se pre-crean sin la columna postgis
             # (el servidor no tiene la librería postgis-3 operativa). Si la

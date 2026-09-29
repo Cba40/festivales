@@ -15,13 +15,13 @@ import pytest
 
 from app.models.operational_event import OperationalEvent
 from app.models.zone import Zone
+from app.models.zone_behavior import ZoneBehavior
 from app.models.zone_type import ZoneType
 from src.application.learning.metric_service import MetricService
 from src.domain.entities.zone_behavior import FlowRestriction
 from src.infrastructure.persistence.models import (
     OperationalObservationModel,
     PredictionModel,
-    ZoneBehaviorModel,
 )
 from src.infrastructure.persistence.repositories.prediction_repository import (
     SQLPredictionRepository,
@@ -190,18 +190,23 @@ def make_behavior(
     zone_type_id: str,
     density_factor: float,
     phase_id: str = PHASE,
-) -> ZoneBehaviorModel:
-    return ZoneBehaviorModel(
+) -> ZoneBehavior:
+    # Se construye con el modelo de `app/`, igual que hace `MetricService` desde
+    # la Fase 1. `zone_type_id` es VARCHAR(36) en el modelo real (compatibilidad de
+    # FK con `zone_types.id`), asi que va como string y no como UUID. Lo mismo con
+    # `flow_restriction`: el modelo real es String(20) con un CHECK de 3 valores,
+    # no un ENUM, asi que se pasa el valor del enum y no el enum.
+    return ZoneBehavior(
         id=uuid4(),
         operational_phase_id=UUID(phase_id),
-        zone_type_id=UUID(zone_type_id),
+        zone_type_id=zone_type_id,
         density_factor=density_factor,
-        flow_restriction=FlowRestriction.OPEN,
+        flow_restriction=FlowRestriction.OPEN.value,
     )
 
 
-def neon_behaviors(n: int = 110) -> list[ZoneBehaviorModel]:
-    behaviors: list[ZoneBehaviorModel] = [
+def neon_behaviors(n: int = 110) -> list[ZoneBehavior]:
+    behaviors: list[ZoneBehavior] = [
         make_behavior(ZT_A, 0.8),
         make_behavior(ZT_B, 0.5),
     ]
