@@ -522,20 +522,6 @@ export interface CoverageGapsDTO {
   temporal_distribution: ReportTemporalBucketDTO[];
 }
 
-export interface TechnicalIncidentItemDTO {
-  service_category: string;
-  error_count: number;
-  error_rate: number;
-}
-
-export interface TechnicalIncidentsDTO {
-  event_id: string;
-  event_name: string;
-  period: ReportPeriodRange;
-  services: TechnicalIncidentItemDTO[];
-  temporal_distribution: ReportTemporalBucketDTO[];
-}
-
 export interface TemporalDistributionBucketDTO {
   bucket: string;
   count: number;
@@ -593,88 +579,4 @@ export interface ZoneAnalysisDTO {
   period: ReportPeriodRange;
   service_category: string | null;
   zones: ZoneAnalysisItemDTO[];
-}
-
-export interface RecommendedZoneItemDTO {
-  zone_id: string;
-  zone_name: string;
-  zone_type: string;
-  recommendations: number;
-}
-
-export interface RecommendedZonesDTO {
-  event_id: string;
-  event_name: string;
-  period: ReportPeriodRange;
-  service_category: string | null;
-  zones: RecommendedZoneItemDTO[];
-}
-
-export interface OperationalPhaseRefDTO {
-  phase_id: string | null;
-  phase_name: string;
-}
-
-export interface PlatformQueriesPhaseDTO extends OperationalPhaseRefDTO {
-  consultas_total: number;
-  with_results: number;
-  empty: number;
-  unavailable: number;
-  error: number;
-}
-
-export interface ZonePredictionSummaryDTO {
-  zone_id: string | null;
-  zone_name: string;
-  projected_density: number | null;
-  operational_state: string | null;
-}
-
-export interface PredictionsPhaseDTO extends OperationalPhaseRefDTO {
-  predictions_count: number;
-  zones: ZonePredictionSummaryDTO[];
-}
-
-export interface ZoneObservationSummaryDTO {
-  zone_id: string;
-  zone_name: string;
-  observations_count: number;
-  observed_density_total: number;
-  observed_density_avg: number | null;
-}
-
-export interface ObservationsPhaseDTO extends OperationalPhaseRefDTO {
-  observations_count: number;
-  zones: ZoneObservationSummaryDTO[];
-}
-
-export interface OperationalEventSummaryItemDTO {
-  operational_event_id: string;
-  event_type: string;
-  is_incident: boolean;
-  zone_id: string | null;
-  zone_name: string | null;
-  start_timestamp: string;
-  end_timestamp: string;
-  description: string | null;
-}
-
-export interface OperationalEventsPhaseDTO extends OperationalPhaseRefDTO {
-  total_events: number;
-  incidents: number;
-  events: OperationalEventSummaryItemDTO[];
-}
-
-export interface OperationalProfileDTO {
-  event_id: string;
-  event_name: string;
-  period: ReportPeriodRange;
-  timezone: string;
-  operational_profile_id: string | null;
-  phases: OperationalPhaseRefDTO[];
-  platform_queries: PlatformQueriesPhaseDTO[];
-  predictions_summary: PredictionsPhaseDTO[];
-  observations_summary: ObservationsPhaseDTO[];
-  operational_events_summary: OperationalEventsPhaseDTO[];
-  insufficient_data: string[];
 }

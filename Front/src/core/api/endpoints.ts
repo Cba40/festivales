@@ -101,15 +101,10 @@ export const endpoints = {
     summary: (eventId: string) => `/events/${eventId}/reports/summary`,
     serviceBreakdown: (eventId: string) => `/events/${eventId}/reports/service_breakdown`,
     coverageGaps: (eventId: string) => `/events/${eventId}/reports/coverage_gaps`,
-    technicalIncidents: (eventId: string) =>
-      `/events/${eventId}/reports/technical_incidents`,
     temporalDistribution: (eventId: string) =>
       `/events/${eventId}/reports/temporal_distribution`,
     fieldCensus: (eventId: string) => `/events/${eventId}/reports/field_census`,
     zoneAnalysis: (eventId: string) => `/events/${eventId}/reports/zone_analysis`,
-    recommendedZones: (eventId: string) => `/events/${eventId}/reports/recommended_zones`,
-    operationalProfile: (eventId: string) =>
-      `/events/${eventId}/reports/operational_profile`,
   },
   products: {
     parking: (eventId: string) =>

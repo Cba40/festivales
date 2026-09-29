@@ -49,12 +49,6 @@ export function humanize(value: string): string {
   return value.replace(/_/g, ' ');
 }
 
-export function formatISODate(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString('es-AR', { timeZone: 'UTC' });
-}
-
 export function formatDateOnly(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
@@ -441,10 +435,6 @@ export function buildFilterGroups(
   });
 
   return result.sort((a, b) => b.total - a.total);
-}
-
-export function phaseDisplayName(name: string): string {
-  return name === 'unassigned' ? 'Sin fase asignada' : name;
 }
 
 export const DEFAULT_TIMEZONE = 'America/Argentina/Buenos_Aires';

@@ -5,10 +5,8 @@
 /* -----------------------------------------------------------------------------
    Impresión — Informes del evento
    La impresión se ejecuta con window.print() del navegador (sin PDF backend).
-   Área imprimible: los cinco informes de la pantalla de Informes (ReportsScreen).
-   Las reglas .informe-imprimible aplican al contenedor que se marque con esa
-   clase; hoy ningún informe la aplica, así que solo rigen @page y la ocultación
-   de button/select.
+   No hay un área imprimible dedicada: se imprime la vista activa. Solo se
+   ajustan los márgenes de página y se ocultan los controles interactivos.
 ----------------------------------------------------------------------------- */
 @page {
   margin: 1.5cm;
@@ -23,30 +21,5 @@
   button,
   select {
     display: none !important;
-  }
-
-  /* Área del informe: sin sombras decorativas ni fondos innecesarios */
-  .informe-imprimible {
-    background: #ffffff !important;
-  }
-  .informe-imprimible * {
-    box-shadow: none !important;
-  }
-
-  /* Tablas: repetir encabezados en cada página y evitar cortes de filas */
-  .informe-imprimible thead {
-    display: table-header-group;
-  }
-  .informe-imprimible tr,
-  .informe-imprimible h2,
-  .informe-imprimible h3,
-  .informe-imprimible h4 {
-    page-break-inside: avoid;
-    break-inside: avoid;
-  }
-  .informe-imprimible h2,
-  .informe-imprimible h3,
-  .informe-imprimible h4 {
-    page-break-after: avoid;
   }
 }
