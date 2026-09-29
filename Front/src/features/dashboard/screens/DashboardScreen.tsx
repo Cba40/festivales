@@ -8,6 +8,12 @@ import {
   Activity,
   Wifi,
   Megaphone,
+  FileText,
+  Bell,
+  Brain,
+  CalendarDays,
+  Map,
+  LogOut,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAppStore } from '../../../core/state/store';
@@ -174,39 +180,52 @@ export function DashboardScreen() {
             <RefreshButton onClick={() => void handleRefresh()} loading={refreshing} />
             <button
               onClick={() => navigate('/dashboard/event-config')}
-              className="text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"
+              className="flex items-center gap-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"
             >
+              <CalendarDays className="w-4 h-4" />
               Jornadas y Fases
             </button>
             <button
               onClick={() => navigate('/dashboard/infrastructure')}
-              className="text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"
+              className="flex items-center gap-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"
             >
+              <Map className="w-4 h-4" />
               Gestión de Zonas
             </button>
             <button
               onClick={() => navigate('/dashboard/operational-events')}
-              className="text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"
+              className="flex items-center gap-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"
             >
+              <AlertTriangle className="w-4 h-4" />
               Registrar Incidente
             </button>
             <button
               onClick={() => navigate('/dashboard/alerts')}
-              className="text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"
+              className="flex items-center gap-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"
             >
+              <Bell className="w-4 h-4" />
               Alertas y Mensajes
             </button>
             <button
-              onClick={() => navigate('/dashboard/motor')}
-              className="text-sm bg-purple-600 hover:bg-purple-700 text-white py-2 px-3 rounded-lg transition-colors"
+              onClick={() => navigate('/dashboard/reports')}
+              className="flex items-center gap-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"
             >
+              <FileText className="w-4 h-4" />
+              Informes
+            </button>
+            <button
+              onClick={() => navigate('/dashboard/motor')}
+              className="flex items-center gap-2 text-sm bg-purple-600 hover:bg-purple-700 text-white py-2 px-3 rounded-lg transition-colors"
+            >
+              <Brain className="w-4 h-4" />
               Motor y Análisis
             </button>
             <button
               onClick={handleLogout}
               type="button"
-              className="text-sm bg-red-600 hover:bg-red-700 text-white py-2 px-3 rounded-lg transition-colors"
+              className="flex items-center gap-2 text-sm bg-red-600 hover:bg-red-700 text-white py-2 px-3 rounded-lg transition-colors"
             >
+              <LogOut className="w-4 h-4" />
               Cerrar Sesión
             </button>
           </nav>
