@@ -3,9 +3,12 @@
 @tailwind utilities;
 
 /* -----------------------------------------------------------------------------
-   Impresión — Informe Municipal (Etapa 7)
+   Impresión — Informes del evento
    La impresión se ejecuta con window.print() del navegador (sin PDF backend).
-   Área imprimible: vista "Informe del Evento" (MunicipalReportScreen).
+   Área imprimible: los cinco informes de la pantalla de Informes (ReportsScreen).
+   Las reglas .informe-imprimible aplican al contenedor que se marque con esa
+   clase; hoy ningún informe la aplica, así que solo rigen @page y la ocultación
+   de button/select.
 ----------------------------------------------------------------------------- */
 @page {
   margin: 1.5cm;

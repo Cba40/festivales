@@ -14,15 +14,7 @@ import { DEFAULT_TIMEZONE } from '../components/reports/reportFormat';
 
 const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 
-type Section =
-  | 'reporte'
-  | 'summary'
-  | 'services'
-  | 'coverage'
-  | 'temporal'
-  | 'zones'
-  | 'incidents'
-  | 'operational';
+type Section = 'summary' | 'services' | 'zones' | 'census' | 'coverage';
 
 interface ReportPeriodProps {
   start?: string;
@@ -37,17 +29,8 @@ type ReportSectionComponent = React.LazyExoticComponent<
 const SECTIONS: { key: Section; label: string; Component: ReportSectionComponent }[] =
   [
     {
-      key: 'reporte',
-      label: 'Informe del Evento',
-      Component: lazy(() =>
-        import('@/features/dashboard/screens/MunicipalReportScreen').then((m) => ({
-          default: m.MunicipalReportScreen,
-        }))
-      ),
-    },
-    {
       key: 'summary',
-      label: 'Resumen',
+      label: 'Resumen de Actividad',
       Component: lazy(() =>
         import('@/features/dashboard/components/reports/ReportSummarySection').then((m) => ({
           default: m.ReportSummarySection,
@@ -56,7 +39,7 @@ const SECTIONS: { key: Section; label: string; Component: ReportSectionComponent
     },
     {
       key: 'services',
-      label: 'Por Servicio',
+      label: 'Actividad por Servicio',
       Component: lazy(() =>
         import('@/features/dashboard/components/reports/ReportServiceBreakdownSection').then((m) => ({
           default: m.ReportServiceBreakdownSection,
@@ -64,47 +47,29 @@ const SECTIONS: { key: Section; label: string; Component: ReportSectionComponent
       ),
     },
     {
+      key: 'zones',
+      label: 'Análisis de Zonas',
+      Component: lazy(() =>
+        import('@/features/dashboard/components/reports/ReportZoneAnalysisSection').then((m) => ({
+          default: m.ReportZoneAnalysisSection,
+        }))
+      ),
+    },
+    {
+      key: 'census',
+      label: 'Censo Operativo',
+      Component: lazy(() =>
+        import('@/features/dashboard/components/reports/ReportFieldCensusSection').then((m) => ({
+          default: m.ReportFieldCensusSection,
+        }))
+      ),
+    },
+    {
       key: 'coverage',
-      label: 'Brechas de Información',
+      label: 'Cobertura de Datos por Servicio',
       Component: lazy(() =>
         import('@/features/dashboard/components/reports/ReportCoverageGapsSection').then((m) => ({
           default: m.ReportCoverageGapsSection,
-        }))
-      ),
-    },
-    {
-      key: 'temporal',
-      label: 'Distribución Temporal',
-      Component: lazy(() =>
-        import('@/features/dashboard/components/reports/ReportTemporalDistributionSection').then((m) => ({
-          default: m.ReportTemporalDistributionSection,
-        }))
-      ),
-    },
-    {
-      key: 'zones',
-      label: 'Zonas Recomendadas',
-      Component: lazy(() =>
-        import('@/features/dashboard/components/reports/ReportRecommendedZonesSection').then((m) => ({
-          default: m.ReportRecommendedZonesSection,
-        }))
-      ),
-    },
-    {
-      key: 'incidents',
-      label: 'Incidencias Técnicas',
-      Component: lazy(() =>
-        import('@/features/dashboard/components/reports/ReportTechnicalIncidentsSection').then((m) => ({
-          default: m.ReportTechnicalIncidentsSection,
-        }))
-      ),
-    },
-    {
-      key: 'operational',
-      label: 'Perfil Operacional',
-      Component: lazy(() =>
-        import('@/features/dashboard/components/reports/ReportOperationalProfileSection').then((m) => ({
-          default: m.ReportOperationalProfileSection,
         }))
       ),
     },
@@ -113,13 +78,13 @@ const SECTIONS: { key: Section; label: string; Component: ReportSectionComponent
 const TABS: { key: Section; label: string }[] = SECTIONS.map(({ key, label }) => ({ key, label }));
 
 export function ReportsScreen() {
-  const [activeSection, setActiveSection] = useState<Section>('reporte');
+  const [activeSection, setActiveSection] = useState<Section>('summary');
   const ActiveSectionComponent = SECTIONS.find((s) => s.key === activeSection)?.Component;
 
   // El período vive acá y no dentro de un informe: antes vivía en
   // MunicipalReportScreen, que se desmonta al cambiar de tab, así que la
   // selección se perdía. Ahora sobrevive al cambio de tab y además la
-  // comparten los ocho informes, que antes la recibían como `undefined` y
+  // comparten los cinco informes, que antes la recibían como `undefined` y
   // consultaban sin rango.
   const [selection, setSelection] = useState<ReportPeriodSelection>({
     mode: 'evento' as ReportPeriodMode,
