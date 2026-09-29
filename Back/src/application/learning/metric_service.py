@@ -7,12 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.operational_event import OperationalEvent
 from app.models.zone import Zone
+from app.models.zone_behavior import ZoneBehavior
 from app.models.zone_type import ZoneType
 from src.application.learning.metric_result import MetricResult
 from src.infrastructure.persistence.models import (
     OperationalObservationModel,
     PredictionModel,
-    ZoneBehaviorModel,
 )
 from src.infrastructure.persistence.repositories.operational_observation_repository import (
     SQLOperationalObservationRepository,
@@ -343,9 +343,14 @@ class MetricService:
     async def _load_behaviors_by_phase(
         self,
         phase_id: str,
-    ) -> dict[str, ZoneBehaviorModel]:
-        stmt = select(ZoneBehaviorModel).where(
-            ZoneBehaviorModel.operational_phase_id == phase_id,
+    ) -> dict[str, ZoneBehavior]:
+        # Se usa el modelo de `app/`, no el de `src/`: son el mismo comportamiento
+        # y ademas el de `src/` declaraba `zone_type_id` como UUID cuando en la
+        # base es VARCHAR(36) (`d0e1f2a3b4c5`, por compatibilidad con
+        # `zone_types.id`). La clave del dict se normaliza con `str()` para que
+        # el emparejamiento con `_load_zone_type_ids_by_slug` no dependa de eso.
+        stmt = select(ZoneBehavior).where(
+            ZoneBehavior.operational_phase_id == phase_id,
         )
         result = await self._db.execute(stmt)
         return {str(behavior.zone_type_id): behavior for behavior in result.scalars().all()}

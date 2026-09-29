@@ -548,7 +548,7 @@ async def evaluate_metrics(
 
     # 3. Ejecutar MetricService.calculate_all
     #    phase_id alineado: el mismo UUID validado en OperationalPhase se pasa en
-    #    forma canónica; MetricService filtra ZoneBehaviorModel.operational_phase_id.
+    #    forma canónica; MetricService filtra ZoneBehavior.operational_phase_id.
     try:
         results = await MetricService(db).calculate_all(
             request.event_day_id,
