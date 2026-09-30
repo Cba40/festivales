@@ -54,6 +54,10 @@ from app.db.session import Base as AppBase
 import importlib
 import pkgutil
 
+import pytest
+from sqlalchemy.dialects import postgresql
+from sqlalchemy.schema import CreateTable
+
 import src.infrastructure.persistence.models as _src_models_pkg
 
 for _module_info in pkgutil.iter_modules(_src_models_pkg.__path__):
@@ -166,6 +170,63 @@ class TestRegistryMatchesReality:
             "Una tabla nueva en src/ necesita una migracion que la cree en el arbol "
             "activo; sin ella, el autogenerate la va a proponer como drop_table."
         )
+
+
+class TestSrcLayerCanEmitDdl:
+    """Guard de la regresión que perdió una FK cross-registry.
+
+    `ZoneRecommendationModel` declaraba `ForeignKey("zones.id")` y
+    `PredictionModel` declaraba `ForeignKey("event_days.id")`, con las dos tablas
+    referenciadas en `AppBase` y los dos modelos en `SrcBase`. SQLAlchemy resuelve
+    el string de una FK dentro del MetaData donde se define la tabla, así que en
+    cuanto alguien compila el DDL de esas tablas (un `alembic autogenerate`, un
+    test que arme el schema, cualquier cosa que llame a `create_all`) revienta con
+    NoReferencedTableError.
+
+    No se rompía al escribir filas ni al leer: por eso pasó inadvertido y solo
+    exploto en los endpoints de recomendacion, que son los que llegan a
+    reconstruir el schema. Y no lo detectaba ningun test de la suite.
+
+    Compilar el DDL de las 4 tablas de `src/` es la forma barata de cerrar eso.
+    """
+
+    def test_las_tablas_de_src_emiten_ddl(self) -> None:
+        dialect = postgresql.dialect()
+        for name, table in sorted(SrcBase.metadata.tables.items()):
+            try:
+                str(CreateTable(table).compile(dialect=dialect))
+            except Exception as exc:  # pragma: no cover - solo se ejecuta al fallar
+                pytest.fail(
+                    f"La tabla src/ '{name}' no compila su DDL: "
+                    f"{type(exc).__name__}: {exc}\n"
+                    "Casi siempre es una ForeignKey que apunta a una tabla de la "
+                    "capa app/, que no esta en SrcBase.metadata. La columna se "
+                    "declara sin ForeignKey y la integridad la siguen aplicando "
+                    "las ForeignKeyConstraint de las migraciones, en Postgres. "
+                    "Ver comment en el modelo."
+                )
+
+    def test_src_no_declara_fks_hacia_app(self) -> None:
+        """Las FK de `src/` no pueden apuntar a tablas de `app/`. Nunca.
+
+        Es la misma comprobacion que el test de arriba, pero sobre la causa y no
+        sobre el síntoma: si algún día se autoriza una FK cross-registry, este
+        test dice por qué no, en el punto donde se escribe, en vez de dejar que se
+        descubra en runtime.
+        """
+        tablas_app = set(AppBase.metadata.tables)
+        for name, table in sorted(SrcBase.metadata.tables.items()):
+            for fk in table.foreign_keys:
+                tabla_destino = fk.column.table.name
+                if tabla_destino in tablas_app and tabla_destino not in SrcBase.metadata.tables:
+                    pytest.fail(
+                        f"La columna '{name}.{fk.parent.name}' declara FK a "
+                        f"'{tabla_destino}', que es una tabla de la capa app/ y no "
+                        "esta en SrcBase.metadata. Compilar el DDL de esa tabla "
+                        "falla con NoReferencedTableError. Dejalo como columna "
+                        "simple: la integridad la aplica la constraint de la "
+                        "migracion, en la base."
+                    )
 
 
 class TestAppPrimaryKeys:
