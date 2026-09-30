@@ -506,6 +506,34 @@ class TestTransportEndpointHTTP:
         assert zona["minutes_until_next"] == 30
         assert zona["destination"] == "Córdoba"
 
+    def test_200_public_access_without_auth(
+        self,
+        client: TestClient,
+        _mock_adapter: AsyncMock,
+    ):
+        """Los endpoints de productos son públicos por decisión de producto.
+
+        Paridad con los otros cinco (baño, estacionamiento, hidratación,
+        gastronomía y descanso): se cubre sin credenciales a propósito, porque el
+        caso de uso es el asistente que planifica su viaje desde fuera del radio
+        del evento, sin sesión iniciada. La seguridad de estas rutas la dan rate
+        limiting y caching, no `verify_token`.
+        """
+        resp = client.get(
+            f"{BASE_URL}/products/transport",
+            params={
+                "destination": "Córdoba",
+                "latitude": -31.42,
+                "longitude": -64.19,
+            },
+        )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["event_id"] == EVENT_ID
+        assert body["mode"] == "informar"
+        assert len(body["zonas"]) == 1
+
     def test_adapter_receives_new_params(
         self,
         client: TestClient,

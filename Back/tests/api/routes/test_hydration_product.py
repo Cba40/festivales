@@ -209,10 +209,17 @@ class TestHydrationProductEndpoint:
         )
         assert resp.status_code == 422
 
-    def test_401_no_auth(
+    def test_200_public_access_without_auth(
         self,
         client: TestClient,
     ):
+        """Los endpoints de productos son públicos por decisión de producto.
+
+        Se cubre sin credenciales a propósito: el caso de uso es el asistente
+        que planifica su viaje desde fuera del radio del evento, sin sesión
+        iniciada. La seguridad de estas rutas la dan rate limiting y caching,
+        no `verify_token`.
+        """
         resp = client.get(
             f"{BASE_URL}/products/hydration",
             params={
@@ -221,7 +228,11 @@ class TestHydrationProductEndpoint:
                 "user_id": "550e8400-e29b-41d4-a716-446655440000",
             },
         )
-        assert resp.status_code == 401
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["event_id"] == EVENT_ID
+        assert body["mode"] == "informar"
+        assert len(body["zonas"]) == 2
 
     def test_negative_speed(
         self,
