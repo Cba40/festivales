@@ -2,6 +2,7 @@ import asyncio
 import os
 import sys
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 from typing import Optional
 
 import pytest
@@ -11,7 +12,7 @@ from fastapi.testclient import TestClient
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 from jose import jwt
-from sqlalchemy import create_engine, text
+from sqlalchemy import DefaultClause, String, create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import settings
@@ -19,10 +20,36 @@ from app.db.session import Base, get_db
 from app.main import app
 from app.models.event import Event
 from app.models.event_day import EventDay
+from app.models.event_day_phase import EventDayPhase
 from app.models.zone import Zone
 from app.models.zone_type import ZoneType
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", settings.DATABASE_URL)
+
+# ── Guard de seguridad ───────────────────────────────────────────────
+#
+# El fixture `test_engine` de abajo BORRA el schema `public` de TEST_DATABASE_URL
+# al empezar y al terminar la sesion. Si esa URL apunta por error a la base de
+# desarrollo, la suite destruye el esquema y la cadena de Alembic.
+#
+# Ya paso: `TEST_DATABASE_URL` no estaba definida, con caia al fallback
+# `settings.DATABASE_URL` (que es la de DESARROLLO) y los tests corrían `drop_all`
+# contra ella. Por eso se exige un nombre de base que termine en `_test`, en vez
+# de confiar en que la variable este bien puesta.
+#
+# Para correr los tests hay que tener `TEST_DATABASE_URL` en `Back/.env`
+# apuntando a una base `_test`. Se puede sobreescribir por proceso con la misma
+# variable de entorno.
+# ────────────────────────────────────────────────────────────────────
+_DB_NAME = TEST_DATABASE_URL.rsplit("/", 1)[-1].split("?")[0]
+if not _DB_NAME.endswith("_test"):
+    raise RuntimeError(
+        "SECURITY BLOCK: la suite de tests borra el schema `public` de la base a "
+        "la que apunta TEST_DATABASE_URL, asi que el nombre debe terminar en "
+        f"`_test`. Se resolvio {_DB_NAME!r}. Configura TEST_DATABASE_URL en "
+        f"{Path(__file__).resolve().parents[1] / '.env'} apuntando a una base de "
+        "test (por ejemplo `.../territorial_mvp_test`)."
+    )
 
 ZONE_TYPE_IDS = {
     "puesto_comida": "b1111111-1111-1111-1111-111111111111",
@@ -110,13 +137,88 @@ def _seed_zone_types(session: Session):
             ))
 
 
+_TEST_GEOMETRY_GEOM_COLUMNS = [
+    (table.c[column_name], column.type)
+    for table in Base.metadata.tables.values()
+    for column_name, column in table.columns.items()
+    if "geometry" in column.type.__class__.__name__.lower()
+]
+_TEST_GEOMETRY_INDEXES = [
+    index
+    for table in Base.metadata.tables.values()
+    for index in table.indexes
+    if "geometry" in [c.name for c in index.columns]
+]
+_TEST_INTENSITY_COLUMN = EventDayPhase.__table__.c.intensity
+_TEST_INTENSITY_DEFAULT = _TEST_INTENSITY_COLUMN.server_default
+
+
+def _degrade_geometry_for_tests() -> None:
+    """Ajusta el DDL para que `create_all` funcione sin PostGIS.
+
+    Dos bugs de los modelos, ya parcheados aparte en `test_crud_p3.py` y
+    `test_recommendation_flow.py`. Se corrigen aqui para el DDL de la sesion.
+
+    1. El entorno local no tiene PostGIS (no esta en `pg_available_extensions` ni
+       hay binarios en disco), asi que `create_all` falla con
+       `UndefinedObject: no existe el tipo «geometry»`, y un `SELECT` que proyecte
+       la columna muere en `ST_AsEWKB`. Antes esto no se notaba porque la base
+       arrastraba una `zones.geometry` ya degradada a VARCHAR de una epoca
+       anterior. Los tests de este modulo solo leen `zone.id` y `zone.capacity`.
+
+       Hay que tocar el tipo y no solo el DDL, porque el problema esta en la
+       expresion del SELECT, no en la definicion de la tabla.
+
+    2. `EventDayPhase.intensity` declara `server_default=func.text('1.0')` sobre
+       una columna `Float`, y Postgres rechaza un default de tipo `text` sobre
+       `double precision` (DatatypeMismatch).
+    """
+    for column, _ in _TEST_GEOMETRY_GEOM_COLUMNS:
+        column.type = String()
+    for index in _TEST_GEOMETRY_INDEXES:
+        index.table.indexes.discard(index)
+    _TEST_INTENSITY_COLUMN.server_default = DefaultClause(text("1.0"))
+
+
+def _restore_geometry_after_tests() -> None:
+    for column, original_type in _TEST_GEOMETRY_GEOM_COLUMNS:
+        column.type = original_type
+    for index in _TEST_GEOMETRY_INDEXES:
+        index.table.indexes.add(index)
+    _TEST_INTENSITY_COLUMN.server_default = _TEST_INTENSITY_DEFAULT
+
+
 @pytest.fixture(scope="session")
 def test_engine():
     engine = create_engine(TEST_DATABASE_URL, pool_pre_ping=True)
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
-    yield engine
-    Base.metadata.drop_all(bind=engine)
+    # Antes era `Base.metadata.drop_all(bind=engine)`, que fallaba con
+    # `DependentObjectsStillExist`: 7 tablas de la base (zone_subtypes,
+    # zone_recommendations, predictions, operational_observations,
+    # configuration_recommendations, knowledge_model_versions,
+    # recommendation_audit_log) NO estan en `app.db.session.Base.metadata`, asi
+    # que `drop_all` no las borraba y sus FKs bloqueaban el DROP de `event_days`.
+    # Eso abortaba el drop entero y el `create_all` siguiente nunca corria,
+    # tumbando 64 tests de 5 archivos en el setup.
+    #
+    # `DROP SCHEMA ... CASCADE` borra lo que haya, este o no en el metadata, y en
+    # el orden correcto. Es idempotente y no depende de las tablas que SQLAlchemy
+    # conozca. El guard de arriba garantiza que esta base termina en `_test`.
+    with engine.begin() as conn:
+        conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
+        conn.execute(text("CREATE SCHEMA public"))
+    # La degradacion se mantiene durante TODA la sesion, no solo durante el
+    # `create_all`: el mismo `ST_GeomFromEWKT` aparece en el `INSERT` de un `Zone`
+    # a traves del bind param de la columna, asi que restaurar el tipo aqui
+    # hacia fallar igual en el setup de los tests que si insertan zonas.
+    _degrade_geometry_for_tests()
+    try:
+        Base.metadata.create_all(bind=engine)
+        yield engine
+    finally:
+        _restore_geometry_after_tests()
+        with engine.begin() as conn:
+            conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
+            conn.execute(text("CREATE SCHEMA public"))
     engine.dispose()
 
 
@@ -153,6 +255,8 @@ def sample_event_day(db_session: Session, sample_event: Event) -> EventDay:
         date=date(2026, 7, 10),
         day_of_week="viernes",
         is_active=True,
+        operational_start_min=480,
+        operational_end_min=1320,
     )
     db_session.add(day)
     db_session.flush()
@@ -167,6 +271,8 @@ def sample_event_day_cross_midnight(db_session: Session, sample_event: Event) ->
         date=date(2026, 7, 10),
         day_of_week="viernes",
         is_active=True,
+        operational_start_min=480,
+        operational_end_min=1320,
     )
     db_session.add(day)
     db_session.flush()
@@ -181,6 +287,8 @@ def sample_event_day_next(db_session: Session, sample_event: Event) -> EventDay:
         date=date(2026, 7, 11),
         day_of_week="sabado",
         is_active=True,
+        operational_start_min=480,
+        operational_end_min=1320,
     )
     db_session.add(day)
     db_session.flush()

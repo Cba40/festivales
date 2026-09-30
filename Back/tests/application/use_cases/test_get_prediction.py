@@ -9,6 +9,7 @@ import pytest
 
 from src.application.use_cases.get_prediction import GetTerritorialPrediction
 from src.domain.entities.attendance_level import AttendanceLevel
+from src.domain.entities.operational_phase import OperationalPhase
 from src.domain.entities.zone import Zone
 from src.domain.entities.zone_behavior import ZoneBehavior
 from src.domain.value_objects.territorial_prediction import TerritorialPrediction
@@ -26,6 +27,15 @@ def zones() -> list[Zone]:
 
 @pytest.fixture
 def zone_behaviors() -> dict[tuple[UUID, UUID], ZoneBehavior]:
+    return {}
+
+
+# `GetTerritorialPrediction.execute` reenvia `operational_phases` al engine. Estos
+# tests mockean el engine, asi que un mapping vacio alcanza: lo que se verifica aqui
+# es el contrato del use case (cache hit/miss, propagacion de errores), no la
+# resolucion de fases.
+@pytest.fixture
+def operational_phases() -> dict[UUID, OperationalPhase]:
     return {}
 
 
@@ -89,6 +99,7 @@ class TestGetTerritorialPrediction:
         zones: list[Zone],
         zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
         attendance_level: AttendanceLevel,
+        operational_phases: dict[UUID, OperationalPhase],
     ) -> None:
         prediction_repo.find_by_timestamp = AsyncMock(return_value=prediction)
 
@@ -97,6 +108,7 @@ class TestGetTerritorialPrediction:
             zones=zones,
             zone_behaviors=zone_behaviors,
             attendance_level=attendance_level,
+            operational_phases=operational_phases,
         )
 
         assert result is prediction
@@ -111,6 +123,7 @@ class TestGetTerritorialPrediction:
         zones: list[Zone],
         zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
         attendance_level: AttendanceLevel,
+        operational_phases: dict[UUID, OperationalPhase],
     ) -> None:
         prediction_repo.find_by_timestamp = AsyncMock(return_value=prediction)
 
@@ -119,6 +132,7 @@ class TestGetTerritorialPrediction:
             zones=zones,
             zone_behaviors=zone_behaviors,
             attendance_level=attendance_level,
+            operational_phases=operational_phases,
         )
 
         generate_prediction.execute.assert_not_awaited()
@@ -131,12 +145,14 @@ class TestGetTerritorialPrediction:
         zones: list[Zone],
         zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
         attendance_level: AttendanceLevel,
+        operational_phases: dict[UUID, OperationalPhase],
     ) -> None:
         await use_case.execute(
             timestamp=timestamp,
             zones=zones,
             zone_behaviors=zone_behaviors,
             attendance_level=attendance_level,
+            operational_phases=operational_phases,
         )
 
         generate_prediction.execute.assert_awaited_once()
@@ -150,12 +166,14 @@ class TestGetTerritorialPrediction:
         zones: list[Zone],
         zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
         attendance_level: AttendanceLevel,
+        operational_phases: dict[UUID, OperationalPhase],
     ) -> None:
         result = await use_case.execute(
             timestamp=timestamp,
             zones=zones,
             zone_behaviors=zone_behaviors,
             attendance_level=attendance_level,
+            operational_phases=operational_phases,
         )
 
         assert result is prediction
@@ -170,6 +188,7 @@ class TestGetTerritorialPrediction:
         zones: list[Zone],
         zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
         attendance_level: AttendanceLevel,
+        operational_phases: dict[UUID, OperationalPhase],
     ) -> None:
         prediction_repo.find_by_timestamp = AsyncMock(return_value=prediction)
 
@@ -178,6 +197,7 @@ class TestGetTerritorialPrediction:
             zones=zones,
             zone_behaviors=zone_behaviors,
             attendance_level=attendance_level,
+            operational_phases=operational_phases,
         )
 
         generate_prediction.execute.assert_not_awaited()
@@ -190,12 +210,14 @@ class TestGetTerritorialPrediction:
         zones: list[Zone],
         zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
         attendance_level: AttendanceLevel,
+        operational_phases: dict[UUID, OperationalPhase],
     ) -> None:
         await use_case.execute(
             timestamp=timestamp,
             zones=zones,
             zone_behaviors=zone_behaviors,
             attendance_level=attendance_level,
+            operational_phases=operational_phases,
         )
 
         generate_prediction.execute.assert_awaited_once_with(
@@ -203,6 +225,8 @@ class TestGetTerritorialPrediction:
             zones=zones,
             zone_behaviors=zone_behaviors,
             attendance_level=attendance_level,
+            operational_phases=operational_phases,
+            config=None,
         )
 
     async def test_propagates_repository_find_error(
@@ -213,6 +237,7 @@ class TestGetTerritorialPrediction:
         zones: list[Zone],
         zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
         attendance_level: AttendanceLevel,
+        operational_phases: dict[UUID, OperationalPhase],
     ) -> None:
         prediction_repo.find_by_timestamp = AsyncMock(
             side_effect=RuntimeError("DB failure"),
@@ -224,6 +249,7 @@ class TestGetTerritorialPrediction:
                 zones=zones,
                 zone_behaviors=zone_behaviors,
                 attendance_level=attendance_level,
+                operational_phases=operational_phases,
             )
 
     async def test_propagates_generate_prediction_error(
@@ -234,6 +260,7 @@ class TestGetTerritorialPrediction:
         zones: list[Zone],
         zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
         attendance_level: AttendanceLevel,
+        operational_phases: dict[UUID, OperationalPhase],
     ) -> None:
         generate_prediction.execute = AsyncMock(
             side_effect=RuntimeError("Generation failed"),
@@ -245,6 +272,7 @@ class TestGetTerritorialPrediction:
                 zones=zones,
                 zone_behaviors=zone_behaviors,
                 attendance_level=attendance_level,
+                operational_phases=operational_phases,
             )
 
     async def test_does_not_access_infrastructure(
@@ -254,12 +282,14 @@ class TestGetTerritorialPrediction:
         zones: list[Zone],
         zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
         attendance_level: AttendanceLevel,
+        operational_phases: dict[UUID, OperationalPhase],
     ) -> None:
         result = await use_case.execute(
             timestamp=timestamp,
             zones=zones,
             zone_behaviors=zone_behaviors,
             attendance_level=attendance_level,
+            operational_phases=operational_phases,
         )
 
         assert isinstance(result, TerritorialPrediction)
@@ -271,12 +301,14 @@ class TestGetTerritorialPrediction:
         zones: list[Zone],
         zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
         attendance_level: AttendanceLevel,
+        operational_phases: dict[UUID, OperationalPhase],
     ) -> None:
         result = await use_case.execute(
             timestamp=timestamp,
             zones=zones,
             zone_behaviors=zone_behaviors,
             attendance_level=attendance_level,
+            operational_phases=operational_phases,
         )
 
         assert isinstance(result, TerritorialPrediction)

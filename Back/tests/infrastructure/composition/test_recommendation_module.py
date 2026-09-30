@@ -90,6 +90,7 @@ class CapturingEngine:
         attendance_level,
         event_day,
         events,
+        config=None,
     ) -> TerritorialPrediction:
         self.captured_event_day = event_day
         self.captured_zones = list(zones)

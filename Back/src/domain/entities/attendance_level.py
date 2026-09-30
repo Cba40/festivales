@@ -18,10 +18,11 @@ class AttendanceLevel:
         min_people: int,
         max_people: int | None = None,
         event_id: str | None = None,
-        id: str | None = None,
+        id: str | UUID | None = None,
     ) -> None:
-        from uuid import uuid4
-        resolved_id = id if id is not None else str(uuid4())
+        resolved_id = (
+            self._normalize_id(id) if id is not None else str(uuid4())
+        )
         self._validate(resolved_id, name, min_people, max_people)
         self._id = resolved_id
         self._name = name.strip()
@@ -48,6 +49,20 @@ class AttendanceLevel:
     @property
     def max_people(self) -> int | None:
         return self._max_people
+
+    @staticmethod
+    def _normalize_id(id: str | UUID) -> str:
+        """Normaliza el id a `str`, que es el tipo de la columna real.
+
+        La columna es `VARCHAR(36)` (ver `tests/infrastructure/test_model_drift.py`),
+        asi que `str` es el unico contrato de salida. Se acepta `UUID` en la
+        entrada para no obligar a cada llamador a convertirlo. Cualquier otro tipo
+        se rechaza: sin esta comprobacion, `str(123)` pasaria la validacion como
+        si fuera un id legitimo.
+        """
+        if not isinstance(id, (str, UUID)):
+            raise TypeError("id must be a string")
+        return str(id)
 
     @staticmethod
     def _validate(

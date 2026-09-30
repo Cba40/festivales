@@ -53,13 +53,29 @@ class TestAttendanceLevelValidation:
         al = AttendanceLevel(name=name, min_people=0, max_people=1000)
         assert al.name == name
 
+    def test_uuid_id_is_normalized_to_string(self) -> None:
+        """Un `UUID` es un id valido: se normaliza a `str`.
+
+        La columna real es `VARCHAR(36)` (ver `test_model_drift.py`), asi que el
+        contrato de salida es `str`. Aceptar `UUID` en la entrada evita que cada
+        test tenga que convertirlo a mano.
+        """
+        al = AttendanceLevel(
+            name="Test",
+            min_people=0,
+            max_people=1000,
+            id=UUID("00000000-0000-0000-0000-000000000001"),
+        )
+        assert al.id == "00000000-0000-0000-0000-000000000001"
+        assert isinstance(al.id, str)
+
     def test_invalid_id_type_raises_error(self) -> None:
         with pytest.raises(TypeError, match="must be a string"):
             AttendanceLevel(
                 name="Test",
                 min_people=0,
                 max_people=1000,
-                id=UUID("00000000-0000-0000-0000-000000000001"),  # type: ignore[arg-type]
+                id=123,  # type: ignore[arg-type]
             )
 
     def test_min_people_negative_raises_error(self) -> None:

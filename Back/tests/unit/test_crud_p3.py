@@ -6,7 +6,7 @@ import os
 import uuid
 
 import pytest
-from sqlalchemy import create_engine, select, text
+from sqlalchemy import DefaultClause, String, create_engine, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -36,6 +36,8 @@ from app.schemas.operational_event import OperationalEventCreate
 from app.schemas.operational_phase import OperationalPhaseCreate
 from app.schemas.operational_profile import OperationalProfileCreate
 from app.schemas.zone_behavior import ZoneBehaviorCreate
+from app.models.event_day_phase import EventDayPhase
+from app.models.zone import Zone
 from app.schemas.zone_type import ZoneTypeCreate
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", settings.DATABASE_URL)
@@ -49,6 +51,66 @@ def async_engine():
     async_url = TEST_DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
     engine = create_async_engine(async_url)
     return engine
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _degrade_geometry_columns():
+    """Baja a `String` todas las columnas `geometry` del metadata de `app/`.
+
+    El entorno local no tiene PostGIS: no esta en `pg_available_extensions`,
+    `CREATE EXTENSION postgis` falla y no hay binarios en disco. Sin la
+    extension, `create_all` falla con
+    `UndefinedFile: no se pudo acceder al archivo «postgis-3»`, y un `SELECT` que
+    proyecte la columna muere en `ST_AsEWKB`.
+
+    No es solo `zones.geometry`: tambien la declara `events.geometry`
+    (POLYGON) y `points.geometry` (POINT). Se recorren todas, asi que este
+    parche no depende de cual tabla cree `create_all` primero.
+
+    Estos tests nunca usan la geometria: solo leen `zone.id` y `zone.capacity`.
+    Hay que tocar el tipo y no solo el DDL porque el problema esta en la
+    expresion del SELECT, no en la definicion de la tabla.
+
+    Es el mismo patron que ya usan `test_operational_observations.py` y
+    `test_recommendation_flow.py`.
+    """
+    saved = [
+        (table.c[column_name], column.type)
+        for table in Base.metadata.tables.values()
+        for column_name, column in table.columns.items()
+        if "geometry" in column.type.__class__.__name__.lower()
+    ]
+    for column, _ in saved:
+        column.type = String()
+
+    # Los indices GIST sobre esas columnas tambien fallan sin PostGIS: ahora la
+    # columna es VARCHAR, y `USING gist` exige una clase de operadores por omision
+    # para el tipo. Se quitan del metadata mientras corre el modulo (se restauran
+    # al terminar). No los usa ningun test de aqui.
+    removed_indexes = [
+        index for table in Base.metadata.tables.values() for index in table.indexes
+        if "geometry" in [c.name for c in index.columns]
+    ]
+    for index in removed_indexes:
+        index.table.indexes.discard(index)
+
+    # Segundo bug pre-existente de los modelos: `EventDayPhase.intensity` declara
+    # `server_default=func.text('1.0')`, y Postgres rechaza un default de tipo
+    # `text` sobre una columna `double precision` (DatatypeMismatch). Se corrige
+    # solo para el DDL de este modulo, sin tocar `app/`. Mismo workaround que ya
+    # aplica `tests/integration/test_recommendation_flow.py`.
+    intensity_column = EventDayPhase.__table__.c.intensity
+    saved_default = intensity_column.server_default
+    intensity_column.server_default = DefaultClause(text("1.0"))
+
+    try:
+        yield
+    finally:
+        intensity_column.server_default = saved_default
+        for column, original_type in saved:
+            column.type = original_type
+        for index in removed_indexes:
+            index.table.indexes.add(index)
 
 
 @pytest.fixture

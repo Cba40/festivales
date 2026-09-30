@@ -30,7 +30,13 @@ class EventDay(Base):
     operational_profile_id: Mapped[Optional[UUID]] = mapped_column(
         ForeignKey("operational_profiles.id"), nullable=True,
     )
-    attendance_level_id: Mapped[str] = mapped_column(String(36), ForeignKey("attendance_levels.id"), nullable=False)
+    # nullable=True: alineado con la migracion c7d8e9f0a1b2, que lo declara
+    # NULLABLE "de forma definitiva" para conservar las jornadas que aun no
+    # tienen nivel asignado. Este modelo decia nullable=False, en contradiccion
+    # con el esquema: cualquier INSERT sin nivel fallaba.
+    attendance_level_id: Mapped[Optional[str]] = mapped_column(
+        String(36), ForeignKey("attendance_levels.id"), nullable=True,
+    )
     estimated_vehicles: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     average_parking_duration: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     operational_start_min: Mapped[int] = mapped_column(Integer, nullable=False)

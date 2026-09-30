@@ -9,6 +9,7 @@ import pytest
 
 from src.application.use_cases.get_recommendations import GetRecommendations
 from src.domain.entities.attendance_level import AttendanceLevel
+from src.domain.entities.operational_phase import OperationalPhase
 from src.domain.entities.zone import Zone
 from src.domain.entities.zone_behavior import FlowRestriction, ZoneBehavior
 from src.domain.recommendation.mobility_context import MobilityContext
@@ -39,6 +40,14 @@ def zones() -> list[Zone]:
 
 @pytest.fixture
 def zone_behaviors() -> dict[tuple[UUID, UUID], ZoneBehavior]:
+    return {}
+
+
+# `GetRecommendations.execute` reenvia `operational_phases` al servicio de
+# recomendacion, que esta mockeado en estos tests. Un mapping vacio alcanza: lo que
+# se verifica aqui es el contrato del use case, no la resolucion de fases.
+@pytest.fixture
+def operational_phases() -> dict[UUID, OperationalPhase]:
     return {}
 
 
@@ -144,6 +153,7 @@ class TestGetRecommendations:
         zones: list[Zone],
         zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
         attendance_level: AttendanceLevel,
+        operational_phases: dict[UUID, OperationalPhase],
         user_context: UserContext,
         mobility_context: MobilityContext,
         requested_action: RequestedAction,
@@ -153,6 +163,7 @@ class TestGetRecommendations:
             zones=zones,
             zone_behaviors=zone_behaviors,
             attendance_level=attendance_level,
+            operational_phases=operational_phases,
             user_context=user_context,
             mobility_context=mobility_context,
             requested_action=requested_action,
@@ -168,6 +179,7 @@ class TestGetRecommendations:
         zones: list[Zone],
         zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
         attendance_level: AttendanceLevel,
+        operational_phases: dict[UUID, OperationalPhase],
         user_context: UserContext,
         mobility_context: MobilityContext,
         requested_action: RequestedAction,
@@ -177,6 +189,7 @@ class TestGetRecommendations:
             zones=zones,
             zone_behaviors=zone_behaviors,
             attendance_level=attendance_level,
+            operational_phases=operational_phases,
             user_context=user_context,
             mobility_context=mobility_context,
             requested_action=requested_action,
@@ -193,6 +206,7 @@ class TestGetRecommendations:
         zones: list[Zone],
         zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
         attendance_level: AttendanceLevel,
+        operational_phases: dict[UUID, OperationalPhase],
         user_context: UserContext,
         mobility_context: MobilityContext,
         requested_action: RequestedAction,
@@ -203,6 +217,7 @@ class TestGetRecommendations:
             zones=zones,
             zone_behaviors=zone_behaviors,
             attendance_level=attendance_level,
+            operational_phases=operational_phases,
             user_context=user_context,
             mobility_context=mobility_context,
             requested_action=requested_action,
@@ -224,6 +239,7 @@ class TestGetRecommendations:
         zones: list[Zone],
         zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
         attendance_level: AttendanceLevel,
+        operational_phases: dict[UUID, OperationalPhase],
         user_context: UserContext,
         mobility_context: MobilityContext,
         requested_action: RequestedAction,
@@ -234,6 +250,7 @@ class TestGetRecommendations:
             zones=zones,
             zone_behaviors=zone_behaviors,
             attendance_level=attendance_level,
+            operational_phases=operational_phases,
             user_context=user_context,
             mobility_context=mobility_context,
             requested_action=requested_action,
@@ -253,6 +270,7 @@ class TestGetRecommendations:
         zones: list[Zone],
         zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
         attendance_level: AttendanceLevel,
+        operational_phases: dict[UUID, OperationalPhase],
         user_context: UserContext,
         mobility_context: MobilityContext,
         requested_action: RequestedAction,
@@ -263,6 +281,7 @@ class TestGetRecommendations:
             zones=zones,
             zone_behaviors=zone_behaviors,
             attendance_level=attendance_level,
+            operational_phases=operational_phases,
             user_context=user_context,
             mobility_context=mobility_context,
             requested_action=requested_action,
@@ -279,6 +298,7 @@ class TestGetRecommendations:
         zones: list[Zone],
         zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
         attendance_level: AttendanceLevel,
+        operational_phases: dict[UUID, OperationalPhase],
         user_context: UserContext,
         mobility_context: MobilityContext,
         requested_action: RequestedAction,
@@ -293,6 +313,7 @@ class TestGetRecommendations:
                 zones=zones,
                 zone_behaviors=zone_behaviors,
                 attendance_level=attendance_level,
+                operational_phases=operational_phases,
                 user_context=user_context,
                 mobility_context=mobility_context,
                 requested_action=requested_action,
@@ -308,6 +329,7 @@ class TestGetRecommendations:
         zones: list[Zone],
         zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
         attendance_level: AttendanceLevel,
+        operational_phases: dict[UUID, OperationalPhase],
         user_context: UserContext,
         mobility_context: MobilityContext,
         requested_action: RequestedAction,
@@ -322,6 +344,7 @@ class TestGetRecommendations:
                 zones=zones,
                 zone_behaviors=zone_behaviors,
                 attendance_level=attendance_level,
+                operational_phases=operational_phases,
                 user_context=user_context,
                 mobility_context=mobility_context,
                 requested_action=requested_action,
@@ -335,6 +358,7 @@ class TestGetRecommendations:
         zones: list[Zone],
         zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
         attendance_level: AttendanceLevel,
+        operational_phases: dict[UUID, OperationalPhase],
         user_context: UserContext,
         mobility_context: MobilityContext,
         requested_action: RequestedAction,
@@ -344,6 +368,7 @@ class TestGetRecommendations:
             zones=zones,
             zone_behaviors=zone_behaviors,
             attendance_level=attendance_level,
+            operational_phases=operational_phases,
             user_context=user_context,
             mobility_context=mobility_context,
             requested_action=requested_action,
@@ -367,6 +392,7 @@ class TestGetRecommendations:
         zones: list[Zone],
         zone_behaviors: dict[tuple[UUID, UUID], ZoneBehavior],
         attendance_level: AttendanceLevel,
+        operational_phases: dict[UUID, OperationalPhase],
         user_context: UserContext,
         mobility_context: MobilityContext,
         requested_action: RequestedAction,
@@ -376,6 +402,7 @@ class TestGetRecommendations:
             zones=zones,
             zone_behaviors=zone_behaviors,
             attendance_level=attendance_level,
+            operational_phases=operational_phases,
             user_context=user_context,
             mobility_context=mobility_context,
             requested_action=requested_action,
