@@ -9,6 +9,7 @@ Los timestamps usan explícitamente America/Argentina/Buenos_Aires.
 """
 from __future__ import annotations
 
+import re
 from datetime import date, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -66,6 +67,27 @@ def _scalar_one_result(model):
     return result
 
 
+def _first_result(model):
+    """Fila unica accesible por `.first()` y por `.scalars().first()`.
+
+    La misma tabla se lee con las dos formas segun quien la consulta: el snapshot
+    del Knowledge Model usa `.scalars().first()`, mientras que otros lectores
+    usan `.first()` a secas. Con un helper que no cubriera ambos, `json.dumps`
+    del hash se comia un MagicMock y reventaba con
+    `TypeError: Object of type MagicMock is not JSON serializable`.
+    """
+    result = MagicMock()
+    result.first = MagicMock(return_value=model)
+    scalars_mock = MagicMock()
+    scalars_mock.first = MagicMock(return_value=model)
+    scalars_mock.all = MagicMock(return_value=[model] if model is not None else [])
+    scalars_mock.__iter__ = MagicMock(return_value=iter([model] if model is not None else []))
+    result.scalars = MagicMock(return_value=scalars_mock)
+    result.one_or_none = MagicMock(return_value=model)
+    result.scalar_one_or_none = MagicMock(return_value=model)
+    return result
+
+
 def _one_result(row):
     result = MagicMock()
     result.one_or_none = MagicMock(return_value=row)
@@ -87,6 +109,7 @@ class CapturingEngine:
         event_day,
         events,
         config=None,
+        knowledge_model_version_id=None,
     ) -> TerritorialPrediction:
         self.captured_event_day = event_day
         return TerritorialPrediction(
@@ -140,6 +163,12 @@ behavior_rows = [
         operational_phase_id=PHASE_ID,
         density_factor=density,
         flow_restriction="OPEN",
+        # Campos que ademas lee el snapshot del Knowledge Model: se serializan tal
+        # cual en `snapshot["zone_behaviors"]`, asi que la fila debe traerlos.
+        saturation_factor=0.5,
+        availability_factor=0.5,
+        resource_factor=0.5,
+        priority_weight=1.0,
     )
     for i, (slug, density) in enumerate(
         [("estacionamiento", 0.8), ("comida", 0.6)],
@@ -172,70 +201,112 @@ attendance_row = SimpleNamespace(
     min_people=10000,
     max_people=25000,
 )
+# Jornada con ventana operativa que NO contiene el instante que usan los tests de
+# "inactivo" (04:01 AR = minuto 1681). Sirve para que `resolve_active_event_day`
+# la descarte por ventana, que es como decide, en vez de por fecha.
+inactive_ed_row = SimpleNamespace(
+    id=DAY_ID,
+    date=date(2026, 7, 15),
+    attendance_level_id=ATTENDANCE_ID,
+    operational_profile_id=UUID(OP_ID),
+    operational_start_min=600,
+    operational_end_min=1200,
+    estimated_vehicles=8000,
+    average_parking_duration=4.0,
+    phases=[
+        SimpleNamespace(
+            id=PHASE_ID,
+            operational_phase_id=OP_ID,
+            start_min=600,
+            end_min=1200,
+            intensity=0.5,
+        )
+    ],
+)
 phase_rows = [SimpleNamespace(id=OP_ID, name="Nocturna", sort_order=1)]
+# `PredictionModule` y `RecommendationModule` capturan un snapshot del Knowledge
+# Model antes de predecir (`KnowledgeModelSnapshotService.capture_current_snapshot`).
+# Esa lectura exige filas reales: si `recommendation_config` o `stage4_config` vienen
+# vacias, el servicio levanta `ValueError("... is not configured")`. El
+# `side_effect` posicional no tenia entradas para estas consultas, asi que el
+# recorrido terminaba en `StopIteration`.
+recommendation_config_row = SimpleNamespace(
+    low_density_saturation_threshold=0.2,
+    low_density_reasoning_threshold=0.3,
+    regulated_penalty=0.1,
+    vip_bonus=0.05,
+    staff_bonus=0.02,
+    mobility_penalty=0.01,
+)
+stage4_config_row = SimpleNamespace(
+    saturation_high_threshold=1.2,
+    saturation_moderate_threshold=0.8,
+)
 
 
 def _mock_session(*, module: str, active: bool) -> AsyncMock:
     """Construye la sesión según el flujo del módulo.
 
-    `active=True` -> 1 lookup de EventDay (primaria activa).
-    `active=False` -> 2 lookups (primaria + día anterior, ambas inactivas).
-    """
-    session = AsyncMock()
-    ed_lookups = 1 if active else 2
+    Las respuestas se despachan por nombre de tabla, no por posición. Antes era
+    una lista `side_effect=[...]` que se consumía en orden, y cualquier consulta
+    nueva en producción la agotaba (`StopIteration`) sin decir nada del dominio.
 
-    if module == "parking":
-        effects = [
-            _scalars_result(zone_type_rows),
-            _one_result(ref_row),
-            _scalars_result(parking_rows),
-        ]
-        effects += [_scalar_one_result(ed_row)] * ed_lookups
-        # Permanencia Parking V1: service_configs override + default
-        # (sin filas → fallback a EventDay.average_parking_duration).
-        effects += [_scalar_one_result(None)] * 2
-    elif module == "prediction":
-        effects = [
-            _scalars_result(zone_type_rows),
-            _one_result(ref_row),
-            _scalars_result(all_zone_rows),
-            _scalars_result(behavior_rows),
-        ]
-        effects += [_scalar_one_result(ed_row)] * ed_lookups
-        if active:
-            effects += [
-                _scalar_one_result(attendance_row),
-                _scalars_result(phase_rows),
-                # operational_events (OperationalEventAdapter): sin eventos activos.
-                _scalars_result([]),
-            ]
-    elif module == "recommendation":
-        effects = [
-            _scalars_result(zone_type_rows),
-            _one_result(ref_row),
-            _scalars_result(all_zone_rows),
-            _scalars_result(behavior_rows),
-        ]
-        effects += [_scalar_one_result(ed_row)] * ed_lookups
-        if active:
-            effects += [
-                _scalar_one_result(attendance_row),
-                _scalars_result(phase_rows),
-                # operational_events (OperationalEventAdapter): sin eventos activos.
-                _scalars_result([]),
-                # ParkingModule (puente ETAPA 4):
-                _scalars_result(zone_type_rows),
-                _one_result(ref_row),
-                _scalars_result(parking_rows),
-                _scalar_one_result(ed_row),
-                # Permanencia Parking V1: service_configs override + default.
-                _scalar_one_result(None),
-                _scalar_one_result(None),
-            ]
-    else:
+    `active=True` -> la jornada del día está activa.
+    `active=False` -> ninguna jornada activa (los módulos devuelven None/vacío).
+    """
+    if module not in ("parking", "prediction", "recommendation"):
         raise ValueError(f"unknown module {module}")
 
-    session.execute = AsyncMock(side_effect=effects)
+    session = AsyncMock()
+
+    responses: dict[str, MagicMock] = {
+        "zone_types": _scalars_result(zone_type_rows),
+        "events": _one_result(ref_row),
+        "zone_behaviors": _scalars_result(behavior_rows),
+        # Sin eventos operativos activos.
+        "operational_events": _scalars_result([]),
+        # Knowledge Model snapshot: exige filas, ver comentario de las constantes.
+        # Ver `_first_result`: la fila tiene que ser alcanzable por `.first()` y por
+        # `.scalars().first()`, o el `json.dumps` del hash se come un MagicMock.
+        "recommendation_config": _first_result(recommendation_config_row),
+        "stage4_config": _first_result(stage4_config_row),
+        "knowledge_model_versions": _scalars_result([]),
+    }
+    if active:
+        responses["event_days"] = _scalar_one_result(ed_row)
+        responses["attendance_levels"] = _scalar_one_result(attendance_row)
+        responses["operational_phases"] = _scalars_result(phase_rows)
+    else:
+        # La jornada EXISTE pero su ventana operativa no contiene el instante.
+        # `resolve_active_event_day` decide por ventana, no por fecha: sin fila
+        # devolvía None y el recorrido moría antes de llegar al final. Con una
+        # ventana ajena al instante se exercise el mismo camino que en producción:
+        # jornada presente, inactiva.
+        responses["event_days"] = _scalar_one_result(inactive_ed_row)
+
+    async def _router(stmt) -> MagicMock:
+        sql = str(stmt).lower()
+        match = re.search(r"\bfrom\s+([a-z_][a-z0-9_]*)", sql)
+        table = match.group(1) if match else ""
+        if table == "zones":
+            # Dos consultas distintas a la misma tabla: la del ContextEngine pide
+            # todas las zonas del evento; la de `ParkingModule` (puente ETAPA 4)
+            # filtra por `type = estacionamiento`. Se distinguen por el WHERE.
+            if "'estacionamiento'" in sql:
+                return _scalars_result(parking_rows)
+            return _scalars_result(all_zone_rows)
+        if table == "service_configs":
+            # Permanencia Parking V1: override por jornada + default global.
+            # Sin filas cae al `EventDay.average_parking_duration`.
+            return _scalar_one_result(None)
+        result = responses.get(table)
+        if result is not None:
+            return result
+        # Consulta no modelada: vacía en vez de agotar el mock. Deja el fallo en la
+        # aserción del test, no en un StopIteration que no dice nada del dominio.
+        return _scalars_result([])
+
+    session.execute = AsyncMock(side_effect=_router)
     return session
 
 
