@@ -149,7 +149,7 @@ class TestOperationalEventPersistence:
         ("incidente_sin_impacto", None),
     ])
     def test_create_valid_each_effect(
-        self, db_session, sample_event_day,
+        self, db_session, sample_event_day, sample_zones,
         effect_type: str, effect_value,
     ) -> None:
         data = make_event(effect_type=effect_type, effect_value=effect_value)
@@ -163,7 +163,7 @@ class TestOperationalEventPersistence:
         assert event.is_incident is True
         assert event.is_active is True
 
-    def test_temporal_constraint_rejects_end_before_start(self, db_session, sample_event_day) -> None:
+    def test_temporal_constraint_rejects_end_before_start(self, db_session, sample_event_day, sample_zones) -> None:
         start = datetime(2026, 8, 30, 22, 0, tzinfo=timezone.utc)
         end = datetime(2026, 8, 30, 20, 0, tzinfo=timezone.utc)
         event = OperationalEvent(**make_event(start_timestamp=start, end_timestamp=end))
@@ -172,7 +172,7 @@ class TestOperationalEventPersistence:
             db_session.flush()
         db_session.rollback()
 
-    def test_temporal_constraint_rejects_equal_timestamps(self, db_session, sample_event_day) -> None:
+    def test_temporal_constraint_rejects_equal_timestamps(self, db_session, sample_event_day, sample_zones) -> None:
         ts = datetime(2026, 8, 30, 20, 0, tzinfo=timezone.utc)
         event = OperationalEvent(**make_event(start_timestamp=ts, end_timestamp=ts))
         db_session.add(event)
@@ -194,7 +194,7 @@ class TestOperationalEventPersistence:
         ("incidente_sin_impacto", 1, False),
     ])
     def test_effect_value_constraint(
-        self, db_session, sample_event_day,
+        self, db_session, sample_event_day, sample_zones,
         effect_type: str, effect_value, expected_ok: bool,
     ) -> None:
         event = OperationalEvent(**make_event(effect_type=effect_type, effect_value=effect_value))
@@ -216,7 +216,7 @@ class TestOperationalEventPersistence:
         (None, True),
     ])
     def test_latitude_constraint(
-        self, db_session, sample_event_day,
+        self, db_session, sample_event_day, sample_zones,
         latitude, expected_ok: bool,
     ) -> None:
         event = OperationalEvent(**make_event(latitude=latitude))
@@ -238,7 +238,7 @@ class TestOperationalEventPersistence:
         (None, True),
     ])
     def test_longitude_constraint(
-        self, db_session, sample_event_day,
+        self, db_session, sample_event_day, sample_zones,
         longitude, expected_ok: bool,
     ) -> None:
         event = OperationalEvent(**make_event(longitude=longitude))
@@ -252,7 +252,7 @@ class TestOperationalEventPersistence:
             db_session.rollback()
 
     def test_persists_coordinates(
-        self, db_session, sample_event_day,
+        self, db_session, sample_event_day, sample_zones,
     ) -> None:
         event = OperationalEvent(**make_event())
         db_session.add(event)
@@ -345,7 +345,7 @@ class TestOperationalEventSchemas:
         with pytest.raises(ValueError):
             OperationalEventUpdate(longitude=200.0)
 
-    def test_response_from_attributes(self, db_session, sample_event_day) -> None:
+    def test_response_from_attributes(self, db_session, sample_event_day, sample_zones) -> None:
         event = OperationalEvent(**make_event())
         db_session.add(event)
         db_session.flush()
@@ -373,7 +373,7 @@ class TestOperationalEventEnums:
         for value in VALID_EVENT_TYPES:
             assert value in EVENT_TYPES
 
-    def test_all_event_types_are_storable(self, db_session, sample_event_day) -> None:
+    def test_all_event_types_are_storable(self, db_session, sample_event_day, sample_zones) -> None:
         for event_type in VALID_EVENT_TYPES:
             event = OperationalEvent(**make_event(event_type=event_type))
             db_session.add(event)
