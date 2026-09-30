@@ -17,7 +17,6 @@ from src.domain.entities.attendance_level import AttendanceLevel
 from src.domain.entities.event_day import EventDay
 from src.domain.entities.event_day_phase import EventDayPhase
 from src.domain.entities.operational_phase import OperationalPhase
-from src.domain.entities.operational_profile import OperationalProfile
 from src.domain.entities.zone import Zone
 from src.domain.entities.zone_behavior import FlowRestriction, ZoneBehavior
 from src.domain.value_objects.territorial_prediction import TerritorialPrediction
@@ -38,15 +37,6 @@ def peak_phase() -> OperationalPhase:
 
 
 @pytest.fixture
-def profile(peak_phase: OperationalPhase) -> OperationalProfile:
-    return OperationalProfile(
-        id=UUID("20000000-0000-0000-0000-000000000001"),
-        name="Test Profile",
-        phases=(peak_phase,),
-    )
-
-
-@pytest.fixture
 def event_day_phase(peak_phase: OperationalPhase) -> EventDayPhase:
     return EventDayPhase(
         id=UUID("30000000-0000-0000-0000-000000000001"),
@@ -60,12 +50,11 @@ def event_day_phase(peak_phase: OperationalPhase) -> EventDayPhase:
 @pytest.fixture
 def event_day(
     event_day_phase: EventDayPhase,
-    profile: OperationalProfile,
 ) -> EventDay:
     return EventDay(
         id=UUID("40000000-0000-0000-0000-000000000001"),
         event_date=date(2026, 1, 10),
-        operational_profile_id=profile.id,
+        operational_profile_id=UUID("20000000-0000-0000-0000-000000000001"),
         attendance_level_id=UUID("50000000-0000-0000-0000-000000000001"),
         operational_start_min=1200,
         operational_end_min=1680,
