@@ -668,5 +668,6 @@ class TestTransportEndpointHTTP:
             "distancia_min", "is_nearest",
             "line_name", "company", "next_departure",
             "minutes_until_next", "destination", "is_tomorrow",
+            "all_schedules",
         }
         assert set(zona.keys()) == expected_fields

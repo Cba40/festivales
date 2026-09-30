@@ -328,5 +328,6 @@ class TestBathroomProductEndpoint:
             "saturation_level", "estado", "availability",
             "estimated_wait", "confidence", "active_restriction",
             "operational_state", "lat", "lng", "referencia", "distancia_min",
+            "is_nearest",
         }
         assert set(zona.keys()) == expected_fields

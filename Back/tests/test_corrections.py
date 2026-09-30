@@ -211,10 +211,10 @@ class TestReasoning:
         result = _evaluate([b, c], coords)
 
         assert result[0].reasoning == [
-            "Más lugares libres",
+            "Mejor opción con más lugares libres",
             "Baja densidad proyectada",
         ]
-        assert result[1].reasoning[0] == "Segunda opción con más lugares"
+        assert result[1].reasoning[0] == "Mejor balance de disponibilidad y cercanía"
         assert any("Baja densidad proyectada" in r.reasoning for r in result)
 
 

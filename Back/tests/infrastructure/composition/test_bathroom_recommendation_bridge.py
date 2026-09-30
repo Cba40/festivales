@@ -10,6 +10,7 @@ suite): no se accede a base de datos alguna ni a SQLite.
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
@@ -351,27 +352,56 @@ def _mock_bridge_session(*, bathroom_request: bool) -> AsyncMock:
     ]
     service_config_row = SimpleNamespace(average_duration_min=DURATION_MIN)
 
-    effects = [
-        _scalars_result(zone_type_rows),
-        _one_result(ref_row),
-        _scalars_result(all_zone_rows),
-        _scalars_result(behavior_rows),
-        _scalar_one_result(ed_row),
-        _scalar_one_result(attendance_row),
-        _scalars_result(phase_rows),
-        # operational_events (OperationalEventAdapter): sin eventos activos.
-        _scalars_result([]),
-    ]
-    if bathroom_request:
-        effects += [
-            _scalars_result(zone_type_rows),
-            _one_result(ref_row),
-            _scalars_result(bathroom_rows),
-            _scalar_one_result(ed_row),
-            _scalar_one_result(attendance_row),
-            _scalar_one_result(service_config_row),
-        ]
-    session.execute = AsyncMock(side_effect=effects)
+    # ── Router por tabla (no side_effect posicional) ──────────────────────
+    #
+    # Antes era una lista `side_effect=[...]` que se consumia en orden. La ruta
+    # real hace ~20 consultas y su ORDEN cambia con cada refactor de producción:
+    # `OperationalEventAdapter` y `BathroomModule` repiten `zone_types`,
+    # `events` y `zones` por su cuenta, y ademas encadena sus propias lecturas.
+    # Con la lista posicional eso se rompia con `StopIteration` (lista agotada) y
+    # con `AttributeError` (fila de la tabla equivocada en la posicion correcta),
+    # dos fallos distintos para la misma causa.
+    #
+    # Este router despacha por nombre de tabla, asi que el test no depende del
+    # orden: agregar, quitar o reordenar una consulta en producción no lo rompe.
+    # El orden de declaracion de las claves es irrelevante.
+    empty_scalars = _scalars_result([])
+    responses: dict[str, MagicMock] = {
+        "zone_types": _scalars_result(zone_type_rows),
+        "events": _one_result(ref_row),
+        "zone_behaviors": _scalars_result(behavior_rows),
+        "event_days": _scalar_one_result(ed_row),
+        "attendance_levels": _scalar_one_result(attendance_row),
+        "operational_phases": _scalars_result(phase_rows),
+        "service_configs": _scalar_one_result(service_config_row),
+        # Sin eventos operativos activos.
+        "operational_events": empty_scalars,
+        "stage4_config": _scalar_one_result(None),
+        "recommendation_config": _scalar_one_result(None),
+    }
+
+    async def _router(stmt) -> MagicMock:
+        sql = str(stmt).lower()
+        match = re.search(r"\bfrom\s+([a-z_][a-z0-9_]*)", sql)
+        table = match.group(1) if match else ""
+        if table == "zones":
+            # Dos consultas distintas van a la misma tabla. La del ContextEngine
+            # (`recommendation_module._load_zones`) pide TODAS las zonas del evento;
+            # la del puente (`bathroom_module._load_bathroom_zones`) filtra por
+            # `type = servicios AND subtipo = banos`. Se distinguen por el WHERE, no
+            # por el orden: lo que cada una devuelve es semanticamente distinto.
+            if "'servicios'" in sql and "'banos'" in sql:
+                return _scalars_result(bathroom_rows)
+            return _scalars_result(all_zone_rows)
+        result = responses.get(table)
+        if result is not None:
+            return result
+        # Consulta no modelada (p.ej. una que se agregue despues): se responde
+        # vacio en vez de agotar el mock. Deja el fallo en la asercion del test,
+        # no en un StopIteration que no dice nada del dominio.
+        return _scalars_result([])
+
+    session.execute = AsyncMock(side_effect=_router)
     return session
 
 
