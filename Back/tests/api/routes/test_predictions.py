@@ -214,15 +214,25 @@ class TestPredictionsEndpoint:
 
         assert resp.status_code == 500
 
-    def test_401_no_auth(
+    def test_200_public_endpoint_without_auth(
         self,
         client: TestClient,
     ):
+        """El endpoint es público por diseño: sin token debe responder 200, no 401.
+
+        Antes este test se llamaba `test_401_no_auth` y exigía autenticación. El
+        commit `92383a5` ("Resuelve HTTP 401 en cbafestivales.vercel.app") quitó
+        `Depends(verify_token)` del router porque el Visitor App no puede
+        autenticar, y `get_predictions` documenta hoy: "Endpoint público para
+        Visitor App. No requiere autenticación". El test se invierte para fijar el
+        contrato vigente en vez de seguir exigiendo el revocado.
+        """
         resp = client.get(
             f"{BASE_URL}/predictions",
         )
 
-        assert resp.status_code == 401
+        assert resp.status_code == 200
+        assert resp.json()["timestamp"] == "2026-07-10T20:00:00+00:00"
 
     def test_adapter_invoked_once(
         self,

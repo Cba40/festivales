@@ -193,25 +193,70 @@ def _mock_full_flow_session() -> AsyncMock:
             sort_order=2,
         )
     ]
+    stage4_row = SimpleNamespace(
+        saturation_high_threshold=0.9,
+        saturation_moderate_threshold=0.5,
+    )
+    recommendation_row = SimpleNamespace(
+        low_density_saturation_threshold=1.5,
+        low_density_reasoning_threshold=1.2,
+        regulated_penalty=0.05,
+        vip_bonus=-0.02,
+        staff_bonus=-0.03,
+        mobility_penalty=0.10,
+    )
 
+    # El orden importa: `side_effect` es una lista, no un mapa por consulta. Cada
+    # entrada esta anotada con la consulta que satisface y el accessor que esa
+    # consulta usa en produccion (`scalar_one_or_none` vs `scalars().all()`),
+    # porque un accessor sobre un MagicMock del otro tipo devuelve un mock
+    # truthy en vez de fallar, y desalinea el flujo en silencio.
+    #
+    # Antes esta lista tenia 14 entradas y la composicion pide 18: faltaban los
+    # configs de Stage 4 / recommendations (que `get_stage4_config` y
+    # `get_recommendation_config` leen con `scalar_one_or_none`) y las consultas
+    # de los puentes ETAPA 4. Sin ellas el `side_effect` se agotaba y el test
+    # terminaba en StopAsyncIteration.
     session.execute = AsyncMock(
         side_effect=[
+            # 1. type_map de zone_types
             _scalars_result(zone_type_rows),
+            # 2. punto de referencia del evento
             _one_result(ref_row),
+            # 3. zonas del evento
             _scalars_result(zone_rows),
+            # 4. zone_behaviors del evento
             _scalars_result(behavior_rows),
+            # 5. EventDay de la fecha local
             _scalar_one_result(ed_row),
+            # 6. AttendanceLevel
             _scalar_one_result(attendance_row),
+            # 7. OperationalPhase referenciadas por el día
             _scalars_result(phase_rows),
-            # operational_events (OperationalEventAdapter): sin eventos activos.
+            # 8. stage4_config (get_stage4_config)
+            _scalar_one_result(stage4_row),
+            # 9. recommendation_config (get_recommendation_config)
+            _scalar_one_result(recommendation_row),
+            # 10. operational_events (OperationalEventAdapter): sin eventos activos.
+            # Lista vacía ⇒ el adapter retorna temprano y no consulta los
+            # expirados (`stale_result`), así que no se lista esa consulta.
             _scalars_result([]),
-            # ETAPA 4 — queries adicionales de ParkingModule (puente Parking):
+            # ETAPA 4 — puente Parking (ParkingModule.execute):
+            # 11. type_map propio del módulo
             _scalars_result(zone_type_rows),
+            # 12. punto de referencia
             _one_result(ref_row),
+            # 13. zonas de estacionamiento
             _scalars_result(zone_rows),
+            # 14. EventDay del módulo
             _scalar_one_result(ed_row),
-            # Permanencia Parking V1: service_configs override + default
-            # (sin filas → fallback a EventDay.average_parking_duration).
+            # 15-16. `_resolve_service_duration` consulta `service_configs` dos
+            # veces: override por jornada y luego default global
+            # (`prediction_module.py:134-151`). Sin ninguna fila levanta
+            # `ValueError`, que `ParkingModule` captura para caer en el fallback
+            # `EventDay.average_parking_duration` (4.0 horas). Devolver un mock
+            # truthy en vez de `None` hacía que `duration` fuera un MagicMock y el
+            # modelo de dominio abortara con "duration must be a number".
             _scalar_one_result(None),
             _scalar_one_result(None),
         ]

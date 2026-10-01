@@ -209,6 +209,7 @@ class TestGeneratePrediction:
             attendance_level=attendance_level,
             event_day=event_day,
             events=[],
+            config=None,
         )
 
     async def test_returns_prediction_from_engine(
