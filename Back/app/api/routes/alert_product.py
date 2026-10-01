@@ -10,9 +10,11 @@ from typing import Optional
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.infrastructure.middleware.rate_limit import PUBLIC_READ_LIMIT, rate_limit
 
 from app.crud.operator_message import list_active as list_active_messages
 from app.crud.transport_alert import list_active as list_active_alerts
@@ -56,7 +58,9 @@ class PublicAlertsResponse(BaseModel):
 
 
 @router.get("/alerts", response_model=PublicAlertsResponse)
+@rate_limit(limit=PUBLIC_READ_LIMIT)
 async def get_public_alerts(
+    request: Request,
     event_id: str,
     db: AsyncSession = Depends(get_async_db),
 ):

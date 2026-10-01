@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+
+from src.infrastructure.middleware.rate_limit import PUBLIC_READ_LIMIT, rate_limit
 
 from app.db.session import get_async_db
 from app.models.city import City
@@ -17,7 +19,9 @@ router = APIRouter(prefix="/api", tags=["Emergency"])
 
 
 @router.get("/cities", response_model=list[CityResponse])
+@rate_limit(limit=PUBLIC_READ_LIMIT)
 async def list_cities(
+    request: Request,
     db: AsyncSession = Depends(get_async_db),
 ):
     """Lista las ciudades disponibles (público) para el módulo de emergencias.
@@ -31,7 +35,9 @@ async def list_cities(
 
 
 @router.get("/emergencies", response_model=EmergencyRecommendationResponse)
+@rate_limit(limit=PUBLIC_READ_LIMIT)
 async def emergency_recommendations(
+    request: Request,
     city_id: UUID = Query(...),
     type: EmergencyType | None = Query(None),
     latitude: float | None = Query(None, ge=-90.0, le=90.0),

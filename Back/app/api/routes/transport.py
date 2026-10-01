@@ -3,9 +3,11 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, Query
+from fastapi import APIRouter, Depends, Header, Query, Request
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.infrastructure.middleware.rate_limit import PUBLIC_READ_LIMIT, rate_limit
 
 from app.db.session import get_async_db
 from app.models.transport_line import TransportLine
@@ -45,14 +47,16 @@ async def get_available_destinations(
 
 
 @router.get("/products/transport", response_model=TransportRecommendationResponse)
+@rate_limit(limit=PUBLIC_READ_LIMIT)
 async def transport_recommendations(
+    request: Request,
     event_id: str,
     destination: str | None = Query(None),
     transport_type: str | None = Query(None, pattern="^(urbano|interurbano)$"),
     latitude: float | None = Query(None, ge=-90.0, le=90.0),
     longitude: float | None = Query(None, ge=-180.0, le=180.0),
     limit: int = Query(5, ge=1, le=50),
-    speed: float | None = Query(None, ge=0.0),
+    speed: float | None = Query(None, ge=0.0, le=10.0),
     accessibility_required: bool = Query(False),
     user_id: str | None = Query(None),
     access_level: str | None = Query(None),

@@ -23,6 +23,7 @@ from app.models.event_day import EventDay
 from app.models.event_day_phase import EventDayPhase
 from app.models.zone import Zone
 from app.models.zone_type import ZoneType
+from src.infrastructure.middleware.rate_limit import reset_backend
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", settings.DATABASE_URL)
 
@@ -349,6 +350,23 @@ def sample_attendance_levels(db_session: Session, sample_event: Event, sample_ev
         db_session.add(al)
     db_session.flush()
     return levels
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limit_state():
+    """Deja el rate limiter en cero antes de cada test.
+
+    El backend en memoria es un singleton de proceso y el IP de `TestClient` es
+    siempre la misma, asi que sin este reset los tests se consumirian entre si
+    el limite (60/min en GET, 10/min en /activity, 5/min en /login) y una suite
+    con mas de 60 llamadas a rutas publicas empezaria a fallar con 429 de forma
+    dependiente del orden de ejecucion.
+
+    Los tests propios de rate limit (tests/infrastructure/middleware/
+    test_rate_limit.py) miden el limite a proposito y no dependen de este reset.
+    """
+    yield
+    asyncio.run(reset_backend())
 
 
 @pytest.fixture

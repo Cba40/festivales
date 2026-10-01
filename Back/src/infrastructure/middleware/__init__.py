@@ -1,0 +1,1 @@
+"""Middleware de infraestructura del backend."""

@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, Header, Query
+from fastapi import APIRouter, Depends, Header, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.infrastructure.middleware.rate_limit import PUBLIC_READ_LIMIT, rate_limit
 
 from app.db.session import get_async_db
 from app.models.accommodation import AccommodationType
@@ -19,7 +21,9 @@ router = APIRouter(prefix="/api/events/{event_id}", tags=["Accommodation Product
 
 
 @router.get("/products/accommodation", response_model=AccommodationRecommendationResponse)
+@rate_limit(limit=PUBLIC_READ_LIMIT)
 async def accommodation_recommendations(
+    request: Request,
     event_id: str,
     type: AccommodationType | None = Query(None),
     latitude: float | None = Query(None, ge=-90.0, le=90.0),

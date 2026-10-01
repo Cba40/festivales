@@ -2,10 +2,12 @@
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+
+from src.infrastructure.middleware.rate_limit import PUBLIC_READ_LIMIT, rate_limit
 
 from app.db.session import get_async_db
 from app.models.attendance_level import AttendanceLevel
@@ -190,7 +192,9 @@ async def _build_prediction_response(
 
 
 @router.get("/predictions")
+@rate_limit(limit=PUBLIC_READ_LIMIT)
 async def get_predictions(
+    request: Request,
     event_id: str,
     db: AsyncSession = Depends(get_async_db),
 ):

@@ -8,8 +8,10 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Header, Query
+from fastapi import APIRouter, Depends, Header, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.infrastructure.middleware.rate_limit import PUBLIC_READ_LIMIT, rate_limit
 
 from app.db.session import get_async_db
 from app.schemas.exit_product import ExitRecommendationResponse
@@ -26,7 +28,9 @@ router = APIRouter(prefix="/api/events/{event_id}", tags=["Exit Product"])
 
 
 @router.get("/products/exit", response_model=ExitRecommendationResponse)
+@rate_limit(limit=PUBLIC_READ_LIMIT)
 async def exit_recommendations(
+    request: Request,
     event_id: str,
     destination_id: str | None = Query(None),
     mode: TransporteLiteral | None = Query(None),

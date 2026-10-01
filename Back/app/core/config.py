@@ -51,6 +51,17 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "supersecretkey-dev-only"
     ALGORITHM: str = "HS256"
 
+    # Rate limiting de las rutas públicas.
+    #
+    # `REDIS_URL` estaba declarada en `.env` pero ningún módulo la leía: era una
+    # variable muerta, y sin cliente `redis` instalado el conteo distribuido no
+    # era posible. Ahora la lee `src/infrastructure/middleware/rate_limit.py`.
+    # Sin valor (o si el ping falla) el rate limit degrada a un contador en
+    # memoria del proceso, que en Vercel serverless es por instancia.
+    REDIS_URL: Optional[str] = None
+    # Interruptor de emergencia: en `False` las rutas públicas no cuentan nada.
+    RATE_LIMIT_ENABLED: bool = True
+
     model_config = {"case_sensitive": True}
 
 

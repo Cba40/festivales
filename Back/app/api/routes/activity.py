@@ -10,7 +10,9 @@ respuesta HTTP no se rompe (telemetría secundaria, igual que en los productos).
 """
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Body, Path
+from fastapi import APIRouter, Body, Path, Request
+
+from src.infrastructure.middleware.rate_limit import PUBLIC_WRITE_LIMIT, rate_limit
 
 from app.schemas.activity import ActivityCreate, ActivityRecorded
 from app.services.service_interaction_log import log_service_interaction
@@ -21,7 +23,9 @@ EVENT_ID_PATTERN = r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4
 
 
 @router.post("/activity", response_model=ActivityRecorded, status_code=201)
+@rate_limit(limit=PUBLIC_WRITE_LIMIT)
 async def record_activity(
+    request: Request,
     event_id: str = Path(..., pattern=EVENT_ID_PATTERN, description="ID del evento (UUID)"),
     body: ActivityCreate = Body(...),
 ):

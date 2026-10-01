@@ -3,8 +3,10 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, Query
+from fastapi import APIRouter, Depends, Header, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.infrastructure.middleware.rate_limit import PUBLIC_READ_LIMIT, rate_limit
 
 from app.db.session import get_async_db
 from app.schemas.product import BathroomRecommendationResponse
@@ -21,9 +23,11 @@ router = APIRouter(prefix="/api/events/{event_id}", tags=["Bathroom Product"])
 
 
 @router.get("/products/bathroom", response_model=BathroomRecommendationResponse)
+@rate_limit(limit=PUBLIC_READ_LIMIT)
 async def bathroom_recommendations(
+    request: Request,
     event_id: str,
-    speed: float = Query(..., ge=0.0),
+    speed: float = Query(..., ge=0.0, le=10.0),
     accessibility_required: bool = Query(...),
     limit: int = Query(5, ge=1, le=50),
     current_zone_id: str | None = Query(None),
