@@ -46,5 +46,12 @@ class TransportLine(Base):
     )
 
     stops: Mapped[list["TransportLineStop"]] = relationship(
-        "TransportLineStop", back_populates="line", order_by="TransportLineStop.stop_order",
+        "TransportLineStop", back_populates="line",
+        order_by="TransportLineStop.stop_order",
+        # `passive_deletes=True` delega la cascada en el `ON DELETE CASCADE` del
+        # DDL en vez de emitir un UPDATE que pone la FK a NULL. Sin esto, borrar
+        # una línea vía ORM intentaba `UPDATE transport_line_stops SET line_id=NULL`
+        # y reventaba con NotNullViolation (la columna es NOT NULL), dejando la
+        # cascada del DDL como código muerto.
+        passive_deletes=True,
     )

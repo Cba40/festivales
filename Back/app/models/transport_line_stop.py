@@ -43,4 +43,9 @@ class TransportLineStop(Base):
     schedules: Mapped[list["TransportSchedule"]] = relationship(
         "TransportSchedule", back_populates="line_stop",
         order_by="TransportSchedule.departure_time",
+        # Último eslabón de la misma cadena de cascada. Sin esto, borrar una parada
+        # vía ORM intentaba `UPDATE transport_schedules SET line_stop_id=NULL` y
+        # fallaba con NotNullViolation en vez de dejar que el DDL limpiara los
+        # horarios. Cubierto por test_cascade_delete_with_line_removes_schedules.
+        passive_deletes=True,
     )

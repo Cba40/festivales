@@ -53,6 +53,9 @@ class Zone(Base):
     )
     transport_line_stops: Mapped[list["TransportLineStop"]] = relationship(
         "TransportLineStop", back_populates="zone",
+        # Mismo motivo que `TransportLine.stops`: la FK `zone_id` es NOT NULL y la
+        # cascada está declarada en el DDL, así que la debe aplicar Postgres.
+        passive_deletes=True,
     )
 
     @staticmethod

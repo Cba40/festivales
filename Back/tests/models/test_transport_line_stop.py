@@ -195,6 +195,43 @@ class TestTransportLineStopPersistence:
         ).scalars().all()
         assert remaining == []
 
+    def test_cascade_delete_with_line_removes_schedules(
+        self, db_session, sample_event
+    ) -> None:
+        """Borrar una parada vía ORM debe arrastrar sus horarios.
+
+        `test_cascade_delete_with_line_stop` de test_transport_schedule.py usa un
+        DELETE por SQL, que no pasa por la ORM y por eso nunca ejercitó este
+        camino. Aquí el borrado es `session.delete(tls)`: sin `passive_deletes`
+        en `TransportLineStop.schedules`, SQLAlchemy emitía
+        `UPDATE transport_schedules SET line_stop_id=NULL` en vez de dejar que
+        el `ON DELETE CASCADE` del DDL limpiara los horarios, y como la columna
+        es NOT NULL el borrado reventaba con IntegrityError.
+        """
+        import datetime
+
+        from app.models.transport_schedule import TransportSchedule
+
+        line = self._make_line(db_session, sample_event.id)
+        zone = self._make_zone(db_session, sample_event.id)
+
+        tls = TransportLineStop(line_id=line.id, zone_id=zone.id, stop_order=1)
+        db_session.add(tls)
+        db_session.flush()
+
+        db_session.add(TransportSchedule(
+            line_stop_id=tls.id,
+            day_type="weekday",
+            departure_time=datetime.time(8, 0),
+            destination="Terminal Central",
+        ))
+        db_session.flush()
+
+        db_session.delete(tls)
+        db_session.flush()
+
+        assert db_session.execute(select(TransportSchedule)).scalars().all() == []
+
     def test_duplicate_line_zone_rejected(self, db_session, sample_event) -> None:
         line = self._make_line(db_session, sample_event.id)
         zone = self._make_zone(db_session, sample_event.id)
