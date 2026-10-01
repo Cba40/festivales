@@ -73,6 +73,17 @@ export const endpoints = {
     updateProtocol: (id: string) => `/admin/emergency-protocols/${id}`,
     deleteProtocol: (id: string) => `/admin/emergency-protocols/${id}`,
   },
+  observationControlProtocolAdmin: {
+    list: (eventId: string) =>
+      `/admin/observation-control-protocols?event_id=${eventId}`,
+    create: () => `/admin/observation-control-protocols`,
+    update: (id: string) => `/admin/observation-control-protocols/${id}`,
+    remove: (id: string) => `/admin/observation-control-protocols/${id}`,
+    suggestions: () => `/admin/observation-control-protocols/suggestions`,
+    applySuggestions: () => `/admin/observation-control-protocols/apply-suggestions`,
+    compliance: (eventId: string) =>
+      `/admin/observation-control-protocols/compliance?event_id=${eventId}`,
+  },
   contextEngine: {
     zoneTypes: () => '/context-engine/zone-types',
     zoneSubtypes: () => '/context-engine/zone-subtypes',

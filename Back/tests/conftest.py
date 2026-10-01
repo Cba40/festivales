@@ -23,7 +23,7 @@ from app.models.event_day import EventDay
 from app.models.event_day_phase import EventDayPhase
 from app.models.zone import Zone
 from app.models.zone_type import ZoneType
-from src.infrastructure.middleware.rate_limit import reset_backend
+from src.infrastructure.middleware.rate_limit import reset_backend_sync
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", settings.DATABASE_URL)
 
@@ -364,9 +364,18 @@ def _reset_rate_limit_state():
 
     Los tests propios de rate limit (tests/infrastructure/middleware/
     test_rate_limit.py) miden el limite a proposito y no dependen de este reset.
+
+    El reset es **sincrono a proposito**. Con `asyncio.run(reset_backend())` este
+    fixture abria y cerraba un event loop en cada uno de los ~1600 tests de la
+    suite, y eso se cruzaba con los fixtures asincronos de scope modulo/sesion del
+    resto (`Future attached to a different loop`,
+    `asyncpg: another operation is in progress`). Se manifesto como 8 fallos en
+    tests/models y tests/unit/test_crud_p3.py mas 5 errors en
+    tests/crud/test_operational_observation.py, y solo al superar el numero de
+    tests que hace falta para que los loops se solapen.
     """
     yield
-    asyncio.run(reset_backend())
+    reset_backend_sync()
 
 
 @pytest.fixture

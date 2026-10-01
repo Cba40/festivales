@@ -2,17 +2,27 @@ import { useSearchParams } from 'react-router-dom';
 import { MotorConfigScreen } from './MotorConfigScreen';
 import { EventConfigPage } from '../../../pages/EventConfigPage';
 import { ObservationsScreen } from './ObservationsScreen';
+import { ObservationProtocolManagementScreen } from './ObservationProtocolManagementScreen';
 import { AnalyticsScreen } from './AnalyticsScreen';
 import { DashboardHeader } from '../components/DashboardHeader';
 import { AppFooter } from '@/components/AppFooter';
 import { SectionTabs } from '../components/ui';
 
-type Section = 'config' | 'predictions' | 'observations' | 'analytics';
+type Section =
+  | 'config'
+  | 'predictions'
+  | 'observations'
+  | 'observation-protocols'
+  | 'analytics';
 
 const SECTIONS: { key: Section; label: string }[] = [
   { key: 'config', label: 'Configuración' },
   { key: 'predictions', label: 'Predicciones' },
   { key: 'observations', label: 'Observaciones' },
+  // Tab propia y no un bloque dentro de "Observaciones": la de al lado es la
+  // carga manual de datos (qué se registró) y esta es la de reglas (cuándo
+  // debería registrarse). Mezclarlas hacia que el operador no sepa cual es cual.
+  { key: 'observation-protocols', label: 'Protocolos de observación' },
   { key: 'analytics', label: 'Analytics' },
 ];
 
@@ -42,6 +52,9 @@ export function MotorScreen() {
         {activeSection === 'config' && <MotorConfigScreen />}
         {activeSection === 'predictions' && <EventConfigPage />}
         {activeSection === 'observations' && <ObservationsScreen />}
+        {activeSection === 'observation-protocols' && (
+          <ObservationProtocolManagementScreen />
+        )}
         {activeSection === 'analytics' && <AnalyticsScreen />}
       </main>
 

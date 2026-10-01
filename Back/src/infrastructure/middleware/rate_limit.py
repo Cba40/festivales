@@ -159,6 +159,17 @@ class InMemorySlidingWindowBackend(RateLimitBackend):
                 del self._hits[key]
 
     async def reset(self) -> None:
+        self.reset_sync()
+
+    def reset_sync(self) -> None:
+        """Variante sin `await` para callers sincronicos.
+
+        Existe para que un fixture sincronico pueda limpiar el estado sin abrir un
+        event loop: `asyncio.run()` por test crea y destruye un loop en cada uno,
+        y eso cruza loops con los fixtures asincronos de scope modulo/sesion de
+        otros tests (`Future attached to a different loop`,
+        `asyncpg: another operation is in progress`).
+        """
         self._hits.clear()
 
 
@@ -295,6 +306,27 @@ async def reset_backend() -> None:
     """Limpia el estado del backend activo (tests)."""
     if _backend is not None:
         await _backend.reset()
+
+
+def reset_backend_sync() -> None:
+    """Igual que ``reset_backend`` pero sin I/O ni event loop.
+
+    Para fixtures sincronicos. Un `asyncio.run()` por test abre y cierra un event
+    loop en cada uno, y eso se cruza con los fixtures asincronos de scope modulo o
+    sesion del resto de la suite.
+    """
+    backend = _backend
+    if backend is None:
+        return
+    reset_sync = getattr(backend, "reset_sync", None)
+    if reset_sync is not None:
+        reset_sync()
+        return
+    # El backend de Redis necesita I/O: se deja el estado y se avisa en vez de
+    # fingir que se limpio.
+    logger.debug(
+        "reset_backend_sync ignorado: %s no expone reset_sync", type(backend).__name__
+    )
 
 
 def resolve_client_ip(request: Optional[Request]) -> str:

@@ -1031,6 +1031,56 @@ def seed_protocols(session):
     return {"protocols_created": created, "protocols_skipped": skipped}
 
 
+def seed_observation_control_protocols(session, event):
+    """Seed idempotente de Protocolos de Control de Observaciones.
+
+    A diferencia de `seed_protocols` (catálogo transversal por contexto), estos
+    protocolos son **por evento**: se siembran para el evento que se está
+    configurando.
+
+    Reutiliza la constante `SUGGESTIONS` del router admin para que el seed y el
+    botón "aplicar sugerencias" de la UI no puedan divergir. Idempotente por
+    `(event_id, name)`. Devuelve {"protocols_created": n, "protocols_skipped": n}.
+    """
+    from app.api.routes.observation_control_protocol_admin import SUGGESTIONS
+    from app.models.observation_control_protocol import ObservationControlProtocol
+
+    created = 0
+    skipped = 0
+    for order, suggestion in enumerate(SUGGESTIONS):
+        existing = (
+            session.query(ObservationControlProtocol)
+            .filter(
+                ObservationControlProtocol.event_id == event.id,
+                ObservationControlProtocol.name == suggestion.name,
+            )
+            .first()
+        )
+        if existing:
+            print(f"ℹ️ Protocolo de observación ya existe: {suggestion.name}")
+            skipped += 1
+            continue
+        session.add(
+            ObservationControlProtocol(
+                event_id=event.id,
+                event_day_id=None,
+                name=suggestion.name,
+                description=suggestion.description,
+                trigger_metric=suggestion.trigger_metric,
+                trigger_operator=suggestion.trigger_operator,
+                threshold_value=suggestion.threshold_value,
+                action_interval_minutes=suggestion.action_interval_minutes,
+                zone_type_id=None,
+                active=True,
+                order=order,
+            )
+        )
+        session.flush()
+        created += 1
+        print(f"✅ Protocolo de observación creado: {suggestion.name} (cada {suggestion.action_interval_minutes} min)")
+    return {"protocols_created": created, "protocols_skipped": skipped}
+
+
 def main():
     session = SessionLocal()
     try:
@@ -1079,6 +1129,10 @@ def main():
 
         # Emergencia V2 (Fase S1): protocolos de emergencia
         seed_protocols(session)
+        session.commit()
+
+        # Motor: protocolos de control de observaciones (4 sugerencias base)
+        seed_observation_control_protocols(session, event)
         session.commit()
 
         print(f"\n\U0001f4cb VITE_EVENT_ID={event.id}")

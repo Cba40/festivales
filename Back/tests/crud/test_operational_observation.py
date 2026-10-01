@@ -141,6 +141,21 @@ def _sync_dsn() -> str:
 
 
 def _require_working_postgres() -> None:
+    """Skip si la tabla que este modulo necesita no esta utilizable.
+
+    El guard miraba `zones`, que NO es la tabla que usa el modulo: aqui se escribe
+    y lee `operational_observations`. `zones` la crea `tests/conftest.py::test_engine`
+    (AppBase) pero `operational_observations` vive en el registro de `src/`
+    (InfraBase) y solo la crea `tests/integration/test_recommendation_flow.py`.
+
+    Con el guard sobre `zones` el resultado dependia de que modulo hubiera corrido
+    antes en la sesion, y por eso los 6 tests alternaban entre SKIP y ERROR segun
+    la corrida: con `zones` presente el guard pasaba y los tests se ejecutaban
+    contra una tabla inexistente
+    (`asyncpg UndefinedTableError: no existe la relacion
+    «operational_observations»`). Guardando la tabla que realmente se usa, el skip
+    es determinista y no depende del orden.
+    """
     import psycopg2
 
     try:
@@ -149,15 +164,17 @@ def _require_working_postgres() -> None:
         pytest.skip(f"No se pudo abrir la base de tests: {type(exc).__name__}: {exc}")
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT id, name, capacity FROM zones LIMIT 1")
+            cur.execute(
+                "SELECT id, zone_id, observed_density FROM operational_observations LIMIT 1"
+            )
     except Exception as exc:  # pragma: no cover - entorno
         conn.close()
         pytest.skip(
-            "El entorno no soporta este test: la tabla `zones` no es utilizable "
-            f"({type(exc).__name__}: {str(exc).splitlines()[0]}). Causa habitual: falta la "
-            "librería `postgis-3` o el schema local está desactualizado. No es un fallo "
-            "del código bajo prueba; es la misma limitación que ya hace fallar a "
-            "tests/unit/test_crud_p3.py."
+            "El entorno no soporta este test: la tabla `operational_observations` "
+            f"no es utilizable ({type(exc).__name__}: {str(exc).splitlines()[0]}). "
+            "Esa tabla se crea desde el registro de `src/` (tests/integration/"
+            "test_recommendation_flow.py::_ensure_test_schema), no desde el "
+            "`test_engine` de conftest. No es un fallo del código bajo prueba."
         )
     conn.close()
 
