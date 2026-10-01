@@ -1,11 +1,44 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from uuid import UUID
 
 from src.domain.entities.zone_behavior import FlowRestriction
 from src.domain.value_objects.territorial_prediction import TerritorialPrediction
 from src.domain.value_objects.zone_state import ZoneState
 from src.infrastructure.persistence.models.prediction import PredictionModel
+
+
+def prediction_timestamp_to_storage(value: datetime) -> datetime:
+    """Normaliza un instante a la convencion de almacenamiento de `predictions`.
+
+    `predictions.timestamp` es `timestamp without time zone`, y el valor que
+    fluye por el dominio es la hora local de la jornada (`astimezone(LOCAL_TZ)`
+    en `prediction_module.py`), no UTC. Guardar esa hora local sin declararlo
+    dejaba la columna ambigua y rompia a todo consumidor que la compara con un
+    instante UTC:
+
+      - `MetricService._as_utc` interpreta los naive como UTC, asi que la
+        desviacion media nunca caia en la ventana de ±30 min y
+        `density_deviation` quedaba BLOCKED de forma permanente.
+      - `app/crud/operational_event.py` compara la columna contra
+        `start_timestamp`/`end_timestamp`, que si son UTC (RFC-OPERATIONAL-EVENTS-V1),
+        con el mismo desfase de 3 h.
+
+    Se elige UTC como convencion unica porque es la que ya asumian los dos
+    lectores. Se hace aqui, en la frontera de persistencia, y no en el motor:
+    la entidad de dominio conserva su instante local con timezone, asi que los
+    endpoints que exponen `prediction.timestamp.isoformat()` no cambian.
+
+    Una columna `timestamp without time zone` guarda el literal tal cual, sin
+    convertir por el `TimeZone` de la sesion, asi que el resultado no depende de
+    como este configurado Postgres.
+    """
+    if value.tzinfo is None:
+        # Sin timezone no hay nada que convertir: se asume que ya es UTC, que es
+        # lo que historicamente guardaba esta columna.
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
 
 
 def _zone_state_to_dict(state: ZoneState) -> dict:
@@ -68,7 +101,7 @@ def prediction_to_domain(model: PredictionModel) -> TerritorialPrediction:
 
 def prediction_to_model(entity: TerritorialPrediction) -> PredictionModel:
     return PredictionModel(
-        timestamp=entity.timestamp,
+        timestamp=prediction_timestamp_to_storage(entity.timestamp),
         event_day_id=entity.event_day_id,
         knowledge_model_version_id=entity.knowledge_model_version_id,
         active_phase_id=entity.active_phase_id,

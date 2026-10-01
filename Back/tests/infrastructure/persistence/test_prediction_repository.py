@@ -275,3 +275,78 @@ class TestSQLPredictionRepositoryFind:
         ], "SQLPredictionRepository does not inherit from PredictionRepository"
         assert hasattr(SQLPredictionRepository, "save")
         assert hasattr(SQLPredictionRepository, "find_by_timestamp")
+
+
+class TestPredictionTimestampStorageConvention:
+    """`predictions.timestamp` guarda UTC naive.
+
+    El dominio produce la hora local de la jornada (`astimezone(LOCAL_TZ)`). Si se
+    guardara tal cual, `MetricService._as_utc` la interpretaria como UTC y la
+    desviacion de densidad no caeria nunca en la ventana de ±30 min
+    (`density_deviation` BLOCKED permanente), y `app/crud/operational_event.py`
+    la compararia contra instantes UTC con 3 h de desfase.
+    """
+
+    def test_local_aware_timestamp_is_converted_to_naive_utc(self) -> None:
+        from src.application.context_engine.stage1_context_resolution import LOCAL_TZ
+        from src.infrastructure.persistence.mappers.prediction_mapper import (
+            prediction_timestamp_to_storage,
+        )
+
+        local = datetime(2026, 7, 15, 15, 0, tzinfo=LOCAL_TZ)
+
+        stored = prediction_timestamp_to_storage(local)
+
+        assert stored == datetime(2026, 7, 15, 18, 0)  # 15:00 ART = 18:00 UTC
+        assert stored.tzinfo is None
+
+    def test_naive_timestamp_is_left_untouched(self) -> None:
+        from src.infrastructure.persistence.mappers.prediction_mapper import (
+            prediction_timestamp_to_storage,
+        )
+
+        naive = datetime(2026, 7, 15, 18, 0)
+
+        assert prediction_timestamp_to_storage(naive) is naive
+
+    async def test_save_stores_normalized_timestamp(self) -> None:
+        from src.application.context_engine.stage1_context_resolution import LOCAL_TZ
+
+        session = AsyncMock()
+        session.add = MagicMock()
+        session.flush = AsyncMock()
+        session.refresh = AsyncMock()
+
+        prediction = _make_prediction(
+            timestamp=datetime(2026, 7, 15, 15, 0, tzinfo=LOCAL_TZ),
+        )
+        repo = SQLPredictionRepository(session)
+
+        await repo.save(prediction)
+
+        model = session.add.call_args.args[0]
+        assert model.timestamp == datetime(2026, 7, 15, 18, 0)
+        assert model.timestamp.tzinfo is None
+
+    async def test_find_by_timestamp_filters_with_normalized_value(self) -> None:
+        """La busqueda debe usar la misma convencion que `save`, o el cache falla."""
+        from src.application.context_engine.stage1_context_resolution import LOCAL_TZ
+
+        session = AsyncMock()
+        scalar_result = MagicMock()
+        scalar_result.scalar_one_or_none = MagicMock(return_value=None)
+        session.execute = AsyncMock(return_value=scalar_result)
+
+        repo = SQLPredictionRepository(session)
+
+        await repo.find_by_timestamp(
+            datetime(2026, 7, 15, 15, 0, tzinfo=LOCAL_TZ)
+        )
+
+        compiled = str(
+            session.execute.call_args[0][0].compile(
+                compile_kwargs={"literal_binds": True}
+            )
+        )
+        assert "2026-07-15 18:00:00" in compiled
+        assert "15:00:00-03:00" not in compiled

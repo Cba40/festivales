@@ -43,10 +43,13 @@ def _as_utc(value: datetime) -> datetime:
     zone`` (llega naive), y Python se niega a restar uno contra el otro con
     ``can't subtract offset-naive and offset-aware datetimes``.
 
-    El lado naive se interpreta como UTC porque es como lo escribe la propia
-    aplicacion: los valores de ``timestamp`` en ``predictions`` se producen con
-    ``datetime.now(timezone.utc)`` y las columnas sin timezone de Postgres
-    guardan UTC cuando la sesion esta en UTC, que es el default de Neon.
+    El lado naive se interpreta como UTC porque es la convencion de
+    almacenamiento de ``predictions.timestamp``: la normaliza a UTC naive
+    ``prediction_mapper.prediction_timestamp_to_storage`` antes de escribir. Ese
+    docstring antes afirmaba que la columna se llenaba con
+    ``datetime.now(timezone.utc)``, y era falso (se escribia la hora local de la
+    jornada), lo que hacia que esta funcion introdujera un desfase de 3 h y que
+    ``density_deviation`` quedara BLOCKED de forma permanente.
     """
     if value.tzinfo is None or value.utcoffset() is None:
         return value.replace(tzinfo=timezone.utc)

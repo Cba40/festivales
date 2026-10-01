@@ -11,6 +11,9 @@ from src.infrastructure.persistence.mappers import (
     prediction_to_domain,
     prediction_to_model,
 )
+from src.infrastructure.persistence.mappers.prediction_mapper import (
+    prediction_timestamp_to_storage,
+)
 from src.infrastructure.persistence.models import PredictionModel
 
 
@@ -32,9 +35,15 @@ class SQLPredictionRepository(PredictionRepository):
         self,
         timestamp: datetime,
     ) -> TerritorialPrediction | None:
+        # Se normaliza igual que en `save`: la columna guarda UTC naive, asi que
+        # comparar contra el instante local de la jornada nunca encontraria la fila
+        # y el cache de predicciones faltaria siempre.
         stmt = (
             select(PredictionModel)
-            .where(PredictionModel.timestamp == timestamp)
+            .where(
+                PredictionModel.timestamp
+                == prediction_timestamp_to_storage(timestamp),
+            )
         )
         result = await self._session.execute(stmt)
         model = result.scalar_one_or_none()
