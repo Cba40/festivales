@@ -114,12 +114,31 @@ def _degrade_geometry_columns():
 
 
 @pytest.fixture
-async def async_session(async_engine):
+async def async_session(async_engine) -> AsyncSession:
+    """Sesion asincrona transaccional, con la misma politica que produccion.
+
+    `expire_on_commit=False` es obligatorio y no es cosmetico: TODOS los CRUD de
+    `app/crud/` terminan en `await db.commit()`. Con el default de SQLAlchemy
+    (`True`), ese commit expira **todos** los objetos vivos en la sesion, y el
+    siguiente acceso a un atributo (`prof.id`, `profile_a.id`) dispara una carga
+    perezosa fuera del contexto greenlet -> `sqlalchemy.exc.MissingGreenlet`.
+    La app real ya lo hace asi en `src/infrastructure/db/config.py:24`.
+
+    `join_transaction_mode="create_savepoint"` hace que el `commit()` de cada CRUD
+    libere un SAVEPOINT en vez de la transaccion externa, de modo que el
+    `rollback()` del fixture seguiria revirtiendo todo. Es el mismo criterio que
+    usa `tests/crud/test_operational_observation.py:181` y que ya documenta el
+    fixture `sync_session` de este modulo.
+    """
     async with async_engine.connect() as conn:
-        await conn.begin()
-        session = AsyncSession(bind=conn)
-        yield session
-        await conn.rollback()
+        tx = await conn.begin()
+        maker = async_sessionmaker(
+            bind=conn, expire_on_commit=False, join_transaction_mode="create_savepoint"
+        )
+        async with maker() as session:
+            yield session
+            await session.rollback()
+        await tx.rollback()
 
 
 @pytest.fixture
@@ -375,10 +394,47 @@ class TestOperationalEventCRUD:
 @pytest.mark.asyncio
 class TestEventDayCRUD:
 
-    async def test_event_day_create_validates_profile_exists(
+    async def test_event_day_create_validates_operational_window(
         self, async_session: AsyncSession, clean_tables,
     ):
-        """§13: Crear EventDay con operational_profile_id inexistente → ValueError."""
+        """§13: Ventana operacional invertida (`end_min <= start_min`) → ValueError."""
+        from app.models.attendance_level import AttendanceLevel
+        from app.models.event import Event
+
+        event = Event(id="test-event-crud-al", name="AL Test", description="")
+        async_session.add(event)
+        al = AttendanceLevel(id="al-crud-test", event_id=event.id, name="TestAL",
+                             min_people=0, max_people=100000)
+        async_session.add(al)
+        await async_session.flush()
+
+        with pytest.raises(ValueError) as exc_info:
+            await create_event_day(
+                async_session,
+                EventDayCreate(
+                    date="2026-07-10",
+                    day_of_week="jueves",
+                    operational_start_min=1800,
+                    operational_end_min=480,
+                    attendance_level_id=al.id,
+                ),
+                event_id="test-event-crud-al",
+            )
+        assert "operational_end_min" in str(exc_info.value)
+
+    async def test_event_day_create_missing_profile_violates_foreign_key(
+        self, async_session: AsyncSession, clean_tables,
+    ):
+        """§13: `operational_profile_id` inexistente lo detiene la FK de Postgres.
+
+        RFC-007 elimino el chequeo en CRUD (`create` ya no hace
+        `db.get(OperationalProfile, ...)`) y declaro `OperationalProfile` como
+        entidad de compatibilidad. La integridad referencial la garantiza la FK
+        `event_days_operational_profile_id_fkey`, no una validacion previa, asi que
+        lo que se observa es un `IntegrityError` de SQLAlchemy, no un `ValueError`.
+        """
+        from sqlalchemy.exc import IntegrityError
+
         from app.models.attendance_level import AttendanceLevel
         from app.models.event import Event
 
@@ -390,7 +446,7 @@ class TestEventDayCRUD:
         await async_session.flush()
 
         fake_profile_id = uuid.uuid4()
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(IntegrityError) as exc_info:
             await create_event_day(
                 async_session,
                 EventDayCreate(
@@ -403,7 +459,7 @@ class TestEventDayCRUD:
                 ),
                 event_id="test-event-crud-al",
             )
-        assert "not found" in str(exc_info.value).lower()
+        assert "event_days_operational_profile_id_fkey" in str(exc_info.value)
 
 
 @pytest.mark.asyncio
@@ -463,6 +519,7 @@ class TestEventDayPhaseCRUD:
                 operational_phase_id=p1.id,
                 start_min=480,
                 end_min=600,
+                intensity=1.0,
             ),
         )
         return edp, p2.id
@@ -507,7 +564,11 @@ def sync_session():
     sync_engine.dispose()
 
 
-@pytest.mark.asyncio
+# Sin `@pytest.mark.asyncio`: `pytest.ini` ya fija `asyncio_mode = auto`, asi que
+# pytest-asyncio recognise solo los tests y fixtures asincronos. Ademas esta clase
+# mezcla un test sincrono sobre `sync_session` (el CRUD de `zone_type.create` es
+# sincrono), que bajo el marcador de clase emitia
+# `PytestWarning: marked with '@pytest.mark.asyncio' but it is not an async function`.
 class TestIntegrityP31A:
     """P3.1A — Integridad del modelo operacional (comportamientos automáticos)."""
 
@@ -587,13 +648,18 @@ class TestIntegrityP31A:
             assert behavior.flow_restriction == "OPEN"
 
     async def test_rollback_when_behavior_creation_fails(
-        self, async_session: AsyncSession, clean_tables,
+        self, async_session: AsyncSession, seed_zone_types, clean_tables,
     ):
         """Si la creación automática falla → rollback completo, sin datos parciales."""
         from unittest.mock import patch
 
         from app.models.operational_phase import OperationalPhase
 
+        # `seed_zone_types` es imprescindible, no decorativo: `sync_zone_behaviors`
+        # devuelve 0 sin ningun ZoneType que sincronizar
+        # (`zone_behavior_sync.py:77`), sin llamar nunca a `default_behavior`. Sin al
+        # menos un ZoneType el parche no se disparaba y el test terminaba en
+        # `DID NOT RAISE`.
         profile = await create_operational_profile(
             async_session, OperationalProfileCreate(name="P31A-Rollback", description=""),
         )
@@ -756,8 +822,26 @@ class TestZoneBehaviorSyncP31B:
 
 @pytest.mark.asyncio
 class TestEventDayProfileIntegrityP31C:
-    """P3.1C — Todas las EventDayPhase de un EventDay deben pertenecer al mismo
-    OperationalProfile que el EventDay."""
+    """P3.1C — Independencia de las fases del EventDay respecto a su perfil.
+
+    Este bloque se reescribio sobre el contrato vigente. La version anterior
+    exigia que toda EventDayPhase perteneciera al mismo OperationalProfile que su
+    EventDay ("does not belong"), una invariante que RFC-007 elimino a proposito
+    (`alear modelo persistente con RFC-007`):
+
+      - RFC-007, seccion 4.4: "Una vez configurada una jornada, sus fases son
+        independientes del perfil que las origino: modificaciones posteriores en
+        OperationalProfile no afectan las fases ya configuradas".
+      - El commit que alineo el modelo con RFC-007 elimino de
+        `app/crud/event_day.py` y `app/crud/event_day_phase.py` los chequeos
+        `does not belong to OperationalProfile` y `operational_profile_id cannot
+        change without providing new 'phases'`.
+
+    Los tests de aqui ahora fijan el comportamiento real: el perfil organiza fases
+    al configurar la jornada y despues deja de intervenir. Lo que si se sigue
+    validando es la existencia de la `OperationalPhase` referenciada, que si forma
+    parte del contrato.
+    """
 
     async def _setup(self, async_session: AsyncSession):
         from app.models.attendance_level import AttendanceLevel
@@ -808,7 +892,7 @@ class TestEventDayProfileIntegrityP31C:
                 attendance_level_id=al_id,
                 phases=[
                     EventDayPhaseCreate(
-                        operational_phase_id=ph, start_min=0, end_min=300,
+                        operational_phase_id=ph, start_min=0, end_min=300, intensity=1.0,
                     )
                     for ph in phase_ids
                 ],
@@ -816,13 +900,42 @@ class TestEventDayProfileIntegrityP31C:
             event_id=event_id,
         )
 
-    async def test_create_rejects_phase_from_other_profile(
+    async def test_create_accepts_phase_from_other_profile(
         self, async_session: AsyncSession, clean_tables,
     ):
-        """Crear un EventDay con una fase de otro perfil → ValueError."""
+        """RFC-007 §4.4: un EventDay puede traer una fase creada en otro perfil."""
         from app.schemas.event_day_phase import EventDayPhaseCreate
 
         e, al, pa, _pb, _pha, phb = await self._setup(async_session)
+        day = await create_event_day(
+            async_session,
+            EventDayCreate(
+                date="2026-06-02",
+                day_of_week="miercoles",
+                operational_profile_id=pa,
+                operational_start_min=0,
+                operational_end_min=600,
+                attendance_level_id=al,
+                phases=[
+                    EventDayPhaseCreate(
+                        operational_phase_id=phb, start_min=0, end_min=300, intensity=1.0,
+                    )
+                ],
+            ),
+            event_id=e,
+        )
+
+        assert day.operational_profile_id == pa
+        phases = await list_phases_by_event_day(async_session, day.id)
+        assert [p.operational_phase_id for p in phases] == [phb]
+
+    async def test_create_rejects_unknown_operational_phase(
+        self, async_session: AsyncSession, clean_tables,
+    ):
+        """Una OperationalPhase inexistente si se rechaza: ese chequeo sigue vigente."""
+        from app.schemas.event_day_phase import EventDayPhaseCreate
+
+        e, al, pa, _pb, _pha, _phb = await self._setup(async_session)
         with pytest.raises(ValueError) as exc_info:
             await create_event_day(
                 async_session,
@@ -835,94 +948,77 @@ class TestEventDayProfileIntegrityP31C:
                     attendance_level_id=al,
                     phases=[
                         EventDayPhaseCreate(
-                            operational_phase_id=phb, start_min=0, end_min=300,
+                            operational_phase_id=uuid.uuid4(),
+                            start_min=0,
+                            end_min=300,
+                            intensity=1.0,
                         )
                     ],
                 ),
                 event_id=e,
             )
-        assert "does not belong" in str(exc_info.value)
+        assert "not found" in str(exc_info.value).lower()
 
-    async def test_update_rejects_mixed_phases(
+    async def test_update_keeps_phases_when_profile_changes(
         self, async_session: AsyncSession, clean_tables,
     ):
-        """Cambiar perfil y enviar fases del perfil anterior → ValueError."""
+        """RFC-007 §4.4: cambiar el perfil sin mandar fases conserva las existentes."""
+        e, al, pa, pb, pha, _phb = await self._setup(async_session)
+        day = await self._make_day(async_session, e, al, pa, [pha])
+
+        updated = await update_event_day(
+            async_session, day, EventDayUpdate(operational_profile_id=pb),
+        )
+
+        assert updated.operational_profile_id == pb
+        phases = await list_phases_by_event_day(async_session, day.id)
+        assert [p.operational_phase_id for p in phases] == [pha]
+
+    async def test_update_accepts_phases_from_another_profile(
+        self, async_session: AsyncSession, clean_tables,
+    ):
+        """Las fases enviadas se aplican aunque pertenezcan a otro perfil."""
         from app.schemas.event_day_phase import EventDayPhaseCreate
 
-        e, al, pa, pb, pha, _phb = await self._setup(async_session)
-        day = await self._make_day(async_session, e, al, pa, [pha])
+        e, al, pa, _pb, _pha, phb = await self._setup(async_session)
+        day = await self._make_day(async_session, e, al, pa, [])
 
-        with pytest.raises(ValueError) as exc_info:
-            await update_event_day(
-                async_session, day,
-                EventDayUpdate(
-                    operational_profile_id=pb,
-                    phases=[
-                        EventDayPhaseCreate(
-                            operational_phase_id=pha, start_min=0, end_min=300,
-                        )
-                    ],
-                ),
-            )
-        assert "does not belong" in str(exc_info.value)
+        updated = await update_event_day(
+            async_session,
+            day,
+            EventDayUpdate(
+                phases=[
+                    EventDayPhaseCreate(
+                        operational_phase_id=phb, start_min=0, end_min=300, intensity=1.0,
+                    )
+                ],
+            ),
+        )
+        assert updated.operational_profile_id == pa
+        phases = await list_phases_by_event_day(async_session, day.id)
+        assert [p.operational_phase_id for p in phases] == [phb]
 
-    async def test_update_rejects_profile_change_without_phases(
+    async def test_create_phase_from_other_profile_accepted(
         self, async_session: AsyncSession, clean_tables,
     ):
-        """Cambiar perfil sin enviar fases nuevas cuando el día ya tiene fases → ValueError."""
-        e, al, pa, pb, pha, _phb = await self._setup(async_session)
-        day = await self._make_day(async_session, e, al, pa, [pha])
-
-        with pytest.raises(ValueError):
-            await update_event_day(
-                async_session, day,
-                EventDayUpdate(operational_profile_id=pb),
-            )
-
-    async def test_update_phases_only_must_match_current_profile(
-        self, async_session: AsyncSession, clean_tables,
-    ):
-        """Enviar solo fases que no pertenecen al perfil actual → ValueError."""
+        """Agregar una EventDayPhase de otro perfil es válido bajo RFC-007."""
         from app.schemas.event_day_phase import EventDayPhaseCreate
 
         e, al, pa, _pb, pha, phb = await self._setup(async_session)
         day = await self._make_day(async_session, e, al, pa, [pha])
 
-        with pytest.raises(ValueError) as exc_info:
-            await update_event_day(
-                async_session, day,
-                EventDayUpdate(
-                    phases=[
-                        EventDayPhaseCreate(
-                            operational_phase_id=phb, start_min=0, end_min=300,
-                        )
-                    ],
-                ),
-            )
-        assert "does not belong" in str(exc_info.value)
+        added = await create_event_day_phase(
+            async_session, day.id,
+            EventDayPhaseCreate(
+                operational_phase_id=phb, start_min=300, end_min=400, intensity=1.0,
+            ),
+        )
+        assert added.operational_phase_id == phb
 
-    async def test_create_phase_from_other_profile_rejected(
+    async def test_update_phase_to_other_profile_accepted(
         self, async_session: AsyncSession, clean_tables,
     ):
-        """Agregar una EventDayPhase de otro perfil → ValueError."""
-        from app.schemas.event_day_phase import EventDayPhaseCreate
-
-        e, al, pa, _pb, pha, phb = await self._setup(async_session)
-        day = await self._make_day(async_session, e, al, pa, [pha])
-
-        with pytest.raises(ValueError) as exc_info:
-            await create_event_day_phase(
-                async_session, day.id,
-                EventDayPhaseCreate(
-                    operational_phase_id=phb, start_min=0, end_min=400,
-                ),
-            )
-        assert "does not belong" in str(exc_info.value)
-
-    async def test_update_phase_to_other_profile_rejected(
-        self, async_session: AsyncSession, clean_tables,
-    ):
-        """Reasignar una EventDayPhase a una fase de otro perfil → ValueError."""
+        """Reasignar una EventDayPhase a una fase de otro perfil es válido."""
         from app.schemas.event_day_phase import EventDayPhaseCreate
 
         e, al, pa, _pb, pha, phb = await self._setup(async_session)
@@ -930,16 +1026,14 @@ class TestEventDayProfileIntegrityP31C:
         phase = await create_event_day_phase(
             async_session, day.id,
             EventDayPhaseCreate(
-                operational_phase_id=pha, start_min=0, end_min=300,
+                operational_phase_id=pha, start_min=0, end_min=300, intensity=1.0,
             ),
         )
 
-        with pytest.raises(ValueError) as exc_info:
-            await update_event_day_phase(
-                async_session, phase,
-                EventDayPhaseUpdate(operational_phase_id=phb),
-            )
-        assert "does not belong" in str(exc_info.value)
+        updated = await update_event_day_phase(
+            async_session, phase, EventDayPhaseUpdate(operational_phase_id=phb),
+        )
+        assert updated.operational_phase_id == phb
 
     async def test_valid_profile_change_replaces_all_phases(
         self, async_session: AsyncSession, clean_tables,
@@ -956,7 +1050,7 @@ class TestEventDayProfileIntegrityP31C:
                 operational_profile_id=pb,
                 phases=[
                     EventDayPhaseCreate(
-                        operational_phase_id=phb, start_min=0, end_min=300,
+                        operational_phase_id=phb, start_min=0, end_min=300, intensity=1.0,
                     )
                 ],
             ),
@@ -978,7 +1072,7 @@ class TestEventDayProfileIntegrityP31C:
         added = await create_event_day_phase(
             async_session, day.id,
             EventDayPhaseCreate(
-                operational_phase_id=pha, start_min=0, end_min=300,
+                operational_phase_id=pha, start_min=0, end_min=300, intensity=1.0,
             ),
         )
         assert added.operational_phase_id == pha
