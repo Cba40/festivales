@@ -168,6 +168,9 @@ class TestTemporalDistribution:
             "bucket": "2026-09-21T15:00:00",
             "count": 5,
             "phase": "tarde",
+            # Sin `service_category` el endpoint no calcula el detalle por
+            # request_mode y devuelve `breakdown=None` (event_reports.py:615).
+            "breakdown": None,
         }
         assert body["buckets"][1]["count"] == 3
         assert body["buckets"][1]["phase"] == "tarde"
@@ -193,7 +196,13 @@ class TestTemporalDistribution:
         assert resp.status_code == 200
         body = resp.json()
         assert body["buckets"] == [
-            {"bucket": "2026-09-21T23:00:00", "count": 2, "phase": None}
+            {
+                "bucket": "2026-09-21T23:00:00",
+                "count": 2,
+                "phase": None,
+                # Sin `service_category` no hay detalle por request_mode.
+                "breakdown": None,
+            }
         ]
         assert len(db_mock.execute.await_args_list) == 3
 
@@ -218,7 +227,13 @@ class TestTemporalDistribution:
         body = resp.json()
         assert body["granularity"] == "day"
         assert body["buckets"] == [
-            {"bucket": "2026-09-21T00:00:00", "count": 7, "phase": None}
+            {
+                "bucket": "2026-09-21T00:00:00",
+                "count": 7,
+                "phase": None,
+                # Sin `service_category` no hay detalle por request_mode.
+                "breakdown": None,
+            }
         ]
         assert len(db_mock.execute.await_args_list) == 2
 
@@ -229,9 +244,21 @@ class TestTemporalDistribution:
         auth_headers: dict[str, str],
     ):
         bucket = datetime(2026, 9, 21, 15, 0)
+        # Con `service_category` no nulo el handler encadena mas consultas:
+        #   1) Event                       (_get_event_or_404)
+        #   2) bucket + count              (agregado)
+        #   3) bucket + request_mode+count (detalle; solo si service_category,
+        #                                     event_reports.py:615)
+        #   4) EventDay                    (_resolve_operational_phases)
+        # La 4a devuelve vacio, asi que `_resolve_operational_phases` corta antes
+        # de las dos siguientes (event_reports.py: `if event_days:`) y phase queda
+        # None. Sin el 3er y 4to efecto el mock se agota y el endpoint responde 500.
         db_mock.execute.side_effect = [
             _event_result(_event(EVENT_START, EVENT_END)),
             _all_result([SimpleNamespace(bucket=bucket, count=1)]),
+            _all_result(
+                [SimpleNamespace(bucket=bucket, request_mode="parking", count=1)]
+            ),
             _scalars_result([]),
         ]
 
