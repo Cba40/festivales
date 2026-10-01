@@ -465,3 +465,109 @@ class TestObservationComplianceEvaluator:
         alertas = await ObservationComplianceEvaluator(session).evaluate("ev-1", now=NOW)
 
         assert alertas == []
+
+
+# ── Mezclas de alcance: transversal + anclado a jornada ──────────────────────
+#
+# Estos casos son los que destaparon el bug de resolucion de jornadas. Antes se
+# inferia si hacia falta jornada activa con `len(day_ids) < len(protocols)`, que
+# compara conjuntos de tamanhos distintos: en cuanto habia un protocolo anclado
+# MAS de una jornada en juego, el transversal resolvia `_single(day_ids) == None`
+# y se saltaba en silencio. Como las 4 sugerencias de `apply-suggestions` son
+# transversales, el efecto era que el operador perdia el cumplimiento de todas
+# en cuanto anclaba una sola regla a una jornada.
+
+
+class TestMixedScopeEvaluation:
+    """Protocolos transversales y anclados conviven: todos deben evaluarse."""
+
+    async def test_transversal_y_anclado_ambos_se_evaluan(self):
+        session = _FakeAsyncSession(
+            protocols=[
+                _protocolo(name="Transversal", event_day_id=None),
+                _protocolo(name="Anclado", event_day_id="day-X"),
+            ],
+            prediction=SimpleNamespace(
+                zone_states_data=_zone_states(saturation_level=0.92)
+            ),
+            event_day_id="day-activa",
+        )
+
+        alertas = await ObservationComplianceEvaluator(session).evaluate("ev-1", now=NOW)
+
+        assert sorted(a.protocol_name for a in alertas) == ["Anclado", "Transversal"]
+
+    async def test_transversal_mas_dos_anclados_se_evaluan_los_tres(self):
+        session = _FakeAsyncSession(
+            protocols=[
+                _protocolo(name="Transversal", event_day_id=None),
+                _protocolo(name="Anclado X", event_day_id="day-X"),
+                _protocolo(name="Anclado Y", event_day_id="day-Y"),
+            ],
+            prediction=SimpleNamespace(
+                zone_states_data=_zone_states(saturation_level=0.92)
+            ),
+            event_day_id="day-activa",
+        )
+
+        alertas = await ObservationComplianceEvaluator(session).evaluate("ev-1", now=NOW)
+
+        assert sorted(a.protocol_name for a in alertas) == [
+            "Anclado X",
+            "Anclado Y",
+            "Transversal",
+        ]
+
+    async def test_transversal_usa_la_jornada_activa(self):
+        """El transversal no hereda la jornada de otro protocolo: usa la activa."""
+        session = _FakeAsyncSession(
+            protocols=[
+                _protocolo(name="Transversal", event_day_id=None),
+                _protocolo(name="Anclado", event_day_id="day-X"),
+            ],
+            prediction=SimpleNamespace(
+                zone_states_data=_zone_states(saturation_level=0.92)
+            ),
+            event_day_id="day-activa",
+        )
+
+        alertas = await ObservationComplianceEvaluator(session).evaluate("ev-1", now=NOW)
+
+        por_nombre = {a.protocol_name: a.event_day_id for a in alertas}
+        assert por_nombre["Transversal"] == "day-activa"
+        assert por_nombre["Anclado"] == "day-X"
+
+    async def test_sin_jornada_activa_el_transversal_no_se_evalua(self):
+        """Sin jornada activa no hay contra que medir: solo los anclados cuentan."""
+        session = _FakeAsyncSession(
+            protocols=[
+                _protocolo(name="Transversal", event_day_id=None),
+                _protocolo(name="Anclado", event_day_id="day-X"),
+            ],
+            prediction=SimpleNamespace(
+                zone_states_data=_zone_states(saturation_level=0.92)
+            ),
+            event_day_id=None,
+        )
+
+        alertas = await ObservationComplianceEvaluator(session).evaluate("ev-1", now=NOW)
+
+        assert [a.protocol_name for a in alertas] == ["Anclado"]
+
+    async def test_todos_anclados_no_consulta_la_jornada_activa(self):
+        """Si ningun protocolo es transversal, no hace falta la jornada activa."""
+        session = _FakeAsyncSession(
+            protocols=[
+                _protocolo(name="Anclado X", event_day_id="day-X"),
+                _protocolo(name="Anclado Y", event_day_id="day-Y"),
+            ],
+            prediction=SimpleNamespace(
+                zone_states_data=_zone_states(saturation_level=0.92)
+            ),
+            event_day_id=None,
+        )
+
+        alertas = await ObservationComplianceEvaluator(session).evaluate("ev-1", now=NOW)
+
+        assert sorted(a.protocol_name for a in alertas) == ["Anclado X", "Anclado Y"]
+        assert not any("FROM event_days" in q for q in session.queries)

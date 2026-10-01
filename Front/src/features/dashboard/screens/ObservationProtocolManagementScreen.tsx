@@ -22,6 +22,8 @@ import {
   type TriggerOperator,
 } from '@/services/observationControlProtocolAdmin';
 import { ComplianceAlertsPanel } from '@/components/ComplianceAlertsPanel';
+import { apiClient } from '@/core/api/client';
+import { endpoints } from '@/core/api/endpoints';
 import { Badge } from '@/features/dashboard/components/ui/Badge';
 import { Card } from '@/features/dashboard/components/ui/Card';
 import { Button } from '@/features/dashboard/components/ui/Button';
@@ -92,6 +94,7 @@ export function ObservationProtocolManagementScreen() {
   const [modalError, setModalError] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [applying, setApplying] = useState(false);
+  const [referenceDataError, setReferenceDataError] = useState<string | null>(null);
 
   const cargar = useCallback(async () => {
     setIsLoading(true);
@@ -127,14 +130,27 @@ export function ObservationProtocolManagementScreen() {
 
   useEffect(() => {
     let cancelado = false;
-    import('@/core/api/client').then(({ apiClient }) => {
-      apiClient
-        .get<ZoneTypeOption[]>('/context-engine/zone-types')
-        .then((res) => {
-          if (!cancelado) setZoneTypes(res.data ?? []);
-        })
-        .catch(() => {});
-    });
+    // Antes: apiClient.get('/event-days?event_id=...') → 404. La ruta real es
+    // /api/events/{event_id}/event-days (app/api/routes/event_days.py:40) y
+    // apiClient ya antepone /api, asi que lo correcto es usar el helper de
+    // endpoints en vez de escribir la URL a mano.
+    apiClient
+      .get<EventDayOption[]>(endpoints.eventDays.list(EVENT_ID))
+      .then((res) => {
+        if (cancelado) return;
+        setEventDays(res.data ?? []);
+        setReferenceDataError(null);
+      })
+      .catch(() => {
+        if (cancelado) return;
+        setEventDays([]);
+        // Sin este aviso el dropdown "Jornadas" queda con la unica opcion
+        // "Todas las jornadas" y el operador no tiene forma de saber que le
+        // falta cargar el catalogo: pareceria que el evento no tiene jornadas.
+        setReferenceDataError(
+          'No se pudieron cargar las jornadas del evento. No vas a poder acotar una regla a una jornada.'
+        );
+      });
     return () => {
       cancelado = true;
     };
@@ -142,14 +158,20 @@ export function ObservationProtocolManagementScreen() {
 
   useEffect(() => {
     let cancelado = false;
-    import('@/core/api/client').then(({ apiClient }) => {
-      apiClient
-        .get<EventDayOption[]>(`/event-days?event_id=${EVENT_ID}`)
-        .then((res) => {
-          if (!cancelado) setEventDays(res.data ?? []);
-        })
-        .catch(() => {});
-    });
+    apiClient
+      .get<ZoneTypeOption[]>(endpoints.contextEngine.zoneTypes())
+      .then((res) => {
+        if (cancelado) return;
+        setZoneTypes(res.data ?? []);
+        setReferenceDataError(null);
+      })
+      .catch(() => {
+        if (cancelado) return;
+        setZoneTypes([]);
+        setReferenceDataError(
+          'No se pudieron cargar los tipos de zona. Las reglas se van a aplicar a todas las zonas.'
+        );
+      });
     return () => {
       cancelado = true;
     };
@@ -289,6 +311,11 @@ export function ObservationProtocolManagementScreen() {
       {result && (
         <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
           {result}
+        </div>
+      )}
+      {referenceDataError && (
+        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+          {referenceDataError}
         </div>
       )}
 

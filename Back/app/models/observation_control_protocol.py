@@ -23,10 +23,16 @@ Scope
 -----
 - ``event_id`` obligatorio: la unidad de configuración que pide el operador.
 - ``event_day_id`` opcional: acota la regla a una sola jornada. ``NULL`` significa
-  "todas las jornadas del evento".
+  "todas las jornadas del evento". ``ON DELETE SET NULL`` y no ``CASCADE`` por el
+  mismo motivo que ``zone_type_id``: perder la configuracion del operador porque
+  se re-siembro el calendario seria peor que un alcance demasiado amplio.
 - ``zone_type_id`` opcional: acota la regla a un tipo de zona. ``NULL`` significa
   "todas las zonas". ``ON DELETE SET NULL`` y no ``CASCADE``: borrar un tipo de
   zona debe desactivar el filtro, no borrar la regla.
+
+Es decir: las dos columnas de estrechamiento son ``SET NULL`` (se degradan a
+"todo el evento") y solo ``event_id`` es ``CASCADE`` (sin evento, la regla no
+tiene sentido).
 
 Convención del repo
 -------------------
@@ -105,7 +111,14 @@ class ObservationControlProtocol(Base):
     )
     event_day_id: Mapped[Optional[str]] = mapped_column(
         String(36),
-        ForeignKey("event_days.id", ondelete="CASCADE"),
+        # SET NULL y no CASCADE: si la jornada desaparece (se edita su ventana
+        # operativa, se re-siembra el calendario), la regla debe SOBREVIVIR y
+        # volver a ser transversal, no borrarse en silencio. Borrar una
+        # configuracion del operador porque le cambiaron el calendario a una
+        # jornada seria perder trabajo suyo sin aviso. Es el mismo criterio que
+        # `zone_type_id` mas abajo, y el contrario de `event_id`, que si es
+        # CASCADE porque sin evento la regla no significa nada.
+        ForeignKey("event_days.id", ondelete="SET NULL"),
         nullable=True,
     )
     name: Mapped[str] = mapped_column(String(100), nullable=False)

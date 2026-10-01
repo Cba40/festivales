@@ -207,12 +207,25 @@ class ObservationComplianceEvaluator:
         if not protocols:
             return []
 
-        # Días a resolver: los del protocolo o, si no tiene, la jornada activa.
+        # La jornada transversal se resuelve UNA sola vez y se reutiliza para
+        # todos los protocolos que no traen una propia.
+        #
+        # Antes se inferia con `len(day_ids) < len(protocols)`, que es una
+        # comparacion entre conjuntos que no son del mismo tipo: en cuanto
+        # existia un protocolo anclado a una jornada concreta MAS de una jornada
+        # distinta en juego, el transversal caia en `_single(day_ids) == None`, su
+        # `day_id` quedaba en None y `predictions.get(None)` devolvia vacio, con
+        # lo que se saltaba **en silencio**. Reproducido: con 1 transversal + 1
+        # anclado solo se reportaba el anclado, y las 4 sugerencias que siembra
+        # apply-suggestions (todas transversales) se quedaban mudas en cuanto el
+        # operador anclaba una sola regla a una jornada.
+        needs_fallback = any(p.event_day_id is None for p in protocols)
         day_ids = {p.event_day_id for p in protocols if p.event_day_id}
-        if len(day_ids) < len(protocols):
-            fallback_day = await self._active_event_day_id(event_id)
+        fallback_day = (
+            await self._active_event_day_id(event_id) if needs_fallback else None
+        )
+        if fallback_day:
             day_ids.add(fallback_day)
-        day_ids.discard(None)
         if not day_ids:
             logger.info(
                 "Compliance sin jornadas evaluables | event_id=%s | protocolos=%d",
@@ -236,7 +249,9 @@ class ObservationComplianceEvaluator:
 
         alerts: list[ComplianceAlertResponse] = []
         for protocol in protocols:
-            day_id = protocol.event_day_id or self._single(day_ids)
+            # Cada protocolo usa su propia jornada; los transversales usan la
+            # activa del evento, ya resuelta arriba.
+            day_id = protocol.event_day_id or fallback_day
             states = predictions.get(day_id) or []
             if not states:
                 continue
@@ -244,10 +259,6 @@ class ObservationComplianceEvaluator:
                 await self._protocol_alerts(protocol, states, day_id, now, names, zone_types)
             )
         return alerts
-
-    @staticmethod
-    def _single(values: set) -> Optional[str]:
-        return next(iter(values)) if len(values) == 1 else None
 
     async def _zone_type_map(self) -> dict[str, Optional[str]]:
         """Mapa ``zone_id -> zone.type`` para evaluar el filtro ``zone_type_id``."""

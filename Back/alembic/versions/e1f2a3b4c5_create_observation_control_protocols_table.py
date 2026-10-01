@@ -80,11 +80,13 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["event_id"], ["events.id"], ondelete="CASCADE"
         ),
+        # SET NULL y no CASCADE, igual que zone_type_id: si la jornada se borra o
+        # se re-siembra, la regla sobrevive y vuelve a ser transversal. Perder la
+        # configuracion que escribio el operador porque le cambiaron el calendario
+        # a una jornada seria peor que un alcance demasiado amplio.
         sa.ForeignKeyConstraint(
-            ["event_day_id"], ["event_days.id"], ondelete="CASCADE"
+            ["event_day_id"], ["event_days.id"], ondelete="SET NULL"
         ),
-        # SET NULL, no CASCADE: borrar un tipo de zona desactiva el filtro de la
-        # regla en vez de borrar la regla.
         sa.ForeignKeyConstraint(
             ["zone_type_id"], ["zone_types.id"], ondelete="SET NULL"
         ),
