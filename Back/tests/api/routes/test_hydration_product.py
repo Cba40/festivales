@@ -17,6 +17,9 @@ from src.domain.recommendation.zone_recommendation import ZoneRecommendation
 from src.domain.value_objects.territorial_prediction import TerritorialPrediction
 from src.domain.value_objects.zone_state import ZoneState
 
+# Token de acceso valido, firmado con la misma funcion que el login real.
+from tests._auth_tokens import mint_token
+
 EVENT_ID = "test-event-1"
 BASE_URL = f"/api/events/{EVENT_ID}"
 
@@ -43,11 +46,7 @@ def _override_get_async_db(mock_async_db):
 @pytest.fixture
 def auth_headers() -> dict[str, str]:
     expire = datetime.now(timezone.utc) + timedelta(hours=8)
-    token = jwt.encode(
-        {"sub": "admin", "exp": expire},
-        settings.SECRET_KEY,
-        algorithm=settings.ALGORITHM,
-    )
+    token = mint_token()
     return {"Authorization": f"Bearer {token}"}
 
 

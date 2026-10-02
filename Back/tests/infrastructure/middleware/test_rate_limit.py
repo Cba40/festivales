@@ -16,6 +16,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.core.config import settings
+from sqlalchemy.orm import Session
+
+from app.db.session import get_db
 from app.main import app
 from src.infrastructure.middleware import rate_limit as rl
 from src.infrastructure.middleware.rate_limit import (
@@ -65,12 +68,28 @@ def backend(clock: FakeClock) -> InMemorySlidingWindowBackend:
 
 
 @pytest.fixture
-def client() -> TestClient:
-    """Cliente con backend limpio por test, sin depender del orden."""
+def client(test_engine) -> TestClient:
+    """Cliente con backend limpio por test, sin depender del orden.
+
+    `test_engine` (y el override de `get_db`) es necesario desde que el login
+    consulta la tabla `users`: antes comparaba `admin`/`1234` en memoria y no
+    tocaba la base, así que este módulo podía correr sin Postgres detrás. Ahora,
+    sin el override, el login abriría el motor real de `settings.DATABASE_URL` —
+    la de desarrollo— y el test fallaría por conexión, no por rate limit.
+    """
     set_backend(InMemorySlidingWindowBackend())
-    with TestClient(app, raise_server_exceptions=False) as c:
-        yield c
-    set_backend(None)
+
+    def override_get_db():
+        with Session(bind=test_engine) as session:
+            yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        with TestClient(app, raise_server_exceptions=False) as c:
+            yield c
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        set_backend(None)
 
 
 # ── Algoritmo: ventana deslizante ──────────────────────────────────────────
@@ -440,39 +459,50 @@ class TestActivityWriteRateLimit:
 
 
 class TestLoginRateLimit:
-    """POST /login es la barrera de fuerza bruta: 5 por minuto."""
+    """POST /login es la barrera de fuerza bruta: 5 por minuto.
+
+    Los intentos usan un usuario inexistente a proposito: asi se ejercita el
+    rate limit por IP sin depender del lockout por cuenta ni de que exista un
+    usuario sembrado. El login nuevo compara contra la tabla `users` y 401 es la
+    respuesta tanto para "no existe" como para "contrasena mala".
+    """
 
     URL = "/api/auth/login"
+    USER = "rate-limit-probe"
 
     def test_allows_five_then_blocks(self, client: TestClient, backend):
         statuses = [
             client.post(
-                self.URL, json={"username": "admin", "password": "malo"}
+                self.URL, json={"username": self.USER, "password": "malo"}
             ).status_code
             for _ in range(LOGIN_LIMIT)
         ]
         bloqueado = client.post(
-            self.URL, json={"username": "admin", "password": "malo"}
+            self.URL, json={"username": self.USER, "password": "malo"}
         )
 
         assert statuses == [401] * LOGIN_LIMIT
         assert bloqueado.status_code == 429
 
-    def test_valid_credentials_also_count_against_the_limit(
-        self, client: TestClient, backend
-    ):
-        """El limite es por intento, no solo por fallo: no se puede farmear
-        contadores probando la credencial correcta."""
-        ok = client.post(
-            self.URL, json={"username": "admin", "password": "1234"}
-        )
-        assert ok.status_code == 200
+    def test_the_limit_counts_every_attempt(self, client: TestClient, backend):
+        """El limite es por intento, no solo por fallo.
 
-        for i in range(LOGIN_LIMIT - 1):
-            client.post(self.URL, json={"username": "admin", "password": "malo"})
+        No se puede farmear contadores distinguendo "acierto" de "fallo": ambos
+        consumen cupo. Con el login viejo (credenciales en el codigo) esto se podia
+        verificar con la contrasena real; ahora alcanza con comprobar que la
+        respuesta de un intento fallido tambien descuenta.
+        """
+        for _ in range(LOGIN_LIMIT - 1):
+            client.post(self.URL, json={"username": self.USER, "password": "malo"})
+
+        # Un intento más (el LOGIN_LIMITésimo) entra; el siguiente, no.
+        dentro = client.post(
+            self.URL, json={"username": self.USER, "password": "malo"}
+        )
+        assert dentro.status_code == 401
 
         bloqueado = client.post(
-            self.URL, json={"username": "admin", "password": "1234"}
+            self.URL, json={"username": self.USER, "password": "malo"}
         )
         assert bloqueado.status_code == 429
 

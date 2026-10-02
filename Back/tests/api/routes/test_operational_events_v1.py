@@ -21,6 +21,9 @@ from app.core.config import settings
 from app.db.session import get_async_db
 from app.main import app
 
+# Token de acceso valido, firmado con la misma funcion que el login real.
+from tests._auth_tokens import mint_token
+
 ED_ID = "ed-fase2"
 ZONE_ID = "zone-fase2"
 RANDOM_UUID = "00000000-0000-0000-0000-000000000000"
@@ -102,11 +105,7 @@ async def oe_env():
 
 def _auth_headers() -> dict:
     expire = datetime.now(timezone.utc) + timedelta(hours=8)
-    token = jwt.encode(
-        {"sub": "admin", "exp": expire},
-        settings.SECRET_KEY,
-        algorithm=settings.ALGORITHM,
-    )
+    token = mint_token()
     return {"Authorization": f"Bearer {token}"}
 
 

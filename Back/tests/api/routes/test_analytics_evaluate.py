@@ -23,6 +23,9 @@ from src.application.learning.metric_result import MetricResult
 from src.domain.entities.configuration_recommendation import ConfigurationRecommendation
 from src.domain.entities.recommendation_enums import RecommendationStatus, RecommendationType
 
+# Token de acceso valido, firmado con la misma funcion que el login real.
+from tests._auth_tokens import mint_token
+
 ENDPOINT = "/api/analytics/evaluate"
 EVENT_DAY = "test-day-0001"
 PHASE = "22222222-2222-2222-2222-222222222222"
@@ -125,11 +128,7 @@ def _workflow_service():
 @pytest.fixture
 def auth_headers() -> dict[str, str]:
     expire = datetime.now(timezone.utc) + timedelta(hours=8)
-    token = jwt.encode(
-        {"sub": "admin", "exp": expire},
-        settings.SECRET_KEY,
-        algorithm=settings.ALGORITHM,
-    )
+    token = mint_token()
     return {"Authorization": f"Bearer {token}"}
 
 

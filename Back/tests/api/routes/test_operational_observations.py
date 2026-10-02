@@ -31,6 +31,9 @@ from sqlalchemy.schema import CreateIndex, CreateTable
 from app.core.config import settings
 from app.db.session import get_async_db
 from app.main import app
+
+# Token de acceso valido, firmado con la misma funcion que el login real.
+from tests._auth_tokens import mint_token
 from app.models.event_day import EventDay
 from app.models.zone import Zone
 from src.infrastructure.persistence.models.operational_observation import (
@@ -170,12 +173,10 @@ async def _obs_env_impl():
 
 
 def _auth_headers(sub: str = "admin") -> dict:
-    expire = datetime.now(_UTC) + timedelta(hours=8)
-    token = jwt.encode(
-        {"sub": sub, "exp": expire},
-        settings.SECRET_KEY,
-        algorithm=settings.ALGORITHM,
-    )
+    # Token valido firmado con la misma funcion que el login real. Antes se armaba
+    # con jwt.encode a mano, lo que quedo desactualizado cuando `decode_token` empezo
+    # a exigir `typ`/`iss`/`aud`.
+    return {"Authorization": f"Bearer {mint_token(subject=sub)}"}
     return {"Authorization": f"Bearer {token}"}
 
 

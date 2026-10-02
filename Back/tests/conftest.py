@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 from jose import jwt
-from sqlalchemy import DefaultClause, String, create_engine, text
+from sqlalchemy import DefaultClause, String, create_engine, select, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import settings
@@ -25,6 +25,9 @@ from app.models.event_day_phase import EventDayPhase
 from app.models.zone import Zone
 from app.models.zone_type import ZoneType
 from src.infrastructure.middleware.rate_limit import reset_backend_sync
+
+# Token de acceso valido, firmado con la misma funcion que el login real.
+from tests._auth_tokens import mint_token
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", settings.DATABASE_URL)
 
@@ -199,6 +202,75 @@ def _restore_geometry_after_tests() -> None:
     _TEST_INTENSITY_COLUMN.server_default = _TEST_INTENSITY_DEFAULT
 
 
+def _seed_rbac_catalog(engine) -> None:
+    """Siembra roles, permisos y su cruce en la base de tests.
+
+    Por que hace falta
+    ------------------
+    `create_all` crea las TABLAS desde el metadata, pero no los datos. El catalogo
+    de RBAC lo siembra la migracion `a7c8e9f0a1b2`, y la suite no corre
+    migraciones. Sin esto, cualquier test que necesite un rol falla con
+    `NoResultFound`.
+
+    Se siembra desde `app/core/permissions.py` —las constantes del codigo— y no
+    desde el SQL de la migracion, a proposito: asi el test usa exactamente los
+    mismos permisos que el codigo escribe en los endpoints. Si alguien agrega un
+    permiso a un endpoint y no lo agrega al catalogo, el drift test lo detecta; si
+    lo agrega al catalogo pero la migracion no lo siembra, esta siembra y el drift
+    test lo detectan tambien.
+    """
+    from sqlalchemy.orm import Session as _Session
+
+    from app.core.permissions import (
+        ALL_ROLES,
+        PERMISSION_CATALOG,
+        ROLE_PERMISSIONS,
+    )
+    from app.models.user import Permission, Role, RolePermission
+
+    with _Session(bind=engine) as db:
+        for code, module, action, description in PERMISSION_CATALOG:
+            if db.execute(
+                select(Permission).where(Permission.code == code)
+            ).scalar_one_or_none() is None:
+                db.add(
+                    Permission(
+                        code=code, module=module, action=action,
+                        description=description, is_system=True,
+                    )
+                )
+        db.flush()
+
+        role_ids: dict[str, str] = {}
+        for code in ALL_ROLES:
+            row = db.execute(select(Role).where(Role.code == code)).scalar_one_or_none()
+            if row is None:
+                row = Role(code=code, name=code, description="", is_system=True)
+                db.add(row)
+                db.flush()
+            role_ids[code] = row.id
+
+        for role_code, perm_codes in ROLE_PERMISSIONS.items():
+            role_id = role_ids.get(role_code)
+            if role_id is None:
+                continue
+            for perm_code in perm_codes:
+                perm = db.execute(
+                    select(Permission).where(Permission.code == perm_code)
+                ).scalar_one_or_none()
+                if perm is None:
+                    continue
+                exists = db.execute(
+                    select(RolePermission).where(
+                        RolePermission.role_id == role_id,
+                        RolePermission.permission_id == perm.id,
+                    )
+                ).scalar_one_or_none()
+                if exists is None:
+                    db.add(RolePermission(role_id=role_id, permission_id=perm.id))
+        db.commit()
+
+
 @pytest.fixture(scope="session")
 def test_engine():
     engine = create_engine(TEST_DATABASE_URL_SYNC, pool_pre_ping=True)
@@ -224,6 +296,7 @@ def test_engine():
     _degrade_geometry_for_tests()
     try:
         Base.metadata.create_all(bind=engine)
+        _seed_rbac_catalog(engine)
         yield engine
     finally:
         _restore_geometry_after_tests()
@@ -391,12 +464,76 @@ def _reset_rate_limit_state():
 @pytest.fixture
 def auth_headers() -> dict:
     expire = datetime.now(timezone.utc) + timedelta(hours=8)
-    token = jwt.encode(
-        {"sub": "admin", "exp": expire},
-        settings.SECRET_KEY,
-        algorithm=settings.ALGORITHM,
-    )
+    token = mint_token()
     return {"Authorization": f"Bearer {token}"}
+
+
+# ── Fixtures de RBAC ─────────────────────────────────────────────────────────
+#
+# `require_permission` resuelve los roles y permisos contra la tabla `users` en cada
+# request, a propósito: así una baja o un cambio de rol cortan el acceso de
+# inmediato y no 15 minutos después, cuando expira el access token. Por eso un
+# token solo no alcanza para probar un endpoint protegido: el usuario tiene que
+# existir en la base.
+#
+# Se llaman `rbac_*` y no `municipal`/`sin_permisos` para no ensombrecer los
+# fixtures homónimos que tienen algunos módulos con motor propio.
+
+
+@pytest.fixture
+def rbac_municipal(db_session: Session) -> str:
+    """MUNICIPAL_ADMIN real. Devuelve el username para mintar el token."""
+    return _crear_usuario(db_session, "rbac-municipal", "MUNICIPAL_ADMIN")
+
+
+@pytest.fixture
+def rbac_field(db_session: Session) -> str:
+    """OPERADOR_CAMPO real: 7 permisos, ninguno de escritura de configuración."""
+    return _crear_usuario(db_session, "rbac-campo", "OPERADOR_CAMPO")
+
+
+def _crear_usuario(db: Session, username: str, role_code: str) -> str:
+    """Crea un usuario con un rol, idempotente dentro del test.
+
+    El motor de la suite es de scope sesión y `db_session` hace commit, así que
+    la fila persiste entre tests: se borra antes de crear para no chocar contra el
+    UNIQUE de `users.username`.
+    """
+    from sqlalchemy import delete
+
+    from app.core.security import hash_password
+    from app.models.user import Role, User, UserRole
+
+    previo = db.execute(select(User).where(User.username == username)).scalar_one_or_none()
+    if previo is not None:
+        db.execute(delete(UserRole).where(UserRole.user_id == previo.id))
+        db.execute(delete(User).where(User.id == previo.id))
+        db.flush()
+
+    role = db.execute(select(Role).where(Role.code == role_code)).scalar_one()
+    user = User(username=username, password_hash=hash_password("clave-de-prueba-larga"))
+    db.add(user)
+    db.flush()
+    db.add(UserRole(user_id=user.id, role_id=role.id))
+    db.flush()
+    return username
+
+
+@pytest.fixture
+def rbac_client(db_session: Session) -> TestClient:
+    """Cliente con la sesión transaccional y sin `raise_server_exceptions`.
+
+    `raise_server_exceptions=False` importa: sin él, una dependencia que revienta
+    por un motivo interno sale como 500 genérico y el test cree que probó la ruta
+    equivocada. Con la excepcion visible, el error real se ve.
+    """
+    def override_get_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+    with TestClient(app, raise_server_exceptions=False) as c:
+        yield c
+    app.dependency_overrides.pop(get_db, None)
 
 
 @pytest.fixture

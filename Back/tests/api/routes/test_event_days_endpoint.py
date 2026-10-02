@@ -19,6 +19,9 @@ from app.core.config import settings
 from app.db.session import get_async_db
 from app.main import app
 
+# Token de acceso valido, firmado con la misma funcion que el login real.
+from tests._auth_tokens import mint_token
+
 EVENT_ID = "11111111-1111-1111-1111-111111111111"
 OTHER_EVENT_ID = "22222222-2222-2222-2222-222222222222"
 ENDPOINT = "/api/events/{}/event-days"
@@ -54,11 +57,7 @@ def _clean_overrides():
 @pytest.fixture
 def auth_headers() -> dict[str, str]:
     expire = datetime.now(timezone.utc) + timedelta(hours=8)
-    token = jwt.encode(
-        {"sub": "admin", "exp": expire},
-        settings.SECRET_KEY,
-        algorithm=settings.ALGORITHM,
-    )
+    token = mint_token()
     return {"Authorization": f"Bearer {token}"}
 
 

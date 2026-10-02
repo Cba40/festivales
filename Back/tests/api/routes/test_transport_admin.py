@@ -24,6 +24,9 @@ from app.core.config import settings
 from app.db.session import get_db
 from app.main import app
 
+# Token de acceso valido, firmado con la misma funcion que el login real.
+from tests._auth_tokens import mint_token
+
 EVENT_ID = "event-transport-admin-a"
 OTHER_EVENT_ID = "event-transport-admin-b"
 LINE_ID = "line-a"
@@ -105,11 +108,7 @@ def env():
 @pytest.fixture()
 def auth_headers() -> dict:
     expire = datetime.now(timezone.utc) + timedelta(hours=8)
-    token = jwt.encode(
-        {"sub": "admin", "exp": expire},
-        settings.SECRET_KEY,
-        algorithm=settings.ALGORITHM,
-    )
+    token = mint_token()
     return {"Authorization": f"Bearer {token}"}
 
 

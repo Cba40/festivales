@@ -24,6 +24,9 @@ from app.main import app
 from app.models.exit_destination import ExitDestination
 from app.models.exit_zone_destination import exit_zone_destinations_table
 
+# Token de acceso valido, firmado con la misma funcion que el login real.
+from tests._auth_tokens import mint_token
+
 EVENT_ID = "event-exit-admin-a"
 OTHER_EVENT_ID = "event-exit-admin-b"
 ZONE_ID = "zone-salida-norte"
@@ -92,11 +95,7 @@ def env():
 @pytest.fixture()
 def auth_headers() -> dict:
     expire = datetime.now(timezone.utc) + timedelta(hours=8)
-    token = jwt.encode(
-        {"sub": "admin", "exp": expire},
-        settings.SECRET_KEY,
-        algorithm=settings.ALGORITHM,
-    )
+    token = mint_token()
     return {"Authorization": f"Bearer {token}"}
 
 
