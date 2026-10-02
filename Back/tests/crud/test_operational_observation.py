@@ -17,12 +17,14 @@ Los tests estánPartidos en dos bloques a propósito:
   de biblioteca que no dice nada del código bajo prueba.
 """
 import os
+import uuid
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 from app.core.config import settings
 from app.crud.operational_observation import (
@@ -184,8 +186,26 @@ async def engine():
     _require_working_postgres()
     import re
 
-    async_url = re.sub(r"^postgresql://", "postgresql+asyncpg://", _sync_dsn())
-    engine = create_async_engine(async_url)
+    # `sslmode` no existe para asyncpg: lo pasa tal cual a `connect()` y revienta
+    # con "connect() got an unexpected keyword argument 'sslmode'". Su
+    # equivalente es `ssl=`. `_sync_dsn()` solo normaliza el driver, se queda con
+    # el `?sslmode=require` de la URL de Neon, asi que hay que traducirlo aqui.
+    #
+    # Esto estaba latente: con la base de pruebas vacia, `_require_working_postgres`
+    # detectaba que `operational_observations` no era utilizable y hacia SKIP de
+    # todo el modulo, asi que este fixture nunca llegaba a construirse. En cuanto
+    # la tabla existe (base migrada con `alembic upgrade head`, o creada por otro
+    # modulo) el guard pasa, el fixture se construye y el error aparece.
+    async_url = (
+        re.sub(r"^postgresql://", "postgresql+asyncpg://", _sync_dsn())
+        .replace("sslmode=require", "ssl=require")
+    )
+    # `NullPool` por el mismo motivo que en `tests/unit/test_crud_p3.py`: el
+    # fixture es de scope "module" pero pytest-asyncio crea un event loop nuevo
+    # por test, asi que con pool la segunda sesion reutiliza una conexion creada
+    # en el loop del test anterior ("got Future attached to a different loop" /
+    # "another operation is in progress").
+    engine = create_async_engine(async_url, poolclass=NullPool)
     yield engine
     await engine.dispose()
 
@@ -209,12 +229,28 @@ async def context(session: AsyncSession):
     from app.models.attendance_level import AttendanceLevel
     from app.models.event import Event
     from app.models.event_day import EventDay
+    from app.models.operational_profile import OperationalProfile
     from app.models.zone import Zone
 
     today = datetime.now(ART).date()
     event = Event(id="obs-test-event", name="Censo Test")
     level = AttendanceLevel(
         id="obs-test-level", event_id=event.id, name="Media", min_people=0, max_people=None
+    )
+    # `event_days.operational_profile_id` es NOT NULL en el esquema que producen
+    # las migraciones (`d0e1f2a3b4c5:159`), pero NULLABLE en el modelo
+    # (`app/models/event_day.py:30`, que dice estar alineado con `c7d8e9f0a1b2`,
+    # migracion que no toca la columna). Con la base de pruebas creada desde
+    # `Base.metadata` la columna es nullable y el test pasaba sin esto; contra el
+    # esquema real fallaba con `null value in column "operational_profile_id"`.
+    # Crear el perfil y referenciarlo deja el test valido contra los dos.
+    profile = OperationalProfile(
+        # `operational_profiles.id` es UUID en la base (no varchar): un id
+        # alfanumerico tipo "obs-test-profile" lo rechaza el driver con
+        # "invalid UUID ... length must be between 32..36 characters".
+        id=uuid.UUID("0b5c9f14-2d3e-4a6b-8c1f-7e5a9d2b4c60"),
+        name="Perfil del test de observaciones",
+        description="",
     )
     day = EventDay(
         id="obs-test-day",
@@ -223,6 +259,7 @@ async def context(session: AsyncSession):
         day_of_week="lunes",
         is_active=True,
         attendance_level_id=level.id,
+        operational_profile_id=profile.id,
         operational_start_min=0,
         operational_end_min=1440,
     )
@@ -236,7 +273,7 @@ async def context(session: AsyncSession):
         capacity=100,
         available_capacity=100,
     )
-    session.add_all([event, level, day, zone])
+    session.add_all([event, level, profile, day, zone])
     await session.flush()
     return zone, day
 
@@ -248,10 +285,14 @@ def _hours_ago(hours: float) -> datetime:
 def _payload(zone, day, density: int, **kwargs):
     from app.schemas.operational_observation import OperationalObservationCreate
 
+    # `timestamp` va por defecto "ahora", pero los tests de la ventana
+    # anti-spam lo pasan explicito. Con `**kwargs` al final, un `timestamp` en
+    # kwargs llegaba duplicado y reventaba con "got multiple values for keyword
+    # argument 'timestamp'". `setdefault` deja que el kwargs gane.
+    kwargs.setdefault("timestamp", datetime.now(timezone.utc))
     return OperationalObservationCreate(
         event_day_id=day.id,
         zone_id=zone.id,
-        timestamp=datetime.now(timezone.utc),
         observed_density=density,
         **kwargs,
     )
@@ -273,9 +314,19 @@ class TestObservationProtocol:
         from app.crud.operational_observation import create_observation
 
         zone, day = context
-        await create_observation(session, _payload(zone, day, 50, timestamp=_hours_ago(2)))
+        # Las dos observaciones tienen que caer REALMENTE dentro de la ventana de
+        # 15 min. Este test usaba 2 h y 1 h, o sea 60 min de diferencia, y aun
+        # asi exigia el rechazo: no lo hay, porque la ventana se ancla en el
+        # timestamp de la observacion nueva (`since = timestamp - 15 min`), asi
+        # que una observacion de hace 2 h queda fuera de la ventana de la de
+        # hace 1 h. El codigo de produccion es el correcto; la expectativa del
+        # test no. Esto nunca sevio porque el modulo se saltaba entero.
+        await create_observation(session, _payload(zone, day, 50, timestamp=_hours_ago(1)))
         with pytest.raises(HTTPException) as exc:
-            await create_observation(session, _payload(zone, day, 60, timestamp=_hours_ago(1)))
+            # 6 minutos despues: dentro de los 15.
+            await create_observation(
+                session, _payload(zone, day, 60, timestamp=_hours_ago(0.9))
+            )
         assert exc.value.status_code == 400
         assert f"menos de {MIN_INTERVAL_MINUTES} minutos" in exc.value.detail
 
