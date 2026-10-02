@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { useAppStore } from './core/state/store';
+import { useLoadIdentity } from './core/auth/useAuth';
 import { useDashboardSync } from './features/dashboard/hooks/useDashboardSync';
 import { useTerritorialPrediction } from './hooks/useContextEngine';
 import { loadEventDayContext } from './utils/contextoEvento';
@@ -53,6 +54,7 @@ const ReportsScreen = lazy(() =>
   import('@/features/dashboard/screens/ReportsScreen').then((m) => ({ default: m.ReportsScreen }))
 );
 const LoginScreen = lazy(() => import('./features/auth/screens/LoginScreen'));
+const ForbiddenScreen = lazy(() => import('./features/auth/screens/ForbiddenScreen'));
 
 function buildProductParams(): Record<string, unknown> {
   const { userLocation, zones } = useAppStore.getState();
@@ -94,6 +96,11 @@ const SCREEN_OPEN_ROUTE_CATEGORY: Record<string, ActivityServiceCategory> = {
 function AppLayout() {
   const location = useLocation();
   const isDashboard = location.pathname.startsWith('/dashboard');
+
+  // Consulta /auth/me una vez por sesión. Tiene que correr antes de que cualquier
+  // `ProtectedRoute` decida: sin esto, un reload con un token válido se vería
+  // como "no autenticado" hasta que respondiera la API.
+  useLoadIdentity();
   const { refresh } = useDashboardSync();
   const { refresh: refreshPredictions } = useTerritorialPrediction();
   const setUserLocation = useAppStore(s => s.setUserLocation);
@@ -315,6 +322,9 @@ function AppLayout() {
         <Suspense fallback={<ScreenLoading />}>
         <Routes>
         <Route path="/dashboard/login" element={<LoginScreen />} />
+        {/* Sesión válida sin permiso: pantalla propia, no el login. Mandarlo al
+            login lo haría pensar que su sesión expiró. */}
+        <Route path="/dashboard/denegado" element={<ForbiddenScreen />} />
         <Route path="/dashboard/*" element={
           <ProtectedRoute>
             <DashboardScreen />

@@ -25,9 +25,38 @@ export const useThemeStore = create<{
     }),
 }));
 
+/**
+ * Identidad del actor, la trae `GET /auth/me`.
+ *
+ * Antes el frontend no sabía quién era el usuario: `isAuthenticated` miraba que
+ * hubiera *alguna cadena* en `localStorage`, así que un string no vacío ya
+ * contaba como sesión válida. Ahora el token se valida contra el backend y de ahí
+ * salen los permisos que decide qué se muestra.
+ *
+ * `permissions` llega filtrado: un operador de campo recibe 5, no los 19 del
+ * administrador. Ocultar un menú no es una medida de seguridad —el backend igual
+ * responde 403—, pero evita mostrar al operador pantallas que no puede usar.
+ */
+export interface AuthUser {
+  id: string | null;
+  username: string;
+  roles: string[];
+  permissions: string[];
+  is_provider_super_admin: boolean;
+  is_superuser: boolean;
+  scopes: { event_id: string | null; zone_id: string | null }[];
+  is_global_scope: boolean;
+}
+
 interface AppState {
   // Auth
-  auth: { token: string | null; isAuthenticated: boolean };
+  auth: {
+    token: string | null;
+    isAuthenticated: boolean;
+    user: AuthUser | null;
+    /** true mientras se consulta /auth/me. Evita parpadeo de menús. */
+    isLoadingUser: boolean;
+  };
 
   // Data
   zones: Zone[];
@@ -39,6 +68,7 @@ interface AppState {
   // Actions — Auth
   login: (token: string) => void;
   logout: () => void;
+  setUser: (user: AuthUser | null) => void;
 
   // Actions — Zones
   setZones: (zones: Zone[]) => void;
@@ -55,20 +85,41 @@ interface AppState {
 
 export const useAppStore = create<AppState>((set, get) => ({
   // Auth state
+  //
+  // `isAuthenticated` ya NO se deduce de que haya un string en localStorage: se
+  // pone en true recién cuando /auth/me confirma la identidad. Mientras tanto
+  // `isLoadingUser` está en true y las rutas protegidas esperan, en vez de dejar
+  // pasar a alguien con un token inválido y enterarse recién cuando la primera
+  // API responde 401.
   auth: {
     token: localStorage.getItem('auth_token'),
-    isAuthenticated: !!localStorage.getItem('auth_token'),
+    isAuthenticated: false,
+    user: null,
+    isLoadingUser: true,
   },
 
   // Auth mutations
   login: (token) => {
     localStorage.setItem('auth_token', token);
-    set({ auth: { token, isAuthenticated: true } });
+    set({ auth: { token, isAuthenticated: false, user: null, isLoadingUser: true } });
   },
   logout: () => {
     localStorage.removeItem('auth_token');
-    set({ auth: { token: null, isAuthenticated: false }, zones: [] });
+    set({
+      auth: { token: null, isAuthenticated: false, user: null, isLoadingUser: false },
+      zones: [],
+    });
   },
+  setUser: (user) =>
+    set({
+      auth: {
+        token: get().auth.token,
+        // Hay identidad confirmada: recién acá la sesión se considera activa.
+        isAuthenticated: user !== null,
+        user,
+        isLoadingUser: false,
+      },
+    }),
 
   // User location
   userLocation: (() => {

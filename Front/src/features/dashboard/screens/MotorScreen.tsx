@@ -7,6 +7,8 @@ import { AnalyticsScreen } from './AnalyticsScreen';
 import { DashboardHeader } from '../components/DashboardHeader';
 import { AppFooter } from '@/components/AppFooter';
 import { SectionTabs } from '../components/ui';
+import { useAppStore } from '@/core/state/store';
+import { filterByPermission } from '@/core/auth/useAuth';
 
 type Section =
   | 'config'
@@ -15,34 +17,67 @@ type Section =
   | 'observation-protocols'
   | 'analytics';
 
-const SECTIONS: { key: Section; label: string }[] = [
-  { key: 'config', label: 'Configuración' },
-  { key: 'predictions', label: 'Predicciones' },
-  { key: 'observations', label: 'Observaciones' },
+const SECTIONS: { key: Section; label: string; permission?: string }[] = [
+  // El permiso va en la definición de la pestaña, no en un if dentro del render:
+  // así la lista visible y la regla de acceso viven en el mismo lugar, y no puede
+  // quedar una pestaña visible que el backend le va a responder 403.
+  //
+  // Antes no había `permission` en ninguna: las cinco pestañas se mostraban a
+  // cualquier usuario con token, incluido un operador de campo.
+  { key: 'config', label: 'Configuración', permission: 'config:read' },
+  { key: 'predictions', label: 'Predicciones', permission: 'events:read' },
+  { key: 'observations', label: 'Observaciones', permission: 'observations:read' },
   // Tab propia y no un bloque dentro de "Observaciones": la de al lado es la
   // carga manual de datos (qué se registró) y esta es la de reglas (cuándo
   // debería registrarse). Mezclarlas hacia que el operador no sepa cual es cual.
-  { key: 'observation-protocols', label: 'Protocolos de observación' },
-  { key: 'analytics', label: 'Analytics' },
+  {
+    key: 'observation-protocols',
+    label: 'Protocolos de observación',
+    permission: 'protocols:read',
+  },
+  { key: 'analytics', label: 'Analytics', permission: 'analytics:read' },
 ];
 
-const SECTION_KEYS: Section[] = SECTIONS.map((s) => s.key);
+// Las claves permitidas ahora dependen de los permisos del usuario y se calculan
+// en el componente, así que no hay una constante `SECTION_KEYS` global.
 
 export function MotorScreen() {
+  const user = useAppStore((s) => s.auth.user);
+
+  // Se recalcula en cada render del store: si cambian los permisos (el admin se
+  // los quita mientras la pantalla está abierta), las pestañas se actualizan.
+  const seccionesVisibles = filterByPermission(SECTIONS, user);
+  const clavesVisibles = seccionesVisibles.map((s) => s.key);
+
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab') as Section | null;
+
+  // Si la pestaña de la URL ya no está permitida —típico cuando un operador abre
+  // un link directo— cae a la primera visible en vez de dejar un 403 en pantalla.
+  const activaPorUrl = tabParam && clavesVisibles.includes(tabParam) ? tabParam : null;
   const activeSection: Section =
-    tabParam && SECTION_KEYS.includes(tabParam) ? tabParam : 'config';
+    activaPorUrl ?? (clavesVisibles[0] as Section | undefined) ?? 'config';
 
   const selectSection = (section: Section) => {
     setSearchParams({ tab: section });
   };
 
+  if (seccionesVisibles.length === 0) {
+    return (
+      <div className="min-h-screen bg-slate-50 w-full">
+        <DashboardHeader title="Motor" subtitle="Configuración y Análisis del Motor" />
+        <p className="p-6 text-sm text-slate-500">
+          No tenés permisos para ver ninguna sección del motor.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 w-full">
       <DashboardHeader title="Motor" subtitle="Configuración y Análisis del Motor" />
       <SectionTabs
-        sections={SECTIONS}
+        sections={seccionesVisibles}
         activeSection={activeSection}
         onChange={selectSection}
         className="flex flex-wrap gap-2 px-4 sm:px-6 py-3"

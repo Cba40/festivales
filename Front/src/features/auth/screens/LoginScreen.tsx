@@ -11,6 +11,8 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const login = useAppStore((state) => state.login);
+  const setUser = useAppStore((state) => state.setUser);
+  const logout = useAppStore((state) => state.logout);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,12 +25,27 @@ export default function LoginScreen() {
         password,
       });
       login(res.data.access_token);
+
+      // Trae la identidad antes de navegar. `login()` deja `isAuthenticated` en
+      // false a propósito: la sesión recién tiene el token, pero no sabemos quién
+      // es hasta que /auth/me responde. Sin este paso, `ProtectedRoute` vería
+      // `isAuthenticated === false` y devolvería al login, que es un loop.
+      const me = await apiClient.get('/auth/me', {
+        headers: { Authorization: `Bearer ${res.data.access_token}` },
+      });
+      setUser(me.data);
+
       navigate('/dashboard');
     } catch (err: unknown) {
       const message =
         (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
         'Error de conexión con el servidor';
       setError(message);
+      // Si el login fue pero /auth/me falló, la sesión quedó a medias: se
+      // descarta el token para no dejar un access vivo sin identidad asociada.
+      if ((err as { response?: { status?: number } })?.response?.status === 401) {
+        logout();
+      }
     } finally {
       setLoading(false);
     }
