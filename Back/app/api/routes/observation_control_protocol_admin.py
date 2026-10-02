@@ -2,8 +2,26 @@
 
 CRUD plano sobre ``observation_control_protocols`` para el Dashboard
 (Motor > Protocolos de observación), calcado de ``emergency_protocol_admin.py``:
-prefijo ``/api/admin``, lecturas sin token, escrituras con ``verify_token`` y
-soft delete.
+prefijo ``/api/admin``, soft delete.
+
+Autorización (Fase 4 del RBAC)
+-----------------------------
+Los nueve endpoints usan ``require_permission`` con dos permisos:
+
+* ``protocols:read``  — GET /suggestions, GET /compliance, GET lista
+* ``protocols:write`` — POST, POST /apply-suggestions, PUT, DELETE
+
+Antes de esta migración solo las escrituras exigían ``verify_token``, y el GET de
+la lista **no exigía nada**: exponía la configuración de reglas de todos los
+eventos de la municipalidad a cualquiera que hiteara la URL. El GET ahora pide
+``protocols:read``; su único consumidor
+(`ObservationProtocolManagementScreen`) ya va detrás de ``ProtectedRoute``, y el
+interceptor de ``apiClient`` adjunta el token siempre, así que ningún cliente
+legítimo se queda afuera.
+
+Nótese la diferencia con ``emergency_admin.py``, donde las lecturas siguen siendo
+públicas **a propósito**: alimentan el catálogo que ve el ciudadano. Acá no, estas
+reglas son configuración interna del operador.
 
 Dos diferencias con los protocolos de emergencia, y las dos son a propósito:
 
@@ -30,7 +48,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
-from app.api.deps import verify_token
+from app.api.deps import require_permission
 from app.db.session import get_async_db, get_db
 from app.models.observation_control_protocol import (
     ObservationControlProtocol,
@@ -190,7 +208,7 @@ def _validate_zone_type(db: Session, zone_type_id: Optional[str]) -> None:
 
 
 @router.get("/suggestions", response_model=SuggestionsResponse)
-def list_suggestions(_=Depends(verify_token)):
+def list_suggestions(_=Depends(require_permission("protocols:read"))):
     """Las 4 sugerencias de arranque, para que el operador no escriba reglas de cero."""
     return SuggestionsResponse(suggestions=SUGGESTIONS)
 
@@ -199,7 +217,7 @@ def list_suggestions(_=Depends(verify_token)):
 def apply_suggestions(
     body: ApplySuggestionsRequest,
     db: Session = Depends(get_db),
-    _=Depends(verify_token),
+    _=Depends(require_permission("protocols:write")),
 ):
     """Crea los protocolos sugeridos que falten en el evento.
 
@@ -256,7 +274,7 @@ def apply_suggestions(
 async def get_compliance(
     event_id: str = Query(..., min_length=1, max_length=36),
     db: AsyncSession = Depends(get_async_db),
-    _=Depends(verify_token),
+    _=Depends(require_permission("protocols:read")),
 ):
     """Evalúa en el momento los protocolos activos contra las observaciones reales.
 
@@ -283,8 +301,17 @@ def list_protocols(
     event_id: str = Query(..., min_length=1, max_length=36),
     include_inactive: bool = False,
     db: Session = Depends(get_db),
+    _=Depends(require_permission("protocols:read")),
 ):
-    """Lista los protocolos de un evento. Sin token: lo consume el dashboard."""
+    """Lista los protocolos de un evento.
+
+    Antes esto NO exigia token: era el unico endpoint sin proteccion del modulo, y
+    exponia la configuracion de reglas de todos los eventos de la municipalidad a
+    cualquiera que hiteara la URL. Lo consume `ObservationProtocolManagementScreen`,
+    que ya va detras de `ProtectedRoute` y por lo tanto manda el token siempre
+    (lo adjunta el interceptor de `apiClient`), asi que ningun cliente legitimo se
+    queda afuera.
+    """
     query = db.query(ObservationControlProtocol).filter(
         ObservationControlProtocol.event_id == event_id
     )
@@ -301,7 +328,7 @@ def list_protocols(
 def create_protocol(
     body: ObservationControlProtocolCreate,
     db: Session = Depends(get_db),
-    _=Depends(verify_token),
+    _=Depends(require_permission("protocols:write")),
 ):
     name = body.name.strip()
     if not name:
@@ -344,7 +371,7 @@ def update_protocol(
     protocol_id: str,
     body: ObservationControlProtocolUpdate,
     db: Session = Depends(get_db),
-    _=Depends(verify_token),
+    _=Depends(require_permission("protocols:write")),
 ):
     proto = _get_or_404(db, protocol_id)
     provided = body.model_fields_set
@@ -409,7 +436,7 @@ def update_protocol(
 def delete_protocol(
     protocol_id: str,
     db: Session = Depends(get_db),
-    _=Depends(verify_token),
+    _=Depends(require_permission("protocols:write")),
 ):
     """Soft delete: ``active=False`` preserva el histórico de qué regla se violated."""
     proto = _get_or_404(db, protocol_id)

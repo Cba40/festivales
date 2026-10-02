@@ -18,7 +18,7 @@ from decimal import Decimal
 import pytest
 from fastapi.testclient import TestClient
 from jose import jwt
-from sqlalchemy import String, create_engine
+from sqlalchemy import String, create_engine, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -33,7 +33,16 @@ from app.models.observation_control_protocol import (
 )
 from app.models.zone_type import ZoneType
 
+# Token de acceso valido, firmado con la misma funcion que el login real.
+from tests._auth_tokens import mint_token
+
 BASE = "/api/admin/observation-control-protocols"
+# Username del usuario con permisos que usa `_auth()`. Tiene que existir en la
+# tabla `users`: `require_permission` resuelve contra la base, no contra los claims
+# del token.
+AUTH_USER = "ocp-municipal"
+# Usuario sin permisos de protocolos, para probar el 403.
+SIN_PERMISOS_USER = "ocp-sin-permisos"
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", settings.DATABASE_URL)
 # La URL de `TEST_DATABASE_URL` viene en forma asyncpg (es la de Neon), pero
 # `ocp_engine` abre un motor SINCRONO. `create_engine` no acepta un driver
@@ -94,6 +103,13 @@ def ocp_engine():
 
     try:
         Base.metadata.create_all(bind=engine)
+        # `create_all` crea las TABLAS, no los datos. Este modulo abre su propio
+        # motor (no usa el `test_engine` de conftest), asi que el seed de roles y
+        # permisos que vive ahi no corrio sobre este esquema: sin esto, cualquier
+        # test que monte un usuario con un rol falla con `NoResultFound`.
+        from tests.conftest import _seed_rbac_catalog
+
+        _seed_rbac_catalog(engine)
         yield engine
     finally:
         intensity_column.server_default = saved_default
@@ -117,6 +133,75 @@ def db_session(ocp_engine):
 
 
 @pytest.fixture
+def municipal(db_session: Session) -> str:
+    """Crea un MUNICIPAL_ADMIN real y devuelve su username.
+
+    Hace falta porque `require_permission` resuelve los permisos contra la tabla
+    `users` en cada request (a proposito, para que una baja o un cambio de rol
+    surtan efecto inmediato). Un token minted sin usuario en la base daria 401,
+    no 403.
+
+    El usuario vive dentro de la misma transaccion que `db_session`, asi que
+    existe durante el test y desaparece con el rollback.
+    """
+    from sqlalchemy import delete
+
+    from app.core.security import hash_password
+    from app.models.user import Role, User, UserRole
+
+    previo = db_session.execute(
+        select(User).where(User.username == AUTH_USER)
+    ).scalar_one_or_none()
+    if previo is not None:
+        db_session.execute(delete(UserRole).where(UserRole.user_id == previo.id))
+        db_session.execute(delete(User).where(User.id == previo.id))
+        db_session.flush()
+
+    role = db_session.execute(
+        select(Role).where(Role.code == "MUNICIPAL_ADMIN")
+    ).scalar_one()
+    user = User(
+        username=AUTH_USER,
+        password_hash=hash_password("clave-de-prueba-larga-suficiente"),
+    )
+    db_session.add(user)
+    db_session.flush()
+    db_session.add(UserRole(user_id=user.id, role_id=role.id))
+    db_session.flush()
+    return AUTH_USER
+
+
+@pytest.fixture
+def sin_permisos(db_session: Session) -> str:
+    """Un OPERADOR_CAMPO real: 5 permisos, ninguno de protocols:*."""
+    from sqlalchemy import delete
+
+    from app.core.security import hash_password
+    from app.models.user import Role, User, UserRole
+
+    previo = db_session.execute(
+        select(User).where(User.username == SIN_PERMISOS_USER)
+    ).scalar_one_or_none()
+    if previo is not None:
+        db_session.execute(delete(UserRole).where(UserRole.user_id == previo.id))
+        db_session.execute(delete(User).where(User.id == previo.id))
+        db_session.flush()
+
+    role = db_session.execute(
+        select(Role).where(Role.code == "OPERADOR_CAMPO")
+    ).scalar_one()
+    user = User(
+        username=SIN_PERMISOS_USER,
+        password_hash=hash_password("clave-de-prueba-larga-suficiente"),
+    )
+    db_session.add(user)
+    db_session.flush()
+    db_session.add(UserRole(user_id=user.id, role_id=role.id))
+    db_session.flush()
+    return SIN_PERMISOS_USER
+
+
+@pytest.fixture
 def sample_event(db_session: Session) -> Event:
     event = Event(id="test-event-1", name="Test Event", description="Test")
     db_session.add(event)
@@ -125,7 +210,14 @@ def sample_event(db_session: Session) -> Event:
 
 
 @pytest.fixture
-def client(db_session: Session) -> TestClient:
+def client(db_session: Session, municipal: str) -> TestClient:
+    """Cliente con la sesión transaccional y con un usuario con permisos.
+
+    Depende de `municipal` a propósito: todos los endpoints del módulo ahora exigen
+    `protocols:read` o `protocols:write`, y `require_permission` resuelve contra la
+    base. Sin el usuario, cada request devolvería 401 y ningún test probaría lo que
+    dice probar.
+    """
     def override_get_db():
         yield db_session
 
@@ -291,7 +383,7 @@ class TestList:
         )
         db_session.flush()
 
-        resp = client.get(BASE, params={"event_id": sample_event.id})
+        resp = client.get(BASE, params={"event_id": sample_event.id}, headers=_auth())
 
         assert resp.status_code == 200
         nombres = [p["name"] for p in resp.json()]
@@ -313,7 +405,7 @@ class TestList:
         )
         db_session.flush()
 
-        assert client.get(BASE, params={"event_id": sample_event.id}).json() == []
+        assert client.get(BASE, params={"event_id": sample_event.id}, headers=_auth()).json() == []
 
     def test_include_inactive_los_trae(
         self, client: TestClient, db_session: Session, sample_event: Event
@@ -334,6 +426,7 @@ class TestList:
         resp = client.get(
             BASE,
             params={"event_id": sample_event.id, "include_inactive": "true"},
+            headers=_auth(),
         )
         assert [p["name"] for p in resp.json()] == ["Inactivo"]
 
@@ -354,14 +447,28 @@ class TestList:
             )
         db_session.flush()
 
-        resp = client.get(BASE, params={"event_id": sample_event.id})
+        resp = client.get(BASE, params={"event_id": sample_event.id}, headers=_auth())
         assert [p["name"] for p in resp.json()] == ["Primero", "Segundo", "Tercero"]
 
     def test_event_id_es_obligatorio(self, client: TestClient):
-        assert client.get(BASE).status_code == 422
+        # Con token: la validacion de auth pasa y gana la de query params.
+        assert client.get(BASE, headers=_auth()).status_code == 422
 
-    def test_lectura_es_publica(self, client: TestClient, sample_event: Event):
-        assert client.get(BASE, params={"event_id": sample_event.id}).status_code == 200
+    def test_lectura_ya_no_es_publica(self, client: TestClient, sample_event: Event):
+        """Antes esta lectura NO exigia token. Ahora sí.
+
+        El cambio es deliberado: expone la configuracion de reglas de todos los
+        eventos de la municipalidad. Lo cubre tambien
+        `TestAutorizacionRBAC.test_lecturas_sin_token_es_401`.
+        """
+        assert client.get(
+            BASE, params={"event_id": sample_event.id}
+        ).status_code == 401
+
+    def test_lectura_con_permiso_es_200(self, client: TestClient, sample_event: Event):
+        assert client.get(
+            BASE, params={"event_id": sample_event.id}, headers=_auth()
+        ).status_code == 200
 
 
 class TestUpdate:
@@ -467,7 +574,7 @@ class TestDelete:
         ).json()
         client.delete(f"{BASE}/{created['id']}", headers=_auth())
 
-        resp = client.get(BASE, params={"event_id": sample_event.id})
+        resp = client.get(BASE, params={"event_id": sample_event.id}, headers=_auth())
         assert resp.json() == []
 
     def test_id_inexistente_es_404(self, client: TestClient):
@@ -521,7 +628,7 @@ class TestApplySuggestions:
             "created_names": ["Saturación alta"],
         }
 
-        listado = client.get(BASE, params={"event_id": sample_event.id}).json()
+        listado = client.get(BASE, params={"event_id": sample_event.id}, headers=_auth()).json()
         assert len(listado) == 1
         protocolo = listado[0]
         assert protocolo["trigger_metric"] == "saturation_level"
@@ -540,7 +647,7 @@ class TestApplySuggestions:
         )
 
         assert segunda.json() == {"created": 0, "skipped": 2, "created_names": []}
-        listado = client.get(BASE, params={"event_id": sample_event.id}).json()
+        listado = client.get(BASE, params={"event_id": sample_event.id}, headers=_auth()).json()
         assert len(listado) == 2
 
     def test_no_duplica_si_el_operador_ya_creo_esa_regla(
@@ -652,14 +759,26 @@ class _EmptyResult:
 
 
 @pytest.fixture
-def compliance_client() -> TestClient:
+def compliance_client(db_session: Session, municipal: str) -> TestClient:
+    """Cliente para `/compliance`.
+
+    Necesita las DOS overrides: el endpoint lee datos con `get_async_db`, pero su
+    dependencia de autorizacion (`require_permission` -> `get_current_user`) usa
+    `get_db`. Sin overridear `get_db` tambien, esa ultima abria el motor real de
+    `settings.DATABASE_URL` y el request terminaba en 500 por conexion.
+    """
     async def override_get_async_db():
         yield _EmptyAsyncSession()
 
+    def override_get_db():
+        yield db_session
+
     app.dependency_overrides[get_async_db] = override_get_async_db
+    app.dependency_overrides[get_db] = override_get_db
     with TestClient(app, raise_server_exceptions=False) as c:
         yield c
     app.dependency_overrides.pop(get_async_db, None)
+    app.dependency_overrides.pop(get_db, None)
 
 
 class TestComplianceEndpoint:
@@ -706,18 +825,209 @@ class TestComplianceEndpoint:
         assert resp.status_code == 422
 
 
-def _auth() -> dict:
-    """El fixture `auth_headers` de conftest no está disponible a nivel de módulo."""
-    from datetime import datetime, timedelta, timezone
+def _auth(username: str = AUTH_USER) -> dict:
+    """Header `Authorization` de un usuario con permisos de protocolos.
 
-    from jose import jwt
+    El token lo emite `mint_token` (la misma funcion del login real), pero lo que
+    decide el acceso es la fila en `users`: `get_current_user` relee roles y
+    permisos de ahi, y por eso el usuario tiene que existir. El fixture `municipal`
+    lo crea.
+    """
+    return {"Authorization": f"Bearer {mint_token(subject=username)}"}
 
-    from app.core.config import settings
 
-    expire = datetime.now(timezone.utc) + timedelta(hours=1)
-    token = jwt.encode(
-        {"sub": "admin", "exp": expire},
-        settings.SECRET_KEY,
-        algorithm=settings.ALGORITHM,
-    )
-    return {"Authorization": f"Bearer {token}"}
+class TestAutorizacionRBAC:
+    """401 sin token, 403 con token sin permiso, 200 con el permiso correcto.
+
+    Antes de la migracion a `require_permission` estos endpoints solo pedian un
+    token valido: cualquier usuario autenticado entraba, incluido un operador de
+    campo. Estos tests fijan el contrato nuevo.
+    """
+
+    # ── 401: sin token ──
+    def test_lecturas_sin_token_es_401(self, client: TestClient, sample_event: Event):
+        assert client.get(f"{BASE}?event_id={sample_event.id}").status_code == 401
+        assert client.get(f"{BASE}/suggestions").status_code == 401
+        assert client.get(f"{BASE}/compliance?event_id={sample_event.id}").status_code == 401
+
+    def test_escrituras_sin_token_es_401(self, client: TestClient, sample_event: Event):
+        assert client.post(BASE, json=_body(sample_event.id)).status_code == 401
+        r = client.post(
+            f"{BASE}/apply-suggestions",
+            json={"event_id": sample_event.id, "suggestion_keys": ["saturacion_alta"]},
+        )
+        assert r.status_code == 401
+        assert client.put(f"{BASE}/no-existe", json={"active": False}).status_code == 401
+        assert client.delete(f"{BASE}/no-existe").status_code == 401
+
+    def test_token_invalido_es_401(self, client: TestClient, sample_event: Event):
+        r = client.get(
+            f"{BASE}?event_id={sample_event.id}",
+            headers={"Authorization": "Bearer no-es-un-jwt"},
+        )
+        assert r.status_code == 401
+
+    def test_token_de_usuario_inexistente_es_401(
+        self, client: TestClient, sample_event: Event
+    ):
+        """Token bien firmado pero de alguien que no esta en `users`.
+
+        No alcanza con que el JWT sea criptograficamente valido: `get_current_user`
+        resuelve contra la base, asi que un token de un usuario borrado no sirve.
+        """
+        r = client.get(
+            f"{BASE}?event_id={sample_event.id}",
+            headers=_auth("fantasma-que-no-existe"),
+        )
+        assert r.status_code == 401
+
+    # ── 403: token valido, sin el permiso ──
+    def test_lecturas_sin_permiso_es_403(
+        self, client: TestClient, sample_event: Event, sin_permisos: str
+    ):
+        """Un OPERADOR_CAMPO tiene sesion valida pero no `protocols:read`."""
+        h = _auth(sin_permisos)
+        assert client.get(f"{BASE}?event_id={sample_event.id}", headers=h).status_code == 403
+        assert client.get(f"{BASE}/suggestions", headers=h).status_code == 403
+        r = client.get(f"{BASE}/compliance?event_id={sample_event.id}", headers=h)
+        assert r.status_code == 403
+
+    def test_escrituras_sin_permiso_es_403(
+        self, client: TestClient, sample_event: Event, sin_permisos: str
+    ):
+        h = _auth(sin_permisos)
+        assert client.post(BASE, json=_body(sample_event.id), headers=h).status_code == 403
+
+        creado = client.post(BASE, json=_body(sample_event.id), headers=_auth())
+        pid = creado.json()["id"]
+        assert client.put(f"{BASE}/{pid}", json={"active": False}, headers=h).status_code == 403
+        assert client.delete(f"{BASE}/{pid}", headers=h).status_code == 403
+
+    def test_el_403_dice_que_permiso_falta(
+        self, client: TestClient, sample_event: Event, sin_permisos: str
+    ):
+        """El mensaje nombra el permiso: sin eso el operador llama al administrador
+        y no sabe que pedir."""
+        r = client.post(BASE, json=_body(sample_event.id), headers=_auth(sin_permisos))
+        assert r.json()["detail"] == "Permiso requerido: protocols:write"
+
+    def test_403_no_cierra_la_sesion(
+        self, client: TestClient, sample_event: Event, sin_permisos: str
+    ):
+        """403 no es 401.
+
+        Un 401 hace que el cliente cierre sesion y pierda lo que estaba haciendo.
+        Con 403 solo se le niega esta accion.
+        """
+        r = client.get(f"{BASE}?event_id={sample_event.id}", headers=_auth(sin_permisos))
+        assert r.status_code == 403
+        assert "WWW-Authenticate" not in r.headers
+
+    # ── 200: con el permiso ──
+    def test_lecturas_con_permiso_es_200(
+        self, client: TestClient, sample_event: Event
+    ):
+        h = _auth()
+        assert client.get(f"{BASE}?event_id={sample_event.id}", headers=h).status_code == 200
+        assert client.get(f"{BASE}/suggestions", headers=h).status_code == 200
+        assert client.get(f"{BASE}/compliance?event_id={sample_event.id}", headers=h).status_code == 200
+
+    def test_escrituras_con_permiso_es_200(self, client: TestClient, sample_event: Event):
+        h = _auth()
+        creado = client.post(BASE, json=_body(sample_event.id), headers=h)
+        assert creado.status_code == 201
+        pid = creado.json()["id"]
+        assert client.put(f"{BASE}/{pid}", json={"active": False}, headers=h).status_code == 200
+        assert client.delete(f"{BASE}/{pid}", headers=h).status_code == 204
+
+    # ── El permiso es por endpoint, no "tocar el modulo" ──
+    def test_read_no_alcanza_para_escribir(
+        self, client: TestClient, sample_event: Event, db_session: Session
+    ):
+        """`protocols:read` no habilita escrituras.
+
+        Si `apply-suggestions` se hubiera dejado con `read`, un usuario de solo
+        lectura podria crear reglas.
+        """
+        from app.core.security import hash_password
+        from app.models.user import Permission, Role, RolePermission, User, UserRole
+
+        user = User(
+            username="ocp-solo-lectura",
+            password_hash=hash_password("clave-de-prueba-larga"),
+        )
+        db_session.add(user)
+        db_session.flush()
+
+        solo_read = Role(
+            code="SOLO_LECTURA_PROTOCOLOS", name="Solo lectura", is_system=True
+        )
+        db_session.add(solo_read)
+        db_session.flush()
+        permiso = db_session.execute(
+            select(Permission).where(Permission.code == "protocols:read")
+        ).scalar_one()
+        db_session.add(RolePermission(role_id=solo_read.id, permission_id=permiso.id))
+        db_session.add(UserRole(user_id=user.id, role_id=solo_read.id))
+        db_session.flush()
+
+        h = _auth(user.username)
+        assert client.get(f"{BASE}?event_id={sample_event.id}", headers=h).status_code == 200
+        assert client.post(BASE, json=_body(sample_event.id), headers=h).status_code == 403
+
+    # ── El acceso refleja el estado actual de la cuenta ──
+    def test_quitar_el_permiso_corta_el_acceso_al_instante(
+        self,
+        client: TestClient,
+        sample_event: Event,
+        municipal: str,
+        db_session: Session,
+    ):
+        """El token sigue siendo criptograficamente valido; la cuenta ya no alcanza.
+
+        Es la razon de que `get_current_user` relea la base en vez de confiar en los
+        claims del JWT: sin esto, revocar un permiso tardaria hasta 15 minutos (la
+        vida del access token) en surtir efecto.
+
+        Se opera sobre `db_session`, que es la misma sesion que el cliente inyecta
+        en `get_db`: por eso el cambio es visible para el request siguiente.
+        """
+        from app.models.user import User
+
+        h = _auth(municipal)
+        assert client.get(f"{BASE}?event_id={sample_event.id}", headers=h).status_code == 200
+
+        u = db_session.execute(
+            select(User).where(User.username == municipal)
+        ).scalar_one()
+        for ur in list(u.user_roles):
+            db_session.delete(ur)
+        db_session.flush()
+        # `User.user_roles` es `lazy="selectin"`: ya está cargado en el identity map
+        # de esta sesión, y sin `expire_all` el request siguiente devolvería la
+        # colección cacheada con los roles que ya se borraron.
+        db_session.expire_all()
+
+        assert client.get(f"{BASE}?event_id={sample_event.id}", headers=h).status_code == 403
+
+    def test_desactivar_el_usuario_lo_expulsa(
+        self,
+        client: TestClient,
+        sample_event: Event,
+        municipal: str,
+        db_session: Session,
+    ):
+        """Dar de baja a alguien es 401, no 403: la sesion deja de existir."""
+        from app.models.user import User
+
+        h = _auth(municipal)
+        assert client.get(f"{BASE}?event_id={sample_event.id}", headers=h).status_code == 200
+
+        u = db_session.execute(
+            select(User).where(User.username == municipal)
+        ).scalar_one()
+        u.is_active = False
+        db_session.flush()
+        db_session.expire_all()
+
+        assert client.get(f"{BASE}?event_id={sample_event.id}", headers=h).status_code == 401

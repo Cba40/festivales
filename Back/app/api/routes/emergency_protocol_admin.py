@@ -5,8 +5,23 @@ CRUD plano sobre el catálogo ``emergency_protocols`` para el Dashboard
 activar/desactivar y eliminar (soft delete) protocolos.
 
 El catálogo es transversal (por ``context``, sin ``event_id`` ni ``city_id``).
-Patrón idéntico a emergency_admin.py / accommodation_admin.py: preijo
-``/api/admin``, lecturas públicas y escrituras con ``verify_token``.
+Patrón idéntico a emergency_admin.py / accommodation_admin.py: prefijo
+``/api/admin``.
+
+Autorización (Fase 4 del RBAC)
+-----------------------------
+Las escrituras usan ``require_permission("emergency_protocols:write")``. No se
+reutiliza ``protocols:write``: ese prefijo ya lo usa el módulo de Protocolos de
+Control de Observaciones, que es otro dominio (por evento, no por contexto).
+
+``GET /api/admin/emergency-protocols`` **sigue público**, como estaba y como
+documenta el módulo. El motivo de que no se cierre: el catálogo público de
+protocolos ya se sirve en ``/api/emergency-protocols``
+(``emergency_protocol.py``, módulo product), así que el ciudadano no pierde nada,
+pero el panel de Infraestructura —que sí va detrás de ``ProtectedRoute``— usa esta
+ruta admin y necesita seguir funcionando para cualquier operador de campo. Cerrarla
+sería quitarle acceso a algo que hoy tiene; la de-duplicar las dos rutas es una
+tarea aparte y de otro tipo.
 
 El DELETE es un *soft delete*: establece ``active = False`` preservando el
 histórico y ocultando el protocolo del endpoint público (S2 filtra por
@@ -15,7 +30,7 @@ histórico y ocultando el protocolo del endpoint público (S2 filtra por
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import verify_token
+from app.api.deps import require_permission
 from app.db.session import get_db
 from app.models.emergency_protocol import EmergencyProtocol, EmergencyProtocolContext
 from app.schemas.emergency_protocol import (
@@ -90,7 +105,7 @@ def list_protocols(
 def create_protocol(
     body: ProtocolCreate,
     db: Session = Depends(get_db),
-    _=Depends(verify_token),
+    _=Depends(require_permission("emergency_protocols:write")),
 ):
     title = body.title.strip()
     if not title:
@@ -137,7 +152,7 @@ def update_protocol(
     protocol_id: str,
     body: ProtocolUpdate,
     db: Session = Depends(get_db),
-    _=Depends(verify_token),
+    _=Depends(require_permission("emergency_protocols:write")),
 ):
     proto = _get_protocol_or_404(db, protocol_id)
     provided = body.model_fields_set
@@ -195,7 +210,7 @@ def update_protocol(
 def delete_protocol(
     protocol_id: str,
     db: Session = Depends(get_db),
-    _=Depends(verify_token),
+    _=Depends(require_permission("emergency_protocols:write")),
 ):
     proto = _get_protocol_or_404(db, protocol_id)
     # Soft delete: ocultamos del endpoint público sin borrar históricos.

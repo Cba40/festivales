@@ -6,7 +6,19 @@ y desactivar puntos de emergencia. Sin lógica de incidentes ni recursos
 
 El módulo es transversal por CIUDAD (no por evento), por lo que el router usa el
 prefijo ``/api/admin``. ``GET /api/admin/cities`` alimenta el selector de ciudad
-del panel. Las escrituras usan ``verify_token``; las lecturas son públicas.
+del panel.
+
+Autorización (Fase 4 del RBAC)
+-----------------------------
+Las escrituras usan ``require_permission("emergency:write")``. Las lecturas
+**siguen públicas a propósito** y no se tocan: el catálogo de emergencias y el de
+ciudades son datos que ve el ciudadano, y ya tienen endpoint propio en los módulos
+product (``emergency.py`` sirve ``/api/cities`` y ``/api/emergencies`` sin token).
+Que exista además la versión bajo ``/api/admin`` es duplicación del prefijo, no
+una decisión de acceso: por eso se respetan tal como están en vez de cerrarlas.
+
+Los servicios públicos no se apoyan en estas rutas admin para nada que el ciudadano
+no pueda ver igual.
 
 El DELETE es un *soft delete*: establece ``active = False`` para preservar la
 integridad histórica (los desactivados dejan de exponerse en el endpoint público
@@ -15,7 +27,7 @@ pero se mantienen en la base).
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import verify_token
+from app.api.deps import require_permission
 from app.db.session import get_db
 from app.models.city import City
 from app.models.emergency import Emergency
@@ -74,7 +86,7 @@ def list_cities(
 def create_city(
     body: CityCreate,
     db: Session = Depends(get_db),
-    _=Depends(verify_token),
+    _=Depends(require_permission("emergency:write")),
 ):
     name = body.name.strip()
     if not name:
@@ -122,7 +134,7 @@ def list_emergencies(
 def create_emergency(
     body: EmergencyCreate,
     db: Session = Depends(get_db),
-    _=Depends(verify_token),
+    _=Depends(require_permission("emergency:write")),
 ):
     _require_city(db, body.city_id)
 
@@ -164,7 +176,7 @@ def update_emergency(
     emergency_id: str,
     body: EmergencyUpdate,
     db: Session = Depends(get_db),
-    _=Depends(verify_token),
+    _=Depends(require_permission("emergency:write")),
 ):
     em = _get_emergency_or_404(db, emergency_id)
 
@@ -216,7 +228,7 @@ def update_emergency(
 def delete_emergency(
     emergency_id: str,
     db: Session = Depends(get_db),
-    _=Depends(verify_token),
+    _=Depends(require_permission("emergency:write")),
 ):
     em = _get_emergency_or_404(db, emergency_id)
     # Soft delete: ocultamos del endpoint público sin borrar históricos.
