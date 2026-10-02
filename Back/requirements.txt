@@ -4,6 +4,11 @@ psycopg2-binary==2.9.9
 psycopg[binary]>=3.1,<4.0
 geoalchemy2==0.15.1
 python-jose[cryptography]==3.3.0
+# Hashing de contrasenas del modulo de identidad. argon2id: lento a proposito y
+# con uso de memoria, para que un atacante no pueda probar millones de
+# candidatos por segundo con una tabla `users` filtrada. Reemplaza al
+# `passlib[bcrypt]` que estaba declarado y nunca se instaló.
+argon2-cffi==25.1.0
 python-dotenv==1.0.1
 pydantic==2.8.2
 pydantic-settings==2.5.2

@@ -28,6 +28,19 @@ from app.models.observation_control_protocol import (
 from app.models.transport_alert import TransportAlert, ALERT_TYPES
 from app.models.operator_message import OperatorMessage, MESSAGE_STATUSES, MESSAGE_PRIORITIES
 from app.models.service_interaction_log import ServiceInteractionLog, SERVICE_CATEGORIES, RESULT_STATUSES, INTERACTION_TYPES, REQUEST_ORIGINS
+# Identidad / RBAC. Importarlo acá importa los modelos a `AppBase.metadata`, que es
+# lo que revisa `tests/infrastructure/test_model_drift.py` y lo que usa
+# `Base.metadata.create_all` en la suite. Si no estuviera, esas tablas no
+# aparecerían en ninguna de las dos cosas.
+from app.models.user import (
+    User,
+    Role,
+    Permission,
+    UserRole,
+    RolePermission,
+    RefreshToken,
+    AuditLog,
+)
 
 __all__ = [
     "Event",
@@ -67,4 +80,12 @@ __all__ = [
     "RESULT_STATUSES",
     "INTERACTION_TYPES",
     "REQUEST_ORIGINS",
+    # RBAC
+    "User",
+    "Role",
+    "Permission",
+    "UserRole",
+    "RolePermission",
+    "RefreshToken",
+    "AuditLog",
 ]
