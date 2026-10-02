@@ -39,6 +39,25 @@ Lo unico que agrega son los indices que el CRUD necesita y que no existian.
 Se crean con `IF NOT EXISTS` para que la migracion sea idempotente y no
 falle si el indice ya estuviera presente.
 
+Prerrequisito anadido en esta iteracion
+--------------------------------------
+El docstring de arriba dice, con razon, "No hay `create_table`: la tabla ya
+existe con datos". Eso es cierto en Neon de produccion y falso en cualquier
+base nueva: en este arbol la tabla no la crea ninguna migracion, asi que los
+`create_index` de mas abajo fallaban con `relation
+"operational_observations" does not exist` y `alembic upgrade head` no podia
+correr desde cero. Se agrega un `CREATE TABLE IF NOT EXISTS` con el esquema
+declarado en `OperationalObservationModel`, que es exactamente el verificado
+contra Neon mas arriba (timestamptz, jsonb, varchar(36)). Es un no-op donde la
+tabla ya existe, con lo que no cambia el comportamiento de produccion.
+
+Se agrega tambien `predictions` por el mismo motivo: es otra tabla de `src/`
+que ninguna migracion de este arbol crea. No bloquea esta migracion (nada la
+tocaba), pero sin ella una base instalada desde cero queda sin la tabla de la
+que lee el Context Engine, y el `applying` de este arbol daria exito con una
+base incompleta. Esquema tomado de `PredictionModel`, sin FKs por el motivo que
+documenta ese propio modelo.
+
 Sobre los indices
 -----------------
 `app/crud/operational_observation.py::_find_observation_window` filtra por
@@ -66,6 +85,7 @@ Create Date: 2026-09-28
 from typing import Sequence, Union
 
 from alembic import op
+import sqlalchemy as sa
 
 
 revision: str = 'f2a3b4c5d6e7'
@@ -75,6 +95,53 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    # 0) Prerrequisitos idempotentes: materializar las dos tablas de `src/` que
+    #    ninguna migracion de este arbol creaba. Ver el docstring.
+    #
+    #    `operational_observations`: esquema de `OperationalObservationModel` en
+    #    su estado HISTORICO. Sin FKs, igual que el modelo, y sin los indices que
+    #    crea esta misma migracion mas abajo.
+    #
+    #    `corrected_by` y `corrected_at` NO van aqui a proposito: los agrega
+    #    `b4c5d6e7f8a9`, que corre despues. Incluirlos aqui hacia fallar la
+    #    cadena con `column "corrected_by" already exists`. Es el mismo criterio
+    #    que se aplico en p91 con `snapshot_hash`.
+    op.execute(sa.text(
+        """
+        CREATE TABLE IF NOT EXISTS operational_observations (
+            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            event_day_id varchar(36) NOT NULL,
+            zone_id varchar(36) NOT NULL,
+            timestamp timestamptz NOT NULL,
+            observed_density integer NOT NULL,
+            observer_id varchar(36),
+            source varchar(50) NOT NULL DEFAULT 'manual',
+            "metadata" jsonb,
+            created_at timestamptz NOT NULL DEFAULT now()
+        )
+        """
+    ))
+
+    # `predictions`: esquema de `PredictionModel`. El UNIQUE de `timestamp`
+    # se crea con su nombre (`uq_predictions_timestamp`) para que coincida con
+    # el declarado en el modelo y un `autogenerate` posterior no lo proponga
+    # para borrar.
+    op.execute(sa.text(
+        """
+        CREATE TABLE IF NOT EXISTS predictions (
+            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            timestamp timestamp NOT NULL,
+            event_day_id varchar(36) NOT NULL,
+            knowledge_model_version_id uuid,
+            active_phase_id uuid NOT NULL,
+            active_event_day_phase_id uuid NOT NULL,
+            zone_states_data JSON NOT NULL,
+            created_at timestamp NOT NULL DEFAULT now(),
+            CONSTRAINT uq_predictions_timestamp UNIQUE (timestamp)
+        )
+        """
+    ))
+
     op.create_index(
         'ix_operational_observations_zone_id_timestamp',
         'operational_observations',

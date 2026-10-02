@@ -18,6 +18,34 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    # 0) Prerrequisito: la tabla tiene que existir. En Neon de produccion la
+    #    creo una migracion del arbol huerfano
+    #    (`src/infrastructure/persistence/migrations/versions/`, al que
+    #    `alembic.ini` no apunta), asi que en este arbol jamas se creo y esta
+    #    migracion fallaba con `relation "knowledge_model_versions" does not
+    #    exist`. El propio repo lo admite en el docstring de f2a3b4c5d6e7.
+    #
+    #    Se crea en su estado HISTORICO, es decir sin `snapshot_hash` y sin el
+    #    UNIQUE `uq_km_versions_snapshot_hash`: los agrega este mismo upgrade mas
+    #    abajo, y crearlos aqui daria "column already exists". Por la misma
+    #    razon `version_number` se crea sin el `server_default` de la secuencia;
+    #    lo setea el `alter_column` de mas abajo.
+    #
+    #    Sin FK a proposito, igual que el modelo: `KnowledgeModelVersionModel`
+    #    declara `knowledge_model_version_id` en otros lado pero no una FK.
+    #    `IF NOT EXISTS` la hace no-op en una base que ya la tiene.
+    op.execute(sa.text(
+        """
+        CREATE TABLE IF NOT EXISTS knowledge_model_versions (
+            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            version_number integer NOT NULL,
+            snapshot_data JSON NOT NULL,
+            created_at timestamptz NOT NULL DEFAULT now(),
+            created_by varchar(100)
+        )
+        """
+    ))
+
     op.execute("CREATE SEQUENCE IF NOT EXISTS km_version_number_seq")
 
     op.add_column(

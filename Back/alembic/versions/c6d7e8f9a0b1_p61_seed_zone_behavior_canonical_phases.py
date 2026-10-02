@@ -27,6 +27,24 @@ SOURCE_SORT_ORDER = 2
 
 
 def upgrade() -> None:
+    # 0) Prerrequisito, idempotente y equivalente al paso 0 de p60: esta
+    #    migracion clona `zone_behaviors` de las fases del perfil
+    #    `a4a316d7-...`, asi que ese perfil tiene que existir. En una base
+    #    creada desde cero no lo esta, porque ninguna migracion lo crea. Se
+    #    repite acá (y no solo en p60) para que cada migracion sea
+    #    autosuficiente y el conjunto se pueda aplicar en cualquier orden.
+    op.execute(sa.text(
+        """
+        INSERT INTO operational_profiles (id, name, description)
+        VALUES (
+            CAST(:profile AS uuid),
+            'ActividadExtendida',
+            'Perfil operativo territorial canonico'
+        )
+        ON CONFLICT DO NOTHING
+        """
+    ).bindparams(profile=OPERATIONAL_PROFILE_ID))
+
     # For each canonical phase (1..10) clone every ZoneBehavior of the source
     # phase (sort_order = 2). Pairs (phase, zone_type) that already exist are
     # skipped via ON CONFLICT; id, created_at and updated_at are left to

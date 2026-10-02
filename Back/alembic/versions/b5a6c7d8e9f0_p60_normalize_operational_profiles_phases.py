@@ -24,6 +24,29 @@ ACTIVIDAD_PROFILE_ID = 'a4a316d7-c1ff-4134-9758-a6dab488043c'
 
 
 def upgrade() -> None:
+    # 0) Prerrequisito: el perfil que esta migracion va a preservar tiene que
+    #    existir. En la base de desarrollo (creada a mano, no por migraciones)
+    #    ya estaba, y por eso el fallo nunca apareció: el paso 3 inserta
+    #    `operational_phases` con este UUID como FK, así que sin la fila el
+    #    INSERT viola `operational_phases_operational_profile_id_fkey` y
+    #    `alembic upgrade head` no puede correr en una base nueva.
+    #
+    #    El nombre es el que documenta el docstring de esta migracion
+    #    ("ActividadExtendida"). `ON CONFLICT DO NOTHING` (sin columna) para que
+    #    sea idempotente tanto si ya existe la fila con este id como si el id
+    #    chocara por el UNIQUE de `name`: en una base ya sembrada no se toca nada.
+    op.execute(sa.text(
+        """
+        INSERT INTO operational_profiles (id, name, description)
+        VALUES (
+            CAST(:profile AS uuid),
+            'ActividadExtendida',
+            'Perfil operativo territorial canonico'
+        )
+        ON CONFLICT DO NOTHING
+        """
+    ).bindparams(profile=ACTIVIDAD_PROFILE_ID))
+
     # 1) Every event_days row points to the preserved profile.
     op.execute(sa.text(
         """
