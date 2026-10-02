@@ -1,5 +1,6 @@
 import asyncio
 import os
+import re
 import sys
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -26,6 +27,15 @@ from app.models.zone_type import ZoneType
 from src.infrastructure.middleware.rate_limit import reset_backend_sync
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", settings.DATABASE_URL)
+
+# `TEST_DATABASE_URL` se configura con la URL de Neon en forma asyncpg (ver
+# `Back/.env`), pero este fixture abre un motor SINCRONO con `create_engine`, que
+# rechaza un driver async ("connect() got an unexpected keyword argument
+# 'sslmode'"). Se fuerza psycopg para el motor sync. El guard de seguridad de
+# abajo sigue leyendo la URL original, que es la que importa para el nombre.
+TEST_DATABASE_URL_SYNC = re.sub(
+    r"^postgresql\+[a-z0-9_]+://", "postgresql+psycopg://", TEST_DATABASE_URL
+)
 
 # ── Guard de seguridad ───────────────────────────────────────────────
 #
@@ -191,7 +201,7 @@ def _restore_geometry_after_tests() -> None:
 
 @pytest.fixture(scope="session")
 def test_engine():
-    engine = create_engine(TEST_DATABASE_URL, pool_pre_ping=True)
+    engine = create_engine(TEST_DATABASE_URL_SYNC, pool_pre_ping=True)
     # Antes era `Base.metadata.drop_all(bind=engine)`, que fallaba con
     # `DependentObjectsStillExist`: 7 tablas de la base (zone_subtypes,
     # zone_recommendations, predictions, operational_observations,

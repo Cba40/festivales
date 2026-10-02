@@ -3,12 +3,15 @@
 Cubre §13: unicidad de nombre, clave compuesta, FK validation, filtro de eventos activos.
 """
 import os
+import re
 import uuid
+from datetime import date
 
 import pytest
 from sqlalchemy import DefaultClause, String, create_engine, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import NullPool
 
 from app.core.config import settings
 from app.crud import (
@@ -41,6 +44,20 @@ from app.models.zone import Zone
 from app.schemas.zone_type import ZoneTypeCreate
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", settings.DATABASE_URL)
+# `TEST_DATABASE_URL` viene en forma asyncpg (URL de Neon). Este modulo abre un
+# motor async (fixture `async_engine`) y uno sync (`sync_engine` mas abajo), asi
+# que se derivan las dos variantes en vez de asumir una sola forma.
+#
+# Ademas hay que traducir el parametro de TLS: asyncpg NO entiende `sslmode`, lo
+# pasa tal cual a `connect()` y revienta con "connect() got an unexpected keyword
+# argument 'sslmode'". Su equivalente es `ssl=`. Solo se cubre `require`, que es
+# lo que emite la URL de Neon.
+TEST_ASYNC_URL = re.sub(
+    r"^postgresql(\+[a-z0-9_]+)?://", "postgresql+asyncpg://", TEST_DATABASE_URL, count=1
+).replace("sslmode=require", "ssl=require")
+TEST_SYNC_URL = re.sub(
+    r"^postgresql\+[a-z0-9_]+://", "postgresql+psycopg://", TEST_DATABASE_URL
+)
 
 
 # ── Fixtures ──────────────────────────────────────────────────────
@@ -48,8 +65,13 @@ TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", settings.DATABASE_URL)
 
 @pytest.fixture(scope="session")
 def async_engine():
-    async_url = TEST_DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
-    engine = create_async_engine(async_url)
+    # `NullPool` es obligatorio, no una optimizacion. El fixture es de scope
+    # "session" pero pytest-asyncio crea un event loop NUEVO por test, asi que
+    # con el pool por defecto la segunda sesion que usa este motor reutiliza una
+    # conexion creada en el loop del test anterior y revienta con
+    # "got Future attached to a different loop". Sin pool, cada conexion se abre
+    # y se cierra dentro del loop que la usa.
+    engine = create_async_engine(TEST_ASYNC_URL, poolclass=NullPool)
     return engine
 
 
@@ -339,7 +361,7 @@ class TestOperationalEventCRUD:
         day = EventDay(
             id="test-ed-active-filter",
             event_id=event.id,
-            date="2026-07-10",
+            date=date(2026, 7, 10),
             day_of_week="jueves",
             operational_profile_id=prof.id,
             operational_start_min=480,
@@ -412,7 +434,7 @@ class TestEventDayCRUD:
             await create_event_day(
                 async_session,
                 EventDayCreate(
-                    date="2026-07-10",
+                    date=date(2026, 7, 10),
                     day_of_week="jueves",
                     operational_start_min=1800,
                     operational_end_min=480,
@@ -450,7 +472,7 @@ class TestEventDayCRUD:
             await create_event_day(
                 async_session,
                 EventDayCreate(
-                    date="2026-07-10",
+                    date=date(2026, 7, 10),
                     day_of_week="jueves",
                     operational_profile_id=fake_profile_id,
                     operational_start_min=480,
@@ -484,7 +506,7 @@ class TestEventDayPhaseCRUD:
         day = EventDay(
             id="test-edp-day",
             event_id=event.id,
-            date="2026-08-01",
+            date=date(2026, 8, 1),
             day_of_week="sabado",
             operational_profile_id=prof.id,
             operational_start_min=480,
@@ -552,7 +574,7 @@ class TestEventDayPhaseCRUD:
 @pytest.fixture
 def sync_session():
     """Sesión síncrona transaccional: el commit del CRUD solo libera el SAVEPOINT."""
-    sync_engine = create_engine(TEST_DATABASE_URL)
+    sync_engine = create_engine(TEST_SYNC_URL)
     connection = sync_engine.connect()
     transaction = connection.begin()
     session = Session(bind=connection)
@@ -884,7 +906,7 @@ class TestEventDayProfileIntegrityP31C:
         return await create_event_day(
             async_session,
             EventDayCreate(
-                date="2026-09-01",
+                date=date(2026, 9, 1),
                 day_of_week="martes",
                 operational_profile_id=profile_id,
                 operational_start_min=0,
@@ -910,7 +932,7 @@ class TestEventDayProfileIntegrityP31C:
         day = await create_event_day(
             async_session,
             EventDayCreate(
-                date="2026-06-02",
+                date=date(2026, 6, 2),
                 day_of_week="miercoles",
                 operational_profile_id=pa,
                 operational_start_min=0,
@@ -940,7 +962,7 @@ class TestEventDayProfileIntegrityP31C:
             await create_event_day(
                 async_session,
                 EventDayCreate(
-                    date="2026-06-02",
+                    date=date(2026, 6, 2),
                     day_of_week="miercoles",
                     operational_profile_id=pa,
                     operational_start_min=0,
