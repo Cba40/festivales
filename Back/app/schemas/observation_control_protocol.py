@@ -42,13 +42,6 @@ class ObservationControlProtocolResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class ObservationControlProtocolListResponse(BaseModel):
-    """Respuesta del listado de protocolos de un evento."""
-
-    event_id: str
-    protocols: list[ObservationControlProtocolResponse]
-
-
 class ObservationControlProtocolCreate(BaseModel):
     """DTO de creación. ``event_id``, ``name``, ``trigger_metric``,
     ``threshold_value`` y ``action_interval_minutes`` son obligatorios."""
@@ -142,9 +135,16 @@ class ComplianceAlertResponse(BaseModel):
 
 
 class ComplianceResponse(BaseModel):
-    """Estado de cumplimiento de todos los protocolos activos del evento."""
+    """Estado de cumplimiento de todos los protocolos activos del evento.
+
+    `protocols_evaluated` es lo que impide el falso "todo bien": dice
+    cuantos protocolos llegaron a compararse contra una prediccion real. Si es
+    0, `total_alerts == 0` no significa que todo cumpla sino que no hay datos
+    para juzgarlo, y la UI tiene que decirlo en vez de mostrar un verde.
+    """
 
     event_id: str
     evaluated_at: str
+    protocols_evaluated: int
     total_alerts: int
     alerts: list[ComplianceAlertResponse]

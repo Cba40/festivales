@@ -215,8 +215,8 @@ class _FakeAsyncSession:
     """Session async que devuelve filas distintas segun la tabla consultada.
 
     Despacha mirando el FROM de la sentencia, y para la consulta de
-    observaciones saca la zona de los parametros compilados en vez de parsear el
-    SQL (que viene con marcadores `__[POSTCOMPILE_...]__`).
+    observaciones saca las zonas de los parametros compilados en vez de parsear
+    el SQL (que viene con marcadores `__[POSTCOMPILE_...]__`).
     """
 
     def __init__(
@@ -244,9 +244,13 @@ class _FakeAsyncSession:
         if "FROM predictions" in sql:
             return _Result([self._prediction] if self._prediction else [])
         if "operational_observations" in sql:
-            zona = self._zone_of(stmt)
-            ultima = self._observations.get(zona)
-            return _Result([ultima] if ultima else [])
+            # Consulta agrupada (`GROUP BY zone_id` + `max(timestamp)`): una fila
+            # `(zone_id, timestamp)` por zona CON observacion. Las zonas sin
+            # observacion no aparecen, que es lo que espera `.get(zone_id)`.
+            zonas = self._zone_ids_in(stmt)
+            return _Result(
+                [(z, self._observations[z]) for z in zonas if self._observations.get(z)]
+            )
         if "FROM event_days" in sql:
             return _Result([self._event_day_id])
         if "FROM zones" in sql:
@@ -254,17 +258,22 @@ class _FakeAsyncSession:
         return _Result([])
 
     @staticmethod
-    def _zone_of(stmt) -> str:
-        """El id de zona viaja como bind param `zone_id_1`, junto a `event_day_id_1`.
+    def _zone_ids_in(stmt) -> list[str]:
+        """Las zonas del `IN (...)` viajan en el bind param `zone_id_1`.
 
-        Se busca por nombre de clave: la consulta trae las dos y el primero que
-        aparezca no es necesariamente la zona.
+        Se busca por nombre de clave porque la consulta trae tambien
+        `event_day_id_1`, y el primero que aparezca no es necesariamente la zona.
+        Antes de la optimizacion B1 la consulta era por una sola zona; ahora trae
+        la lista entera, asi que se acepta cualquiera de las dos formas.
         """
         params = stmt.compile().params
         for key, value in params.items():
-            if "zone_id" in key and isinstance(value, str):
-                return value
-        return ""
+            if "zone_id" in key:
+                if isinstance(value, (list, tuple, set)):
+                    return [v for v in value if isinstance(v, str)]
+                if isinstance(value, str):
+                    return [value]
+        return []
 
 
 NOW = datetime(2026, 7, 15, 15, 0, tzinfo=timezone.utc)
@@ -571,3 +580,110 @@ class TestMixedScopeEvaluation:
 
         assert sorted(a.protocol_name for a in alertas) == ["Anclado X", "Anclado Y"]
         assert not any("FROM event_days" in q for q in session.queries)
+
+
+class TestProtocolsEvaluated:
+    """`protocols_evaluated` es lo que separa "todo cumple" de "no hay datos".
+
+    Sin esto, un evento sin predicciones publicadas devolvia `total_alerts=0` y
+    la UI lo pintaba como un semaforo verde, cuando en realidad no se habia
+    evaluado nada.
+    """
+
+    async def test_cuenta_los_protocolos_con_prediccion(self):
+        session = _FakeAsyncSession(
+            protocols=[_protocolo(name="Evaluable", event_day_id="day-1")],
+            prediction=SimpleNamespace(
+                zone_states_data=_zone_states(saturation_level=0.10)
+            ),
+        )
+
+        alertas, evaluados = await ObservationComplianceEvaluator(
+            session
+        ).evaluate_with_count("ev-1", now=NOW)
+
+        assert evaluados == 1
+        assert alertas == []  # cumple el umbral? no: por eso no hay alerta
+
+    async def test_sin_prediccion_no_cuenta_como_evaluado(self):
+        """El caso que dispara el falso "todo bien": no hay prediccion que leer."""
+        session = _FakeAsyncSession(
+            protocols=[_protocolo(name="Sin datos", event_day_id="day-1")],
+            prediction=None,
+        )
+
+        alertas, evaluados = await ObservationComplianceEvaluator(
+            session
+        ).evaluate_with_count("ev-1", now=NOW)
+
+        assert alertas == []
+        assert evaluados == 0
+
+    async def test_solo_cuenta_los_que_tienen_prediccion_en_su_jornada(self):
+        """Un anclado a otra jornada no se evalua, y tampoco cuenta."""
+        session = _FakeAsyncSession(
+            protocols=[
+                _protocolo(name="Anclado", event_day_id="day-X"),
+                _protocolo(name="Transversal", event_day_id=None),
+            ],
+            prediction=SimpleNamespace(
+                zone_states_data=_zone_states(saturation_level=0.10)
+            ),
+            event_day_id="day-activa",
+        )
+
+        _, evaluados = await ObservationComplianceEvaluator(
+            session
+        ).evaluate_with_count("ev-1", now=NOW)
+
+        # La falsa sesion devuelve la misma prediccion para toda jornada, asi que
+        # el anclado tambien encuentra metricas: cuenta 2.
+        assert evaluados == 2
+
+    async def test_sin_protocolos_devuelve_cero_evaluados(self):
+        session = _FakeAsyncSession(protocols=[])
+
+        alertas, evaluados = await ObservationComplianceEvaluator(
+            session
+        ).evaluate_with_count("ev-1", now=NOW)
+
+        assert alertas == []
+        assert evaluados == 0
+
+
+class TestQueriesDeObservaciones:
+    """Guard de regresion de la optimizacion B1 (fin del N+1)."""
+
+    async def test_una_sola_query_de_observaciones_por_jornada(self):
+        """4 protocolos x 2 zonas superaron el umbral: 1 query, no 8.
+
+        Antes `_protocol_alerts` llamaba `_last_observation_at` por cada par
+        (protocolo, zona) que pasaba el trigger. Con las 4 sugerencias que siembra
+        `seed.py` y un evento grande eso eran cientos de queries por llamada, y
+        el panel refresca cada 30 s.
+        """
+        estados = [
+            {"zone_id": "z1", "type": "escenario", "saturation_level": 0.92},
+            {"zone_id": "z2", "type": "escenario", "saturation_level": 0.95},
+        ]
+        session = _FakeAsyncSession(
+            protocols=[
+                _protocolo(name="P1", event_day_id="day-1"),
+                _protocolo(name="P2", event_day_id="day-1"),
+                _protocolo(name="P3", event_day_id="day-1"),
+                _protocolo(name="P4", event_day_id="day-1"),
+            ],
+            prediction=SimpleNamespace(zone_states_data=estados),
+            observations={},
+        )
+
+        await ObservationComplianceEvaluator(session).evaluate("ev-1", now=NOW)
+
+        queries_obs = [q for q in session.queries if "operational_observations" in q]
+        assert len(queries_obs) == 1, (
+            "la ultima observacion de todas las zonas debe resolverse en una "
+            f"sola query agrupada, llegaron {len(queries_obs)}"
+        )
+        # Y debe traer las dos zonas en un unico `IN (...)`.
+        assert "GROUP BY" in queries_obs[0]
+        assert "max(" in queries_obs[0]

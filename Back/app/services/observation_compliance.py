@@ -36,7 +36,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any, Iterable, Optional
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.observation_control_protocol import (
@@ -139,8 +139,6 @@ class ObservationComplianceEvaluator:
     async def _active_protocols(
         self, event_id: str
     ) -> list[ObservationControlProtocol]:
-        from sqlalchemy.orm import Session
-
         # El modelo es de `app/`, pero la sesión de esta feature es async. La
         # lectura se hace con `select()` sobre la sesión async contra el mismo
         # Postgres, que es lo que hace el resto del código de `src/`.
@@ -173,18 +171,34 @@ class ObservationComplianceEvaluator:
         )
         return result.scalars().first()
 
-    async def _last_observation_at(
-        self, event_day_id: str, zone_id: str
-    ) -> Optional[datetime]:
+    async def _last_observations_at(
+        self, event_day_id: str, zone_ids: Iterable[str]
+    ) -> dict[str, datetime]:
+        """Última observación de cada zona de la jornada, en UNA sola query.
+
+        Antes esto se resolvia con `_last_observation_at(day_id, zone_id)` dentro
+        del bucle de zonas de `_protocol_alerts`, o sea una query por cada par
+        (protocolo, zona) que superaba el umbral. Con las 4 sugerencias que
+        siembra `seed.py` y un evento de 60 zonas con saturacion alta, eso son
+        ~240 queries secuenciales por llamada, y `ComplianceAlertsPanel` la
+        refresca cada 30 s: el endpoint se caia solo con carga normal.
+
+        Se resuelve en O(1) por zona con un `GROUP BY zone_id` + `max(timestamp)`
+        y un dict en memoria. Las zonas sin ninguna observacion simplemente no
+        aparecen en el mapa, que es exactamente el caso "nunca observada" que el
+        llamador distingue con `.get(zone_id) is None`.
+        """
         _, observation_model = self._models()
+        ids = [z for z in zone_ids if z]
+        if not ids:
+            return {}
         result = await self._db.execute(
-            select(observation_model.timestamp)
+            select(observation_model.zone_id, func.max(observation_model.timestamp))
             .where(observation_model.event_day_id == event_day_id)
-            .where(observation_model.zone_id == zone_id)
-            .order_by(observation_model.timestamp.desc())
-            .limit(1)
+            .where(observation_model.zone_id.in_(ids))
+            .group_by(observation_model.zone_id)
         )
-        return result.scalar_one_or_none()
+        return {row[0]: row[1] for row in result.all()}
 
     async def _zone_names(self, zone_ids: Iterable[str]) -> dict[str, str]:
         """Nombre legible de las zonas, para que la alerta sea accionable."""
@@ -201,11 +215,33 @@ class ObservationComplianceEvaluator:
     async def evaluate(
         self, event_id: str, now: Optional[datetime] = None
     ) -> list[ComplianceAlertResponse]:
-        """Devuelve una alerta por cada (protocolo, zona) incumplido."""
+        """Devuelve una alerta por cada (protocolo, zona) incumplido.
+
+        No dice quantos protocolos llegaron a evaluarse de verdad; para eso esta
+        `evaluate_with_count`, que es la que consume el endpoint.
+        """
+        alerts, _ = await self._evaluate(event_id, now)
+        return alerts
+
+    async def evaluate_with_count(
+        self, event_id: str, now: Optional[datetime] = None
+    ) -> tuple[list[ComplianceAlertResponse], int]:
+        """Como `evaluate`, pero ademas devuelve cuantos protocolos se evaluaron.
+
+        El segundo valor es el que separa "todo cumple" de "no hay nada que
+        mirar": un protocolo sin prediccion para su jornada no se puede evaluar,
+        asi que no cuenta. Sin esto, un evento sin predicciones publicadas
+        devolvia `total_alerts=0` y el panel lo pintaba como un semaforo verde.
+        """
+        return await self._evaluate(event_id, now)
+
+    async def _evaluate(
+        self, event_id: str, now: Optional[datetime] = None
+    ) -> tuple[list[ComplianceAlertResponse], int]:
         now = now or datetime.now(timezone.utc)
         protocols = await self._active_protocols(event_id)
         if not protocols:
-            return []
+            return [], 0
 
         # La jornada transversal se resuelve UNA sola vez y se reutiliza para
         # todos los protocolos que no traen una propia.
@@ -232,14 +268,24 @@ class ObservationComplianceEvaluator:
                 event_id,
                 len(protocols),
             )
-            return []
+            return [], 0
 
         predictions: dict[str, list[dict]] = {}
         for day_id in day_ids:
             prediction = await self._latest_prediction(day_id)
             predictions[day_id] = _zone_states_from_prediction(prediction) if prediction else []
 
-        zone_types = await self._zone_type_map()
+        # B1: una query por jornada en lugar de una por (protocolo, zona). Solo
+        # se piden las zonas que aparecen en las predicciones de ESA jornada.
+        last_seen_by_day: dict[str, dict[str, datetime]] = {}
+        for day_id, states in predictions.items():
+            zone_ids = {z["zone_id"] for z in states if z.get("zone_id")}
+            if zone_ids:
+                last_seen_by_day[day_id] = await self._last_observations_at(
+                    day_id, zone_ids
+                )
+
+        zone_types = await self._zone_type_map(event_id)
         names = await self._zone_names(
             zone["zone_id"]
             for states in predictions.values()
@@ -248,23 +294,52 @@ class ObservationComplianceEvaluator:
         )
 
         alerts: list[ComplianceAlertResponse] = []
+        evaluated = 0
         for protocol in protocols:
             # Cada protocolo usa su propia jornada; los transversales usan la
             # activa del evento, ya resuelta arriba.
             day_id = protocol.event_day_id or fallback_day
             states = predictions.get(day_id) or []
             if not states:
+                # Sin prediccion no hay metricas que comparar: el protocolo NO se
+                # evaluo. Antes se saltaba en silencio y el endpoint reportaba
+                # total_alerts=0 como si todo cumpliera.
+                logger.info(
+                    "Compliance: protocolo sin prediccion evaluable | "
+                    "protocolo=%s | event_id=%s | event_day_id=%s",
+                    protocol.name,
+                    event_id,
+                    day_id,
+                )
                 continue
+            evaluated += 1
             alerts.extend(
-                await self._protocol_alerts(protocol, states, day_id, now, names, zone_types)
+                await self._protocol_alerts(
+                    protocol,
+                    states,
+                    day_id,
+                    now,
+                    names,
+                    zone_types,
+                    last_seen_by_day.get(day_id, {}),
+                )
             )
-        return alerts
+        return alerts, evaluated
 
-    async def _zone_type_map(self) -> dict[str, Optional[str]]:
-        """Mapa ``zone_id -> zone.type`` para evaluar el filtro ``zone_type_id``."""
+
+    async def _zone_type_map(self, event_id: str) -> dict[str, Optional[str]]:
+        """Mapa ``zone_id -> zone.type`` para evaluar el filtro ``zone_type_id``.
+
+        Se filtra por `event_id`: antes traía `select(Zone.id, Zone.type)` sin
+        filtro, o sea TODAS las zonas de la base (todos los eventos, todas las
+        jornadas) en cada evaluación, para descartar casi todas. Con el filtro
+        solo entran las zonas del evento que se está evaluando.
+        """
         from app.models.zone import Zone
 
-        result = await self._db.execute(select(Zone.id, Zone.type))
+        result = await self._db.execute(
+            select(Zone.id, Zone.type).where(Zone.event_id == event_id)
+        )
         return {row[0]: row[1] for row in result.all()}
 
     async def _protocol_alerts(
@@ -275,6 +350,7 @@ class ObservationComplianceEvaluator:
         now: datetime,
         names: dict[str, str],
         zone_types: dict[str, Optional[str]],
+        last_seen_by_zone: dict[str, datetime],
     ) -> list[ComplianceAlertResponse]:
         metric = protocol.trigger_metric
         operator = protocol.trigger_operator
@@ -298,7 +374,9 @@ class ObservationComplianceEvaluator:
             if not evaluate_trigger(current, operator, threshold):
                 continue
 
-            last_seen = await self._last_observation_at(day_id, zone_id)
+            # B1: lectura O(1) del mapa precargado, sin query por zona.
+            # Ausente en el mapa = nunca observada, que es el caso critico.
+            last_seen = last_seen_by_zone.get(zone_id)
             minutes_since = None
             if last_seen is not None:
                 aware = last_seen if last_seen.tzinfo else last_seen.replace(tzinfo=timezone.utc)

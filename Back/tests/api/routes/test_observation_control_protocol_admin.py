@@ -11,6 +11,7 @@ suggestions / apply-suggestions con su idempotencia.
 from __future__ import annotations
 
 import os
+import re
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
@@ -21,7 +22,7 @@ from sqlalchemy import String, create_engine
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.db.session import Base, get_db
+from app.db.session import Base, get_async_db, get_db
 from app.main import app
 from app.models.event import Event
 from app.models.event_day_phase import EventDayPhase
@@ -34,6 +35,12 @@ from app.models.zone_type import ZoneType
 
 BASE = "/api/admin/observation-control-protocols"
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", settings.DATABASE_URL)
+# La URL de `TEST_DATABASE_URL` viene en forma asyncpg (es la de Neon), pero
+# `ocp_engine` abre un motor SINCRONO. `create_engine` no acepta un driver
+# async, asi que se fuerza psycopg. Mismo criterio que en conftest.py.
+TEST_DATABASE_URL_SYNC = re.sub(
+    r"^postgresql\+[a-z0-9_]+://", "postgresql+psycopg://", TEST_DATABASE_URL
+)
 
 
 # ── Motor propio del módulo ────────────────────────────────────────────────
@@ -53,7 +60,7 @@ TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", settings.DATABASE_URL)
 # el pool de la suite en un estado que otro herede.
 @pytest.fixture(scope="module")
 def ocp_engine():
-    engine = create_engine(TEST_DATABASE_URL, pool_pre_ping=True)
+    engine = create_engine(TEST_DATABASE_URL_SYNC, pool_pre_ping=True)
     # Workaround de PostGIS, identico al de tests/conftest.py:
     # `_degrade_geometry_for_tests`. Sin la libreria `postgis-3`, `create_all`
     # falla al crear la columna geometry, y degradarla a VARCHAR hace fallar
@@ -611,6 +618,92 @@ class TestZoneTypeRelation:
         )
         assert resp.status_code == 201
         assert resp.json()["zone_type_id"] == zone_type.id
+
+
+class _EmptyAsyncSession:
+    """Sesion async sin datos, para ejercitar el cableado de `/compliance`.
+
+    El endpoint lee con `get_async_db` (AsyncSession) y el evaluador consulta
+    `predictions` / `operational_observations`, que viven en el registro de `src/`
+    y NO estan en el `Base.metadata` que crea este modulo. Para probar la RUTA
+    (auth, validacion de `event_id`, forma de la respuesta) no hace falta sembrar
+    esas tablas: alcanza con que la sesion no devuelva ningun protocolo. La
+    logica del evaluador ya esta cubierta en
+    `tests/services/test_observation_compliance.py` con la sesion falsa propia.
+    """
+
+    def __init__(self):
+        self.queries: list[str] = []
+
+    async def execute(self, stmt):
+        self.queries.append(str(stmt))
+        return _EmptyResult()
+
+
+class _EmptyResult:
+    def scalars(self):
+        return self
+
+    def scalar_one_or_none(self):
+        return None
+
+    def all(self):
+        return []
+
+
+@pytest.fixture
+def compliance_client() -> TestClient:
+    async def override_get_async_db():
+        yield _EmptyAsyncSession()
+
+    app.dependency_overrides[get_async_db] = override_get_async_db
+    with TestClient(app, raise_server_exceptions=False) as c:
+        yield c
+    app.dependency_overrides.pop(get_async_db, None)
+
+
+class TestComplianceEndpoint:
+    """GET /compliance: el unico endpoint de la feature sin cobertura de ruta."""
+
+    def test_devuelve_200_y_el_contrato_completo(self, compliance_client: TestClient):
+        resp = compliance_client.get(
+            f"{BASE}/compliance", params={"event_id": "test-event-1"}, headers=_auth()
+        )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["event_id"] == "test-event-1"
+        assert data["evaluated_at"]
+        # Sin protocolos activos no hay nada que evaluar: 0 alertas Y 0 evaluados.
+        # Lo importante es que `protocols_evaluated` exista, para que la UI pueda
+        # distinguir "nada incumplido" de "nada evaluable".
+        assert data["total_alerts"] == 0
+        assert data["protocols_evaluated"] == 0
+        assert data["alerts"] == []
+
+    def test_requiere_token(self, compliance_client: TestClient):
+        resp = compliance_client.get(
+            f"{BASE}/compliance", params={"event_id": "test-event-1"}
+        )
+        assert resp.status_code == 401
+
+    def test_token_invalido_es_401(self, compliance_client: TestClient):
+        resp = compliance_client.get(
+            f"{BASE}/compliance",
+            params={"event_id": "test-event-1"},
+            headers={"Authorization": "Bearer no-es-un-jwt"},
+        )
+        assert resp.status_code == 401
+
+    def test_event_id_es_obligatorio(self, compliance_client: TestClient):
+        resp = compliance_client.get(f"{BASE}/compliance", headers=_auth())
+        assert resp.status_code == 422
+
+    def test_event_id_vacio_es_422(self, compliance_client: TestClient):
+        resp = compliance_client.get(
+            f"{BASE}/compliance", params={"event_id": ""}, headers=_auth()
+        )
+        assert resp.status_code == 422
 
 
 def _auth() -> dict:

@@ -27,7 +27,6 @@ from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
@@ -265,10 +264,11 @@ async def get_compliance(
     que están en el registro de ``src/``.
     """
     evaluator = ObservationComplianceEvaluator(db)
-    alerts = await evaluator.evaluate(event_id)
+    alerts, protocols_evaluated = await evaluator.evaluate_with_count(event_id)
     return ComplianceResponse(
         event_id=event_id,
         evaluated_at=datetime.now(timezone.utc).isoformat(),
+        protocols_evaluated=protocols_evaluated,
         total_alerts=len(alerts),
         alerts=alerts,
     )
