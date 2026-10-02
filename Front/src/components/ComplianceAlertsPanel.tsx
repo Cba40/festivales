@@ -59,6 +59,11 @@ export function ComplianceAlertsPanel({ eventId }: { eventId: string }) {
 
   const alertas: ComplianceAlertDTO[] = data?.alerts ?? [];
   const hayAlertas = alertas.length > 0;
+  // `protocols_evaluated === 0` con 0 alertas NO es un "todo bien": es que no
+  // había predicción contra la cual evaluar las reglas. Sin esta distinción el
+  // panel mostraba un semáforo verde mientras el Context Engine no publicaba
+  // nada, que es la peor falla posible en un panel de monitoreo.
+  const sinDatosParaEvaluar = data !== null && data.protocols_evaluated === 0;
 
   return (
     <Card variant="standard">
@@ -98,10 +103,22 @@ export function ComplianceAlertsPanel({ eventId }: { eventId: string }) {
         <p className="text-sm text-slate-400 italic">Evaluando cumplimiento…</p>
       )}
 
-      {!isLoading && !error && !hayAlertas && (
+      {!isLoading && !error && sinDatosParaEvaluar && (
+        <div className="p-3 mb-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+          <p className="font-medium">No hay datos de predicción disponibles</p>
+          <p className="mt-1 text-amber-700">
+            No hay datos de predicción disponibles para evaluar las reglas en este
+            momento. Ningún protocolo se evaluó, así que no se puede afirmar que
+            estén cumpliendo.
+          </p>
+        </div>
+      )}
+
+      {!isLoading && !error && !hayAlertas && !sinDatosParaEvaluar && (
         <p className="text-sm text-slate-400 italic">
-          Sin incumplimientos: todas las reglas que se están cumpliendo tienen su
-          observación al día.
+          Sin incumplimientos: {data?.protocols_evaluated ?? 0}{' '}
+          {data?.protocols_evaluated === 1 ? 'regla se está' : 'reglas se están'}
+          cumpliendo con su observación al día.
         </p>
       )}
 
@@ -171,7 +188,11 @@ export function ComplianceAlertsPanel({ eventId }: { eventId: string }) {
 
       {data && (
         <p className="text-xs text-slate-400 mt-3">
-          Evaluado {new Date(data.evaluated_at).toLocaleTimeString('es-AR')}
+          Evaluado {new Date(data.evaluated_at).toLocaleTimeString('es-AR')} ·{' '}
+          {data.protocols_evaluated}{' '}
+          {data.protocols_evaluated === 1
+            ? 'protocolo evaluado'
+            : 'protocolos evaluados'}
         </p>
       )}
     </Card>

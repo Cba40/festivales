@@ -84,6 +84,13 @@ export interface ComplianceAlertDTO {
 export interface ComplianceDTO {
   event_id: string
   evaluated_at: string
+  /**
+   * Cuántos protocolos llegaron a compararse contra una predicción real. Si es
+   * 0, `total_alerts === 0` NO significa que todo cumpla: significa que no
+   * había datos para juzgarlo (el Context Engine no publicó predicciones para
+   * la jornada). La UI tiene que diferenciar los dos casos.
+   */
+  protocols_evaluated: number
   total_alerts: number
   alerts: ComplianceAlertDTO[]
 }

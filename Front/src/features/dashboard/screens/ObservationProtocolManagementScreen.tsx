@@ -10,10 +10,8 @@ import {
   listProtocols,
   updateProtocol,
   describeRule,
-  formatMetricValue,
   INTERVAL_LABELS,
   INTERVAL_OPTIONS,
-  METRIC_LABELS,
   METRIC_OPTIONS,
   THRESHOLD_OPTIONS,
   type ObservationProtocolDTO,
@@ -505,7 +503,7 @@ export function ObservationProtocolManagementScreen() {
                   }
                   className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
-                  {THRESHOLD_OPTIONS[form.trigger_metric].map((o, i) => (
+                  {THRESHOLD_OPTIONS[form.trigger_metric].map((o) => (
                     <option key={`${o.operator}|${o.value}`} value={`${o.operator}|${o.value}`}>
                       {o.label}
                     </option>
