@@ -55,6 +55,7 @@ const ReportsScreen = lazy(() =>
 );
 const LoginScreen = lazy(() => import('./features/auth/screens/LoginScreen'));
 const ForbiddenScreen = lazy(() => import('./features/auth/screens/ForbiddenScreen'));
+const UserManagementScreen = lazy(() => import('./features/dashboard/screens/UserManagementScreen'));
 
 function buildProductParams(): Record<string, unknown> {
   const { userLocation, zones } = useAppStore.getState();
@@ -325,6 +326,14 @@ function AppLayout() {
         {/* Sesión válida sin permiso: pantalla propia, no el login. Mandarlo al
             login lo haría pensar que su sesión expiró. */}
         <Route path="/dashboard/denegado" element={<ForbiddenScreen />} />
+        {/* Gestión de usuarios: exige `users:read`, que solo tiene quien puede
+            administering identidades. Un operador de campo que escriba la URL a
+            mano cae en /dashboard/denegado, no en el login. */}
+        <Route path="/dashboard/users" element={
+          <ProtectedRoute permission="users:read">
+            <UserManagementScreen />
+          </ProtectedRoute>
+        } />
         <Route path="/dashboard/*" element={
           <ProtectedRoute>
             <DashboardScreen />

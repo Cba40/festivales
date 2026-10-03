@@ -14,6 +14,7 @@ import {
   CalendarDays,
   Map,
   LogOut,
+  Users,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAppStore } from '../../../core/state/store';
@@ -23,6 +24,7 @@ import { useDashboardSync } from '../hooks/useDashboardSync';
 import { useEventDays } from '../hooks/useEventDays';
 import { useOperationalEvents } from '../hooks/useOperationalEvents';
 import { RefreshButton } from '../components/ui';
+import { usePermission } from '@/core/auth/useAuth';
 
 const DEFAULT_EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 
@@ -108,6 +110,9 @@ interface SystemMetric {
 
 export function DashboardScreen() {
   const navigate = useNavigate();
+  // Botón de "Usuarios". `false` mientras se carga la identidad, así que no
+  // parpadea ni aparece en un render con el usuario todavía desconocido.
+  const puedeGestionarUsuarios = usePermission('users:read');
   const logout = useAppStore((state) => state.logout);
   const [syncTime, setSyncTime] = useState(() => new Date());
   const [refreshing, setRefreshing] = useState(false);
@@ -213,6 +218,19 @@ export function DashboardScreen() {
               <FileText className="w-4 h-4" />
               Informes
             </button>
+            {/* Solo para quien puede administrar identidades. Ocultarlo NO es la
+                garantía: la ruta tiene `ProtectedRoute permission="users:read"`
+                y el backend exige `users:write` en cada escritura. Esto solo evita
+                ofrecerle un botón a alguien que recibiría 403. */}
+            {puedeGestionarUsuarios && (
+              <button
+                onClick={() => navigate('/dashboard/users')}
+                className="flex items-center gap-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"
+              >
+                <Users className="w-4 h-4" />
+                Usuarios
+              </button>
+            )}
             <button
               onClick={() => navigate('/dashboard/motor')}
               className="flex items-center gap-2 text-sm bg-purple-600 hover:bg-purple-700 text-white py-2 px-3 rounded-lg transition-colors"

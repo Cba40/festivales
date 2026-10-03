@@ -39,6 +39,7 @@ from app.api.routes.emergency_protocol_resource import router as emergency_proto
 from app.api.routes.observation_control_protocol_admin import (
     router as observation_control_protocol_admin_router,
 )
+from app.api.routes.user_admin import router as user_admin_router
 from app.api.routes.analytics import router as analytics_router
 from app.api.routes.operational_observations import router as operational_observations_router
 from app.api.routes.alert_admin import router as alert_admin_router
@@ -91,6 +92,7 @@ app.include_router(emergency_protocol_router)
 app.include_router(emergency_protocol_admin_router)
 app.include_router(emergency_protocol_resource_router)
 app.include_router(observation_control_protocol_admin_router)
+app.include_router(user_admin_router)
 app.include_router(operational_observations_router, prefix="/api")
 app.include_router(analytics_router)
 app.include_router(alert_admin_router)
