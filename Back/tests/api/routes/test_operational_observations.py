@@ -13,24 +13,31 @@
 # modelos romperia estos tests con un "column does not exist" que no tiene nada
 # que ver con lo que se esta probando. Las FKs se dejan como salen de la
 # metadata y se resuelven con tablas stub de una columna (ver _scratch_ddl).
+#
+# El POST resuelve el actor con `get_current_user`, que relee la tabla `users` en
+# cada request. Por eso `obs_env` overridea tambien `get_db` y se apoya en los
+# fixtures de RBAC de tests/conftest.py: un token con un `sub` que no existe en
+# `users` ya no alcanza, sale 401. Las tablas de RBAC viven en `public`, que ya
+# esta en el `search_path` de la conexion del schema temporal.
 
 import re
 
 import httpx
 import pytest
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from types import SimpleNamespace
 
-from jose import jwt
-from sqlalchemy import String, text
+from sqlalchemy import String, select, text
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.orm import Session
 from sqlalchemy.pool import NullPool
 from sqlalchemy.schema import CreateIndex, CreateTable
 
 from app.core.config import settings
-from app.db.session import get_async_db
+from app.db.session import get_async_db, get_db
 from app.main import app
+from app.models.user import User
 
 # Token de acceso valido, firmado con la misma funcion que el login real.
 from tests._auth_tokens import mint_token
@@ -92,7 +99,12 @@ def _scratch_ddl() -> str:
 
 
 @pytest.fixture()
-async def obs_env():
+async def obs_env(db_session: Session, rbac_municipal: str, rbac_field: str):
+    # `db_session` + los fixtures `rbac_*` son los de tests/conftest.py: crean
+    # usuarios reales en `users` y dan de vuelta sus usernames. El POST exige un
+    # actor que exista en la base, asi que sin esto todos los tests que crean una
+    # observacion salen 401 antes de llegar al CRUD.
+    #
     # `Zone.geometry` esta declarada como Geometry("POLYGON"), y el tipo de
     # SQLAlchemy envuelve la columna en `ST_AsEWKB(zones.geometry)` al
     # proyectarla. La base de tests tiene la extension postgis registrada en el
@@ -108,13 +120,13 @@ async def obs_env():
     original_type = geometry_column.type
     geometry_column.type = String()
     try:
-        async for value in _obs_env_impl():
+        async for value in _obs_env_impl(db_session, rbac_municipal, rbac_field):
             yield value
     finally:
         geometry_column.type = original_type
 
 
-async def _obs_env_impl():
+async def _obs_env_impl(db_session: Session, municipal: str, field: str):
     engine = create_async_engine(settings.DATABASE_URL, poolclass=NullPool)
     conn = await engine.connect()
     await conn.execute(text(f"DROP SCHEMA IF EXISTS {SCHEMA} CASCADE"))
@@ -158,26 +170,50 @@ async def _obs_env_impl():
     async def _override_get_async_db():
         yield session
 
+    def _override_get_db():
+        yield db_session
+
     app.dependency_overrides[get_async_db] = _override_get_async_db
+    # `get_current_user` (POST) depende de la sesion SINCRONA `get_db`, que por
+    # defecto apunta al motor de DESARROLLO: sin este override el usuario del
+    # token se busca en la base equivocada. Se saca solo lo que se puso, en vez de
+    # `clear()`, para no pisar los overrides de otros fixtures de la suite.
+    app.dependency_overrides[get_db] = _override_get_db
     client = httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app), base_url="http://test"
     )
     try:
-        yield SimpleNamespace(client=client, session=session)
+        yield SimpleNamespace(
+            client=client,
+            session=session,
+            db=db_session,
+            user=municipal,
+            field_user=field,
+        )
     finally:
         await client.aclose()
-        app.dependency_overrides.clear()
+        app.dependency_overrides.pop(get_async_db, None)
+        app.dependency_overrides.pop(get_db, None)
         await session.close()
         await conn.close()
         await engine.dispose()
 
 
-def _auth_headers(sub: str = "admin") -> dict:
-    # Token valido firmado con la misma funcion que el login real. Antes se armaba
-    # con jwt.encode a mano, lo que quedo desactualizado cuando `decode_token` empezo
-    # a exigir `typ`/`iss`/`aud`.
-    return {"Authorization": f"Bearer {mint_token(subject=sub)}"}
-    return {"Authorization": f"Bearer {token}"}
+def _auth_headers(username: str) -> dict:
+    """Token de un usuario REAL, para el que creo el fixture de RBAC.
+
+    El POST usa `get_current_user`: la dependencia relee `users` y devuelve 401 si
+    el `sub` no corresponde a una cuenta activa. Un `sub` inventado ya no sirve
+    para "firmar" nada, asi que el username es siempre el de `rbac_municipal` o el
+    de `rbac_field`.
+    """
+    return {"Authorization": f"Bearer {mint_token(subject=username)}"}
+
+
+def _user_id(db_session: Session, username: str) -> str:
+    return db_session.execute(
+        select(User).where(User.username == username)
+    ).scalar_one().id
 
 
 def _create_body(overrides: dict | None = None) -> dict:
@@ -193,11 +229,11 @@ def _create_body(overrides: dict | None = None) -> dict:
     return body
 
 
-async def _crear(env, overrides=None, sub: str = "admin") -> dict:
+async def _crear(env, overrides=None, username: str | None = None) -> dict:
     response = await env.client.post(
         "/api/operational-observations/",
         json=_create_body(overrides),
-        headers=_auth_headers(sub),
+        headers=_auth_headers(username or env.user),
     )
     assert response.status_code == 201, response.text
     return response.json()
@@ -238,7 +274,7 @@ class TestPatch:
         response = await obs_env.client.patch(
             f"/api/operational-observations/{created['id']}",
             json={"observed_density": 50},
-            headers=_auth_headers(),
+            headers=_auth_headers(obs_env.user),
         )
         assert response.status_code == 200
         body = response.json()
@@ -250,7 +286,7 @@ class TestPatch:
         response = await obs_env.client.patch(
             f"/api/operational-observations/{created['id']}",
             json={"source": "sensor"},
-            headers=_auth_headers(),
+            headers=_auth_headers(obs_env.user),
         )
         assert response.status_code == 200
         assert response.json()["source"] == "sensor"
@@ -261,10 +297,11 @@ class TestPatch:
         await obs_env.client.patch(
             f"/api/operational-observations/{created['id']}",
             json={"observed_density": 77},
-            headers=_auth_headers(),
+            headers=_auth_headers(obs_env.user),
         )
         reread = await obs_env.client.get(
-            f"/api/operational-observations/{created['id']}", headers=_auth_headers()
+            f"/api/operational-observations/{created['id']}",
+            headers=_auth_headers(obs_env.user),
         )
         assert reread.json()["observed_density"] == 77
 
@@ -272,7 +309,7 @@ class TestPatch:
         response = await obs_env.client.patch(
             "/api/operational-observations/11111111-1111-1111-1111-111111111111",
             json={"observed_density": 10},
-            headers=_auth_headers(),
+            headers=_auth_headers(obs_env.user),
         )
         assert response.status_code == 404
 
@@ -281,7 +318,7 @@ class TestPatch:
         response = await obs_env.client.patch(
             f"/api/operational-observations/{created['id']}",
             json={},
-            headers=_auth_headers(),
+            headers=_auth_headers(obs_env.user),
         )
         assert response.status_code == 422
 
@@ -290,35 +327,49 @@ class TestPatch:
         response = await obs_env.client.patch(
             f"/api/operational-observations/{created['id']}",
             json={"observed_density": -1},
-            headers=_auth_headers(),
+            headers=_auth_headers(obs_env.user),
         )
         assert response.status_code == 422
 
-    async def test_patch_observer_id_invalido_400(self, obs_env) -> None:
+    async def test_patch_observer_id_422(self, obs_env) -> None:
+        """`observer_id` salio del DTO de correccion: mandarlo es 422, no 400.
+
+        Antes se aceptaba y se validaba el formato (400 si no era UUID). Ahora el
+        campo ni existe en `OperationalObservationUpdate`, asi que el rechazo lo
+        hace `extra="forbid"` antes de tocar la fila.
+        """
         created = await _crear(obs_env)
         response = await obs_env.client.patch(
             f"/api/operational-observations/{created['id']}",
             json={"observer_id": "no-soy-un-uuid"},
-            headers=_auth_headers(),
+            headers=_auth_headers(obs_env.user),
         )
-        assert response.status_code == 400
+        assert response.status_code == 422
+        reread = await obs_env.client.get(
+            f"/api/operational-observations/{created['id']}",
+            headers=_auth_headers(obs_env.user),
+        )
+        assert reread.json()["observer_id"] == created["observer_id"]
 
 
 class TestImmutableFields:
-    """timestamp, zone_id y event_day_id no se pueden tocar: 422, no ignore."""
+    """timestamp, zone_id, event_day_id y observer_id no se pueden tocar: 422, no ignore."""
 
-    @pytest.mark.parametrize("campo", ["timestamp", "zone_id", "event_day_id"])
+    @pytest.mark.parametrize(
+        "campo", ["timestamp", "zone_id", "event_day_id", "observer_id"]
+    )
     async def test_patch_campo_inmutable_422(self, obs_env, campo: str) -> None:
         created = await _crear(obs_env)
         response = await obs_env.client.patch(
             f"/api/operational-observations/{created['id']}",
             json={"observed_density": 50, campo: "cualquiera"},
-            headers=_auth_headers(),
+            headers=_auth_headers(obs_env.user),
         )
         assert response.status_code == 422
         # Y la densidad no se aplicó: el 422 corta la request entera.
         reread = await obs_env.client.get(
-            f"/api/operational-observations/{created['id']}", headers=_auth_headers()
+            f"/api/operational-observations/{created['id']}",
+            headers=_auth_headers(obs_env.user),
         )
         assert reread.json()["observed_density"] == created["observed_density"]
 
@@ -328,7 +379,7 @@ class TestImmutableFields:
         response = await obs_env.client.patch(
             f"/api/operational-observations/{created['id']}",
             json={"observed_density": 50, "corrected_by": "yo-quisiera-ser-admin"},
-            headers=_auth_headers(sub="admin-real"),
+            headers=_auth_headers(obs_env.field_user),
         )
         assert response.status_code == 422
 
@@ -337,7 +388,7 @@ class TestImmutableFields:
         response = await obs_env.client.patch(
             f"/api/operational-observations/{created['id']}",
             json={"observed_density": 50, "corrected_at": "2020-01-01T00:00:00Z"},
-            headers=_auth_headers(),
+            headers=_auth_headers(obs_env.user),
         )
         assert response.status_code == 422
 
@@ -351,10 +402,10 @@ class TestAuditFields:
         response = await obs_env.client.patch(
             f"/api/operational-observations/{created['id']}",
             json={"observed_density": 50},
-            headers=_auth_headers(sub="inspector-ana"),
+            headers=_auth_headers(obs_env.field_user),
         )
         body = response.json()
-        assert body["corrected_by"] == "inspector-ana"
+        assert body["corrected_by"] == obs_env.field_user
         assert body["corrected_at"] is not None
 
     async def test_corrected_at_es_una_fecha_parseable(self, obs_env) -> None:
@@ -362,22 +413,27 @@ class TestAuditFields:
         response = await obs_env.client.patch(
             f"/api/operational-observations/{created['id']}",
             json={"source": "sensor"},
-            headers=_auth_headers(),
+            headers=_auth_headers(obs_env.user),
         )
         parsed = datetime.fromisoformat(response.json()["corrected_at"])
         assert parsed.tzinfo is not None
 
     async def test_correccion_repetida_actualiza_el_autor(self, obs_env) -> None:
+        """Dos operadores reales distintos: el `sub` del token es la firma."""
         created = await _crear(obs_env)
         obs_id = f"/api/operational-observations/{created['id']}"
         first = await obs_env.client.patch(
-            obs_id, json={"observed_density": 50}, headers=_auth_headers(sub="ana")
+            obs_id,
+            json={"observed_density": 50},
+            headers=_auth_headers(obs_env.field_user),
         )
         second = await obs_env.client.patch(
-            obs_id, json={"observed_density": 60}, headers=_auth_headers(sub="beto")
+            obs_id,
+            json={"observed_density": 60},
+            headers=_auth_headers(obs_env.user),
         )
-        assert first.json()["corrected_by"] == "ana"
-        assert second.json()["corrected_by"] == "beto"
+        assert first.json()["corrected_by"] == obs_env.field_user
+        assert second.json()["corrected_by"] == obs_env.user
 
     async def test_crear_no_marca_la_observacion_como_corregida(self, obs_env) -> None:
         created = await _crear(obs_env)
@@ -398,7 +454,7 @@ class TestWarningRecalculation:
         response = await obs_env.client.patch(
             f"/api/operational-observations/{created['id']}",
             json={"observed_density": 50},
-            headers=_auth_headers(),
+            headers=_auth_headers(obs_env.user),
         )
         metadata = response.json()["metadata"]
         assert "posible_error_tipeo" not in (metadata or {}).get("warnings", [])
@@ -409,7 +465,7 @@ class TestWarningRecalculation:
         response = await obs_env.client.patch(
             f"/api/operational-observations/{created['id']}",
             json={"observed_density": 900},
-            headers=_auth_headers(),
+            headers=_auth_headers(obs_env.user),
         )
         metadata = response.json()["metadata"]
         assert "posible_error_tipeo" in metadata["warnings"]
@@ -426,7 +482,7 @@ class TestWarningRecalculation:
         response = await obs_env.client.patch(
             f"/api/operational-observations/{segunda['id']}",
             json={"observed_density": 500},
-            headers=_auth_headers(),
+            headers=_auth_headers(obs_env.user),
         )
         # Mismo valor: no se recalcula, se preserva. Y si se recalculara contra
         # si misma, la variacion seria 0% y el warning se perderia.
@@ -437,7 +493,7 @@ class TestWarningRecalculation:
         response = await obs_env.client.patch(
             f"/api/operational-observations/{created['id']}",
             json={"metadata": {"notas": "nota corregida"}},
-            headers=_auth_headers(),
+            headers=_auth_headers(obs_env.user),
         )
         metadata = response.json()["metadata"]
         assert metadata["notas"] == "nota corregida"
@@ -448,7 +504,7 @@ class TestWarningRecalculation:
         response = await obs_env.client.patch(
             f"/api/operational-observations/{created['id']}",
             json={"observed_density": 50},
-            headers=_auth_headers(),
+            headers=_auth_headers(obs_env.user),
         )
         metadata = response.json()["metadata"]
         assert metadata["notas"] == "cola larga"
@@ -462,7 +518,7 @@ class TestWarningRecalculation:
                 "observed_density": 10,
                 "metadata": {"warnings": ["variacion_extrema"]},
             },
-            headers=_auth_headers(),
+            headers=_auth_headers(obs_env.user),
         )
         metadata = response.json()["metadata"]
         assert "variacion_extrema" not in (metadata or {}).get("warnings", [])
@@ -476,8 +532,75 @@ class TestWarningRecalculation:
         response = await obs_env.client.patch(
             f"/api/operational-observations/{segunda['id']}",
             json={"observed_density": 120},
-            headers=_auth_headers(),
+            headers=_auth_headers(obs_env.user),
         )
         metadata = response.json()["metadata"]
         # 120 contra 100 previo es +20%: deja de ser variacion extrema.
         assert "variacion_extrema" not in (metadata or {}).get("warnings", [])
+
+
+class TestObserverIdBlindaje:
+    """`observer_id` lo escribe el servidor, con el id del usuario autenticado.
+
+    Antes el campo venia en el body: cualquier cliente podia atribuir su conteo a
+    otro observador. Ahora el DTO de alta no lo tiene y el router lo inyecta desde
+    `current_user.id`, asi que la fila siempre dice quien esta autenticado de verdad.
+    """
+
+    async def test_observer_id_se_inyecta_desde_el_token_no_del_body(
+        self, obs_env
+    ) -> None:
+        """El `observer_id` guardado debe ser el del usuario autenticado,
+        no lo que mande el frontend."""
+        user_id = _user_id(obs_env.db, obs_env.user)
+        # Se manda un UUID valido en el body: es exactamente el caso que un
+        # cliente malicioso (o un formulario viejo que no se actualizo) manda.
+        response = await obs_env.client.post(
+            "/api/operational-observations/",
+            json=_create_body({"observer_id": "00000000-0000-0000-0000-000000000000"}),
+            headers=_auth_headers(obs_env.user),
+        )
+        assert response.status_code == 201, response.text
+        body = response.json()
+        assert body["observer_id"] == user_id
+
+        # Y en la base esta el id del usuario, no el que vino en el body.
+        obs = (
+            await obs_env.session.execute(
+                select(OperationalObservationModel).where(
+                    OperationalObservationModel.id == body["id"]
+                )
+            )
+        ).scalar_one()
+        assert obs.observer_id == user_id
+        assert obs.observer_id != "00000000-0000-0000-0000-000000000000"
+
+    async def test_observer_id_es_el_del_usuario_que_creo_la_fila(
+        self, obs_env
+    ) -> None:
+        """Cada alta guarda el id de quien la hizo, no el de otro operador."""
+        creada_por_campo = await _crear(
+            obs_env, username=obs_env.field_user, overrides={"timestamp": TS_BASE}
+        )
+        creada_por_municipal = await _crear(
+            obs_env, username=obs_env.user, overrides={"timestamp": TS_LATER}
+        )
+        campo_id = _user_id(obs_env.db, obs_env.field_user)
+        municipal_id = _user_id(obs_env.db, obs_env.user)
+        assert creada_por_campo["observer_id"] == campo_id
+        assert creada_por_municipal["observer_id"] == municipal_id
+        assert campo_id != municipal_id
+
+    async def test_create_sin_usuario_en_la_base_es_401(self, obs_env) -> None:
+        """Un `sub` valido y firmado, pero que no esta en `users`, no pasa.
+
+        Es el cierre del blindaje: `get_current_user` relee la tabla en cada
+        request, asi que revocar la cuenta corta el acceso aunque el token siga
+        sin expirar.
+        """
+        response = await obs_env.client.post(
+            "/api/operational-observations/",
+            json=_create_body(),
+            headers=_auth_headers("usuario-que-no-existe"),
+        )
+        assert response.status_code == 401

@@ -8,7 +8,7 @@ import { DashboardHeader } from '../components/DashboardHeader';
 import { AppFooter } from '@/components/AppFooter';
 import { SectionTabs } from '../components/ui';
 import { useAppStore } from '@/core/state/store';
-import { filterByPermission } from '@/core/auth/useAuth';
+import { filterByPermission, useRole } from '@/core/auth/useAuth';
 
 type Section =
   | 'config'
@@ -43,10 +43,16 @@ const SECTIONS: { key: Section; label: string; permission?: string }[] = [
 
 export function MotorScreen() {
   const user = useAppStore((s) => s.auth.user);
+  const role = useRole();
 
   // Se recalcula en cada render del store: si cambian los permisos (el admin se
   // los quita mientras la pantalla está abierta), las pestañas se actualizan.
-  const seccionesVisibles = filterByPermission(SECTIONS, user);
+  let seccionesVisibles = filterByPermission(SECTIONS, user);
+
+  // Restricción explícita para OPERADOR_CAMPO: únicamente observaciones
+  if (role === 'OPERADOR_CAMPO') {
+    seccionesVisibles = seccionesVisibles.filter((s) => s.key === 'observations');
+  }
   const clavesVisibles = seccionesVisibles.map((s) => s.key);
 
   const [searchParams, setSearchParams] = useSearchParams();

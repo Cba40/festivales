@@ -24,7 +24,7 @@ import { useDashboardSync } from '../hooks/useDashboardSync';
 import { useEventDays } from '../hooks/useEventDays';
 import { useOperationalEvents } from '../hooks/useOperationalEvents';
 import { RefreshButton } from '../components/ui';
-import { usePermission } from '@/core/auth/useAuth';
+import { usePermission, useRole } from '@/core/auth/useAuth';
 
 const DEFAULT_EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 
@@ -112,7 +112,15 @@ export function DashboardScreen() {
   const navigate = useNavigate();
   // Botón de "Usuarios". `false` mientras se carga la identidad, así que no
   // parpadea ni aparece en un render con el usuario todavía desconocido.
+  const role = useRole();
   const puedeGestionarUsuarios = usePermission('users:read');
+  const puedeVerConfig = usePermission('config:read');
+  const puedeVerInformes = usePermission('reports:read');
+  const puedeVerAnalisis = usePermission('analytics:read');
+  const puedeVerMotor = puedeVerAnalisis || usePermission('events:read') || usePermission('observations:read');
+  const puedeVerAlertas = usePermission('emergency:read');
+  const puedeVerIncidentes = usePermission('emergency:write');
+  const puedeVerPredicciones = usePermission('events:read');
   const logout = useAppStore((state) => state.logout);
   const [syncTime, setSyncTime] = useState(() => new Date());
   const [refreshing, setRefreshing] = useState(false);
@@ -183,41 +191,60 @@ export function DashboardScreen() {
         actions={
           <nav className="flex flex-wrap gap-2">
             <RefreshButton onClick={() => void handleRefresh()} loading={refreshing} />
-            <button
-              onClick={() => navigate('/dashboard/event-config')}
-              className="flex items-center gap-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"
-            >
-              <CalendarDays className="w-4 h-4" />
-              Jornadas y Fases
-            </button>
-            <button
-              onClick={() => navigate('/dashboard/infrastructure')}
-              className="flex items-center gap-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"
-            >
-              <Map className="w-4 h-4" />
-              Gestión de Zonas
-            </button>
-            <button
-              onClick={() => navigate('/dashboard/operational-events')}
-              className="flex items-center gap-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"
-            >
-              <AlertTriangle className="w-4 h-4" />
-              Registrar Incidente
-            </button>
-            <button
-              onClick={() => navigate('/dashboard/alerts')}
-              className="flex items-center gap-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"
-            >
-              <Bell className="w-4 h-4" />
-              Alertas y Mensajes
-            </button>
-            <button
-              onClick={() => navigate('/dashboard/reports')}
-              className="flex items-center gap-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"
-            >
-              <FileText className="w-4 h-4" />
-              Informes
-            </button>
+            {role === 'OPERADOR_CAMPO' && puedeVerMotor && (
+              <button
+                onClick={() => navigate('/dashboard/motor?tab=observations')}
+                className="flex items-center gap-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"
+              >
+                <Eye className="w-4 h-4" />
+                Observaciones
+              </button>
+            )}
+            {puedeVerConfig && (
+              <button
+                onClick={() => navigate('/dashboard/event-config')}
+                className="flex items-center gap-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"
+              >
+                <CalendarDays className="w-4 h-4" />
+                Jornadas y Fases
+              </button>
+            )}
+            {puedeVerConfig && (
+              <button
+                onClick={() => navigate('/dashboard/infrastructure')}
+                className="flex items-center gap-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"
+              >
+                <Map className="w-4 h-4" />
+                Gestión de Zonas
+              </button>
+            )}
+            {puedeVerIncidentes && (
+              <button
+                onClick={() => navigate('/dashboard/operational-events')}
+                className="flex items-center gap-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"
+              >
+                <AlertTriangle className="w-4 h-4" />
+                Registrar Incidente
+              </button>
+            )}
+            {puedeVerAlertas && (
+              <button
+                onClick={() => navigate('/dashboard/alerts')}
+                className="flex items-center gap-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"
+              >
+                <Bell className="w-4 h-4" />
+                Alertas y Mensajes
+              </button>
+            )}
+            {puedeVerInformes && (
+              <button
+                onClick={() => navigate('/dashboard/reports')}
+                className="flex items-center gap-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"
+              >
+                <FileText className="w-4 h-4" />
+                Informes
+              </button>
+            )}
             {/* Solo para quien puede administrar identidades. Ocultarlo NO es la
                 garantía: la ruta tiene `ProtectedRoute permission="users:read"`
                 y el backend exige `users:write` en cada escritura. Esto solo evita
@@ -231,13 +258,15 @@ export function DashboardScreen() {
                 Usuarios
               </button>
             )}
-            <button
-              onClick={() => navigate('/dashboard/motor')}
-              className="flex items-center gap-2 text-sm bg-purple-600 hover:bg-purple-700 text-white py-2 px-3 rounded-lg transition-colors"
-            >
-              <Brain className="w-4 h-4" />
-              Motor y Análisis
-            </button>
+            {role !== 'OPERADOR_CAMPO' && puedeVerMotor && (
+              <button
+                onClick={() => navigate('/dashboard/motor')}
+                className="flex items-center gap-2 text-sm bg-purple-600 hover:bg-purple-700 text-white py-2 px-3 rounded-lg transition-colors"
+              >
+                <Brain className="w-4 h-4" />
+                Motor y Análisis
+              </button>
+            )}
             <button
               onClick={handleLogout}
               type="button"

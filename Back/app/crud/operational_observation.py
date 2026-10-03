@@ -177,6 +177,8 @@ def _to_response(model: OperationalObservationModel) -> OperationalObservationRe
 async def create_observation(
     db: AsyncSession,
     observation_in: OperationalObservationCreate,
+    *,
+    observer_id: str | None = None,
 ) -> OperationalObservationResponse:
     event_day = await db.get(EventDay, observation_in.event_day_id)
     if not event_day:
@@ -199,9 +201,7 @@ async def create_observation(
     # 1) El observador tiene que identificarse. Se acepta un UUID o nada: sin
     #    observer_id el registro sigue siendo válido, pero con uno inválido no
     #    se puede atribuir el conteo a nadie.
-    if observation_in.observer_id is not None and not _is_valid_uuid(
-        observation_in.observer_id
-    ):
+    if observer_id is not None and not _is_valid_uuid(observer_id):
         raise HTTPException(
             status_code=400,
             detail=(
@@ -244,7 +244,7 @@ async def create_observation(
         zone_id=observation_in.zone_id,
         timestamp=timestamp,
         observed_density=observation_in.observed_density,
-        observer_id=observation_in.observer_id,
+        observer_id=observer_id,
         source=observation_in.source,
         metadata_=metadata or None,
     )
@@ -315,14 +315,7 @@ async def update_observation(
     if model is None:
         return None
 
-    if observation_in.observer_id is not None and not _is_valid_uuid(observation_in.observer_id):
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "observer_id inválido: debe ser un UUID de 36 caracteres "
-                "o dejarse en blanco"
-            ),
-        )
+    pass  # observer_id es inmutable; no se acepta desde el body.
 
     new_density = (
         observation_in.observed_density
@@ -365,8 +358,6 @@ async def update_observation(
         base.update(preserved_computed)
 
     model.observed_density = new_density
-    if observation_in.observer_id is not None:
-        model.observer_id = observation_in.observer_id
     if observation_in.source is not None:
         model.source = observation_in.source
     model.metadata_ = base or None

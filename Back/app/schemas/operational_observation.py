@@ -4,11 +4,15 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 
 class OperationalObservationCreate(BaseModel):
+    """Alta de una observacion de campo.
+
+    `observer_id` NO esta en el DTO. El servidor lo inyecta desde el usuario autenticado.
+    """
+
     event_day_id: str = Field(..., description="ID del event day")
     zone_id: str = Field(..., description="ID de la zona")
     timestamp: datetime = Field(..., description="Timestamp timezone-aware")
     observed_density: int = Field(..., ge=0, description="Densidad observada (>= 0)")
-    observer_id: Optional[str] = Field(default=None, description="ID del observador")
     source: str = Field(default="manual", description="Fuente: manual, sensor, official_report")
     metadata: Optional[dict] = Field(default=None, description="Metadatos adicionales")
 
@@ -23,22 +27,18 @@ class OperationalObservationCreate(BaseModel):
 class OperationalObservationUpdate(BaseModel):
     """Corrección in-place de una observación (RFC-006).
 
-    `extra="forbid"` no es cosmético: `timestamp`, `zone_id` y `event_day_id` son
-    inmutables por decisión de diseño (cambiar el timestamp evadiría la ventana
-    operativa de la jornada y la ventana anti-spam, que solo se validan en el
-    alta). Con `forbid`, mandar cualquiera de esos campos es un 422 explícito en
-    vez de un ignore silencioso que el cliente interpreta como un éxito.
+    `extra="forbid"` no es cosmético: `timestamp`, `zone_id`, `event_day_id` y `observer_id`
+    son inmutables por decisión de diseño. Con `forbid`, mandar cualquiera de esos campos
+    es un 422 explícito en vez de un ignore silencioso que el cliente interpreta como un éxito.
 
-    `corrected_by` NO se acepta desde el body: lo escribe el servidor con el
-    `sub` del token. Aceptarlo acá haría que un campo de auditoría fuera
-    arbitrariamente seteable por el cliente, que es justo lo que un campo de
-    auditoría no puede ser.
+    `corrected_by` y `observer_id` NO se aceptan desde el body: los escribe el servidor con la
+    identidad del token. Aceptarlos acá haría que un campo de auditoría fuera arbitrariamente
+    seteable por el cliente.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     observed_density: Optional[int] = Field(None, ge=0, description="Densidad observada (>= 0)")
-    observer_id: Optional[str] = Field(None, description="ID del observador")
     source: Optional[str] = Field(None, description="Fuente: manual, sensor, official_report")
     metadata: Optional[dict] = Field(None, description="Metadatos rewritten por el operador")
 
@@ -46,7 +46,6 @@ class OperationalObservationUpdate(BaseModel):
     def at_least_one_field(self) -> "OperationalObservationUpdate":
         if (
             self.observed_density is None
-            and self.observer_id is None
             and self.source is None
             and self.metadata is None
         ):

@@ -16,7 +16,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import TokenPayload, verify_token
+from app.api.deps import CurrentUser, TokenPayload, get_current_user, verify_token
 from app.crud.operational_observation import (
     create_observation,
     find_all,
@@ -37,10 +37,11 @@ router = APIRouter(prefix="/operational-observations", tags=["Operational Observ
 async def create_observation_endpoint(
     observation_in: OperationalObservationCreate,
     db: AsyncSession = Depends(get_async_db),
-    _: TokenPayload = Depends(verify_token),
+    current_user: CurrentUser = Depends(get_current_user),
 ):
     try:
-        return await create_observation(db, observation_in)
+        observer_id = current_user.id
+        return await create_observation(db, observation_in, observer_id=observer_id)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
