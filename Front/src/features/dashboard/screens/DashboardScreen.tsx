@@ -42,8 +42,35 @@ interface QuickAction {
   accent: string;
   iconBg: string;
   path: string;
+  /**
+   * Permiso que habilita la tarjeta. Va acá y no como un `&&` suelto en el
+   * render: asi la lista de acciones y su regla de acceso viven en el mismo lugar,
+   * y agregar una tarjeta al array no puede olvidarse de declararla.
+   */
+  permission: string;
   hint?: string;
 }
+
+/**
+ * Códigos de permiso de las acciones rápidas y de los botones del encabezado.
+ *
+ * Constantes y no strings sueltos porque los dos lados las necesitan: si la
+ * tarjeta de "Alertas y Mensajes" usara un código y el botón del encabezado otro,
+ * el menú prometería una pantalla que la tarjeta esconde. Con una sola fuente, esa
+ * divergencia no se puede escribir.
+ *
+ * Deben coincidir 1:1 con `app/core/permissions.py` del backend. Ojo: `alerts:write`
+ * e `incidents:write` son las acciones de campo (publicar una alerta, reportar un
+ * incidente) y NO son `emergency:write`, que es configuración de infraestructura.
+ */
+const PERMISOS = {
+  observacion: 'observations:write',
+  incidente: 'incidents:write',
+  alertas: 'alerts:write',
+  predicciones: 'events:read',
+  recomendaciones: 'analytics:read',
+  informes: 'reports:read',
+} as const;
 
 const QUICK_ACTIONS: QuickAction[] = [
   {
@@ -53,6 +80,7 @@ const QUICK_ACTIONS: QuickAction[] = [
     accent: 'text-indigo-600',
     iconBg: 'bg-indigo-50 border-indigo-100',
     path: '/dashboard/motor?tab=observations',
+    permission: PERMISOS.observacion,
     hint: 'Ir a Motor › Observaciones',
   },
   {
@@ -62,6 +90,7 @@ const QUICK_ACTIONS: QuickAction[] = [
     accent: 'text-red-600',
     iconBg: 'bg-red-50 border-red-100',
     path: '/dashboard/operational-events',
+    permission: PERMISOS.incidente,
   },
   {
     icon: BarChart3,
@@ -70,6 +99,7 @@ const QUICK_ACTIONS: QuickAction[] = [
     accent: 'text-emerald-600',
     iconBg: 'bg-emerald-50 border-emerald-100',
     path: '/dashboard/motor?tab=predictions',
+    permission: PERMISOS.predicciones,
     hint: 'Ir a Motor › Predicciones',
   },
   {
@@ -79,6 +109,7 @@ const QUICK_ACTIONS: QuickAction[] = [
     accent: 'text-amber-600',
     iconBg: 'bg-amber-50 border-amber-100',
     path: '/dashboard/motor?tab=analytics',
+    permission: PERMISOS.recomendaciones,
     hint: 'Ir a Motor › Analytics',
   },
   {
@@ -88,6 +119,7 @@ const QUICK_ACTIONS: QuickAction[] = [
     accent: 'text-teal-600',
     iconBg: 'bg-teal-50 border-teal-100',
     path: '/dashboard/alerts',
+    permission: PERMISOS.alertas,
   },
   {
     icon: BarChart3,
@@ -96,6 +128,7 @@ const QUICK_ACTIONS: QuickAction[] = [
     accent: 'text-blue-600',
     iconBg: 'bg-blue-50 border-blue-100',
     path: '/dashboard/reports',
+    permission: PERMISOS.informes,
   },
 ];
 
@@ -112,18 +145,43 @@ export function DashboardScreen() {
   const navigate = useNavigate();
   // Botón de "Usuarios". `false` mientras se carga la identidad, así que no
   // parpadea ni aparece en un render con el usuario todavía desconocido.
-  const role = useRole();
+  const esOperadorCampo = useRole('OPERADOR_CAMPO');
   const puedeGestionarUsuarios = usePermission('users:read');
   const puedeVerConfig = usePermission('config:read');
-  const puedeVerInformes = usePermission('reports:read');
-  const puedeVerAnalisis = usePermission('analytics:read');
-  const puedeVerMotor = puedeVerAnalisis || usePermission('events:read') || usePermission('observations:read');
-  const puedeVerAlertas = usePermission('emergency:read');
-  const puedeVerIncidentes = usePermission('emergency:write');
-  const puedeVerPredicciones = usePermission('events:read');
+  const puedeVerInformes = usePermission(PERMISOS.informes);
+  const puedeVerAnalisis = usePermission(PERMISOS.recomendaciones);
+  // Un `usePermission` por permiso, sin `||` entre ellos: encadenarlos con cortocircuito
+  // hacía que algunos hooks no se ejecutaran según el usuario, y React exige el
+  // mismo orden en cada render. Además el atajo devolvía el resultado del primer
+  // permiso, no "tiene alguno de estos".
+  const puedeVerEventos = usePermission(PERMISOS.predicciones);
+  const puedeVerObservaciones = usePermission('observations:read');
+
+  // Las tres acciones de campo. Son las únicas tarjetas que ve un OPERADOR_CAMPO:
+  // registrar observación, reportar incidente y publicar alertas o mensajes.
+  const puedeRegistrarObs = usePermission(PERMISOS.observacion);
+  const puedeReportarIncidente = usePermission(PERMISOS.incidente);
+  const puedeGestionarAlertas = usePermission(PERMISOS.alertas);
+
+  const puedeVerMotor = puedeVerAnalisis || puedeVerEventos || puedeVerObservaciones;
   const logout = useAppStore((state) => state.logout);
   const [syncTime, setSyncTime] = useState(() => new Date());
   const [refreshing, setRefreshing] = useState(false);
+
+  // Las tarjetas se filtran por permiso contra este mapa, no con un `&&` dentro
+  // del `.map()`. La diferencia práctica: si `QUICK_ACTIONS` gana una tarjeta con un
+  // código que no está acá, el `undefined` la esconde. Un permiso sin declarar se
+  // oculta, que es el fallo seguro; al revés, un permiso nuevo declarado acá y no
+  // en las tarjetas no abre nada.
+  const permisosConcedidos: Record<string, boolean> = {
+    [PERMISOS.observacion]: puedeRegistrarObs,
+    [PERMISOS.incidente]: puedeReportarIncidente,
+    [PERMISOS.alertas]: puedeGestionarAlertas,
+    [PERMISOS.predicciones]: puedeVerEventos,
+    [PERMISOS.recomendaciones]: puedeVerAnalisis,
+    [PERMISOS.informes]: puedeVerInformes,
+  };
+  const accionesVisibles = QUICK_ACTIONS.filter((a) => permisosConcedidos[a.permission]);
 
   const { zones, refresh: refreshZones } = useDashboardSync();
   const { eventDays, refresh: refreshDays } = useEventDays(DEFAULT_EVENT_ID);
@@ -191,7 +249,7 @@ export function DashboardScreen() {
         actions={
           <nav className="flex flex-wrap gap-2">
             <RefreshButton onClick={() => void handleRefresh()} loading={refreshing} />
-            {role === 'OPERADOR_CAMPO' && puedeVerMotor && (
+            {esOperadorCampo && puedeVerMotor && (
               <button
                 onClick={() => navigate('/dashboard/motor?tab=observations')}
                 className="flex items-center gap-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"
@@ -218,7 +276,11 @@ export function DashboardScreen() {
                 Gestión de Zonas
               </button>
             )}
-            {puedeVerIncidentes && (
+            {/* Los dos botones de acciones de campo usan las MISMAS banderas que las
+                tarjetas de "Acciones Rápidas". Antes iban por otros permisos
+                (`emergency:read` y `emergency:write`) y el menú llegaba a pantallas
+                que la grilla de tarjetas no mostraba. */}
+            {puedeReportarIncidente && (
               <button
                 onClick={() => navigate('/dashboard/operational-events')}
                 className="flex items-center gap-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"
@@ -227,7 +289,7 @@ export function DashboardScreen() {
                 Registrar Incidente
               </button>
             )}
-            {puedeVerAlertas && (
+            {puedeGestionarAlertas && (
               <button
                 onClick={() => navigate('/dashboard/alerts')}
                 className="flex items-center gap-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg transition-colors"
@@ -258,7 +320,12 @@ export function DashboardScreen() {
                 Usuarios
               </button>
             )}
-            {role !== 'OPERADOR_CAMPO' && puedeVerMotor && (
+            {/* El botón de "Motor y Análisis" abre el motor entero, que incluye
+                predicciones y analytics. Por eso se esconde al operador aunque
+                `puedeVerMotor` sea true: ese flag se cumple con `observations:read`,
+                que le da acceso legitimo a la pantalla de observaciones, no a las de
+                análisis. */}
+            {!esOperadorCampo && puedeVerMotor && (
               <button
                 onClick={() => navigate('/dashboard/motor')}
                 className="flex items-center gap-2 text-sm bg-purple-600 hover:bg-purple-700 text-white py-2 px-3 rounded-lg transition-colors"
@@ -282,8 +349,14 @@ export function DashboardScreen() {
       <main className="p-4 sm:p-6 max-w-5xl mx-auto space-y-8">
         <section>
           <h2 className="text-lg font-semibold text-slate-700 mb-4">Acciones Rápidas</h2>
+          {/* Una tarjeta por acción DECLARADA; lo que se filtra es cuáles se
+              dibujan. Ninguna se borra del código: las seis siguen en
+              `QUICK_ACTIONS` con su permiso, y las ve quien lo tenga. Para un
+              OPERADOR_CAMPO quedan exactamente tres —Registrar Observación,
+              Reportar Incidente y Alertas y Mensajes— porque es lo único que
+              concede su rol. */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {QUICK_ACTIONS.map((action) => (
+            {accionesVisibles.map((action) => (
               <button
                 key={action.title}
                 onClick={() => navigate(action.path)}

@@ -43,14 +43,20 @@ const SECTIONS: { key: Section; label: string; permission?: string }[] = [
 
 export function MotorScreen() {
   const user = useAppStore((s) => s.auth.user);
-  const role = useRole();
+  // `useRole('OPERADOR_CAMPO')` devuelve un booleano. Antes se llamaba sin
+  // argumentos y se comparaba contra el string, así que la comparación era
+  // siempre falsa y el filtro de abajo no filtraba nada.
+  const esOperadorCampo = useRole('OPERADOR_CAMPO');
 
   // Se recalcula en cada render del store: si cambian los permisos (el admin se
   // los quita mientras la pantalla está abierta), las pestañas se actualizan.
   let seccionesVisibles = filterByPermission(SECTIONS, user);
 
-  // Restricción explícita para OPERADOR_CAMPO: únicamente observaciones
-  if (role === 'OPERADOR_CAMPO') {
+  // Restricción explícita para OPERADOR_CAMPO: únicamente observaciones.
+  // Hoy `events:read` ya no alcanza el rol, así que la pestaña de predicciones
+  // cae sola por el filtro de permisos; esto la vuelve a esconder aunque alguien
+  // le devuelva ese permiso, que es la intención original de la línea.
+  if (esOperadorCampo) {
     seccionesVisibles = seccionesVisibles.filter((s) => s.key === 'observations');
   }
   const clavesVisibles = seccionesVisibles.map((s) => s.key);

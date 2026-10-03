@@ -67,6 +67,27 @@ EMERGENCY_WRITE = "emergency:write"
 EMERGENCY_PROTOCOLS_READ = "emergency_protocols:read"
 EMERGENCY_PROTOCOLS_WRITE = "emergency_protocols:write"
 
+# Acciones de campo: reportar un incidente y publicar una alerta o un mensaje al
+# publico. NO son `emergency:*`.
+#
+# Por que un prefijo nuevo y no reusar `emergency:write`
+# ------------------------------------------------------
+# `emergency:write` protege el CRUD del catalogo de PUNTOS de emergencia y de
+# ciudades (`app/api/routes/emergency_admin.py`), que es configuracion de
+# infraestructura. Las acciones de campo son otra cosa: son escritura del operador
+# sobre la operacion del evento. Meterlas en `emergency:write` obligaria a elegir
+# entre dos cosas incompatibles: o el operador no puede reportar nada, o puede
+# crear y borrar puntos de emergencia. Por eso son codigos aparte, y por eso
+# `emergency:write` sigue reservado a quien administra la infraestructura.
+#
+# Sin pareja `:read` a proposito, igual que `counts:write`: las lecturas de
+# alertas, mensajes e incidentes hoy solo exigen token (`alert_admin.py`,
+# `operational_events.py`), asi que un permiso de lectura no restringiria nada. Si
+# alguna vez esos endpoints pasan a exigir `require_permission`, es el momento de
+# agregar `alerts:read` / `incidents:read`.
+ALERTS_WRITE = "alerts:write"
+INCIDENTS_WRITE = "incidents:write"
+
 # Analisis
 REPORTS_READ = "reports:read"
 ANALYTICS_READ = "analytics:read"
@@ -103,6 +124,8 @@ PERMISSION_CATALOG: tuple[tuple[str, str, str, str], ...] = (
         "write",
         "Gestionar el catalogo de protocolos de emergencia",
     ),
+    (ALERTS_WRITE, "alerts", "write", "Publicar y gestionar alertas y mensajes al publico"),
+    (INCIDENTS_WRITE, "incidents", "write", "Reportar y gestionar incidentes operativos"),
     (REPORTS_READ, "reports", "read", "Ver reportes globales"),
     (ANALYTICS_READ, "analytics", "read", "Ver analytics y recomendaciones"),
     (ANALYTICS_WRITE, "analytics", "write", "Resolver recomendaciones"),
@@ -125,21 +148,38 @@ ROLE_PERMISSIONS: dict[str, tuple[str, ...]] = {
         PROTOCOLS_READ, PROTOCOLS_WRITE,
         EMERGENCY_READ, EMERGENCY_WRITE,
         EMERGENCY_PROTOCOLS_READ, EMERGENCY_PROTOCOLS_WRITE,
+        ALERTS_WRITE, INCIDENTS_WRITE,
         REPORTS_READ, ANALYTICS_READ, ANALYTICS_WRITE, AUDIT_LOG_READ,
     ),
     ROLE_OPERADOR_CAMPO: (
-        EVENTS_READ,
+        # `observations:read` sigue aunque la accion de campo sea
+        # `observations:write`: la tarjeta "Registrar Observacion" lleva a la
+        # pantalla de observaciones, y sin lectura esa pantalla no se abre. Es la
+        # lectura que ya tenia, no un permiso nuevo.
         OBSERVATIONS_READ, OBSERVATIONS_WRITE,
         COUNTS_WRITE,
-        # `emergency_protocols:read` acompana a `emergency:read`: los dos dejan
-        # consultar el procedimiento. El GET que ahora exige este permiso era
-        # PUBLICO hasta esta migracion, asi que no otorgarselo le quitaria al
-        # operador un acceso que ya tenia. Least privilege aca quiere decir "no
-        # darle MAS de lo que ya podia", no "dejarlo afuera de algo que ya leia".
+        # Reportar incidentes y publicar alertas: las dos acciones de campo que lo
+        # justifican. Le dan acceso a `/dashboard/operational-events` y
+        # `/dashboard/alerts`, que hoy solo exigen token.
+        ALERTS_WRITE, INCIDENTS_WRITE,
+        # `emergency:read` y `emergency_protocols:read` acompanan al operador para
+        # que pueda consultar el procedimiento de emergencia cuando lo necesita.
+        # El GET de protocolos era PUBLICO hasta `b8d9e0f1a2b3`, asi que no
+        # otorgarselo le quitaria un acceso que ya tenia. Least privilege aca
+        # quiere decir "no darle MAS de lo que ya podia", no "dejarlo afuera de algo
+        # que ya leia". `emergency:write` NO va aca: es configuracion de
+        # infraestructura, no operacion de campo.
         EMERGENCY_READ, EMERGENCY_PROTOCOLS_READ,
+        # Sin `events:read` a proposito: con el, el operador habilita la pestaña de
+        # predicciones del motor, que es analisis y no carga de campo. Los
+        # permisos de analisis (`reports:read`, `analytics:read`) tampoco estan, y
+        # por la misma razon.
     ),
     ROLE_ANALISTA: (
-        EVENTS_READ, OBSERVATIONS_READ, COUNTS_WRITE,
+        # Rol de solo lectura sobre lo que analiza. Ni `counts:write` ni ningun
+        # otro `:write`: cargar conteos o publicar una alerta es operacion de
+        # campo, no analisis.
+        EVENTS_READ, OBSERVATIONS_READ,
         REPORTS_READ, ANALYTICS_READ, AUDIT_LOG_READ,
         PROTOCOLS_READ, EMERGENCY_READ, EMERGENCY_PROTOCOLS_READ,
     ),
