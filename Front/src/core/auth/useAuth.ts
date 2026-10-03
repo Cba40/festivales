@@ -6,7 +6,8 @@ import { getMe } from '@/services/authService';
  * Autorización en el frontend.
  *
  * `useAuth()` devuelve el actor; `usePermission(code)` dice si puede; `useRole()`
- * lo mismo por rol.
+ * lo mismo por rol. Para RESTRINGIR por rol sin que el bypass del super admin se
+ * aplique al super admin, usar `useExactRole()`.
  *
  * Por qué esto NO es una medida de seguridad
  * ------------------------------------------
@@ -68,12 +69,36 @@ export function usePermission(code: string): boolean {
   return hasPermission(user, code);
 }
 
-/** ¿El actor tiene alguno de estos roles? */
+/**
+ * ¿El actor tiene alguno de estos roles?
+ *
+ * Ojo con lo que responde para un super admin: devuelve `true` SIEMPRE, para
+ * cualquier código. Pregunta "¿puede actuar como?", no "¿qué rol tiene?". Para una
+ * guarda de ruta (`ProtectedRoute roles=[...]`) eso es lo correcto.
+ */
 export function useRole(...codes: string[]): boolean {
   const user = useAppStore((s) => s.auth.user);
   if (!user) return false;
   if (user.is_provider_super_admin || user.is_superuser) return true;
   return codes.some((c) => user.roles.includes(c));
+}
+
+/**
+ * ¿El rol del actor es alguno de estos? SIN el bypass del super admin.
+ *
+ * Hace falta para RESTRINGIR, y no para autorizar. "Los operadores de campo solo
+ * ven estas tres acciones" tiene que leer la lista de roles tal cual: si la
+ * pregunta pasa por `useRole`, el super admin contesta `true` para
+ * 'OPERADOR_CAMPO' sin serlo, la restricción le cae encima y le oculta justamente
+ * lo que debería ver más: las pestañas de predicciones y analytics del motor y el
+ * botón de "Motor y Análisis".
+ *
+ * `useRole` para lo que el actor PUEDE hacer; `useExactRole` para lo que le
+ * corresponde por el rol que tiene.
+ */
+export function useExactRole(...codes: string[]): boolean {
+  const user = useAppStore((s) => s.auth.user);
+  return hasExactRole(user, ...codes);
 }
 
 /** ¿El actor tiene alguno de estos permisos? */
@@ -98,6 +123,12 @@ export function hasPermission(user: AuthUser | null, code: string): boolean {
 export function hasAnyRole(user: AuthUser | null, ...codes: string[]): boolean {
   if (!user) return false;
   if (user.is_provider_super_admin || user.is_superuser) return true;
+  return codes.some((c) => user.roles.includes(c));
+}
+
+/** Pareja sin bypass de `hasAnyRole`. Ver `useExactRole`. */
+export function hasExactRole(user: AuthUser | null, ...codes: string[]): boolean {
+  if (!user) return false;
   return codes.some((c) => user.roles.includes(c));
 }
 

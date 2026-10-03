@@ -8,7 +8,7 @@ import { DashboardHeader } from '../components/DashboardHeader';
 import { AppFooter } from '@/components/AppFooter';
 import { SectionTabs } from '../components/ui';
 import { useAppStore } from '@/core/state/store';
-import { filterByPermission, useRole } from '@/core/auth/useAuth';
+import { filterByPermission, useExactRole } from '@/core/auth/useAuth';
 
 type Section =
   | 'config'
@@ -43,10 +43,13 @@ const SECTIONS: { key: Section; label: string; permission?: string }[] = [
 
 export function MotorScreen() {
   const user = useAppStore((s) => s.auth.user);
-  // `useRole('OPERADOR_CAMPO')` devuelve un booleano. Antes se llamaba sin
-  // argumentos y se comparaba contra el string, así que la comparación era
-  // siempre falsa y el filtro de abajo no filtraba nada.
-  const esOperadorCampo = useRole('OPERADOR_CAMPO');
+  // `useExactRole`, no `useRole`: este filtro RESTRINGE al operador a una sola
+  // pestaña. `useRole` tiene bypass de super admin y devolvía true para
+  // 'OPERADOR_CAMPO' sin serlo, así que el super admin veía únicamente
+  // Observaciones. Antes el bug estaba tapado: `useRole()` sin argumentos
+  // devolvía un booleano que se comparaba contra un string, comparación siempre
+  // falsa, y el filtro nunca llegaba a ejecutarse.
+  const esOperadorCampo = useExactRole('OPERADOR_CAMPO');
 
   // Se recalcula en cada render del store: si cambian los permisos (el admin se
   // los quita mientras la pantalla está abierta), las pestañas se actualizan.

@@ -24,7 +24,7 @@ import { useDashboardSync } from '../hooks/useDashboardSync';
 import { useEventDays } from '../hooks/useEventDays';
 import { useOperationalEvents } from '../hooks/useOperationalEvents';
 import { RefreshButton } from '../components/ui';
-import { usePermission, useRole } from '@/core/auth/useAuth';
+import { useExactRole, usePermission } from '@/core/auth/useAuth';
 
 const DEFAULT_EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 
@@ -145,7 +145,10 @@ export function DashboardScreen() {
   const navigate = useNavigate();
   // Botón de "Usuarios". `false` mientras se carga la identidad, así que no
   // parpadea ni aparece en un render con el usuario todavía desconocido.
-  const esOperadorCampo = useRole('OPERADOR_CAMPO');
+  // `useExactRole`, no `useRole`: este flag RESTRINGE. Con `useRole` el super
+  // admin respondía true para 'OPERADOR_CAMPO' sin serlo y se comía su propia
+  // restricción, perdiendo el botón de "Motor y Análisis".
+  const esOperadorCampo = useExactRole('OPERADOR_CAMPO');
   const puedeGestionarUsuarios = usePermission('users:read');
   const puedeVerConfig = usePermission('config:read');
   const puedeVerInformes = usePermission(PERMISOS.informes);
