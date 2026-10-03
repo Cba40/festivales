@@ -60,6 +60,15 @@ class OperationalObservationResponse(BaseModel):
     timestamp: datetime = Field(..., description="Timestamp de la observación")
     observed_density: int = Field(..., ge=0, description="Densidad observada")
     observer_id: Optional[str] = Field(default=None, description="ID del observador")
+    observer_name: Optional[str] = Field(
+        default=None,
+        description=(
+            "Nombre del observador, resuelto desde `observer_id` contra `users` "
+            "(full_name y, si no hay, username). Null si la observacion no tiene "
+            "observador o si el usuario ya no existe: se muestra como desconocido, "
+            "no se oculta."
+        ),
+    )
     source: str = Field(default="manual", description="Fuente de la observación")
     metadata: Optional[dict] = Field(default=None, description="Metadatos adicionales")
     created_at: datetime = Field(..., description="Fecha de creación")

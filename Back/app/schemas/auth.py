@@ -37,6 +37,9 @@ class MeResponse(BaseModel):
 
     id: Optional[str]
     username: str
+    # Nombre y apellido, si el usuario los cargo. Informativo para la UI, que
+    # muestra "nombre (username)" en vez de un UUID. Null si no lo completo.
+    full_name: Optional[str] = None
     roles: list[str]
     permissions: list[str]
     # `true` para el super admin del proveedor, que no existe en `users`.

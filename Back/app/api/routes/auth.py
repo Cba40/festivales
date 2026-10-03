@@ -439,8 +439,9 @@ def me(current: CurrentUser = Depends(get_current_user)):
     administrador.
     """
     return MeResponse(
-        id=current.id,
+id=current.id,
         username=current.username,
+        full_name=current.full_name,
         roles=current.roles,
         permissions=current.permissions,
         is_provider_super_admin=current.is_provider_super_admin,

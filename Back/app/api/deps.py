@@ -66,6 +66,10 @@ class CurrentUser(BaseModel):
     # `None` para el super admin del proveedor: no existe en `users`.
     id: Optional[str] = None
     username: str
+    # Nombre y apellido, si el usuario los cargo. Informativo: la identidad la
+    # define `username`. `None` para el super admin del proveedor y para cualquiera
+    # que no lo haya completado.
+    full_name: Optional[str] = None
     # Rol `SUPER_ADMIN` del proveedor. Viene del token, no de la base.
     is_provider_super_admin: bool = False
     is_superuser: bool = False
@@ -150,6 +154,10 @@ def _load_user_from_db(db: Session, username: str) -> Optional[CurrentUser]:
     return CurrentUser(
         id=user.id,
         username=user.username,
+        # Solo para mostrar. La identidad real la decide `username` + `id`; esto
+        # evita que la UI tenga que inventar un nombre o mostrar un UUID. Es
+        # None cuando el usuario no lo cargo, y la UI cae al username.
+        full_name=user.full_name,
         # `is_superuser` es la capacidad de emergencia del seed. No es un rol
         # asignable, así que nunca aparece en `user_roles` ni se puede otorgar
         # desde la UI.

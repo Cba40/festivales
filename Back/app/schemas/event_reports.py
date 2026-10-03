@@ -195,6 +195,15 @@ class FieldCensusItem(BaseModel):
             "ordenadas. Vacio si ninguna observacion fue marcada."
         ),
     )
+    observer_names: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Observadores distintos que registraron observaciones en la zona durante "
+            "el periodo, para que el administrador sepa a quien dirigirse cuando hay "
+            "alertas de calidad. Vacio si las observaciones no tienen observador o "
+            "el usuario ya no existe."
+        ),
+    )
 
 
 class FieldCensusResponse(BaseModel):

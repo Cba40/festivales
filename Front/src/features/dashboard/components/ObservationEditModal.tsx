@@ -42,7 +42,7 @@ export interface ObservationEditModalProps {
   isSaving: boolean;
   onSave: (
     obs: OperationalObservationDTO,
-    payload: { observed_density: number; observer_id?: string; source: string; metadata?: Record<string, unknown> }
+    payload: { observed_density: number; source: string; metadata?: Record<string, unknown> }
   ) => void;
   onClose: () => void;
 }
@@ -51,10 +51,15 @@ export interface ObservationEditModalProps {
  * Corrección in-place de una observación (RFC-006).
  *
  * El modal NO ofrece timestamp, zona ni jornada: el backend los rechaza con 422
- * (`extra="forbid"`), así que offeringlos sería una acción que nunca puede
+ * (`extra="forbid"`), así que ofrecerlos sería una acción que nunca puede
  * funcionar. Tampoco ofrece "corregido por": ese campo lo escribe el servidor
  * con el `sub` del token y se muestra en solo lectura para que el operador sepa
  * a nombre de quién va a quedar registrada la corrección.
+ *
+ * Tampoco ofrece "observador". `observer_id` es inmutable y el schema de update
+ * lo rechaza con 422. Antes había un input acá que se pre-rellenaba con el UUID
+ * de la fila y lo mandaba siempre: eso convertía TODA corrección en un 422, así
+ * que la función estaba rota. Ahora se muestra en solo lectura.
  */
 export function ObservationEditModal({
   observation,
@@ -63,7 +68,6 @@ export function ObservationEditModal({
   onClose,
 }: ObservationEditModalProps) {
   const [density, setDensity] = useState('');
-  const [observerId, setObserverId] = useState('');
   const [source, setSource] = useState('manual');
   const [notas, setNotas] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -80,7 +84,6 @@ export function ObservationEditModal({
   useEffect(() => {
     if (!obs) return;
     setDensity(String(obs.observed_density));
-    setObserverId(obs.observer_id ?? '');
     setSource(obs.source);
     setNotas(notasDe(obs));
     setError(null);
@@ -110,7 +113,6 @@ export function ObservationEditModal({
     setError(null);
     onSave(obs, {
       observed_density: parsed,
-      ...(observerId.trim() !== '' ? { observer_id: observerId.trim() } : {}),
       source,
       ...(notas.trim() !== '' ? { metadata: { notas: notas.trim() } } : {}),
     });
@@ -158,15 +160,22 @@ export function ObservationEditModal({
           </div>
 
           <label className="block text-sm">
-            <span className="text-slate-700 font-medium">Observador (opcional)</span>
+            <span className="text-slate-700 font-medium">Observador</span>
+            {/* Solo lectura: `observer_id` es inmutable y mandarlo al backend es un
+                422. Antes esto era un input editable que pre-rellenaba el UUID de
+                la fila y lo mandaba en cada corrección. */}
             <input
               type="text"
-              value={observerId}
-              onChange={(e) => setObserverId(e.target.value)}
-              placeholder="UUID del observador"
-              className={FIELD_CLASSES}
-              disabled={isSaving}
+              value={obs.observer_name?.trim() || 'Desconocido'}
+              readOnly
+              tabIndex={-1}
+              aria-readonly="true"
+              title="El observador original no se puede cambiar. La corrección queda registrada con tu usuario."
+              className="mt-1 w-full px-3 py-2 border border-slate-200 bg-slate-50 rounded-lg text-sm text-slate-600 cursor-not-allowed"
             />
+            <span className="mt-1 block text-xs text-slate-400">
+              No se puede modificar. La corrección queda a tu nombre.
+            </span>
           </label>
 
           <label className="block text-sm">

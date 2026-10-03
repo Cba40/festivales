@@ -3,6 +3,7 @@ import { Pencil, Plus } from 'lucide-react';
 import { EVENT_ID } from '@/components/context-engine/constants';
 import { apiClient } from '@/core/api/client';
 import { endpoints } from '@/core/api/endpoints';
+import { useAppStore } from '@/core/state/store';
 import { useOperationalObservations } from '@/hooks/useOperationalObservations';
 import { Badge, Button, Card, RefreshButton } from '@/features/dashboard/components/ui';
 import { ObservationEditModal } from '@/features/dashboard/components/ObservationEditModal';
@@ -17,6 +18,19 @@ const SOURCES = [
   { value: 'sensor', label: 'Sensor' },
   { value: 'official_report', label: 'Reporte oficial' },
 ];
+
+/**
+ * Nombre del observador para mostrar en el formulario y en la tabla.
+ *
+ * Antes el formulario tenía un input de texto donde el operador escribía un ID a
+ * mano, y la tabla mostraba el UUID crudo. El `observer_id` real lo inyecta el
+ * servidor desde el token (`operational_observations.py:43`), así que lo que el
+ * operador escribía se descartaba: era un campo que aparente tener efecto y no
+ * lo tenia.
+ */
+function observerLabel(observerName?: string | null): string {
+  return observerName?.trim() || 'Desconocido';
+}
 
 interface ZoneInfo {
   id: string;
@@ -117,6 +131,12 @@ function formatCorrectionDate(value: string): string {
 }
 
 export function ObservationsScreen() {
+  // Identidad del operador, para mostrar en solo lectura quien queda registrada
+  // como observador. No se manda: el `observer_id` lo pone el servidor desde el
+  // token. Esto es solo confianza de que el sistema sabe quien es.
+  const user = useAppStore((s) => s.auth.user);
+  const observerDisplayName = user?.full_name || user?.username || 'tu usuario';
+
   const {
     observations,
     isLoading,
@@ -137,7 +157,6 @@ export function ObservationsScreen() {
     () => new Date().toISOString().slice(0, 16)
   );
   const [observedDensity, setObservedDensity] = useState('');
-  const [observerId, setObserverId] = useState('');
   const [source, setSource] = useState('manual');
   const [notas, setNotas] = useState('');
   const [formMessage, setFormMessage] = useState<string | null>(null);
@@ -235,7 +254,7 @@ export function ObservationsScreen() {
       zone_id: zoneId,
       timestamp: new Date(timestamp).toISOString(),
       observed_density: density,
-      observer_id: observerId.trim() !== '' ? observerId.trim() : undefined,
+      // Sin `observer_id`: lo inyecta el servidor desde el token.
       source,
       ...(metadataPayload ? { metadata: metadataPayload } : {}),
     });
@@ -243,7 +262,6 @@ export function ObservationsScreen() {
     if (result) {
       setFormMessage('Observación registrada correctamente.');
       setObservedDensity('');
-      setObserverId('');
       setNotas('');
       if (selectedDay) setTimestamp(defaultTimestampForDay(selectedDay));
     } else if (error && /outside the operational range/i.test(error)) {
@@ -251,7 +269,7 @@ export function ObservationsScreen() {
         'La hora seleccionada está fuera del rango operativo de la jornada elegida. Por favor, ajustá la hora o seleccioná otra jornada.'
       );
     }
-  }, [eventDayId, zoneId, timestamp, observedDensity, observerId, source, notas, createObservation, error, timeInRange, selectedDay]);
+  }, [eventDayId, zoneId, timestamp, observedDensity, source, notas, createObservation, error, timeInRange, selectedDay]);
 
   const handleSaveEdit = useCallback(
     async (
@@ -345,14 +363,24 @@ export function ObservationsScreen() {
               />
             </label>
             <label className="block text-sm">
-              <span className="text-slate-700 font-medium">Observador (opcional)</span>
+              <span className="text-slate-700 font-medium">Observador</span>
+              {/* Solo lectura y no un input: el `observer_id` lo inyecta el
+                  servidor desde el token, asi que un campo editable seria una
+                  mentira. Mostrar el nombre confirma al operador que el sistema
+                  sabe quien es, que era el problema: antes habia un input que
+                  pedia un ID a mano y el valor se descartaba. */}
               <input
                 type="text"
-                value={observerId}
-                onChange={(e) => setObserverId(e.target.value)}
-                placeholder="ID del observador"
-                className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                value={observerDisplayName}
+                readOnly
+                tabIndex={-1}
+                aria-readonly="true"
+                title="Se completa automáticamente con tu usuario. No se puede modificar."
+                className="mt-1 w-full px-3 py-2 border border-slate-200 bg-slate-50 rounded-lg text-sm text-slate-600 cursor-not-allowed"
               />
+              <span className="mt-1 block text-xs text-slate-400">
+                Registrado automáticamente desde tu sesión. No se puede modificar.
+              </span>
             </label>
             <label className="block text-sm">
               <span className="text-slate-700 font-medium">Fuente</span>
@@ -451,7 +479,21 @@ export function ObservationsScreen() {
                         </div>
                       )}
                     </td>
-                    <td className="px-5 py-2 text-slate-600">{obs.observer_id || '—'}</td>
+                    {/* Nombre del observador, no el UUID. Y si la observación
+                        tiene alertas de calidad, se resalta: el nombre es
+                        justamente lo que el administrador necesita para saber a
+                        quién pedir la corrección. */}
+                    <td className="px-5 py-2">
+                      {warnings.length > 0 ? (
+                        <span className="inline-flex items-center gap-1 font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
+                          {observerLabel(obs.observer_name)}
+                        </span>
+                      ) : (
+                        <span className="text-slate-600">
+                          {observerLabel(obs.observer_name)}
+                        </span>
+                      )}
+                    </td>
                     <td className="px-5 py-2 text-slate-600">
                       <div>{obs.source}</div>
                       {obs.corrected_by && (

@@ -72,7 +72,21 @@ def _scratch_ddl() -> str:
         "CREATE TABLE operational_profiles (id uuid PRIMARY KEY)",
     ]
     statements = list(stubs)
-    for table in (EventDay.__table__, Zone.__table__, OperationalObservationModel.__table__):
+    # `users` va en el scratch porque `crud/operational_observation` resuelve
+    # `observer_name` con un SELECT a esa tabla. Sin ella, toda observacion que
+    # se creara en estos tests moria con 'no existe la relación «users»'. El
+    # schema scratch se crea en la base de DESARROLLO, que no tiene las tablas
+    # RBAC: por eso hay que declararla acá y no confiar en que exista.
+    #
+    # El CRUD no necesita que el `observer_id` apunte a una fila real: si no
+    # matchea, `_observer_names` no lo encuentra y `observer_name` queda en
+    # None, que es el caso "observación sin atribuir".
+    for table in (
+        EventDay.__table__,
+        Zone.__table__,
+        OperationalObservationModel.__table__,
+        User.__table__,
+    ):
         statements.append(str(CreateTable(table).compile(dialect=dialect)))
         for index in table.indexes:
             index_ddl = str(CreateIndex(index).compile(dialect=dialect))

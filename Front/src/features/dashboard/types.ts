@@ -281,6 +281,12 @@ export interface OperationalObservationDTO {
   timestamp: string;
   observed_density: number;
   observer_id: string | null;
+  /**
+   * Nombre legible del observador, resuelto por el backend contra `users`.
+   * `null` si la observación no tiene observador o si el usuario ya no existe:
+   * se muestra como "Desconocido", no como un UUIDcrudo.
+   */
+  observer_name?: string | null;
   source: string;
   metadata: Record<string, unknown> | null;
   created_at: string;
@@ -295,7 +301,6 @@ export interface OperationalObservationCreatePayload {
   zone_id: string;
   timestamp: string;
   observed_density: number;
-  observer_id?: string;
   source?: string;
   metadata?: Record<string, unknown>;
 }
@@ -306,10 +311,13 @@ export interface OperationalObservationCreatePayload {
  * mandarlos desde acá solo produciría un error de validación.
  *
  * Tampoco incluye `corrected_by`: lo escribe el servidor con el `sub` del token.
+ *
+ * Ni `observer_id`: es inmutable (el backend lo ignora en el update y lo rechaza
+ * si se manda), y antes este tipo lo ofrecia. Mandarlo convertia CADA
+ * correccion en un 422, porque el modal lo pre-rellenaba con el UUID de la fila.
  */
 export interface OperationalObservationUpdatePayload {
   observed_density?: number;
-  observer_id?: string;
   source?: string;
   metadata?: Record<string, unknown>;
 }
@@ -572,7 +580,9 @@ export interface FieldCensusItemDTO {
   observed_density_max: number | null;
   last_observed_at: string | null;
   occupancy_percent: number | null;
-  warning_flags: string[];
+warning_flags: string[];
+  /** Observadores distintos que cargaron en la zona durante el período. */
+  observer_names: string[];
 }
 
 export interface FieldCensusDTO {

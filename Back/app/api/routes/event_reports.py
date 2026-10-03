@@ -20,6 +20,7 @@ from app.models.event_day_phase import EventDayPhase
 from app.models.operational_event import OperationalEvent
 from app.models.operational_phase import OperationalPhase
 from app.models.service_interaction_log import RESULT_STATUSES, ServiceInteractionLog
+from app.models.user import User
 from app.models.zone import Zone
 from app.schemas.event_reports import (
     CoverageGapItem,
@@ -767,6 +768,24 @@ async def event_report_field_census(
     )
     warning_flags_col = warning_flags_sq.c.warning_flags.label("warning_flags")
 
+    # Quien registro cada observacion. Se resuelve con un LEFT JOIN a `users` y
+    # se agrega en el mismo GROUP BY: es lo que permite que el administrador sepa
+    # a quien dirigirse cuando una zona tiene alertas de calidad.
+    #
+    # El LEFT JOIN es obligatorio y no un INNER: hay observaciones con
+    # `observer_id` nulo (carga sin atribucion) y filas cuyo usuario ya no existe.
+    # Con INNER JOIN esas observaciones desaparecerian del censo, que es
+    # exactamente el dato que el administrador necesita ver.
+    #
+    # `coalesce(full_name, username)` replica el fallback del listado de
+    # observaciones: primero el nombre, y si no hay, el username. Un `array_agg`
+    # de distinct sobre eso no repite a la misma persona aunque haya cargado 20
+    # veces en la misma zona.
+    observer_display = func.coalesce(User.full_name, User.username)
+    observer_names_col = (
+        func.array_agg(func.distinct(observer_display)).label("observer_names")
+    )
+
     result = await db.execute(
         select(
             Zone.id.label("zone_id"),
@@ -779,13 +798,16 @@ async def event_report_field_census(
             func.max(OperationalObservationModel.timestamp).label("last_observed_at"),
             occupancy_pct,
             warning_flags_col,
+            observer_names_col,
         )
         .select_from(
             join(
                 Zone.__table__,
                 OperationalObservationModel.__table__,
                 OperationalObservationModel.zone_id == Zone.id,
-            ).outerjoin(warning_flags_sq, warning_flags_sq.c.zone_id == Zone.id)
+            )
+            .outerjoin(warning_flags_sq, warning_flags_sq.c.zone_id == Zone.id)
+            .outerjoin(User, User.id == OperationalObservationModel.observer_id)
         )
         .where(*obs_conditions)
         .group_by(
@@ -814,6 +836,10 @@ async def event_report_field_census(
                 round(row.occupancy_pct, 1) if row.occupancy_pct is not None else None
             ),
             warning_flags=list(row.warning_flags) if row.warning_flags else [],
+            # `array_agg` saltea los NULL, asi que `observer_id` nulo o usuario
+            # inexistente no inventan una entrada. El `distinct` del SQL evita
+            # duplicados; aca se ordena para que el informe sea estable.
+            observer_names=sorted(n for n in (row.observer_names or []) if n),
         )
         for row in result.all()
     ]

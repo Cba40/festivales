@@ -40,6 +40,12 @@ export const useThemeStore = create<{
 export interface AuthUser {
   id: string | null;
   username: string;
+  /**
+   * Nombre y apellido, si el usuario los cargo en su perfil. Informativo: la
+   * identidad la define `username`. `null` cuando no lo completo, y por eso
+   * siempre se muestra como `full_name || username`.
+   */
+  full_name: string | null;
   roles: string[];
   permissions: string[];
   is_provider_super_admin: boolean;

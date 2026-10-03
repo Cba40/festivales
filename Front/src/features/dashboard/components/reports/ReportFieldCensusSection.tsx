@@ -88,7 +88,8 @@ export function ReportFieldCensusSection({
                   {flagged.length} de {zones.length} zonas
                 </span>{' '}
                 tienen observaciones con alertas de calidad que conviene revisar. La
-                observación sigue contando: está marcada, no descartada.
+                observación sigue contando: está marcada, no descartada. La columna
+                Observadores dice a quién pedir la corrección.
               </span>
             </p>
           )}
@@ -113,6 +114,7 @@ export function ReportFieldCensusSection({
                 <th className="px-3 py-2 font-medium text-right">Densidad Máxima</th>
                 <th className="px-3 py-2 font-medium text-right">Ocupación %</th>
                 <th className="px-3 py-2 font-medium">Última observación</th>
+                <th className="px-3 py-2 font-medium">Observadores</th>
                 <th className="px-3 py-2 font-medium">Calidad</th>
               </tr>
             </thead>
@@ -161,6 +163,24 @@ export function ReportFieldCensusSection({
                     {zone.last_observed_at
                       ? formatLocalDateTime(zone.last_observed_at, DEFAULT_TIMEZONE)
                       : '—'}
+                  </td>
+                  <td className="px-3 py-2 text-xs">
+                    {zone.observer_names.length > 0 ? (
+                      /* Con alertas de calidad el nombre se destaca: es a quién
+                         hay que dirigirse para que corrija la carga. Sin alertas
+                         es contexto, no un problema a resolver. */
+                      <span
+                        className={
+                          zone.warning_flags.length > 0
+                            ? 'font-semibold text-amber-800'
+                            : 'text-slate-600'
+                        }
+                      >
+                        {zone.observer_names.join(', ')}
+                      </span>
+                    ) : (
+                      <span className="text-slate-300">sin atribuir</span>
+                    )}
                   </td>
                   <td className="px-3 py-2">
                     {zone.warning_flags.length > 0 ? (

@@ -888,6 +888,10 @@ class TestFieldCensus:
                     last_observed_at=last,
                     occupancy_pct=occupancy,
                     warning_flags=flags,
+                    # El SELECT del endpoint proyecta `observer_names`; el mock tiene
+                    # que traer la columna o el endpoint revienta con
+                    # AttributeError y la respuesta es 500 en vez de 200.
+                    observer_names=[],
                 )
                 for zone_id, name, zone_type, capacity, count, avg_density, max_density, last, occupancy, flags in rows
             ]
@@ -1129,6 +1133,7 @@ class TestFieldCensusWarningFlags:
                     last_observed_at=None,
                     occupancy_pct=occupancy,
                     warning_flags=flags,
+                    observer_names=[],
                 )
                 for zone_id, name, zone_type, capacity, count, avg_density, max_density, occupancy, flags in rows
             ]

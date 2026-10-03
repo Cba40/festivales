@@ -11,6 +11,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.event_day import EventDay
+from app.models.user import User
 from app.models.zone import Zone
 from app.schemas.operational_observation import (
     OperationalObservationCreate,
@@ -158,7 +159,10 @@ def _is_within_event_day(event_day: EventDay, timestamp: datetime) -> bool:
     return event_day.operational_start_min <= current_min < event_day.operational_end_min
 
 
-def _to_response(model: OperationalObservationModel) -> OperationalObservationResponse:
+def _to_response(
+    model: OperationalObservationModel,
+    observer_name: str | None = None,
+) -> OperationalObservationResponse:
     return OperationalObservationResponse(
         id=str(model.id),
         event_day_id=model.event_day_id,
@@ -166,12 +170,49 @@ def _to_response(model: OperationalObservationModel) -> OperationalObservationRe
         timestamp=model.timestamp,
         observed_density=model.observed_density,
         observer_id=model.observer_id,
+        observer_name=observer_name,
         source=model.source,
         metadata=model.metadata_,
         created_at=model.created_at,
         corrected_by=model.corrected_by,
         corrected_at=model.corrected_at,
     )
+
+
+async def _observer_names(db: AsyncSession, ids: set[str]) -> dict[str, str]:
+    """Resuelve `observer_id` -> nombre legible, en UNA consulta.
+
+    Sin esto habria que resolver el nombre fila por fila: el listado de
+    observaciones es el endpoint que mas filas trae, y un nombre por fila son N
+    consultas extra. Ademas el nombre no se guarda en la observacion a proposito:
+    `users.full_name` se puede corregir, y desnormalizarlo congelaria un nombre
+    viejo junto a una fila de auditoría.
+
+    Se trae `username` además de `full_name` por dos casos reales: el super admin
+    del proveedor no existe en `users` (y aunque existiera, no tendria
+    `full_name`), y muchos usuarios se dieron de alta sin completar el nombre.
+    Por eso el fallback no es opcional.
+
+    Un `observer_id` que no matchea ninguna fila se queda fuera del dict: eso
+    produce `observer_name = None`, que la UI muestra como desconocido. Es el
+    comportamiento correcto para una fila huérfana.
+    """
+    valid = {i.strip() for i in ids if i and _is_valid_uuid(i.strip())}
+    if not valid:
+        return {}
+    result = await db.execute(
+        select(User.id, User.full_name, User.username).where(User.id.in_(valid))
+    )
+    return {
+        row.id: (row.full_name or row.username)
+        for row in result.all()
+        if row.full_name or row.username
+    }
+
+
+async def _observer_name_for(db: AsyncSession, observer_id: str | None) -> str | None:
+    names = await _observer_names(db, {observer_id} if observer_id else set())
+    return names.get(observer_id) if observer_id else None
 
 
 async def create_observation(
@@ -252,7 +293,7 @@ async def create_observation(
     await db.flush()
     await db.commit()
     await db.refresh(db_obj)
-    return _to_response(db_obj)
+    return _to_response(db_obj, await _observer_name_for(db, observer_id))
 
 
 async def get_observation(
@@ -262,7 +303,7 @@ async def get_observation(
     model = await db.get(OperationalObservationModel, observation_id)
     if model is None:
         return None
-    return _to_response(model)
+    return _to_response(model, await _observer_name_for(db, model.observer_id))
 
 
 async def find_all(
@@ -285,7 +326,12 @@ async def find_all(
 
     result = await db.execute(stmt)
     models = result.scalars().all()
-    return [_to_response(m) for m in models]
+    # Una sola consulta para todos los observadores del lote, no una por fila.
+    names = await _observer_names(db, {m.observer_id for m in models if m.observer_id})
+    return [
+        _to_response(m, names.get(m.observer_id) if m.observer_id else None)
+        for m in models
+    ]
 
 
 async def update_observation(
@@ -367,4 +413,4 @@ async def update_observation(
     await db.flush()
     await db.commit()
     await db.refresh(model)
-    return _to_response(model)
+    return _to_response(model, await _observer_name_for(db, model.observer_id))
