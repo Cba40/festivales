@@ -19,6 +19,21 @@ from src.domain.entities.zone import Zone
 from src.domain.entities.zone_behavior import FlowRestriction
 
 
+class MissingModelInputError(ValueError):
+    """Falta un dato de entrada opcional y el modelo no puede calcular.
+
+    No es un bug del modelo: es un hueco de datos conocido (por ejemplo
+    `average_duration_min` sin fila en `service_configs`, o
+    `attendance_level.max_people` en NULL). El modelo NO inventa el valor.
+
+    Se distingue de un `ValueError` genérico para que la etapa 4 lo degrade
+    sin generar un warning con traceback por zona: 9 baños sin configurar
+    serían 9 tracebacks en cada pedido a `/predictions`, y eso esconde los
+    fallos que sí hay que mirar. Hereda de `ValueError` para no romper a
+    quien hoy la captura como `ValueError`.
+    """
+
+
 class ModelExecutionContext:
     """Contexto territorial común resuelto que el Context Engine entrega al modelo.
 

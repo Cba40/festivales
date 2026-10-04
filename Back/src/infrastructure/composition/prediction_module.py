@@ -5,6 +5,7 @@ GetTerritorialPrediction with infrastructure dependencies.
 """
 from __future__ import annotations
 
+import logging
 import math
 from collections.abc import Sequence
 from datetime import date, datetime
@@ -61,6 +62,8 @@ from src.infrastructure.persistence.repositories.prediction_repository import (
 # ---------------------------------------------------------------------------
 # Private helpers — data loading from the legacy ORM layer
 # ---------------------------------------------------------------------------
+
+logger = logging.getLogger(__name__)
 
 _EARTH_RADIUS_M = 6_371_000.0
 
@@ -185,6 +188,63 @@ async def _resolve_service_duration(
         "ServiceConfig must define average_duration_min "
         f"for (zone_type_id={zone_type_id}, subtipo={subtipo!r})"
     )
+
+
+async def _resolve_service_durations_by_zone(
+    db: AsyncSession,
+    *,
+    type_map: dict[str, UUID],
+    zones: Sequence[Zone],
+    model_selector: ModelSelector,
+    event_day_id: UUID | str | None,
+) -> dict[UUID, float]:
+    """Resuelve `average_duration_min` (MINUTOS) de las zonas CON modelo.
+
+    El `ContextEngine` es síncrono y no tiene sesión, así que las permanencias
+    se resuelven acá, antes de construir el motor, y se le pasan ya resueltas.
+    Solo se consultan los grupos `(type, subtipo)` que un modelo registrado
+    declara soportar: las zonas sin modelo no gastan consultas, y con 39 zonas
+    eso es la diferencia entre 6 queries y 39*2.
+
+    Se consulta una vez por grupo, no una vez por zona: `_resolve_service_duration`
+    solo depende de `(zone_type_id, subtipo, event_day_id)`.
+
+    Degradación: si `service_configs` no tiene fila para un grupo, ese grupo
+    queda fuera del mapa, el modelo recibe `average_duration_min=None` y degrada
+    SOLO sus zonas. No se inventan valores ni se tumba la predicción: es la
+    misma política que `ParkingModule` con su `except ValueError`
+    (`parking_module.py:208`).
+    """
+    groups: dict[tuple[str, str | None], list[Zone]] = {}
+    for zone in zones:
+        if model_selector.select(zone) is None:
+            continue
+        groups.setdefault((zone.type, zone.subtipo), []).append(zone)
+
+    durations: dict[UUID, float] = {}
+    for (zone_type, subtipo), group in groups.items():
+        try:
+            zone_type_id = _resolve_zone_type_id(type_map, zone_type, subtipo)
+            duration_min = await _resolve_service_duration(
+                db,
+                zone_type_id=zone_type_id,
+                subtipo=subtipo,
+                event_day_id=event_day_id,
+            )
+        except ValueError:
+            # Sin catálogo o sin `service_configs`: se loguea UNA vez por grupo
+            # (no una vez por zona) y esas zonas degradan en stage 4.
+            logger.info(
+                "Sin service_configs para (type=%r, subtipo=%r): las %d zonas "
+                "de ese grupo quedan sin saturacion hasta que exista la fila.",
+                zone_type,
+                subtipo,
+                len(group),
+            )
+            continue
+        for zone in group:
+            durations[zone.id] = float(duration_min)
+    return durations
 
 
 async def _load_default_operational_profile_id(
@@ -493,7 +553,19 @@ class PredictionModule:
 
         stage4_config = await get_stage4_config(self._db)
 
-        engine = ContextEngine(model_selector=_build_model_selector())
+        model_selector = _build_model_selector()
+        service_durations = await _resolve_service_durations_by_zone(
+            self._db,
+            type_map=type_map,
+            zones=zones,
+            model_selector=model_selector,
+            event_day_id=event_day.id,
+        )
+
+        engine = ContextEngine(
+            model_selector=model_selector,
+            service_durations=service_durations,
+        )
         event_day_repo = _PreloadedEventDayRepository(event_day)
         event_repo = OperationalEventAdapter(self._db)
         prediction_repo = _ReturnSavedPredictionRepository()

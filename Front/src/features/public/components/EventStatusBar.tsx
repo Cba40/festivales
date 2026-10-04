@@ -95,10 +95,10 @@ export function EventStatusBar({ autoRefreshMs = 30000 }: EventStatusBarProps) {
   const zones = data.zone_states;
   const intensityPct = computeIntensityPct(zones);
   // Cuantas zonas hay con saturacion medida. El promedio sale de esas, no de
-  // todas: hoy solo los estacionamientos y (cuando se conecte
-  // `average_duration_min`) los banos tienen modelo, asi que el numero es
-  // "intensidad de las zonas modeladas", no del territorio entero. Decirlo en el
-  // title evita que se lea como cobertura total.
+  // todas: hoy los estacionamientos (parking_v1) y los banos (bathroom_v1)
+  // tienen modelo, y el resto de tipos todavia no. El numero es "intensidad de
+  // las zonas modeladas", no del territorio entero. Decirlo en el title evita
+  // que se lea como cobertura total.
   const zonasMedidas = zones.filter((z) => z.saturation_level != null).length;
   const restrictedZones = zones.filter((z) => z.active_restriction !== 'OPEN').length;
   const barColor = intensityPct === null ? 'bg-slate-300' : intensityPct > 75 ? 'bg-red-500' : intensityPct > 50 ? 'bg-amber-500' : 'bg-emerald-500';

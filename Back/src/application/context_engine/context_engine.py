@@ -34,14 +34,27 @@ from src.domain.value_objects.territorial_prediction import TerritorialPredictio
 
 
 class ContextEngine:
-    def __init__(self, model_selector: ModelSelector | None = None) -> None:
+    def __init__(
+        self,
+        model_selector: ModelSelector | None = None,
+        service_durations: Mapping[UUID, float] | None = None,
+    ) -> None:
         self._model_selector = (
             model_selector if model_selector is not None else ModelSelector()
         )
+        # `zone_id -> average_duration_min` (MINUTOS), resuelto desde
+        # `service_configs` por la capa de composición. El Engine no abre
+        # sesión de base: si una zona no aparece en el mapa, su modelo que
+        # exige permanencia degrada solo esa zona.
+        self._service_durations = dict(service_durations or {})
 
     @property
     def model_selector(self) -> ModelSelector:
         return self._model_selector
+
+    @property
+    def service_durations(self) -> Mapping[UUID, float]:
+        return self._service_durations
 
     def predict(
         self,
@@ -83,6 +96,7 @@ class ContextEngine:
             attendance_level,
             event_day=event_day,
             model_selector=self._model_selector,
+            service_durations=self._service_durations,
         )
 
         zone_states = derive_zone_states(

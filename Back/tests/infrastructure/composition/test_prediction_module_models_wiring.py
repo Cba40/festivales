@@ -5,8 +5,9 @@ Qué prueba
 Que `_build_model_selector()` conecte ParkingV1 y BathroomV1 al Context Engine y
 que el endpoint público `/predictions` siga funcionando cuando un modelo NO puede
 calcular. Sin la BD real esto no se puede verificar: los modelos dependen de
-`event_days.estimated_vehicles` y de `attendance_level.max_people`, que son
-NULLABLE, y el camino de degradación solo se ejercita si de verdad faltan.
+`event_days.estimated_vehicles`, de `attendance_level.max_people` y de
+`service_configs.average_duration_min`, que son NULLABLE, y el camino de
+degradación solo se ejercita si de verdad faltan.
 
 Contra qué base
 ---------------
@@ -69,6 +70,12 @@ EVENT_DAY_ID = "bbbbbbbb-0000-0000-0000-000000000001"
 ZT_PARKING = "cccccccc-0000-0000-0000-000000000001"
 ZT_SERVICIOS = "cccccccc-0000-0000-0000-000000000002"
 ZT_COMIDA = "cccccccc-0000-0000-0000-000000000003"
+
+# Fila de `service_configs` para banos. El id es propio del test (no uuid4) para
+# que el DELETE de limpieza sea exacto y no borre configuracion ajena.
+SC_BANOS_ID = "ffffffff-0000-0000-0000-000000000001"
+# Visita tipica a un baño publico: 5 minutos.
+DURACION_BANOS_MIN = 5
 
 
 def _async_url(url: str) -> str:
@@ -162,6 +169,9 @@ async def escenario(engine, test_engine):
         await conn.execute(
             sa.text("DELETE FROM zone_types WHERE id IN (:a, :b, :c)"),
             {"a": ZT_PARKING, "b": ZT_SERVICIOS, "c": ZT_COMIDA},
+        )
+        await conn.execute(
+            sa.text("DELETE FROM service_configs WHERE id = :i"), {"i": SC_BANOS_ID}
         )
         await conn.execute(sa.text("DELETE FROM recommendation_config WHERE id = 1"))
         await conn.execute(sa.text("DELETE FROM stage4_config WHERE id = 1"))
@@ -317,6 +327,9 @@ async def escenario(engine, test_engine):
             sa.text("DELETE FROM zone_types WHERE id IN (:a, :b, :c)"),
             {"a": ZT_PARKING, "b": ZT_SERVICIOS, "c": ZT_COMIDA},
         )
+        await conn.execute(
+            sa.text("DELETE FROM service_configs WHERE id = :i"), {"i": SC_BANOS_ID}
+        )
         await conn.execute(sa.text("DELETE FROM recommendation_config WHERE id = 1"))
         await conn.execute(sa.text("DELETE FROM stage4_config WHERE id = 1"))
 
@@ -334,6 +347,34 @@ def _by_zone(pred) -> dict:
     return {str(z.zone_id): z for z in pred.zone_states}
 
 
+async def _service_config_banos(engine, minutos: int | None) -> None:
+    """Deja (o quita) la fila de `service_configs` que habilita los banos.
+
+    `minutos=None` la borra. Se borra SIEMPRE antes de insertar: la tabla tiene
+    un indice unico parcial `uq_service_config_default`
+    (`(zone_type_id, COALESCE(subtipo,''), event_day_id) WHERE event_day_id IS
+    NULL`), asi que un segundo INSERT sin borrar antes revienta con
+    UniqueViolationError y el fallo se confundiria con un problema del modelo.
+
+    `zone_type_id=ZT_SERVICIOS`: en este escenario el slug de la zona de banos
+    es `servicios` (no `bano`), y `_resolve_zone_type_id` prioriza el `type`
+    sobre el mapeo por `subtipo`.
+    """
+    async with engine.begin() as conn:
+        await conn.execute(
+            sa.text("DELETE FROM service_configs WHERE id = :i"), {"i": SC_BANOS_ID}
+        )
+        if minutos is not None:
+            await conn.execute(
+                sa.text(
+                    "INSERT INTO service_configs "
+                    "(id, zone_type_id, subtipo, event_day_id, average_duration_min) "
+                    "VALUES (:i, :z, 'banos', NULL, :m)"
+                ),
+                {"i": SC_BANOS_ID, "z": ZT_SERVICIOS, "m": minutos},
+            )
+
+
 class TestModelosConectados:
     async def test_no_revienta_y_devuelve_las_3_zonas(self, escenario):
         pred = await _pred(escenario["factory"], escenario["hoy"], 12)
@@ -349,30 +390,25 @@ class TestModelosConectados:
         )
         assert parking.model_result["parking_id"] == ZONE_PARKING
 
-    async def test_banos_se_degradan_porque_average_duration_min_no_llega(self, escenario):
-        """GAP CONOCIDO, no un test que pasa por casualidad.
+    async def test_banos_degradan_sin_fila_en_service_configs(self, escenario):
+        """Sin `service_configs`, los banos NO calculan y la zona no desaparece.
 
-        `BathroomV1Model.duration_hours` exige `average_duration_min`
-        (`bathroom_v1_model.py:156`). Ese campo existe en `ModelExecutionContext`
-        pero `_build_execution_context` (stage4_model_execution.py:39) NO lo
-        setea, y el helper que lo resolveria desde `service_configs`
-        (`_resolve_service_duration`, prediction_module.py:145) esta definido
-        pero nunca se llama.
-
-        Consecuencia: en el path de prediccion, el modelo de banos NUNCA puede
-        calcular y siempre degrada. Parking si funciona, porque
-        `estimated_vehicles` si llega (viene de `event_day`).
-
-        Este test fija el comportamiento ACTUAL a proposito: cuando se conecte
-        `average_duration_min`, este test va a fallar y hay que invertirlo para
-        exigir `model_result is not None`.
+        `BathroomV1Model.duration_hours` exige `average_duration_min`. Ese campo
+        lo arma `_build_execution_context` (stage4_model_execution.py:63) a partir
+        del mapa `zone_id -> average_duration_min` que
+        `_resolve_service_durations_by_zone` (prediction_module.py:193) resuelve
+        desde `service_configs`. Este escenario NO siembra esa tabla, asi que el
+        modelo recibe `None` y degrada: sin `model_result`, sin `saturation_level`,
+        pero con `operational_state` y sin tumbar a las otras zonas.
         """
         pred = await _pred(escenario["factory"], escenario["hoy"], 12)
         banos = _by_zone(pred)[ZONE_BANOS]
         assert banos.model_result is None, (
-            "los banos YA calculan: significaria que average_duration_min "
-            "llego al contexto. Invertir este assert para exigir "
-            "model_result is not None."
+            "sin fila en service_configs no deberia haber resultado de modelo; "
+            "si lo hay, el modelo esta inventando una permanencia"
+        )
+        assert banos.saturation_level is None, (
+            "una zona degradada se ve igual que una zona sin modelo: sin saturacion"
         )
         assert banos.operational_state is not None, (
             "y la zona no puede desaparecer del resultado"
@@ -416,6 +452,90 @@ class TestLaIntensidadMueveElModelo:
         assert baja.projected_density == alta.projected_density
 
 
+class TestBanosConServiceConfigs:
+    """`average_duration_min` viaja de `service_configs` al contexto del modelo.
+
+    El camino completo, de punta a punta:
+
+    1. `_resolve_service_durations_by_zone` (composition, async) lee
+       `service_configs` UNA vez por grupo `(type, subtipo)` que tiene modelo.
+    2. `ContextEngine` lo recibe ya resuelto; no abre sesión.
+    3. `_build_execution_context` reparte el valor por `zone_id`.
+    4. `BathroomV1Model.execute` lo convierte con `duration_hours` y emite
+       `occupancy_ratio`, que stage4 mapea a `saturation_level`.
+
+    Ojo con las unidades: `service_configs.average_duration_min` esta en MINUTOS
+    y el modelo divide por 60 para trabajar en horas (`duration_hours`).
+    """
+
+    async def test_banos_calculan_y_emiten_saturation(self, engine, escenario):
+        await _service_config_banos(engine, DURACION_BANOS_MIN)
+        try:
+            pred = await _pred(escenario["factory"], escenario["hoy"], 12)
+            banos = _by_zone(pred)[ZONE_BANOS]
+
+            assert banos.model_result is not None, (
+                "con fila en service_configs el modelo de banos tiene que calcular: "
+                "si degrada, average_duration_min no esta llegando al contexto"
+            )
+            assert banos.model_result["bathroom_id"] == ZONE_BANOS
+            # La duracion llega en MINUTOS y entra al modelo como horas.
+            assert banos.model_result["capacity"] == 200
+            assert banos.saturation_level is not None, (
+                "un modelo que calcula tiene que alimentar el indicador del "
+                "EventStatusBar; sin esto la zona sigue sin medir"
+            )
+            assert 0.0 <= banos.saturation_level <= 1.0
+        finally:
+            await _service_config_banos(engine, None)
+
+    async def test_la_duracion_configurada_mueve_el_modelo(self, engine, escenario):
+        """Control de que el valor leido importa: 5 min y 60 min no pueden dar
+        la misma ocupacion concurrente. Si dieran igual, el mapa no se estaria
+        usando y el modelo calcularia con un default."""
+        factory, hoy = escenario["factory"], escenario["hoy"]
+        try:
+            await _service_config_banos(engine, 5)
+            corto = _by_zone(await _pred(factory, hoy, 12))[ZONE_BANOS]
+            await _service_config_banos(engine, 60)
+            largo = _by_zone(await _pred(factory, hoy, 12))[ZONE_BANOS]
+
+            assert corto.model_result is not None
+            assert largo.model_result is not None
+            # Little's law: mas permanencia => mas concurrencia con la misma
+            # llegada. El stock no puede BAJAR al alargar la permanencia.
+            assert largo.model_result["occupied"] > corto.model_result["occupied"], (
+                f"corto(5min)={corto.model_result['occupied']}, "
+                f"largo(60min)={largo.model_result['occupied']}: la duracion de "
+                "service_configs no esta moviendo el modelo"
+            )
+        finally:
+            await _service_config_banos(engine, None)
+
+    async def test_sin_fila_degrada_solo_los_banos(self, engine, escenario):
+        """El otro lado del mismo cable: sin fila, la zona de banos queda sin
+        `saturation_level` y el resto del evento sigue calculando."""
+        await _service_config_banos(engine, None)
+        try:
+            pred = await _pred(escenario["factory"], escenario["hoy"], 12)
+            assert pred is not None
+            assert len(pred.zone_states) == 3, (
+                "una zona sin insumo no puede reducir el numero de zonas"
+            )
+            states = _by_zone(pred)
+
+            assert states[ZONE_BANOS].model_result is None
+            assert states[ZONE_BANOS].saturation_level is None
+            assert states[ZONE_BANOS].operational_state is not None
+
+            # Aislamiento: el parking NO depende de la config de banos.
+            assert states[ZONE_PARKING].model_result is not None
+            assert states[ZONE_PARKING].saturation_level is not None
+            assert states[ZONE_COMIDA].operational_state is not None
+        finally:
+            await _service_config_banos(engine, None)
+
+
 class TestDegradacionGracefulEnBD:
     async def test_parking_sin_estimated_vehicles_no_rompe(self, engine, escenario):
         """El escenario de produccion que motivaba el try/except:
@@ -435,8 +555,8 @@ class TestDegradacionGracefulEnBD:
             states = _by_zone(pred)
             assert states[ZONE_PARKING].model_result is None
             # El resto sigue intacto: la degradacion es por zona. Se usa la zona
-            # generica como referencia porque banos ya degrada siempre (ver
-            # `test_banos_se_degradan_...`).
+            # generica como referencia porque banos ya degrada sin
+            # `service_configs` (ver `test_banos_degradan_sin_fila_en_service_configs`).
             assert states[ZONE_COMIDA].operational_state is not None
         finally:
             async with engine.begin() as conn:

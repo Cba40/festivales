@@ -32,6 +32,7 @@ from uuid import UUID
 from src.domain.entities.event_day_phase import EventDayPhase
 from src.domain.entities.zone import Zone
 from src.domain.models.specialized_model import (
+    MissingModelInputError,
     ModelExecutionContext,
     ModelSpecificResult,
 )
@@ -75,6 +76,11 @@ class BathroomV1Model:
     entregada por el Context Engine. La matemática interna es sistémica
     (multi-zona, multi-fase): `simulate` evalúa la evolución completa y
     `distribute` reparte el stock entre todas las zonas de servicios/baños.
+
+    Faltan datos (sin `average_duration_min`, sin `attendance_level`) NO se
+    inventan: `execute` eleva `MissingModelInputError` y la etapa 4 degrada esa
+    zona sola, dejándola sin `occupancy_ratio` y por lo tanto sin
+    `saturation_level`, como cualquier zona sin modelo.
     """
 
     model_id = "bathroom_v1"
@@ -153,7 +159,10 @@ class BathroomV1Model:
         conversión ocurre aquí para coincidir con `_phase_duration_hours`.
         """
         if average_duration_min is None:
-            raise ValueError("average_duration_min is required")
+            raise MissingModelInputError(
+                "average_duration_min is required (sin fila en service_configs "
+                "para el tipo de zona de banos); la zona degrada sin saturacion"
+            )
         if isinstance(average_duration_min, bool) or not isinstance(
             average_duration_min, (int, float)
         ):
@@ -452,11 +461,15 @@ class BathroomV1Model:
     @staticmethod
     def _require_max_people(attendance_level: object | None) -> int:
         if attendance_level is None:
-            raise ValueError("attendance_level is required")
+            raise MissingModelInputError(
+                "attendance_level is required (event_days.attendance_level_id "
+                "en NULL); la zona degrada sin saturacion"
+            )
         max_people = getattr(attendance_level, "max_people", None)
         if max_people is None:
-            raise ValueError(
-                "attendance_level.max_people is required (NULL no permitido)"
+            raise MissingModelInputError(
+                "attendance_level.max_people is required (NULL no permitido); "
+                "la zona degrada sin saturacion"
             )
         if isinstance(max_people, bool) or not isinstance(max_people, int):
             raise TypeError("max_people must be an integer")

@@ -224,6 +224,15 @@ def _mock_full_flow_session(
     execute_calls.append(_scalars_result([]))
     execute_calls.append(_scalar_one_result(None))  # knowledge_model_versions
     execute_calls.append(_scalar_one_result(None))  # stage4_config (default)
+    # service_configs: `_resolve_service_durations_by_zone` resuelve la
+    # permanencia de los grupos que tienen modelo (aca, solo
+    # `estacionamiento`) y no encuentra fila. "Sin fila" es un resultado
+    # valido, no un error: el grupo queda sin `average_duration_min` y ParkingV1
+    # sigue calculando con `EventDay.average_parking_duration`. Son las dos
+    # consultas de `_resolve_service_duration`: override por jornada y default
+    # global.
+    execute_calls.append(_scalar_one_result(None))  # service_configs override
+    execute_calls.append(_scalar_one_result(None))  # service_configs default
     # operational_events (OperationalEventAdapter): sin eventos activos.
     execute_calls.append(_scalars_result([]))
 

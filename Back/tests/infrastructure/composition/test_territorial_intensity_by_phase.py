@@ -17,6 +17,10 @@ Que mide
 3. Cuanto se moveria el numero del `EventStatusBar` con la formula de "promedio
    de saturation_level", y por que esa formula es engañosa con la mezcla de
    tipos actual.
+4. Cuantas zonas quedan DENTRO de ese promedio. Antes de conectar
+   `service_configs.average_duration_min` eran 8 de 39 (solo estacionamientos);
+   con los banos conectados son 17 de 39. El resto de tipos todavia no tiene
+   modelo, y eso se imprime para que el numero no se lea como cobertura total.
 """
 from __future__ import annotations
 
@@ -38,6 +42,7 @@ from app.models.event_day_phase import EventDayPhase
 from app.models.motor_config import RecommendationConfigModel, Stage4ConfigModel
 from app.models.operational_phase import OperationalPhase
 from app.models.operational_profile import OperationalProfile
+from app.models.service_config import ServiceConfig
 from app.models.zone import Zone
 from app.models.zone_behavior import ZoneBehavior
 from app.models.zone_type import ZoneType
@@ -49,6 +54,7 @@ EVENT_ID = "f0000000-0000-0000-0000-000000000001"
 PROFILE_ID = "f0000000-0000-0000-0000-000000000002"
 ATTENDANCE_ID = "f0000000-0000-0000-0000-000000000003"
 EVENT_DAY_ID = "f0000000-0000-0000-0000-000000000004"
+SC_BANOS_ID = "f0000000-0000-0000-0000-000000000501"
 
 # 10 fases contiguas de 144 min. La intensidad es lo que el operador configura
 # en "Fases de la jornada" y lo que RFC-007 §4.3 declara como la via por la que
@@ -70,6 +76,16 @@ TIPOS = [
 ]
 TOTAL_ZONAS = sum(c for _t, _s, c, _cap in TIPOS)  # 39
 
+# Zonas con modelo especializado: los estacionamientos (parking_v1) y los
+# banos (bathroom_v1). Parking ya calculaba; los banos solo desde que
+# `average_duration_min` llega al contexto desde `service_configs`.
+ZONAS_MODELADAS = sum(
+    c for t, s, c, _cap in TIPOS if t == "estacionamiento" or s == "banos"
+)  # 17
+
+# Permanencia de visita a un baño publico. En MINUTOS, como la columna.
+DURACION_BANOS_MIN = 5
+
 
 def _async_url(url: str) -> str:
     return re.sub(r"\bsslmode=([a-z]+)", r"ssl=\1", url)
@@ -84,6 +100,7 @@ async def engine():
 
 
 async def _limpiar(conn) -> None:
+    await conn.execute(sa.text("DELETE FROM service_configs WHERE id = :i"), {"i": SC_BANOS_ID})
     await conn.execute(sa.text("DELETE FROM zones WHERE event_id = :e"), {"e": EVENT_ID})
     await conn.execute(
         sa.text("DELETE FROM event_day_phases WHERE event_day_id = :d"), {"d": EVENT_DAY_ID}
@@ -181,6 +198,22 @@ async def escenario39(engine, test_engine):
                 ))
         assert len(zonas) == TOTAL_ZONAS, f"esperaba {TOTAL_ZONAS} zonas"
         db.add_all(zonas)
+        await db.flush()
+
+        # Lo que habilita el modelo de banos: sin esta fila,
+        # `_resolve_service_durations_by_zone` no encuentra `average_duration_min`
+        # y las 9 zonas de banos quedan fuera del indicador (8 de 39, no 17).
+        # `event_day_id=NULL` es el default global; el override por jornada se
+        # puede agregar despues sin tocar este.
+        db.add(
+            ServiceConfig(
+                id=SC_BANOS_ID,
+                zone_type_id=zt_ids["servicios"],
+                subtipo="banos",
+                event_day_id=None,
+                average_duration_min=DURACION_BANOS_MIN,
+            )
+        )
         await db.commit()
 
     yield {"hoy": hoy, "factory": factory, "phase_ids": phase_ids}
@@ -244,7 +277,12 @@ async def test_medicion_de_intensidad_por_fase(escenario39):
 
     print(line)
     con_modelo = sum(1 for z in pred1.zone_states if z.saturation_level is not None)
+    con_banos = sum(
+        1 for z in pred1.zone_states
+        if z.subtipo == "banos" and z.saturation_level is not None
+    )
     print(f"zonas con saturation_level: {con_modelo}/{len(pred1.zone_states)}")
+    print(f"  de las cuales banos: {con_banos}")
     print(f"zonas cuya saturacion CAMBIO entre fases: {cambios}")
 
     pct1, n1 = _statusbar_avg_saturation(pred1.zone_states)
@@ -252,11 +290,45 @@ async def test_medicion_de_intensidad_por_fase(escenario39):
     print(f"\nEventStatusBar con la formula 'promedio de saturation_level x 100':")
     print(f"  Fase 1 (0.1): {pct1}%   (calculado sobre {n1} de {len(pred1.zone_states)} zonas)")
     print(f"  Fase 9 (1.0): {pct9}%   (calculado sobre {n9} de {len(pred9.zone_states)} zonas)")
+    print(line)
+    print("\nCOBERTURA DEL INDICADOR (antes vs despues de conectar banos):")
+    print(f"  antes:  8/39 zonas  = 21% del territorio dentro del promedio")
+    print(f"  ahora: {con_modelo}/39 zonas = "
+          f"{round(con_modelo / TOTAL_ZONAS * 100)}% del territorio dentro del promedio")
+    print(f"  siguen sin modelo (fuera del promedio): "
+          f"{TOTAL_ZONAS - con_modelo} zonas (hidratacion, comida, cionreo, descanso, escenario)")
     print(line + "\n")
 
     assert len(pred1.zone_states) == TOTAL_ZONAS
     assert con_modelo > 0, "el mapeo occupancy_ratio -> saturation_level no esta llenando nada"
     assert cambios > 0, "la intensidad de fase no movio ninguna zona"
+
+    # El denominador del EventStatusBar. Estuvo en 8 (solo estacionamientos) y
+    # subio a 17 al conectarse `average_duration_min`: 8 estacionamientos + 9
+    # banos. Si esto baja, los banos volverian a degradar en silencio.
+    assert con_modelo == ZONAS_MODELADAS, (
+        f"esperaba {ZONAS_MODELADAS} zonas con saturacion "
+        f"(8 estacionamientos + 9 banos) y hay {con_modelo}. "
+        "Revisar la fila de service_configs para banos."
+    )
+    assert con_banos == 9, (
+        f"los 9 banos deberian tener saturacion y hay {con_banos} con dato"
+    )
+
+    # El punto de todo el cambio: los banos tienen que RESPONDER a la fase, no
+    # solo existir. Sin esto, 9 ceros en el promedio bajarian el indicador.
+    sat_banos_f1 = [
+        z.saturation_level for z in pred1.zone_states if z.subtipo == "banos"
+    ]
+    sat_banos_f9 = [
+        z.saturation_level for z in pred9.zone_states if z.subtipo == "banos"
+    ]
+    assert all(v is not None for v in sat_banos_f1 + sat_banos_f9)
+    assert sum(sat_banos_f9) > sum(sat_banos_f1), (
+        f"la fase de mayor intensidad no subio la saturacion de los banos: "
+        f"F1={sum(sat_banos_f1):.3f} vs F9={sum(sat_banos_f9):.3f}"
+    )
+
     assert pct9 > pct1, (
         f"el porcentaje no subio en la fase de mayor intensidad: "
         f"F1={pct1}% vs F9={pct9}%"
