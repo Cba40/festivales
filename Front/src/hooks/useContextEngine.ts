@@ -8,10 +8,19 @@ const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 export interface ZoneStateItem {
   zone_id: string;
   operational_state: string;
-  availability: number;
-  saturation_level: number;
-  estimated_wait: number;
-  confidence: number;
+  /**
+   * Los cuatro campos siguientes son resultados especificos del modelo
+   * especializado de la zona, y son NULL cuando no hubo modelo (ADR-004 §2.2:
+   * "pueden existir o no según el modelo ejecutado"). Antes se declaraban como
+   * `number`, que es una mentira: el backend manda `null` y un filtro
+   * `!= null` sobre un tipo no-nullable no parece estar filtrando nada.
+   *
+   * `estimated_wait` es entero (minutos) en el dominio, no float.
+   */
+  availability: number | null;
+  saturation_level: number | null;
+  estimated_wait: number | null;
+  confidence: number | null;
   reasoning_factors: string[];
   active_restriction: string;
   type?: string;

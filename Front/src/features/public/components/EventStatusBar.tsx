@@ -1,8 +1,40 @@
 import { useEffect } from 'react';
 import { AlertTriangle, CheckCircle, Clock, RefreshCw, ShieldBan } from 'lucide-react';
-import { useTerritorialPrediction, useAutoRefresh } from '../../../hooks/useContextEngine';
+import {
+  useTerritorialPrediction,
+  useAutoRefresh,
+  type ZoneStateItem,
+} from '../../../hooks/useContextEngine';
 
 const EVENT_ID = import.meta.env.VITE_EVENT_ID || '';
+
+/**
+ * Intensidad territorial en porcentaje, o `null` si no hay dato.
+ *
+ * Antes contaba zonas en dos cubos sobre `operational_state` (100 para
+ * CLOSED/HIGH_DEMAND, 50 para REGULATED/MODERATE, 0 para el resto) y promediaba.
+ * Ese numero era congelado: `operational_state` sale de
+ * `projected_density / capacity`, y `projected_density = capacity ×
+ * density_factor` con el MISMO `density_factor` en todas las fases, asi que
+ * cambiar la fase no lo movia. Medido: 39/39 zonas en MODERATE en la fase de
+ * intensidad 0.1 y en la de 1.0.
+ *
+ * Ahora promedia `saturation_level`, que es la salida del modelo especializado
+ * y SI responde a `EventDayPhase.intensity`.
+ *
+ * Devuelve `null`, no 0, cuando ninguna zona trae el dato. Cero significa
+ * "territorio vacio" y "sin dato" significa "el modelo no corrio": confundirlos
+ * es exactamente lo que `DESIGN_SYSTEM.md` veta ("no mostrar 0% si el dato es
+ * null"). El componente ya distingue los dos casos y muestra "Sin datos".
+ */
+function computeIntensityPct(zones: ZoneStateItem[]): number | null {
+  const validZones = zones.filter((z) => z.saturation_level != null);
+  if (validZones.length === 0) return null;
+  const avg =
+    validZones.reduce((sum, z) => sum + (z.saturation_level as number), 0) /
+    validZones.length;
+  return Math.round(avg * 100);
+}
 
 interface EventStatusBarProps {
   autoRefreshMs?: number;
@@ -61,16 +93,14 @@ export function EventStatusBar({ autoRefreshMs = 30000 }: EventStatusBarProps) {
   }
 
   const zones = data.zone_states;
-  const highIntensityZones = zones.filter(
-    z => z.operational_state === 'CLOSED' || z.operational_state === 'HIGH_DEMAND'
-  ).length;
-  const mediumIntensityZones = zones.filter(
-    z => z.operational_state === 'REGULATED' || z.operational_state === 'MODERATE'
-  ).length;
-  const intensityPct = zones.length > 0
-    ? Math.round((highIntensityZones * 100 + mediumIntensityZones * 50) / zones.length)
-    : null;
-  const restrictedZones = zones.filter(z => z.active_restriction !== 'OPEN').length;
+  const intensityPct = computeIntensityPct(zones);
+  // Cuantas zonas hay con saturacion medida. El promedio sale de esas, no de
+  // todas: hoy solo los estacionamientos y (cuando se conecte
+  // `average_duration_min`) los banos tienen modelo, asi que el numero es
+  // "intensidad de las zonas modeladas", no del territorio entero. Decirlo en el
+  // title evita que se lea como cobertura total.
+  const zonasMedidas = zones.filter((z) => z.saturation_level != null).length;
+  const restrictedZones = zones.filter((z) => z.active_restriction !== 'OPEN').length;
   const barColor = intensityPct === null ? 'bg-slate-300' : intensityPct > 75 ? 'bg-red-500' : intensityPct > 50 ? 'bg-amber-500' : 'bg-emerald-500';
   const dotColor = intensityPct === null ? 'bg-slate-300' : intensityPct > 75 ? 'bg-red-500' : intensityPct > 50 ? 'bg-amber-500' : 'bg-emerald-500';
 
@@ -88,10 +118,22 @@ export function EventStatusBar({ autoRefreshMs = 30000 }: EventStatusBarProps) {
               <div className={`h-full rounded-full ${barColor} transition-all`} style={{ width: `${intensityPct ?? 0}%` }} />
             </div>
             <span>{intensityPct !== null ? `${intensityPct}% intensidad territorial` : 'Sin datos'}</span>
-            {intensityPct === null && (
-              <span className="text-[10px] text-slate-400" title="Basado en el estado operativo de las zonas">
+            {intensityPct === null ? (
+              <span
+                className="text-[10px] text-slate-400"
+                title="Ninguna zona trae saturación: el modelo especializado no corrió para ninguna de ellas."
+              >
                 Intensidad territorial proyectada
               </span>
+            ) : (
+              zonasMedidas < zones.length && (
+                <span
+                  className="text-[10px] text-slate-400"
+                  title={`Promedio de saturación de las ${zonasMedidas} zonas con modelo especializado, sobre ${zones.length} en total. Las zonas sin modelo quedan fuera del promedio.`}
+                >
+                  {zonasMedidas}/{zones.length} zonas
+                </span>
+              )
             )}
           </div>
           {restrictedZones > 0 && (
