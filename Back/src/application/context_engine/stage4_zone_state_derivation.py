@@ -15,6 +15,31 @@ from src.domain.entities.zone_behavior import FlowRestriction
 from src.domain.value_objects.zone_state import ZoneState
 
 
+def _resolve_saturation_level(model_data: Mapping[str, object] | None) -> float | None:
+    """Saturación de la zona, o `None` si no hay modelo que la produzca.
+
+    Prioridad: la clave del contrato (`saturation_level`) y, si el modelo no la
+    emite, `occupancy_ratio`. Los dos valores son razones de ocupación en 0..1:
+    `ParkingV1Model.indices` calcula `occupancy_ratio = min(occupied, capacity)
+    / capacity`, con `capacity > 0` garantizado.
+
+    Se acepta el alias para que un modelo futuro pueda emitir `saturation_level`
+    directamente (contrato completo) sin tocar esta función, y para que un
+    modelo actual que solo emita `occupancy_ratio` no quede ciego.
+
+    Devolver `None` cuando no hay modelo es lo correcto: la UI lo distingue de
+    0 y muestra "sin datos" en vez de un 0% que parece una zona vacía.
+    """
+    if not model_data:
+        return None
+    value = model_data.get("saturation_level")
+    if value is None:
+        value = model_data.get("occupancy_ratio")
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
+
+
 def derive_zone_states(
     zone_behavior_result: ZoneBehaviorApplicationResult,
     zones: Sequence[Zone],
@@ -59,13 +84,23 @@ def derive_zone_states(
         )
         if model_data is not None and "operational_state" in model_data:
             operational_state = model_data["operational_state"]
-
         # Atributos de estado específicos: solo existen cuando el modelo
         # especializado correspondiente los produce (ADR-004). El Context
         # Engine NO genera fallback universal de estos valores.
-        saturation_level = (
-            model_data.get("saturation_level") if model_data is not None else None
-        )
+        #
+        # `saturation_level` se resuelve con la clave del contrato y, si el
+        # modelo no la emite, con `occupancy_ratio`. NO es un fallback genérico:
+        # solo aplica cuando un modelo especializado corrió y emitió SU propio
+        # resultado, bajo el nombre que el contrato de `ZoneState` usa. Lo que
+        # ADR-004 §2.3 prohíbe (y lo que esto NO hace) es derivarlo de
+        # `projected_density / capacity` cuando no hay modelo: eso sí sería una
+        # fórmula universal, y acá no ocurre.
+        #
+        # Sin este mapeo, conectar ParkingV1 y BathroomV1 no cambiaba nada
+        # visible: los dos emiten `occupancy_ratio` y el endpoint leía
+        # `saturation_level`, que quedaba en `None` para todas las zonas.
+        saturation_level = _resolve_saturation_level(model_data)
+
         availability = (
             model_data.get("availability") if model_data is not None else None
         )

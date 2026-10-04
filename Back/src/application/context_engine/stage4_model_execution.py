@@ -7,6 +7,7 @@ Esta etapa NO contiene fórmulas de ningún modelo: solo conoce el contrato.
 """
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping, Sequence
 from uuid import UUID
 
@@ -23,6 +24,8 @@ from src.domain.models.specialized_model import (
     ModelExecutionContext,
     ModelSpecificResult,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _build_execution_context(
@@ -77,6 +80,36 @@ def execute_specialized_models(
             attendance_level,
             event_day,
         )
-        results[zone.id] = model.execute(context)
+        # Aislamiento por zona. Un modelo especializado puede legitimately no
+        # poder calcular: ParkingV1 exige `event_days.estimated_vehicles` y
+        # BathroomV1 exige `attendance_level.max_people`, y los dos son
+        # NULLABLE en la base. Sin este try, UN parking sin
+        # `estimated_vehicles` levanta ValueError y tumba el endpoint público
+        # `/predictions` completo con un 500, perdiendo las 39 zonashealthy
+        # junto con la que no se pudo calcular.
+        #
+        # Se degrada a "sin resultado de modelo": la zona sigue saliendo con el
+        # contexto territorial comun (`derive_zone_states` la resuelve con el
+        # fallback de `_determine_operational_state`), solo que sin
+        # `saturation_level` / `availability` / `estimated_wait` / `confidence`.
+        # Un endpoint público no puede caerse por datos faltantes de UNA zona.
+        #
+        # Se loguea en warning con la excepción, no se traga en silencio: un
+        # modelo que empieza a fallar en todos lados tiene que verse.
+        try:
+            results[zone.id] = model.execute(context)
+        except Exception:
+            logger.warning(
+                "El modelo especializado %s no pudo calcular la zona %s "
+                "(type=%r, subtipo=%r); se degrada al contexto territorial común "
+                "sin saturación/availability/espera/confianza. "
+                "Revisar estimated_vehicles del EventDay y "
+                "attendance_level.max_people.",
+                getattr(model, "model_id", model.__class__.__name__),
+                zone.id,
+                zone.type,
+                zone.subtipo,
+                exc_info=True,
+            )
 
     return results

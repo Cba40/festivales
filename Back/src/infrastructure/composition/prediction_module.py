@@ -25,6 +25,7 @@ from app.models.operational_phase import OperationalPhase as OperationalPhaseORM
 from app.models.operational_profile import OperationalProfile as OperationalProfileORM
 from app.models.service_config import ServiceConfig as ServiceConfigORM
 from src.application.context_engine import ContextEngine
+from src.application.context_engine.model_selector import ModelSelector
 from src.application.context_engine.stage1_context_resolution import (
     LOCAL_TZ,
     resolve_active_event_day,
@@ -39,6 +40,8 @@ from src.domain.entities.event_day_phase import EventDayPhase
 from src.domain.entities.operational_phase import OperationalPhase
 from src.domain.entities.zone import Zone
 from src.domain.entities.zone_behavior import FlowRestriction, ZoneBehavior
+from src.domain.models.bathroom_v1_model import BathroomV1Model
+from src.domain.models.parking_v1_model import ParkingV1Model
 from src.domain.ports import (
     EventDayRepository,
     PredictionRepository,
@@ -62,6 +65,34 @@ from src.infrastructure.persistence.repositories.prediction_repository import (
 _EARTH_RADIUS_M = 6_371_000.0
 
 _DEFAULT_OPERATIONAL_PROFILE_NAME = "ActividadExtendida"
+
+
+def _build_model_selector() -> ModelSelector:
+    """Registro de modelos especializados que el Context Engine puede ejecutar.
+
+    Antes vivían escrito y testeado (`ParkingV1Model`, `BathroomV1Model`) pero
+    **nadie los registraba**: `ContextEngine()` se construía sin selector, así
+    que `ModelSelector` quedaba vacío y `execute_specialized_models` devolvía
+    `{}` para todas las zonas. Consecuencias, en el orden en que duelen:
+
+    1. `EventDayPhase.intensity` no llegaba a ningún cálculo. Su único
+       consumidor es `stage4_model_execution`, que se saltea entero sin
+       modelos. Los modelos la usan de verdad
+       (`V_expected = estimated_vehicles × intensity` en Parking,
+       `max_people × intensity` en Baños), o sea que la intensidad de cada fase
+       no modulaba nada.
+    2. `saturation_level`, `availability`, `estimated_wait` y `confidence`
+       quedaban en `None` para todas las zonas: no hay modelo que los produzca.
+
+    El orden del registro es el criterio de `ModelSelector.select` (primer
+    `supports()` que gana), así que solo importa que sea determinista, que es.
+
+    Lo que esto NO arregla: los modelos emiten `occupancy_ratio` / `free_ratio`,
+    no `saturation_level` / `availability`. El endpoint lee las claves del
+    contrato de `ZoneState`, así que esos cuatro campos siguen en `None` hasta
+    que se mapeen. Ver `docs/Architecture/Current/ADR-004.md`.
+    """
+    return ModelSelector([ParkingV1Model(), BathroomV1Model()])
 
 
 def _to_uuid_or_none(value: str | UUID | None) -> UUID | None:
@@ -462,7 +493,7 @@ class PredictionModule:
 
         stage4_config = await get_stage4_config(self._db)
 
-        engine = ContextEngine()
+        engine = ContextEngine(model_selector=_build_model_selector())
         event_day_repo = _PreloadedEventDayRepository(event_day)
         event_repo = OperationalEventAdapter(self._db)
         prediction_repo = _ReturnSavedPredictionRepository()
