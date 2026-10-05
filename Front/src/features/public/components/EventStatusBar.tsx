@@ -9,6 +9,26 @@ import {
 const EVENT_ID = import.meta.env.VITE_EVENT_ID || '';
 
 /**
+ * [TEMPORAL - PRE-DEMO] Interruptor de la métrica de intensidad territorial.
+ *
+ * Motivo: el cálculo actual (promedio de `saturation_level`) mostraba 100% en
+ * fases de baja intensidad (ej. 0.5). Causa probable: el valor de
+ * `estimated_vehicles` en `event_days` es demasiado alto en relación a la
+ * `capacity` de las zonas, saturando el modelo matemático
+ * (min(ocupados, capacity) / capacity).
+ *
+ * Pendiente: revisar y corregir la fórmula o ajustar los datos de prueba
+ * post-demo. Para reactivarla, poner `true` acá: el bloque de JSX se conserva
+ * intacto abajo, solo deja de renderizarse.
+ *
+ * Se usa una constante con nombre y no un `false && (...)` literal en el JSX
+ * porque ESLint marca eso con `no-constant-binary-expression`, y porque un
+ * minificador puede eliminar por completo una rama `false &&` junto con el
+ * código que se quiere conservar para reactivarla.
+ */
+const SHOW_TERRITORIAL_INTENSITY = false;
+
+/**
  * Intensidad territorial en porcentaje, o `null` si no hay dato.
  *
  * Antes contaba zonas en dos cubos sobre `operational_state` (100 para
@@ -113,6 +133,7 @@ export function EventStatusBar({ autoRefreshMs = 30000 }: EventStatusBarProps) {
           <span className="text-[11px] font-semibold text-slate-400">{zones.length} zona{zones.length !== 1 ? 's' : ''}</span>
         </div>
         <div className="flex items-center gap-3 text-xs text-slate-500">
+          {SHOW_TERRITORIAL_INTENSITY && (
           <div className="flex items-center gap-1.5">
             <div className={`h-1.5 w-16 rounded-full bg-slate-200 overflow-hidden`}>
               <div className={`h-full rounded-full ${barColor} transition-all`} style={{ width: `${intensityPct ?? 0}%` }} />
@@ -136,6 +157,7 @@ export function EventStatusBar({ autoRefreshMs = 30000 }: EventStatusBarProps) {
               )
             )}
           </div>
+          )}
           {restrictedZones > 0 && (
             <span className="flex items-center gap-1">
               <ShieldBan size={12} className="text-amber-500" />
