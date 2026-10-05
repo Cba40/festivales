@@ -10,6 +10,23 @@ export function emergencyCacheKey(...parts: string[]): string {
   return `emergency:${parts.join(':')}`
 }
 
+/**
+ * Parte de clave de caché para una coordenada opcional.
+ *
+ * Tiene que ir en la clave porque la respuesta depende de ella: el backend ordena
+ * por distancia Haversine cuando recibe coordenadas y alfabéticamente cuando no.
+ * Son dos respuestas distintas y no pueden compartir entrada.
+ *
+ * - Se redondea a 4 decimales (~11 m) para que dos lecturas del mismo GPS que
+ *   difieren en metros no generen entradas distintas.
+ * - `0` es una coordenada válida, así que la ausencia se marca con `'none'` en vez
+ *   de dejar `undefined` en el join: `sin-coordenadas` y `lat=0,lng=0` son
+ *   respuestas distintas.
+ */
+function coordCachePart(value?: number): string {
+  return value == null ? 'none' : value.toFixed(4)
+}
+
 export type EmergencyType =
   | 'policia'
   | 'bomberos'
@@ -105,7 +122,13 @@ export async function getRecommendedResource(
   lng?: number
 ): Promise<EmergencyItem | null> {
   return readThroughCache<EmergencyItem | null>(
-    emergencyCacheKey('recommended', targetType, cityId),
+    emergencyCacheKey(
+      'recommended',
+      targetType,
+      cityId,
+      coordCachePart(lat),
+      coordCachePart(lng)
+    ),
     EMERGENCY_TTL_MS,
     async () => {
       try {
@@ -167,7 +190,13 @@ export function useEmergencyRecommendations(
     setError(null)
     try {
       const res = await readThroughCache<EmergencyRecommendationResponse>(
-        emergencyCacheKey('recommendation', type || 'todos', cityId),
+        emergencyCacheKey(
+          'recommendation',
+          type || 'todos',
+          cityId,
+          coordCachePart(userLocation?.[0]),
+          coordCachePart(userLocation?.[1])
+        ),
         EMERGENCY_TTL_MS,
         async () => {
           const { data } = await apiClient.get<EmergencyRecommendationResponse>(

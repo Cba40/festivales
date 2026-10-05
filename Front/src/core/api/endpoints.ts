@@ -56,8 +56,11 @@ export const endpoints = {
     protocols: (context: string) => `/emergency-protocols?context=${context}`,
     recommendedResource: (targetType: string, cityId: string, lat?: number, lng?: number) =>
       `/emergency-protocols/recommended-resource?target_type=${targetType}&city_id=${cityId}${
-        lat ? `&latitude=${lat}` : ''
-      }${lng ? `&longitude=${lng}` : ''}`,
+        // `!= null` en vez de truthiness: 0 es una coordenada válida (ecuador,
+        // meridiano de Greenwich) y `0 ? ... : ''` la saca del query string,
+        // dejando al backend sin GPS para ordenar por distancia.
+        lat != null ? `&latitude=${lat}` : ''
+      }${lng != null ? `&longitude=${lng}` : ''}`,
   },
   emergencyAdmin: {
     list: (cityId?: string) =>

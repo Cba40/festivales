@@ -117,17 +117,15 @@ export const EmergencyModule = ({ context, cityId }: EmergencyModuleProps) => {
           setResolvedCityId(null)
           setCityError('No hay ciudades configuradas')
         } else {
-          // Prioridad 1: ciudad con datos del festival (Jesús María).
-          const ciudadConDatos = cities.find(c =>
-            c.name?.toLowerCase().includes('jesus maria') ||
-            c.name?.toLowerCase().includes('jesús maría')
-          )
-          // Prioridad 2: si el usuario tiene GPS (evento en Jesús María), se
-          // confirma la misma ciudad.
-          const { userLocation } = useAppStore.getState()
-          const ciudadPorGps = userLocation && ciudadConDatos ? ciudadConDatos : undefined
-          // Fallback: primera ciudad disponible (compatibilidad con otros eventos).
-          setResolvedCityId((ciudadPorGps ?? ciudadConDatos ?? cities[0])?.id ?? null)
+          // Ciudad del módulo público: la primera disponible en el catálogo.
+          //
+          // Antes se priorizaba una ciudad por nombre hardcodeado ("jesus maría").
+          // En cualquier otro deployment ese match fallaba en silencio y caía
+          // exactamente acá, mostrando las emergencias de una ciudad arbitraria
+          // sin avisarle nada al usuario. La selección correcta tiene que venir
+          // de la configuración del evento o del GPS del usuario; hasta que
+          // exista, primera ciudad y sin adivinanzas.
+          setResolvedCityId(cities[0]?.id ?? null)
           setCityError(null)
         }
       } catch {
