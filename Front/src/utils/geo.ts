@@ -14,12 +14,24 @@ export const haversine = (lat1: number, lng1: number, lat2: number, lng2: number
 }
 
 export const getDistancias = (
-  puntoLat: number,
-  puntoLng: number,
+  puntoLat: number | null,
+  puntoLng: number | null,
   userLoc: [number, number] | null,
   fallbackMin: number
 ) => {
-  if (!userLoc || !puntoLat || !puntoLng) {
+  // `== null` en vez de truthiness: 0 es una coordenada válida (ecuador,
+  // meridiano de Greenwich) y `!0` la tomaba por "sin dato".
+  //
+  // El `(0, 0)` explícito es compatibilidad, no semántica: 26 de los 27 call
+  // sites del repo hacen `getDistancias(zona.lat ?? 0, zona.lng ?? 0, ...)`, o
+  // sea que hoy `null` ya llega coercionado a 0. Sin esta rama, cambiar el guard
+  // a `== null` haría que esas 26 llamadas con coordenadas ausentes diesen
+  // Haversine contra Null Island. La salida es idéntica a la de hoy para esos
+  // callers, y los que pasen el `null` real (Estacionar) ya salen bien.
+  //
+  // La única coordenada que esto sigue tratando como ausente es un (0, 0)
+  // exacto, que no corresponde a ningún escenario del despliegue.
+  if (!userLoc || puntoLat == null || puntoLng == null || (puntoLat === 0 && puntoLng === 0)) {
     return {
       walking: `${fallbackMin} min`,
       driving: `${Math.max(1, Math.round(fallbackMin / 3))} min`

@@ -3,9 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/Header'
 import { AppFooter } from '@/components/AppFooter'
 import { Map, X } from 'lucide-react'
-import { InteractiveMap } from '@/components/InteractiveMap'
+import { InteractiveMap, type InteractiveMapPoint } from '@/components/InteractiveMap'
 import { useAppStore } from '@/core/state/store'
-import { useParkingRecommendations, type ZonaEstacionamientoItem } from '@/services/parkingProduct'
+import {
+  useParkingRecommendations,
+  PARKING_LIMIT,
+  DISTANCIA_FALLBACK_MIN,
+  type ZonaEstacionamientoItem,
+} from '@/services/parkingProduct'
 import {
   ZonaCardsList,
   getEstadoStyles,
@@ -17,6 +22,37 @@ import { GpsModal } from '@/components/GpsModal'
 import { recordActivity } from '@/services/activity'
 import { formatUpdatedAt } from '@/utils/formatTime'
 import { getDistancias } from '@/utils/geo'
+
+/**
+ * Fila de métricas de una zona: tiempo en auto y posibilidad de estacionamiento.
+ *
+ * Reemplaza 4 copias idénticas de un IIFE que solo cambiaba el nombre de la
+ * variable. `className` existe porque la tarjeta principal va sobre fondo de
+ * color en modo `guiar` y necesita `opacity-90` en vez de los colores de texto.
+ */
+const FilaMetricas = ({
+  zona,
+  className,
+}: {
+  zona: ZonaEstacionamientoItem
+  className?: string
+}) => {
+  const userLocation = useAppStore(s => s.userLocation)
+  const dist = getDistancias(
+    zona.lat,
+    zona.lng,
+    userLocation,
+    zona.distancia_min ?? DISTANCIA_FALLBACK_MIN
+  )
+  return (
+    <p className={`flex gap-3 ${className ?? 'text-sm text-slate-600 dark:text-slate-300'}`}>
+      <span>🚗 {dist.driving}</span>
+      {zona.saturation_level != null && (
+        <span>📊 {Math.round((1 - zona.saturation_level) * 100)}% de posibilidad</span>
+      )}
+    </p>
+  )
+}
 
 const Estacionar = () => {
   const navigate = useNavigate()
@@ -56,7 +92,9 @@ const Estacionar = () => {
   }
 
   const abrirMapa = (zona: ZonaEstacionamientoItem) => {
-    if (zona.lat && zona.lng) {
+    // `!= null` y no truthiness: una zona en el ecuador (lat 0) o sobre el
+    // meridiano de Greenwich (lng 0) es una zona válida con navegación.
+    if (zona.lat != null && zona.lng != null) {
       window.open(
         `https://www.google.com/maps/dir/?api=1&destination=${zona.lat},${zona.lng}`,
         '_blank'
@@ -69,6 +107,19 @@ const Estacionar = () => {
     if (index === 0) return '👉 Mejor opción ahora'
     return 'Alternativa'
   }
+
+  // El prompt de GPS se resolvía en dos ramas distintas (la de `sin_solucion` y
+  // el return principal) con el mismo mensaje y los mismos callbacks.
+  const gpsPrompt = !userLocation && mostrarGpsModal && (
+    <GpsModal
+      mensaje="Para mostrarte la opción de estacionamiento más cercana, necesitamos tu ubicación GPS."
+      onActivate={() => {
+        requestLocation()
+        setMostrarGpsModal(false)
+      }}
+      onClose={() => setMostrarGpsModal(false)}
+    />
+  )
 
   const renderBottomSheet = selectedZona && (
     <>
@@ -91,7 +142,7 @@ const Estacionar = () => {
             📍 {selectedZona.referencia}
           </p>
           {(() => {
-            const dist = getDistancias(selectedZona.lat ?? 0, selectedZona.lng ?? 0, userLocation, selectedZona.distancia_min ?? 5)
+            const dist = getDistancias(selectedZona.lat, selectedZona.lng, userLocation, selectedZona.distancia_min ?? DISTANCIA_FALLBACK_MIN)
             return (
               <>
                 <p className="text-sm text-slate-600 dark:text-slate-300">
@@ -179,16 +230,7 @@ const Estacionar = () => {
             <p className="text-sm mt-2 opacity-90">Alta demanda en toda la zona</p>
           </div>
 
-          {!userLocation && mostrarGpsModal && (
-            <GpsModal
-              mensaje="Para mostrarte la opción de estacionamiento más cercana, necesitamos tu ubicación GPS."
-              onActivate={() => {
-                requestLocation()
-                setMostrarGpsModal(false)
-              }}
-              onClose={() => setMostrarGpsModal(false)}
-            />
-          )}
+          {gpsPrompt}
 
           {zonas.length === 0 && (
             <div className="bg-slate-100 dark:bg-slate-700 p-4 rounded-xl space-y-3">
@@ -207,7 +249,7 @@ const Estacionar = () => {
                 ⚠️ Disponibilidad muy baja — podés no encontrar lugar
               </p>
               {zonas.slice(0, 3).map((zona, index) => {
-                const dist = getDistancias(zona.lat ?? 0, zona.lng ?? 0, userLocation, zona.distancia_min ?? 5)
+                const dist = getDistancias(zona.lat, zona.lng, userLocation, zona.distancia_min ?? DISTANCIA_FALLBACK_MIN)
                 return (
                   <button
                     key={zona.zone_id}
@@ -238,7 +280,7 @@ const Estacionar = () => {
   }
 
   const esTresOpciones = modo === 'guiar' || modo === 'asistir'
-  const listaRestante = esTresOpciones ? zonas.slice(4) : zonas.slice(1)
+  const listaRestante = esTresOpciones ? zonas.slice(PARKING_LIMIT) : zonas.slice(1)
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col">
@@ -261,7 +303,7 @@ const Estacionar = () => {
                 <p className="text-2xl font-bold mb-1">IR AHORA</p>
                 <p className="text-lg opacity-90">{principal.name}</p>
                 <p className="text-sm opacity-75 mt-1">
-                  🚗 {getDistancias(principal.lat ?? 0, principal.lng ?? 0, userLocation, principal.distancia_min ?? 5).driving}
+                  🚗 {getDistancias(principal.lat, principal.lng, userLocation, principal.distancia_min ?? DISTANCIA_FALLBACK_MIN).driving}
                   {principal.saturation_level != null && ` · 📊 ${Math.round((1 - principal.saturation_level) * 100)}% libre`}
                 </p>
               </div>
@@ -279,15 +321,7 @@ const Estacionar = () => {
                 {getTituloZona(0)}: {principal.name}
               </p>
               <p className="text-sm opacity-90 mt-2">📍 {principal.referencia}</p>
-              {(() => {
-                const dist = getDistancias(principal.lat ?? 0, principal.lng ?? 0, userLocation, principal.distancia_min ?? 5)
-                return (
-                  <p className="text-sm opacity-90 flex gap-3">
-                    <span>🚗 {dist.driving}</span>
-                    {principal.saturation_level != null && <span>📊 {Math.round((1 - principal.saturation_level) * 100)}% de posibilidad</span>}
-                  </p>
-                )
-              })()}
+              <FilaMetricas zona={principal} className="text-sm opacity-90" />
               {Math.round((1 - (principal.saturation_level ?? 0)) * 100) < 20 && (
                 <p className="text-xs opacity-75 mt-2">⚠️ Disponibilidad limitada</p>
               )}
@@ -314,15 +348,7 @@ const Estacionar = () => {
               <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">
                 📍 {alternativa.referencia}
               </p>
-              {(() => {
-                const dist = getDistancias(alternativa.lat ?? 0, alternativa.lng ?? 0, userLocation, alternativa.distancia_min ?? 5)
-                return (
-                  <p className="text-sm text-slate-600 dark:text-slate-300 flex gap-3">
-                    <span>🚗 {dist.driving}</span>
-                    {alternativa.saturation_level != null && <span>📊 {Math.round((1 - alternativa.saturation_level) * 100)}% de posibilidad</span>}
-                  </p>
-                )
-              })()}
+              <FilaMetricas zona={alternativa} />
             </div>
           </button>
         )}
@@ -337,15 +363,7 @@ const Estacionar = () => {
               <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">
                 📍 {terceraOpcion.referencia}
               </p>
-              {(() => {
-                const dist = getDistancias(terceraOpcion.lat ?? 0, terceraOpcion.lng ?? 0, userLocation, terceraOpcion.distancia_min ?? 5)
-                return (
-                  <p className="text-sm text-slate-600 dark:text-slate-300 flex gap-3">
-                    <span>🚗 {dist.driving}</span>
-                    {terceraOpcion.saturation_level != null && <span>📊 {Math.round((1 - terceraOpcion.saturation_level) * 100)}% de posibilidad</span>}
-                  </p>
-                )
-              })()}
+              <FilaMetricas zona={terceraOpcion} />
             </div>
           </button>
         )}
@@ -359,22 +377,14 @@ const Estacionar = () => {
               <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">
                 📍 {cuartaOpcion.referencia}
               </p>
-              {(() => {
-                const dist = getDistancias(cuartaOpcion.lat ?? 0, cuartaOpcion.lng ?? 0, userLocation, cuartaOpcion.distancia_min ?? 5)
-                return (
-                  <p className="text-sm text-slate-600 dark:text-slate-300 flex gap-3">
-                    <span>🚗 {dist.driving}</span>
-                    {cuartaOpcion.saturation_level != null && <span>📊 {Math.round((1 - cuartaOpcion.saturation_level) * 100)}% de posibilidad</span>}
-                  </p>
-                )
-              })()}
+              <FilaMetricas zona={cuartaOpcion} />
             </div>
           </button>
         )}
 
         <InteractiveMap
           puntos={zonas
-            .filter(z => z.lat && z.lng)
+            .filter(z => z.lat != null && z.lng != null)
             .map(z => ({
               id: z.zone_id,
               nombre: z.name,
@@ -383,8 +393,14 @@ const Estacionar = () => {
               referencia: z.referencia,
               tipo: 'estacionamiento',
               originalData: z
-            }))}
-          onSelectPunto={(p) => handleSelectZona(p as ZonaEstacionamientoItem)}
+            })) as InteractiveMapPoint<ZonaEstacionamientoItem>[]}
+          onSelectPunto={(p) => {
+            // Todo punto se construyó con `originalData: z`, así que la ausencia
+            // es defensiva. El cast anterior (`p as ZonaEstacionamientoItem`) lo
+            // rechazaba TypeScript porque las dos formas no comparten ningún
+            // miembro, y además descartaba el registro real.
+            if (p.originalData) handleSelectZona(p.originalData)
+          }}
           onUserLocationUpdate={() => {}}
         />
 
@@ -405,18 +421,7 @@ const Estacionar = () => {
         )}
       </div>
 
-      {!userLocation && mostrarGpsModal && (
-        <GpsModal
-          mensaje="Para mostrarte la opción de estacionamiento más cercana, necesitamos tu ubicación GPS."
-          onActivate={() => {
-            requestLocation()
-            setMostrarGpsModal(false)
-          }}
-          onClose={() => setMostrarGpsModal(false)}
-        />
-      )}
-
-      {renderBottomSheet}
+{gpsPrompt}
 
       <AppFooter variant="public" />
     </div>
