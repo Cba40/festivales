@@ -298,6 +298,12 @@ export const EmergencyModule = ({ context, cityId }: EmergencyModuleProps) => {
     )
   }
 
+  // `protocols` ya no puede ser null al llegar acá: el caso sin error retornó
+  // en el bloque de carga de arriba y el caso con error retornó en el de error.
+  // El guard queda para que lo verifique el compilador en vez de confiar en que
+  // el flujo de control siga siendo ese.
+  if (!protocols) return null
+
   if (protocols.length === 0) {
     return (
       <div className="text-center text-slate-500 dark:text-slate-300 py-10">
@@ -521,7 +527,13 @@ const EmergencyMapSection = ({
       ? emergencies
       : emergencies.filter(e => e.type === typeFilter)
 
-  const puntos: InteractiveMapPoint[] = visibles
+  // Anotar el punto como `InteractiveMapPoint<EmergencyItem>` hace que el
+  // genérico de `InteractiveMap` fluya hasta `onSelectPunto`, así que
+  // `p.originalData` queda tipado como `EmergencyItem | undefined`. Antes se
+  // forzaba un cast `p as EmergencyItem`, que TypeScript rechazaba (ningún
+  // miembro coincide) y que además descartaba el registro real que ya estaba
+  // guardado en `originalData`.
+  const puntos: InteractiveMapPoint<EmergencyItem>[] = visibles
     .filter(e => e.latitude != null && e.longitude != null)
     .map(e => ({
       id: e.id,
@@ -537,7 +549,11 @@ const EmergencyMapSection = ({
     <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm">
       <InteractiveMap
         puntos={puntos}
-        onSelectPunto={(p) => onSelect(p as EmergencyItem)}
+        onSelectPunto={(p) => {
+          // Todo punto de este array se construyó con `originalData: e`, así
+          // que la ausencia es defensiva: sin registro no hay nada que seleccionar.
+          if (p.originalData) onSelect(p.originalData)
+        }}
         onUserLocationUpdate={() => {}}
         puntoResaltadoId={
           recomendadoId != null && puntos.some(p => p.id === recomendadoId)

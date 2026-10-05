@@ -43,7 +43,11 @@ export interface InteractiveMapPoint<T = unknown> {
   nombre: string
   lat: number
   lng: number
-  referencia: string
+  // Opcional a propósito: los dominios que exponen un campo de referencia lo
+  // modelan como nullable (ej. `EmergencyItem.reference: string | null`, que
+  // apunta a una dirección y no siempre existe). El mapa nunca lee este campo,
+  // así que no le hace falta que todos los puntos lo traigan.
+  referencia?: string
   distancia?: number
   updatedAt?: number
   originalData?: T

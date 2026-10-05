@@ -492,6 +492,18 @@ def rbac_field(db_session: Session) -> str:
     return _crear_usuario(db_session, "rbac-campo", "OPERADOR_CAMPO")
 
 
+@pytest.fixture
+def rbac_analista(db_session: Session) -> str:
+    """ANALISTA real: rol de solo lectura, sin ningún permiso `:write`.
+
+    Es el contraejemplo útil para probar que un endpoint de escritura está
+    efectivamente cerrado: antes de que las escrituras de alertas pidieran
+    `alerts:write`, un analista entraba igual porque solo necesitaba un token
+    válido.
+    """
+    return _crear_usuario(db_session, "rbac-analista", "ANALISTA")
+
+
 def _crear_usuario(db: Session, username: str, role_code: str) -> str:
     """Crea un usuario con un rol, idempotente dentro del test.
 

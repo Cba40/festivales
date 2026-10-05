@@ -80,11 +80,23 @@ EMERGENCY_PROTOCOLS_WRITE = "emergency_protocols:write"
 # crear y borrar puntos de emergencia. Por eso son codigos aparte, y por eso
 # `emergency:write` sigue reservado a quien administra la infraestructura.
 #
-# Sin pareja `:read` a proposito, igual que `counts:write`: las lecturas de
-# alertas, mensajes e incidentes hoy solo exigen token (`alert_admin.py`,
-# `operational_events.py`), asi que un permiso de lectura no restringiria nada. Si
-# alguna vez esos endpoints pasan a exigir `require_permission`, es el momento de
-# agregar `alerts:read` / `incidents:read`.
+# Sin pareja `:read` a proposito, igual que `counts:write`. Las lecturas de
+# alertas y mensajes siguen exigiendo solo token (`alert_admin.py` usa
+# `verify_token` en `list_by_event` y `get`), asi que un permiso de lectura no
+# restringiria nada: pasaria a ser otro permiso que todos los roles con
+# `alerts:write` ya tienen.
+#
+# `ALERTS_WRITE` si se aplica: las 9 escrituras de `alert_admin.py` (crear,
+# actualizar, desactivar y eliminar alertas; crear, actualizar, publicar, cancelar
+# y eliminar mensajes) exigen `require_permission("alerts:write")`. Antes solo
+# pedian token, con lo que cualquier cuenta autenticada -incluido ANALISTA, que es
+# de solo lectura- podia publicar o borrar avisos de seguridad al publico. Los
+# operadores de campo lo tienen (`ROLE_OPERADOR_CAMPO`), asi que el panel sigue
+# funcionando.
+#
+# `INCIDENTS_WRITE` sigue sin uso: no hay endpoints de incidentes que lo pidan
+# (`operational_events.py` expone `is_incident` como dato, no como recurso). Si
+# alguna vez los hay, es el momento de agregar tambien `incidents:read`.
 ALERTS_WRITE = "alerts:write"
 INCIDENTS_WRITE = "incidents:write"
 
