@@ -64,14 +64,14 @@ export const endpoints = {
   },
   emergencyAdmin: {
     list: (cityId?: string) =>
-      `/admin/emergencies${cityId ? `?city_id=${cityId}` : ''}`,
+      `/admin/emergencies${cityId != null ? `?city_id=${cityId}` : ''}`,
     create: () => `/admin/emergencies`,
     update: (id: string) => `/admin/emergencies/${id}`,
     delete: (id: string) => `/admin/emergencies/${id}`,
     cities: () => `/admin/cities`,
     createCity: () => `/admin/cities`,
     listProtocols: (context?: string) =>
-      `/admin/emergency-protocols${context ? `?context=${context}` : ''}`,
+      `/admin/emergency-protocols${context != null ? `?context=${context}` : ''}`,
     createProtocol: () => `/admin/emergency-protocols`,
     updateProtocol: (id: string) => `/admin/emergency-protocols/${id}`,
     deleteProtocol: (id: string) => `/admin/emergency-protocols/${id}`,
