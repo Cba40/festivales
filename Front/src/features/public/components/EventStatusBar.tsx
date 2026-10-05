@@ -126,7 +126,9 @@ export function EventStatusBar({ autoRefreshMs = 30000 }: EventStatusBarProps) {
 
   return (
     <div className="px-4 py-3 border-b flex items-center gap-3 bg-white border-l-4 border-l-emerald-500">
-      <div className={`w-3 h-3 rounded-full shrink-0 ${dotColor}`} role="img" aria-label={`Intensidad territorial: ${intensityPct !== null ? `${intensityPct}%` : 'sin datos'}`} />
+      {SHOW_TERRITORIAL_INTENSITY && (
+        <div className={`w-3 h-3 rounded-full shrink-0 ${dotColor}`} role="img" aria-label={`Intensidad territorial: ${intensityPct !== null ? `${intensityPct}%` : 'sin datos'}`} />
+      )}
       <div className="flex-1 min-w-0 space-y-0.5">
         <div className="flex items-center gap-2">
           <p className="text-sm font-bold text-slate-800">Territorio activo</p>
