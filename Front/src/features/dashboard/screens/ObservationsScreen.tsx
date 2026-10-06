@@ -1,6 +1,5 @@
 import { useEffect, useCallback, useMemo, useState } from 'react';
 import { Pencil, Plus } from 'lucide-react';
-import { useResolvedEventId } from '@/hooks/useActiveEvent';
 import { apiClient } from '@/core/api/client';
 import { endpoints } from '@/core/api/endpoints';
 import { useAppStore } from '@/core/state/store';
@@ -138,7 +137,7 @@ export function ObservationsScreen() {
   const observerDisplayName = user?.full_name || user?.username || 'tu usuario';
 
   // Evento activo del store global (`useActiveEvent`), no `VITE_EVENT_ID`.
-  const eventId = useResolvedEventId();
+  const eventId = useAppStore((s) => s.activeEventId);
 
   const {
     observations,

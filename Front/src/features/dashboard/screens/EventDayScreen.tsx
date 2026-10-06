@@ -10,12 +10,12 @@ import { useEventDayMutations } from '../hooks/useEventDayMutations';
 import type { EventDaySummary, EventDay, EventDayCreatePayload } from '../types';
 import { apiClient } from '@/core/api/client';
 import { endpoints } from '@/core/api/endpoints';
-import { useResolvedEventId } from '@/hooks/useActiveEvent';
+import { useAppStore } from '@/core/state/store';
 
 
 export function EventDayScreen() {
   // Evento activo del store global (`useActiveEvent`), no `VITE_EVENT_ID`.
-  const eventId = useResolvedEventId();
+  const eventId = useAppStore((s) => s.activeEventId);
   const { eventDays, loading, error, refresh } = useEventDays(eventId);
   const { create, update, remove, saving } = useEventDayMutations(eventId);
 
@@ -30,8 +30,15 @@ export function EventDayScreen() {
     setShowForm(true);
   };
 
-  const handleEdit = useCallback(async (day: EventDaySummary) => {
+const handleEdit = useCallback(async (day: EventDaySummary) => {
     setFormError(null);
+    // Sin evento no hay contra qué pedir el detalle. No es decorativo:
+    // `endpoints.eventDays.byId` exige `string`, así que el compilador obliga a
+    // decidir antes de armar la URL.
+    if (!eventId) {
+      setFormError('Evento no disponible');
+      return;
+    }
     try {
       const { data } = await apiClient.get<EventDay>(
         endpoints.eventDays.byId(eventId, day.id)
@@ -41,7 +48,11 @@ export function EventDayScreen() {
     } catch {
       setFormError('Error al cargar los datos del día');
     }
-  }, []);
+    // `eventId` en las deps, y no `[]`: con el array vacío el ID quedaba
+    // congelado en el valor del primer render, así que editar una jornada pedía
+    // `/events//event-days/<id>` para siempre, incluso después de que el store
+    // resolviera.
+  }, [eventId]);
 
   const handleDeleteConfirm = useCallback(
     async (id: string) => {

@@ -22,8 +22,13 @@ const POLL_MS = 30_000;
  * requests contra un endpoint que además está rate limited, y se reanuda al
  * volver. Todas las alertas llegan con `event_id`, así que en este despliegue el
  * endpoint va con `verify_token`.
+ *
+ * `eventId` acepta `null` porque el store todavía no resolvió. El guard de `cargar`
+ * es lo que hace que el tipo no mienta: `getCompliance` exige `string`, así que sin
+ * el `''` de antes esta request salía contra `/compliance?event_id=` vacío cada
+ * 30 segundos.
  */
-export function ComplianceAlertsPanel({ eventId }: { eventId: string }) {
+export function ComplianceAlertsPanel({ eventId }: { eventId: string | null }) {
   const [data, setData] = useState<ComplianceDTO | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +36,9 @@ export function ComplianceAlertsPanel({ eventId }: { eventId: string }) {
 
   const cargar = useCallback(async () => {
     if (document.visibilityState === 'hidden') return;
+    // Sin evento no hay evaluación que pedir. Cuando el store resuelva, `eventId`
+    // cambia, `cargar` se recrea y el efecto de abajo vuelve a disparar.
+    if (!eventId) return;
     try {
       const respuesta = await getCompliance(eventId);
       setData(respuesta);

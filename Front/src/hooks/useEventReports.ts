@@ -17,9 +17,19 @@ function extractErrorMessage(err: unknown): string {
   return error?.response?.data?.detail ?? 'Error al cargar el informe.';
 }
 
+/**
+ * `eventId` acepta `null` a propósito.
+ *
+ * Las secciones de reports solían hacer `useAppStore(s => s.activeEventId) ?? ''`
+ * para satisfacer esta firma, y con eso armaban `/events//reports/summary`. El
+ * `''` no se despachaba (el guard de `refresh` lo frenaba), pero el tipo decía
+ * `string` y por lo tanto no obligaba a nadie a decidir. Aceptar `null` acá corre
+ * la cuenta: el llamador tiene que pasar el valor crudo del store y el guard de
+ * `refresh` lo frena de verdad.
+ */
 export function useEventReport<T>(
-  eventId: string,
-  url: string,
+  eventId: string | null,
+  url: string | null,
   options: UseEventReportOptions = {}
 ) {
   const { params, enabled = true } = options;
@@ -28,7 +38,7 @@ export function useEventReport<T>(
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    if (!eventId) return;
+    if (!eventId || !url) return;
     setIsLoading(true);
     setError(null);
     try {

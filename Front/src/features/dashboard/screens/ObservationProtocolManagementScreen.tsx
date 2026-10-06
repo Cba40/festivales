@@ -27,7 +27,7 @@ import { Card } from '@/features/dashboard/components/ui/Card';
 import { Button } from '@/features/dashboard/components/ui/Button';
 import { ConfirmDialog } from '@/features/dashboard/components/ui/ConfirmDialog';
 import { RefreshButton } from '@/features/dashboard/components/ui';
-import { useResolvedEventId } from '@/hooks/useActiveEvent';
+import { useAppStore } from '@/core/state/store';
 
 
 interface ZoneTypeOption {
@@ -76,7 +76,7 @@ function emptyForm(metric: TriggerMetric = 'saturation_level'): ProtocolForm {
 
 export function ObservationProtocolManagementScreen() {
   // Evento activo del store global (`useActiveEvent`), no `VITE_EVENT_ID`.
-  const eventId = useResolvedEventId();
+  const eventId = useAppStore((s) => s.activeEventId);
   const [protocols, setProtocols] = useState<ObservationProtocolDTO[]>([]);
   const [suggestions, setSuggestions] = useState<ProtocolSuggestionDTO[]>([]);
   const [selectedSuggestions, setSelectedSuggestions] = useState<string[]>([]);
@@ -96,7 +96,14 @@ export function ObservationProtocolManagementScreen() {
   const [applying, setApplying] = useState(false);
   const [referenceDataError, setReferenceDataError] = useState<string | null>(null);
 
-  const cargar = useCallback(async () => {
+const cargar = useCallback(async () => {
+    // Sin evento no hay contra qué listar. El guard también es lo que permite que
+    // `eventId` sea `string | null`: `listProtocols` exige `string`.
+    if (!eventId) {
+      setProtocols([]);
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
       setProtocols(await listProtocols(eventId, showInactive));
@@ -235,9 +242,16 @@ setReferenceDataError(
     setModal({ mode: 'edit', protocol });
   };
 
-  const handleSubmit = useCallback(async () => {
+const handleSubmit = useCallback(async () => {
     if (form.name.trim() === '') {
       setModalError('Poné un nombre para la regla.');
+      return;
+    }
+    // El `event_id` viaja en el body de la creación. Sin evento resuelto la
+    // escritura no tiene a qué aplicarse, así que se corta acá en vez de mandar
+    // un ID vacío que el backend rechaza.
+    if (!eventId) {
+      setModalError('Evento no disponible');
       return;
     }
     setModalSaving(true);
@@ -270,8 +284,12 @@ setReferenceDataError(
     }
   }, [form, modal, protocols.length, cargar, eventId]);
 
-  const handleApplySuggestions = useCallback(async () => {
+const handleApplySuggestions = useCallback(async () => {
     if (selectedSuggestions.length === 0) return;
+    if (!eventId) {
+      setReferenceDataError('Evento no disponible');
+      return;
+    }
     setApplying(true);
     try {
       const res = await applySuggestions(eventId, selectedSuggestions);

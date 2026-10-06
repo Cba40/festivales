@@ -8,7 +8,7 @@ import {
 import { useMetricsEvaluation } from '@/hooks/useMetricsEvaluation';
 import { apiClient } from '@/core/api/client';
 import { endpoints } from '@/core/api/endpoints';
-import { useResolvedEventId } from '@/hooks/useActiveEvent';
+import { useAppStore } from '@/core/state/store';
 import type {
   AnomalySeverity,
   ConfigurationRecommendationDTO,
@@ -323,7 +323,7 @@ function MetricCard({ metric }: { metric: MetricResultResponse }) {
 
 function MetricsEvaluationCard() {
   // Evento activo del store global (`useActiveEvent`), no `VITE_EVENT_ID`.
-  const eventId = useResolvedEventId();
+  const eventId = useAppStore((s) => s.activeEventId);
   const { data, isEvaluating, error, evaluate } = useMetricsEvaluation();
   const [eventDays, setEventDays] = useState<EventDaySummary[]>([]);
   const [phases, setPhases] = useState<OperationalPhaseDTO[]>([]);

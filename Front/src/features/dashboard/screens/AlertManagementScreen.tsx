@@ -14,7 +14,7 @@ import {
   useTransportAlerts,
 } from '../hooks/useTransportAlerts';
 import { useOperatorMessages } from '../hooks/useOperatorMessages';
-import { useResolvedEventId } from '@/hooks/useActiveEvent';
+import { useAppStore } from '@/core/state/store';
 import type {
   AlertType,
   OperatorMessageDTO,
@@ -151,7 +151,9 @@ function AlertFormModal({
 }) {
   const [form, setForm] = useState<AlertFormData>(initial);
   // Evento activo del store global (`useActiveEvent`), no `VITE_EVENT_ID`.
-  const eventId = useResolvedEventId();
+  // Sin `?? ''`: el `event_id` del body tiene que ser el ID real o la escritura
+  // no llega a ninguna parte. `canSubmit` lo exige.
+  const eventId = useAppStore((s) => s.activeEventId);
 
   const temporalOk =
     !!form.valid_from && !!form.valid_until
@@ -160,6 +162,7 @@ function AlertFormModal({
 
   const canSubmit =
     !saving &&
+    !!eventId &&
     !!form.alert_type &&
     form.title.trim().length > 0 &&
     form.description.trim().length > 0 &&
@@ -354,7 +357,9 @@ function MessageFormModal({
 }) {
   const [form, setForm] = useState<MessageFormData>(initial);
   // Evento activo del store global (`useActiveEvent`), no `VITE_EVENT_ID`.
-  const eventId = useResolvedEventId();
+  // Sin `?? ''`: mismo motivo que en `AlertFormModal` — el `event_id` del body
+  // tiene que ser el real, y `canSubmit` lo exige.
+  const eventId = useAppStore((s) => s.activeEventId);
 
   const temporalOk =
     form.expires_at.trim() === '' ||
@@ -362,6 +367,7 @@ function MessageFormModal({
 
   const canSubmit =
     !saving &&
+    !!eventId &&
     form.title.trim().length > 0 &&
     form.description.trim().length > 0 &&
     !!form.publish_at &&
@@ -506,7 +512,9 @@ function MessageFormModal({
 
 export function AlertManagementScreen() {
   // Evento activo del store global (`useActiveEvent`), no `VITE_EVENT_ID`.
-  const eventId = useResolvedEventId();
+  // `useTransportAlerts` / `useOperatorMessages` ya aceptan `string | null` y
+  // tienen guard: el valor crudo del store se les puede pasar tal cual.
+  const eventId = useAppStore((s) => s.activeEventId);
   const {
     alerts,
     loading: loadingAlerts,

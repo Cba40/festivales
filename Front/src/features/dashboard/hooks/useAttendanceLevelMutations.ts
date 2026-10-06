@@ -15,7 +15,12 @@ export interface AttendanceLevelUpdatePayload {
   max_people?: number | null;
 }
 
-export function useAttendanceLevelMutations(eventId: string) {
+/**
+ * `eventId` acepta `null` porque el store todavía no resolvió. Los tres guards
+ * (`create`/`update`/`remove`) existían y por eso compila: sin ellos, pasar el
+ * valor nullable al endpoint que exige `string` no tiparía.
+ */
+export function useAttendanceLevelMutations(eventId: string | null) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

@@ -11,7 +11,7 @@ import {
   type ReportPeriodMode,
 } from '../utils/eventDayPeriod';
 import { DEFAULT_TIMEZONE } from '../components/reports/reportFormat';
-import { useResolvedEventId } from '@/hooks/useActiveEvent';
+import { useAppStore } from '@/core/state/store';
 
 type Section = 'summary' | 'services' | 'zones' | 'census' | 'coverage';
 
@@ -78,7 +78,7 @@ const TABS: { key: Section; label: string }[] = SECTIONS.map(({ key, label }) =>
 
 export function ReportsScreen() {
   // Evento activo del store global (`useActiveEvent`), no `VITE_EVENT_ID`.
-  const eventId = useResolvedEventId();
+  const eventId = useAppStore((s) => s.activeEventId);
   const [activeSection, setActiveSection] = useState<Section>('summary');
   const ActiveSectionComponent = SECTIONS.find((s) => s.key === activeSection)?.Component;
 

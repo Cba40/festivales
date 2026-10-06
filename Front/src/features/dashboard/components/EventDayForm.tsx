@@ -11,7 +11,7 @@ import type {
 
 interface EventDayFormProps {
   eventDay?: EventDay | null;
-  eventId?: string;
+  eventId?: string | null;
   onSave: (payload: EventDayCreatePayload) => Promise<void>;
   onCancel: () => void;
   saving: boolean;
@@ -87,7 +87,7 @@ export function EventDayForm({ eventDay, eventId, onSave, onCancel, saving }: Ev
   const [averageParkingDuration, setAverageParkingDuration] = useState('');
   const [attendanceLevelId, setAttendanceLevelId] = useState('');
 
-  const resolvedEventId = eventId || eventDay?.event_id || '';
+  const resolvedEventId = eventId ?? eventDay?.event_id ?? null;
   const { levels, loading: levelsLoading } = useAttendanceLevels(resolvedEventId);
   const { byId: operationalPhaseCatalog, loading: operationalPhasesLoading } = useOperationalPhaseCatalog();
 

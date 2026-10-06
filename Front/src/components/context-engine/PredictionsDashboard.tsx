@@ -17,7 +17,7 @@ import {
   MapPin,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { useResolvedEventId } from '../../hooks/useActiveEvent';
+import { useAppStore } from '../../core/state/store';
 import { useTerritorialPrediction, useAutoRefresh } from '../../hooks/useContextEngine';
 import type { ZoneStateItem } from '../../hooks/useContextEngine';
 import { apiClient } from '../../core/api/client';
@@ -106,15 +106,18 @@ interface ZoneInfo {
 }
 
 interface PredictionsDashboardProps {
-  eventId?: string;
   autoRefreshMs?: number;
 }
 
-export function PredictionsDashboard({ eventId, autoRefreshMs = 15000 }: PredictionsDashboardProps) {
+export function PredictionsDashboard({ autoRefreshMs = 15000 }: PredictionsDashboardProps) {
   // Evento activo del store global (`useActiveEvent`), no `VITE_EVENT_ID`.
-  const activeEventId = useResolvedEventId();
-  const eid = eventId || activeEventId;
-  const { data, loading, error, refresh } = useTerritorialPrediction(eid);
+  //
+  // Sin `?? ''` y sin `||`: el valor queda en `string | null` y eso es lo que obliga
+  // a que los dos efectos de abajo decidan antes de pedir zonas. Con `''` pasaban
+  // de largo y armaban `/events//zones`, además de escribir en la clave
+  // `zones:sin-evento` del caché.
+  const eventId = useAppStore((s) => s.activeEventId);
+  const { data, loading, error, refresh } = useTerritorialPrediction(eventId);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [zonesById, setZonesById] = useState<Record<string, { name: string; type: string }>>({});
   const [searchTerm, setSearchTerm] = useState('');
@@ -124,12 +127,18 @@ export function PredictionsDashboard({ eventId, autoRefreshMs = 15000 }: Predict
   }, [refresh]);
 
   useEffect(() => {
+    // Sin evento no hay catálogo de zonas que pedir. Se limpia el mapa para no
+    // dejar los nombres de un evento anterior pegados en pantalla.
+    if (!eventId) {
+      setZonesById({});
+      return;
+    }
     let cancelled = false;
     readThroughCache<ZoneInfo[]>(
-      zoneCacheKey(eid),
+      zoneCacheKey(eventId),
       ZONES_TTL_MS,
       async () => {
-        const res = await apiClient.get<ZoneInfo[]>(endpoints.zones.list(eid));
+        const res = await apiClient.get<ZoneInfo[]>(endpoints.zones.list(eventId));
         return res.data ?? [];
       }
     )
@@ -145,7 +154,7 @@ export function PredictionsDashboard({ eventId, autoRefreshMs = 15000 }: Predict
     return () => {
       cancelled = true;
     };
-  }, [eid]);
+  }, [eventId]);
 
   useAutoRefresh(refresh, autoRefreshMs, autoRefresh);
 
@@ -283,6 +292,14 @@ export function PredictionsDashboard({ eventId, autoRefreshMs = 15000 }: Predict
       </Card>
     );
   };
+
+  if (!eventId) {
+    return (
+      <p className="p-4 text-sm text-slate-500">
+        Esperando el evento activo...
+      </p>
+    );
+  }
 
   return (
     <div className="space-y-4">

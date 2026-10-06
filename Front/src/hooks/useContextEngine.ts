@@ -37,15 +37,19 @@ export interface TerritorialPredictionResponse {
 /**
  * Predicción territorial del evento activo.
  *
- * `eventId` es opcional: sin argumento usa el del store global (`activeEventId`,
- * resuelto por `useActiveEvent()` desde la jornada activa). Antes el default venía
- * de `import.meta.env.VITE_EVENT_ID`, horneado en el bundle al compilar.
+ * `eventId` es opcional y admite `null`: sin argumento usa el del store global
+ * (`activeEventId`, resuelto por `useActiveEvent()` desde la jornada activa). Antes
+ * el default venía de `import.meta.env.VITE_EVENT_ID`, horneado en el bundle al
+ * compilar, y devolvía `''` mientras no había ID.
+ *
+ * El tipo declara el `null` para que `endpoints.predictions.get()` (que exige
+ * `string`) no se pueda llamar sin haber decidido antes que hay evento.
  *
  * Este hook es el quesurfaced el bug "No se encontraron zonas para el evento": con
  * el ID viejo de `.env` (evento inexistente) el backend responde 404. Ahora sale
  * `No hay evento activo configurado`, que dice qué hacer.
  */
-export function useTerritorialPrediction(eventId?: string) {
+export function useTerritorialPrediction(eventId?: string | null) {
   const activeEventId = useAppStore((s) => s.activeEventId);
   const resolvedEventId = eventId ?? activeEventId;
   const [data, setData] = useState<TerritorialPredictionResponse | null>(null);

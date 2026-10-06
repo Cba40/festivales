@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Info, AlertTriangle, X } from 'lucide-react';
 import { usePublicAlerts } from '@/features/public/hooks/usePublicAlerts';
-import { useResolvedEventId } from '@/hooks/useActiveEvent';
+import { useAppStore } from '@/core/state/store';
 import type { AlertType, MessagePriority } from '@/features/dashboard/types';
 
 interface Notice {
@@ -59,14 +59,16 @@ const styleSeverity = (style: AlertType): number => {
 };
 
 interface PublicAlertsBannerProps {
-  eventId?: string;
   className?: string;
 }
 
-const PublicAlertsBanner = ({ eventId, className }: PublicAlertsBannerProps) => {
+const PublicAlertsBanner = ({ className }: PublicAlertsBannerProps) => {
   // Evento activo del store global (`useActiveEvent`), no `VITE_EVENT_ID`.
-  const activeEventId = useResolvedEventId();
-  const { data } = usePublicAlerts(eventId ?? activeEventId);
+  // Sin `?? ''`: el valor crudo es `string | null` y `usePublicAlerts` frena solo
+  // hasta que resuelva. Era el accessor que devolvía `''` el que armaba
+  // `/events//alerts`.
+  const eventId = useAppStore((s) => s.activeEventId);
+  const { data } = usePublicAlerts(eventId);
   const [dismissed, setDismissed] = useState<string[]>([]);
 
   const notices = useMemo<Notice[]>(() => {
@@ -97,7 +99,7 @@ const PublicAlertsBanner = ({ eventId, className }: PublicAlertsBannerProps) => 
 
   const visible = notices.filter((n) => !dismissed.includes(n.key));
 
-  if (visible.length === 0) return null;
+  if (!eventId || visible.length === 0) return null;
 
   const containerClass =
     className ?? 'px-4 pt-3 space-y-2 w-full max-w-2xl mx-auto';

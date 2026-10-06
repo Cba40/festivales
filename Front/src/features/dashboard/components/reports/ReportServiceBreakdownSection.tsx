@@ -47,9 +47,9 @@ function TemporalBreakdown({
 }: TemporalBreakdownProps) {
   const [category, setCategory] = useState('');
 
-  // Evento activo del store global (`useActiveEvent`). Antes venía de
-  // `import.meta.env.VITE_EVENT_ID`, horneado en el bundle al compilar.
-  const eventId = useAppStore((s) => s.activeEventId) ?? '';
+  // Evento activo del store global (`useActiveEvent`). El valor crudo es
+  // `string | null`: `useEventReport` frena solo hasta que resuelva.
+  const eventId = useAppStore((s) => s.activeEventId);
 
   const params = useMemo(
     () => ({
@@ -64,7 +64,7 @@ function TemporalBreakdown({
 
   const { data, isLoading, error } = useEventReport<TemporalDistributionDTO>(
     eventId,
-    endpoints.reports.temporalDistribution(eventId),
+    eventId ? endpoints.reports.temporalDistribution(eventId) : null,
     { params }
   );
 
@@ -200,9 +200,9 @@ export function ReportServiceBreakdownSection({
   start,
   end,
 }: ReportServiceBreakdownSectionProps = {}) {
-  // Evento activo del store global (`useActiveEvent`). Antes venía de
-  // `import.meta.env.VITE_EVENT_ID`, horneado en el bundle al compilar.
-  const eventId = useAppStore((s) => s.activeEventId) ?? '';
+  // Evento activo del store global (`useActiveEvent`). El valor crudo es
+  // `string | null`: `useEventReport` frena solo hasta que resuelva.
+  const eventId = useAppStore((s) => s.activeEventId);
   const params = useMemo(() => ({ start, end }), [start, end]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [protocolTitles, setProtocolTitles] = useState<Record<string, string>>({});
@@ -210,7 +210,7 @@ export function ReportServiceBreakdownSection({
 
   const { data, isLoading, error, refresh } = useEventReport<ServiceBreakdownDTO>(
     eventId,
-    endpoints.reports.serviceBreakdown(eventId),
+    eventId ? endpoints.reports.serviceBreakdown(eventId) : null,
     { params }
   );
 

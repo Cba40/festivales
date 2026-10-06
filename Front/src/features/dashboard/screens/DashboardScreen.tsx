@@ -25,7 +25,6 @@ import { useEventDays } from '../hooks/useEventDays';
 import { useOperationalEvents } from '../hooks/useOperationalEvents';
 import { RefreshButton } from '../components/ui';
 import { useExactRole, usePermission } from '@/core/auth/useAuth';
-import { useResolvedEventId } from '@/hooks/useActiveEvent';
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -186,7 +185,7 @@ export function DashboardScreen() {
   const accionesVisibles = QUICK_ACTIONS.filter((a) => permisosConcedidos[a.permission]);
 
   // Evento activo del store global (`useActiveEvent`), no `VITE_EVENT_ID`.
-  const eventId = useResolvedEventId();
+  const eventId = useAppStore((s) => s.activeEventId);
   const { zones, refresh: refreshZones } = useDashboardSync();
   const { eventDays, refresh: refreshDays } = useEventDays(eventId);
   const todayIso = toISODate(new Date());

@@ -3,7 +3,12 @@ import { apiClient } from '@/core/api/client';
 import { endpoints } from '@/core/api/endpoints';
 import type { EventDaySummary } from '../types';
 
-export function useEventDays(eventId: string) {
+/**
+ * `eventId` acepta `null`: el store lo deja en `null` hasta que `/events/active`
+ * responde. Aceptarlo acá es lo que obliga al compilador a exigir un guard en el
+ * llamador, en vez de dejar pasar un `''` que armaba `/events//event-days`.
+ */
+export function useEventDays(eventId: string | null) {
   const [eventDays, setEventDays] = useState<EventDaySummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

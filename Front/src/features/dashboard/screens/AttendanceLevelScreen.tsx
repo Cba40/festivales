@@ -8,12 +8,12 @@ import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useAttendanceLevels } from '../hooks/useAttendanceLevels';
 import { useAttendanceLevelMutations } from '../hooks/useAttendanceLevelMutations';
 import type { AttendanceLevelDTO } from '../types';
-import { useResolvedEventId } from '@/hooks/useActiveEvent';
+import { useAppStore } from '@/core/state/store';
 
 
 export function AttendanceLevelScreen() {
   // Evento activo del store global (`useActiveEvent`), no `VITE_EVENT_ID`.
-  const eventId = useResolvedEventId();
+  const eventId = useAppStore((s) => s.activeEventId);
   const { levels, loading, error, refresh } = useAttendanceLevels(eventId);
   const { create, update, remove, saving } = useAttendanceLevelMutations(eventId);
 

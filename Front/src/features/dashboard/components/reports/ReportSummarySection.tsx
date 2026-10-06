@@ -17,14 +17,14 @@ export function ReportSummarySection({
   start,
   end,
 }: ReportSummarySectionProps = {}) {
-  // Evento activo del store global (`useActiveEvent`). Antes venía de
-  // `import.meta.env.VITE_EVENT_ID`, horneado en el bundle al compilar.
-  const eventId = useAppStore((s) => s.activeEventId) ?? '';
+  // Evento activo del store global (`useActiveEvent`). El valor crudo es
+  // `string | null`: `useEventReport` frena solo hasta que resuelva.
+  const eventId = useAppStore((s) => s.activeEventId);
   const params = useMemo(() => ({ start, end }), [start, end]);
 
   const { data, isLoading, error, refresh } = useEventReport<EventSummaryDTO>(
     eventId,
-    endpoints.reports.summary(eventId),
+    eventId ? endpoints.reports.summary(eventId) : null,
     { params }
   );
 

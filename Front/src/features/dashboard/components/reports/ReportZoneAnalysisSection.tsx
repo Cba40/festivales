@@ -20,9 +20,9 @@ export function ReportZoneAnalysisSection({
 }: ReportZoneAnalysisSectionProps = {}) {
   const [category, setCategory] = useState('');
 
-  // Evento activo del store global (`useActiveEvent`). Antes venía de
-  // `import.meta.env.VITE_EVENT_ID`, horneado en el bundle al compilar.
-  const eventId = useAppStore((s) => s.activeEventId) ?? '';
+  // Evento activo del store global (`useActiveEvent`). El valor crudo es
+  // `string | null`: `useEventReport` frena solo hasta que resuelva.
+  const eventId = useAppStore((s) => s.activeEventId);
 
   const params = useMemo(
     () => ({
@@ -35,7 +35,7 @@ export function ReportZoneAnalysisSection({
 
   const { data, isLoading, error, refresh } = useEventReport<ZoneAnalysisDTO>(
     eventId,
-    endpoints.reports.zoneAnalysis(eventId),
+    eventId ? endpoints.reports.zoneAnalysis(eventId) : null,
     { params }
   );
 

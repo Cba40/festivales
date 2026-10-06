@@ -73,7 +73,11 @@ function buildProductParams(): Record<string, unknown> {
 
 function ScreenLoading() {
   return (
-    <div className="flex min-h-[40vh] items-center justify-center text-slate-500">
+    <div className="flex min-h-[40vh] items-center justify-center gap-3 text-slate-500">
+      <span
+        aria-hidden="true"
+        className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-indigo-600"
+      />
       <span>Cargando...</span>
     </div>
   );
@@ -120,9 +124,23 @@ function AppLayout() {
   // ausente cae en el `.catch(() => {})` de cada prefetch en vez de romper el render.
   const {
     activeEventId,
+    isLoading: isLoadingActiveEvent,
     isMissing: isActiveEventMissing,
     resolve: resolveActiveEvent,
   } = useActiveEvent();
+  const [activeEventGateTimedOut, setActiveEventGateTimedOut] = useState(false);
+
+  useEffect(() => {
+    if (!isLoadingActiveEvent) {
+      setActiveEventGateTimedOut(false);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setActiveEventGateTimedOut(true);
+    }, 5000);
+    return () => window.clearTimeout(timeoutId);
+  }, [isLoadingActiveEvent]);
 
   const preloadParking = useCallback(() => {
     getParkingRecommendations(requireActiveEventId(), { ...buildProductParams(), limit: 4 }, 'prefetch').catch(() => {});
@@ -199,9 +217,8 @@ function AppLayout() {
   // Sondeo periódico. El evento activo se re-resuelve acá para que una jornada que
   // el operador marque a mitad de una sesión abierta se tome sin recargar la página.
   useEffect(() => {
-    if (!activeEventId) return;
-    const id = setInterval(() => {
-      void resolveActiveEvent();
+    const refreshForResolvedEvent = () => {
+      if (!useAppStore.getState().activeEventId) return;
       refresh();
       preloadParking();
       preloadGastronomy();
@@ -211,32 +228,21 @@ function AppLayout() {
       preloadAccommodation();
       preloadExit();
       preloadEmergency();
+    };
+
+    const id = setInterval(() => {
+      void resolveActiveEvent();
+      refreshForResolvedEvent();
     }, 30000);
     const onVisibility = () => {
       if (document.visibilityState === 'visible') {
         void resolveActiveEvent();
-        refresh();
-        preloadParking();
-        preloadGastronomy();
-        preloadBathroom();
-        preloadRest();
-        preloadHydration();
-        preloadAccommodation();
-        preloadExit();
-        preloadEmergency();
+        refreshForResolvedEvent();
       }
     };
     const onFocus = () => {
       void resolveActiveEvent();
-      refresh();
-      preloadParking();
-      preloadGastronomy();
-      preloadBathroom();
-      preloadRest();
-      preloadHydration();
-      preloadAccommodation();
-      preloadExit();
-      preloadEmergency();
+      refreshForResolvedEvent();
     };
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('focus', onFocus);
@@ -335,17 +341,33 @@ function AppLayout() {
     });
   }, [location.pathname, isDashboard]);
 
+  const isEventIndependentDashboardRoute =
+    location.pathname === '/dashboard/login' ||
+    location.pathname === '/dashboard/denegado';
+
   // Aviso de evento no configurado. `requireActiveEventId()` lanza en cada prefetch
   // cuando no hay jornada activa, y esos errores se tragan con `.catch(() => {})`
   // (son prefetch, no datos que el usuario pidió). Sin este banner el operador vería
   // pantallas vacías sin explicación; con él, la causa queda a la vista.
-  const activeEventBanner =
-    isActiveEventMissing && !isDashboard ? (
+  const shouldShowActiveEventNotice =
+    !activeEventId &&
+    !isEventIndependentDashboardRoute &&
+    (isActiveEventMissing || !isLoadingActiveEvent || activeEventGateTimedOut);
+  const activeEventBanner = shouldShowActiveEventNotice ? (
       <div className="print:hidden bg-amber-500 text-black text-center text-sm p-1">
-        No hay evento activo configurado. Marcá una jornada como activa desde el
-        dashboard.
+        {isActiveEventMissing
+          ? 'No hay evento activo configurado. Marcá una jornada como activa desde el dashboard.'
+          : 'No se pudo resolver el evento activo. Verificá la conexión o marcá una jornada como activa desde el dashboard.'}
       </div>
     ) : null;
+
+  if (
+    isLoadingActiveEvent &&
+    !activeEventGateTimedOut &&
+    !isEventIndependentDashboardRoute
+  ) {
+    return <ScreenLoading />;
+  }
 
   if (isDashboard) {
     return (

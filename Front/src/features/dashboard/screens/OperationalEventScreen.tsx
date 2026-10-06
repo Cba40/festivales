@@ -7,7 +7,7 @@ import { AdminMapSelector } from '@/components/AdminMapSelector';
 import { useOperationalEvents } from '../hooks/useOperationalEvents';
 import { useOperationalEventMutations } from '../hooks/useOperationalEventMutations';
 import { useEventDays } from '../hooks/useEventDays';
-import { useResolvedEventId } from '@/hooks/useActiveEvent';
+import { useAppStore } from '@/core/state/store';
 import { FlowRestrictionSection } from '../components/FlowRestrictionSection';
 import { DashboardHeader } from '../components/DashboardHeader';
 import { AppFooter } from '@/components/AppFooter';
@@ -641,7 +641,7 @@ function EventFormModal({
 
 export function OperationalEventScreen() {
   // Evento activo del store global (`useActiveEvent`), no `VITE_EVENT_ID`.
-  const eventId = useResolvedEventId();
+  const eventId = useAppStore((s) => s.activeEventId);
   const { eventDays, loading: loadingDays } = useEventDays(eventId);
   const [selectedDayId, setSelectedDayId] = useState<string | null>(null);
   const { events, loading, error, refresh } = useOperationalEvents(selectedDayId);
