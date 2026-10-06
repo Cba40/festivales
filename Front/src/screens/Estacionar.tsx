@@ -24,6 +24,31 @@ import { formatUpdatedAt } from '@/utils/formatTime'
 import { getDistancias } from '@/utils/geo'
 
 /**
+ * Porcentaje de "posibilidad" por debajo del cual se avisa que la disponibilidad
+ * está limitada. Es un umbral de presentación: el número sale del backend y acá
+ * solo se decide si se muestra el aviso.
+ */
+const AVAILABILITY_WARNING_THRESHOLD = 20
+
+/**
+ * Cuántas zonas listar en la rama `sin_solucion`.
+ *
+ * Deliberadamente **desacoplado** de `PARKING_LIMIT`: ese constant es cuántas
+ * pedimos al backend, este es cuántas mostramos en la lista de disponibilidad
+ * limitada. Acoplarlos con `PARKING_LIMIT - 1` haría que subir el limit de 4 a 5
+ * mostrara 4 avisos donde antes mostraba 3, sin que nadie lo pidiera.
+ */
+const ZONAS_MAX_SIN_SOLUCION = 3
+
+/**
+ * Espera orientativa cuando **no hay ninguna zona** que aporte un
+ * `estimated_wait`: en la rama `sin_solucion` con `zonas.length === 0` no hay de
+ * dónde leer un dato dinámico, así que el texto es una estimación fija y
+ * documentada, no un valor hardcodeado sin contexto.
+ */
+const DEFAULT_WAIT_ESTIMATE = '⏱️ Esperar 20–30 min'
+
+/**
  * Fila de métricas de una zona: tiempo en auto y posibilidad de estacionamiento.
  *
  * Reemplaza 4 copias idénticas de un IIFE que solo cambiaba el nombre de la
@@ -124,10 +149,10 @@ const Estacionar = () => {
   const renderBottomSheet = selectedZona && (
     <>
       <div
-        className="fixed inset-0 bg-black/50 z-[9999]"
+        className="fixed inset-0 bg-black/50 z-40"
         onClick={() => setSelectedZona(null)}
       />
-      <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 rounded-t-2xl p-4 z-[10000] max-w-md mx-auto shadow-2xl">
+      <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 rounded-t-2xl p-4 z-50 max-w-md mx-auto shadow-2xl">
         <div
           className="w-12 h-1 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto mb-4 cursor-pointer"
           onClick={() => setSelectedZona(null)}
@@ -235,7 +260,7 @@ const Estacionar = () => {
           {zonas.length === 0 && (
             <div className="bg-slate-100 dark:bg-slate-700 p-4 rounded-xl space-y-3">
               <button className="w-full bg-white dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 p-3 rounded-lg font-bold active:scale-95 transition-transform">
-                ⏱️ Esperar 20–30 min
+                {DEFAULT_WAIT_ESTIMATE}
               </button>
               <button className="w-full bg-white dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 p-3 rounded-lg font-bold active:scale-95 transition-transform">
                 🚶 Alejarse de esta zona
@@ -248,7 +273,7 @@ const Estacionar = () => {
               <p className="text-xs text-red-500 text-center">
                 ⚠️ Disponibilidad muy baja — podés no encontrar lugar
               </p>
-              {zonas.slice(0, 3).map((zona, index) => {
+              {zonas.slice(0, ZONAS_MAX_SIN_SOLUCION).map((zona, index) => {
                 const dist = getDistancias(zona.lat, zona.lng, userLocation, zona.distancia_min ?? DISTANCIA_FALLBACK_MIN)
                 return (
                   <button
@@ -322,7 +347,7 @@ const Estacionar = () => {
               </p>
               <p className="text-sm opacity-90 mt-2">📍 {principal.referencia}</p>
               <FilaMetricas zona={principal} className="text-sm opacity-90" />
-              {Math.round((1 - (principal.saturation_level ?? 0)) * 100) < 20 && (
+              {Math.round((1 - (principal.saturation_level ?? 0)) * 100) < AVAILABILITY_WARNING_THRESHOLD && (
                 <p className="text-xs opacity-75 mt-2">⚠️ Disponibilidad limitada</p>
               )}
               {modo === 'asistir' && (

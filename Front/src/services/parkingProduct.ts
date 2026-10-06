@@ -5,7 +5,59 @@ import { readThroughCache, productCacheKey, PRODUCT_TTL_MS } from '@/core/cache/
 import { useAppStore } from '@/core/state/store'
 import type { SaturationLevel } from '@/features/dashboard/types'
 
-const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id'
+/**
+ * Velocidad de caminata en m/s que se envía al backend como `speed`.
+ *
+ * 1.5 m/s ≈ 5.4 km/h: marcha urbana sostenida. Es la misma cifra que usa
+ * `URBAN_FACTOR`/`kmWalking` en `utils/geo.ts` para estimar tiempos a pie, así
+ * que el tiempo que muestra la pantalla y el que usa el motor concuerdan.
+ */
+export const WALKING_SPEED = 1.5
+
+/** `access_level` por defecto. El enum del backend tiene STANDARD como valor de Query. */
+export const DEFAULT_ACCESS_LEVEL = 'STANDARD'
+
+/**
+ * Si el usuario exige accesibilidad. Hoy el modelo no consulta ese dato, así que
+ * va fijo en false; queda constante para que cuando exista la preferencia sea un
+ * cambio en un solo lugar y no una edición dentro del objeto `params`.
+ */
+export const ACCESSIBILITY_REQUIRED = false
+
+/**
+ * `user_id` que se envía al endpoint.
+ *
+ * El backend lo exige (`user_id: str = Query(...)`) y hoy no hay concepto de
+ * usuario en el frontend público, así que va el UUID nil. Es un valor
+ * **provisional**: si el ranking llegara a personalizar por usuario, todas las
+ * personas recibirían la misma predicción y no se notice. Pendiente de
+ * reemplazar cuando exista auth en el frente público.
+ */
+export const ANONYMOUS_USER_ID = '00000000-0000-0000-0000-000000000000'
+
+/**
+ * Evento contra el que se piden recomendaciones.
+ *
+ * `VITE_EVENT_ID` es obligatorio en cualquier entorno real: si falta, todas las
+ * requests van a `/api/events/default-event-id/...`, que no existe, y la pantalla
+ * cae en el estado "sin opciones" sin decir por qué. El fallback se conserva para
+ * que el dev server no se rompa, pero ahora avisa en consola en vez de fallar en
+ * silencio.
+ *
+ * Nota: `.env.production` hoy no define `VITE_EVENT_ID`, así que en ese entorno
+ * esta función entra siempre por la rama del fallback.
+ */
+function resolveEventId(): string {
+  const configured = import.meta.env.VITE_EVENT_ID
+  if (configured) return configured
+  console.warn(
+    '[parking] VITE_EVENT_ID no configurado: se usará el fallback ' +
+      "'default-event-id'. Las consultas devolverán 0 zonas en un entorno real."
+  )
+  return 'default-event-id'
+}
+
+const EVENT_ID = resolveEventId()
 
 /**
  * Cuántas zonas de estacionamiento pide el hook.
@@ -108,12 +160,12 @@ export function useParkingRecommendations() {
     try {
       const { currentZoneId: zoneIdSnapshot, userLocation: locationSnapshot } = ctxRef.current
       const params: Record<string, unknown> = {
-        speed: 1.5,
-        accessibility_required: false,
+        speed: WALKING_SPEED,
+        accessibility_required: ACCESSIBILITY_REQUIRED,
         limit: PARKING_LIMIT,
         current_zone_id: zoneIdSnapshot || undefined,
-        user_id: '00000000-0000-0000-0000-000000000000',
-        access_level: 'STANDARD',
+        user_id: ANONYMOUS_USER_ID,
+        access_level: DEFAULT_ACCESS_LEVEL,
         ...(locationSnapshot
           ? { latitude: locationSnapshot[0], longitude: locationSnapshot[1] }
           : {}),
