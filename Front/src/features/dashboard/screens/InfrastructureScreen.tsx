@@ -9,8 +9,7 @@ import { ProtocolManagementScreen } from './ProtocolManagementScreen';
 import { DashboardHeader } from '../components/DashboardHeader';
 import { AppFooter } from '@/components/AppFooter';
 import { SectionTabs } from '../components/ui';
-
-const DEFAULT_EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
+import { useResolvedEventId } from '@/hooks/useActiveEvent';
 
 type Section = 'zones' | 'reference' | 'salidas' | 'transporte' | 'hospedaje' | 'emergencias' | 'protocolos';
 
@@ -26,6 +25,8 @@ const SECTIONS: { key: Section; label: string }[] = [
 
 export function InfrastructureScreen() {
   const [activeSection, setActiveSection] = useState<Section>('zones');
+  // Evento activo del store global (`useActiveEvent`), no `VITE_EVENT_ID`.
+  const eventId = useResolvedEventId();
 
   return (
     <div className="min-h-screen bg-slate-50 w-full">
@@ -40,12 +41,12 @@ export function InfrastructureScreen() {
       <main className="p-4 sm:p-6">
         {activeSection === 'zones' && <ZoneAdminScreen />}
         {activeSection === 'reference' && <EventReferencePointScreen />}
-        {activeSection === 'salidas' && <ExitManagementScreen eventId={DEFAULT_EVENT_ID} />}
+        {activeSection === 'salidas' && <ExitManagementScreen eventId={eventId} />}
         {activeSection === 'transporte' && (
-          <TransportManagementScreen eventId={DEFAULT_EVENT_ID} />
+          <TransportManagementScreen eventId={eventId} />
         )}
         {activeSection === 'hospedaje' && (
-          <AccommodationManagementScreen eventId={DEFAULT_EVENT_ID} />
+          <AccommodationManagementScreen eventId={eventId} />
         )}
         {activeSection === 'emergencias' && <EmergencyManagementScreen />}
         {activeSection === 'protocolos' && <ProtocolManagementScreen />}

@@ -2,8 +2,7 @@ import { useCallback, useState } from 'react'
 import { apiClient } from '@/core/api/client'
 import { endpoints } from '@/core/api/endpoints'
 import { readThroughCache, zoneCacheKey, ZONES_TTL_MS } from '@/core/cache/memoryCache'
-
-const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id'
+import { requireActiveEventId } from '@/services/activeEvent'
 
 export interface CajeroItem {
   zone_id: string
@@ -41,11 +40,12 @@ export function useCajeros() {
     setLoading(true)
     setError(null)
     try {
+      const eventId = requireActiveEventId()
       const zones = await readThroughCache<ZoneRow[]>(
-        zoneCacheKey(EVENT_ID),
+        zoneCacheKey(eventId),
         ZONES_TTL_MS,
         async () => {
-          const { data } = await apiClient.get<ZoneRow[]>(endpoints.zones.list(EVENT_ID))
+          const { data } = await apiClient.get<ZoneRow[]>(endpoints.zones.list(eventId))
           return data
         },
         force

@@ -3,8 +3,14 @@ import { apiClient, originHeaders, type RequestOrigin } from '@/core/api/client'
 import { endpoints } from '@/core/api/endpoints'
 import { readThroughCache, productCacheKey, PRODUCT_TTL_MS } from '@/core/cache/memoryCache'
 import { useAppStore } from '@/core/state/store'
+import { requireActiveEventId } from '@/services/activeEvent'
 
-const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id'
+// El `event_id` viene de `useActiveEvent()` (store global), no de
+// `import.meta.env.VITE_EVENT_ID`: la variable de entorno se hornea en el bundle al
+// compilar, así que cambiada de evento había que redeployar y un valor viejo en
+// `.env` hacía pedir zonas de un evento inexistente. Se resuelve dentro de `refresh`
+// y no al importar el módulo porque el store se puebla en runtime: una constante
+// leída al evaluar el archivo quedaría congelada en null.
 
 export interface ZonaGastronomicaItem {
   zone_id: string
@@ -82,12 +88,13 @@ export function useGastronomyRecommendations() {
           ? { latitude: locationSnapshot[0], longitude: locationSnapshot[1] }
           : {}),
       }
+      const eventId = requireActiveEventId()
       const data = await readThroughCache<GastronomyRecommendationResponse>(
-        productCacheKey(EVENT_ID, 'gastronomy'),
+        productCacheKey(eventId, 'gastronomy'),
         PRODUCT_TTL_MS,
         async () => {
           const { data } = await apiClient.get<GastronomyRecommendationResponse>(
-            endpoints.products.gastronomy(EVENT_ID),
+            endpoints.products.gastronomy(eventId),
             {
               params,
               ...(requestOrigin ? { headers: originHeaders(requestOrigin) } : {}),

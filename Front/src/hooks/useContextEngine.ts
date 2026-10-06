@@ -2,8 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { apiClient } from '../core/api/client';
 import { endpoints } from '../core/api/endpoints';
 import { readThroughCache, predictionCacheKey, PREDICTION_TTL_MS } from '../core/cache/memoryCache';
-
-const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
+import { useAppStore } from '../core/state/store';
 
 export interface ZoneStateItem {
   zone_id: string;
@@ -35,21 +34,40 @@ export interface TerritorialPredictionResponse {
   zone_states: ZoneStateItem[];
 }
 
-export function useTerritorialPrediction(eventId: string = EVENT_ID) {
+/**
+ * Predicción territorial del evento activo.
+ *
+ * `eventId` es opcional: sin argumento usa el del store global (`activeEventId`,
+ * resuelto por `useActiveEvent()` desde la jornada activa). Antes el default venía
+ * de `import.meta.env.VITE_EVENT_ID`, horneado en el bundle al compilar.
+ *
+ * Este hook es el quesurfaced el bug "No se encontraron zonas para el evento": con
+ * el ID viejo de `.env` (evento inexistente) el backend responde 404. Ahora sale
+ * `No hay evento activo configurado`, que dice qué hacer.
+ */
+export function useTerritorialPrediction(eventId?: string) {
+  const activeEventId = useAppStore((s) => s.activeEventId);
+  const resolvedEventId = eventId ?? activeEventId;
   const [data, setData] = useState<TerritorialPredictionResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async (force = false) => {
+    // Transitorio: el evento todavía no resolvió. No se setea `error` porque
+    // pisaría el mensaje real de una request que sí falló.
+    if (!resolvedEventId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
       const res = await readThroughCache<TerritorialPredictionResponse>(
-        predictionCacheKey(eventId),
+        predictionCacheKey(resolvedEventId),
         PREDICTION_TTL_MS,
         async () => {
           const { data } = await apiClient.get<TerritorialPredictionResponse>(
-            endpoints.predictions.get(eventId)
+            endpoints.predictions.get(resolvedEventId)
           );
           return data;
         },
@@ -62,7 +80,7 @@ export function useTerritorialPrediction(eventId: string = EVENT_ID) {
     } finally {
       setLoading(false);
     }
-  }, [eventId]);
+  }, [resolvedEventId]);
 
   return { data, loading, error, refresh };
 }

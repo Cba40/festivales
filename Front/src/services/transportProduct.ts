@@ -2,8 +2,7 @@ import { useState, useCallback, useRef } from 'react'
 import { apiClient, originHeaders, type RequestOrigin } from '@/core/api/client'
 import { endpoints } from '@/core/api/endpoints'
 import { useAppStore } from '@/core/state/store'
-
-const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id'
+import { requireActiveEventId } from '@/services/activeEvent'
 
 export interface ScheduleItem {
   day_type: string
@@ -66,7 +65,7 @@ export function useTransportRecommendations(
     try {
       const { currentZoneId: zoneIdSnapshot, userLocation: locationSnapshot } = ctxRef.current
       const { data: res } = await apiClient.get<TransportRecommendationResponse>(
-        endpoints.products.transport(EVENT_ID),
+        endpoints.products.transport(requireActiveEventId()),
         {
           params: {
             speed: 1.5,
@@ -109,7 +108,7 @@ export function useAvailableDestinations(transportType?: TransportType) {
     setError(null)
     try {
       const { data } = await apiClient.get<AvailableDestinationsResponse>(
-        endpoints.products.transportDestinations(EVENT_ID),
+        endpoints.products.transportDestinations(requireActiveEventId()),
         {
           params: transportType ? { transport_type: transportType } : {},
         }

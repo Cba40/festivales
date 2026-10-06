@@ -8,7 +8,7 @@ import {
 import { useMetricsEvaluation } from '@/hooks/useMetricsEvaluation';
 import { apiClient } from '@/core/api/client';
 import { endpoints } from '@/core/api/endpoints';
-import { EVENT_ID } from '@/components/context-engine/constants';
+import { useResolvedEventId } from '@/hooks/useActiveEvent';
 import type {
   AnomalySeverity,
   ConfigurationRecommendationDTO,
@@ -322,39 +322,44 @@ function MetricCard({ metric }: { metric: MetricResultResponse }) {
 }
 
 function MetricsEvaluationCard() {
+  // Evento activo del store global (`useActiveEvent`), no `VITE_EVENT_ID`.
+  const eventId = useResolvedEventId();
   const { data, isEvaluating, error, evaluate } = useMetricsEvaluation();
   const [eventDays, setEventDays] = useState<EventDaySummary[]>([]);
   const [phases, setPhases] = useState<OperationalPhaseDTO[]>([]);
   const [eventDayId, setEventDayId] = useState('');
   const [phaseId, setPhaseId] = useState('');
 
-  useEffect(() => {
-    let cancelled = false;
-    apiClient
-      .get<EventDaySummary[]>(endpoints.eventDays.list(EVENT_ID))
-      .then((res) => {
-        if (cancelled) return;
-        const days = res.data ?? [];
-        setEventDays(days);
-        const active = days.find((d) => d.is_active) ?? days[0];
-        if (active) setEventDayId(active.id);
-      })
-      .catch(() => {});
+// Las jornadas dependen del evento activo: se piden cuando `eventId` resuelve,
+      // no al montar, que es cuando todavía valía `VITE_EVENT_ID`.
+      useEffect(() => {
+        if (!eventId) return;
+        let cancelled = false;
+        apiClient
+          .get<EventDaySummary[]>(endpoints.eventDays.list(eventId))
+          .then((res) => {
+            if (cancelled) return;
+            const days = res.data ?? [];
+            setEventDays(days);
+            const active = days.find((d) => d.is_active) ?? days[0];
+            if (active) setEventDayId(active.id);
+          })
+          .catch(() => {});
 
-    apiClient
-      .get<OperationalPhaseDTO[]>(endpoints.operationalPhases.list())
-      .then((res) => {
-        if (cancelled) return;
-        const phaseList = res.data ?? [];
-        setPhases(phaseList);
-        if (phaseList.length > 0) setPhaseId(phaseList[0].id);
-      })
-      .catch(() => {});
+        apiClient
+          .get<OperationalPhaseDTO[]>(endpoints.operationalPhases.list())
+          .then((res) => {
+            if (cancelled) return;
+            const phaseList = res.data ?? [];
+            setPhases(phaseList);
+            if (phaseList.length > 0) setPhaseId(phaseList[0].id);
+          })
+          .catch(() => {});
 
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+        return () => {
+          cancelled = true;
+        };
+      }, [eventId]);
 
   const handleEvaluate = useCallback(() => {
     if (!eventDayId || !phaseId) return;

@@ -1,6 +1,6 @@
 import { useEffect, useCallback, useMemo, useState } from 'react';
 import { Pencil, Plus } from 'lucide-react';
-import { EVENT_ID } from '@/components/context-engine/constants';
+import { useResolvedEventId } from '@/hooks/useActiveEvent';
 import { apiClient } from '@/core/api/client';
 import { endpoints } from '@/core/api/endpoints';
 import { useAppStore } from '@/core/state/store';
@@ -137,6 +137,9 @@ export function ObservationsScreen() {
   const user = useAppStore((s) => s.auth.user);
   const observerDisplayName = user?.full_name || user?.username || 'tu usuario';
 
+  // Evento activo del store global (`useActiveEvent`), no `VITE_EVENT_ID`.
+  const eventId = useResolvedEventId();
+
   const {
     observations,
     isLoading,
@@ -168,10 +171,13 @@ export function ObservationsScreen() {
     fetchObservations();
   }, [fetchObservations]);
 
+  // `eventId` en las deps: hasta que resuelve no hay catálogo que pedir, y cuando
+  // resuelve hay que pedirlo para ese evento.
   useEffect(() => {
+    if (!eventId) return;
     let cancelled = false;
     apiClient
-      .get<ZoneInfo[]>(endpoints.zones.list(EVENT_ID))
+      .get<ZoneInfo[]>(endpoints.zones.list(eventId))
       .then((res) => {
         if (!cancelled) setZones(res.data ?? []);
       })
@@ -179,12 +185,13 @@ export function ObservationsScreen() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [eventId]);
 
   useEffect(() => {
+    if (!eventId) return;
     let cancelled = false;
     apiClient
-      .get<EventDaySummary[]>(endpoints.eventDays.list(EVENT_ID))
+      .get<EventDaySummary[]>(endpoints.eventDays.list(eventId))
       .then((res) => {
         if (cancelled) return;
         setEventDays(res.data ?? []);
@@ -202,7 +209,7 @@ export function ObservationsScreen() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [eventId]);
 
   const handleEventDayChange = (value: string) => {
     setEventDayId(value);

@@ -4,10 +4,19 @@ import { apiClient } from '../../../core/api/client';
 import { endpoints } from '../../../core/api/endpoints';
 import type { Zone } from '../types';
 
-const DEFAULT_EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
+/**
+ * Mutaciones de zonas contra el evento activo.
+ *
+ * `eventId` es opcional: sin argumento usa el del store global (`activeEventId`,
+ * resuelto por `useActiveEvent()`). Antes el default venía de
+ * `import.meta.env.VITE_EVENT_ID`, horneado en el bundle al compilar.
+ */
+export function useZoneConfigMutations(eventId?: string) {
+  const { removeZone, updateZoneConfig, zones, activeEventId } = useAppStore();
+  const resolvedEventId = eventId ?? activeEventId;
 
-export function useZoneConfigMutations(eventId: string = DEFAULT_EVENT_ID) {
-  const { removeZone, updateZoneConfig, zones } = useAppStore();
+  const sinEvento =
+    'No hay evento activo configurado. Marcá una jornada como activa desde el dashboard.';
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -16,13 +25,17 @@ export function useZoneConfigMutations(eventId: string = DEFAULT_EVENT_ID) {
   const deleteZone = async (id: string): Promise<boolean> => {
     const zoneToRemove = zones.find((z) => z.id === id);
     if (!zoneToRemove) return false;
+    if (!resolvedEventId) {
+      setError(sinEvento);
+      return false;
+    }
 
     setLoading(true);
     setError(null);
     removeZone(id);
 
     try {
-      await apiClient.delete(endpoints.zones.delete(eventId, id));
+      await apiClient.delete(endpoints.zones.delete(resolvedEventId, id));
     } catch {
       useAppStore.getState().addZone(zoneToRemove);
       setError('No se pudo eliminar la zona. Intentá de nuevo.');
@@ -37,6 +50,10 @@ export function useZoneConfigMutations(eventId: string = DEFAULT_EVENT_ID) {
   const updateZone = async (id: string, updates: Partial<Zone>) => {
     const previous = zones.find((z) => z.id === id);
     if (!previous) return;
+    if (!resolvedEventId) {
+      setError(sinEvento);
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -50,7 +67,7 @@ export function useZoneConfigMutations(eventId: string = DEFAULT_EVENT_ID) {
     if (updates.lng !== undefined) body.longitude = updates.lng;
 
     try {
-      await apiClient.put(endpoints.zones.updateConfig(eventId, id), body);
+      await apiClient.put(endpoints.zones.updateConfig(resolvedEventId, id), body);
     } catch {
       useAppStore.getState().updateZoneConfig(id, previous as Partial<Zone>);
       setError('No se pudo actualizar la zona. Intentá de nuevo.');
@@ -65,8 +82,12 @@ export function useZoneConfigMutations(eventId: string = DEFAULT_EVENT_ID) {
     id: string,
     fields: Record<string, string | number | boolean | null>
   ): Promise<boolean> => {
+    if (!resolvedEventId) {
+      setError(sinEvento);
+      return false;
+    }
     try {
-      await apiClient.patch(endpoints.zones.update(eventId, id), fields);
+      await apiClient.patch(endpoints.zones.update(resolvedEventId, id), fields);
       return true;
     } catch {
       return false;

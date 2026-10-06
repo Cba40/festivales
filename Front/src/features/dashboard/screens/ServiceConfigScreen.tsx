@@ -6,12 +6,14 @@ import { useServiceConfigMutations } from '../hooks/useServiceConfigMutations';
 import { useEventDays } from '../hooks/useEventDays';
 import { useZoneTypes } from '../hooks/useZoneBehaviors';
 import type { ServiceConfigDTO } from '../types';
+import { useResolvedEventId } from '@/hooks/useActiveEvent';
 
-const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 
 export function ServiceConfigScreen() {
+  // Evento activo del store global (`useActiveEvent`), no `VITE_EVENT_ID`.
+  const eventId = useResolvedEventId();
   const { data: configs, loading, error, refresh } = useServiceConfigs();
-  const { eventDays } = useEventDays(EVENT_ID);
+  const { eventDays } = useEventDays(eventId);
   const { zoneTypes } = useZoneTypes();
   const { create, update, remove, saving, error: mutationError } =
     useServiceConfigMutations(refresh);

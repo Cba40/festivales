@@ -5,8 +5,7 @@ import {
   useAutoRefresh,
   type ZoneStateItem,
 } from '../../../hooks/useContextEngine';
-
-const EVENT_ID = import.meta.env.VITE_EVENT_ID || '';
+import { useAppStore } from '../../../core/state/store';
 
 /**
  * [TEMPORAL - PRE-DEMO] Interruptor de la métrica de intensidad territorial.
@@ -61,13 +60,16 @@ interface EventStatusBarProps {
 }
 
 export function EventStatusBar({ autoRefreshMs = 30000 }: EventStatusBarProps) {
-  const { data, loading, error, refresh } = useTerritorialPrediction(EVENT_ID);
+  // Evento activo del store global, resuelto por `useActiveEvent()`. Antes venía de
+  // `import.meta.env.VITE_EVENT_ID`, horneado en el bundle al compilar.
+  const eventId = useAppStore((s) => s.activeEventId);
+  const { data, loading, error, refresh } = useTerritorialPrediction(eventId ?? undefined);
 
   useEffect(() => {
     refresh();
   }, [refresh]);
 
-  useAutoRefresh(refresh, autoRefreshMs, !!EVENT_ID);
+  useAutoRefresh(refresh, autoRefreshMs, !!eventId);
 
   if (loading && !data) {
     return (

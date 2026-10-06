@@ -3,8 +3,7 @@ import { apiClient, originHeaders, type RequestOrigin } from '@/core/api/client'
 import { endpoints } from '@/core/api/endpoints'
 import { readThroughCache, productCacheKey, PRODUCT_TTL_MS } from '@/core/cache/memoryCache'
 import { useAppStore } from '@/core/state/store'
-
-const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id'
+import { requireActiveEventId } from '@/services/activeEvent'
 
 export interface ZonaHidratacionItem {
   zone_id: string
@@ -81,12 +80,13 @@ export function useHydrationRecommendations() {
           ? { latitude: locationSnapshot[0], longitude: locationSnapshot[1] }
           : {}),
       }
+      const eventId = requireActiveEventId()
       const data = await readThroughCache<HydrationRecommendationResponse>(
-        productCacheKey(EVENT_ID, 'hydration'),
+        productCacheKey(eventId, 'hydration'),
         PRODUCT_TTL_MS,
         async () => {
           const { data } = await apiClient.get<HydrationRecommendationResponse>(
-            endpoints.products.hydration(EVENT_ID),
+            endpoints.products.hydration(eventId),
             {
               params,
               ...(requestOrigin ? { headers: originHeaders(requestOrigin) } : {}),

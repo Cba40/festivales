@@ -11,8 +11,7 @@ import {
   type ReportPeriodMode,
 } from '../utils/eventDayPeriod';
 import { DEFAULT_TIMEZONE } from '../components/reports/reportFormat';
-
-const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
+import { useResolvedEventId } from '@/hooks/useActiveEvent';
 
 type Section = 'summary' | 'services' | 'zones' | 'census' | 'coverage';
 
@@ -78,6 +77,8 @@ const SECTIONS: { key: Section; label: string; Component: ReportSectionComponent
 const TABS: { key: Section; label: string }[] = SECTIONS.map(({ key, label }) => ({ key, label }));
 
 export function ReportsScreen() {
+  // Evento activo del store global (`useActiveEvent`), no `VITE_EVENT_ID`.
+  const eventId = useResolvedEventId();
   const [activeSection, setActiveSection] = useState<Section>('summary');
   const ActiveSectionComponent = SECTIONS.find((s) => s.key === activeSection)?.Component;
 
@@ -93,7 +94,7 @@ export function ReportsScreen() {
     customEnd: '',
   });
 
-  const { eventDays, loading: loadingDays } = useEventDays(EVENT_ID);
+  const { eventDays, loading: loadingDays } = useEventDays(eventId);
 
   useEffect(() => {
     if (selection.mode === 'dia' && !selection.eventDayDate && eventDays.length > 0) {

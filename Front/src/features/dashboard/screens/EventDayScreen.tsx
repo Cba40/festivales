@@ -10,12 +10,14 @@ import { useEventDayMutations } from '../hooks/useEventDayMutations';
 import type { EventDaySummary, EventDay, EventDayCreatePayload } from '../types';
 import { apiClient } from '@/core/api/client';
 import { endpoints } from '@/core/api/endpoints';
+import { useResolvedEventId } from '@/hooks/useActiveEvent';
 
-const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 
 export function EventDayScreen() {
-  const { eventDays, loading, error, refresh } = useEventDays(EVENT_ID);
-  const { create, update, remove, saving } = useEventDayMutations(EVENT_ID);
+  // Evento activo del store global (`useActiveEvent`), no `VITE_EVENT_ID`.
+  const eventId = useResolvedEventId();
+  const { eventDays, loading, error, refresh } = useEventDays(eventId);
+  const { create, update, remove, saving } = useEventDayMutations(eventId);
 
   const [showForm, setShowForm] = useState(false);
   const [editingDay, setEditingDay] = useState<EventDay | null>(null);
@@ -32,7 +34,7 @@ export function EventDayScreen() {
     setFormError(null);
     try {
       const { data } = await apiClient.get<EventDay>(
-        endpoints.eventDays.byId(EVENT_ID, day.id)
+        endpoints.eventDays.byId(eventId, day.id)
       );
       setEditingDay(data);
       setShowForm(true);
@@ -106,7 +108,7 @@ export function EventDayScreen() {
           </h2>
           <EventDayForm
             eventDay={editingDay}
-            eventId={EVENT_ID}
+            eventId={eventId}
             onSave={handleSave}
             onCancel={handleCancel}
             saving={saving}

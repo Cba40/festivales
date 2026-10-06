@@ -4,8 +4,7 @@ import { endpoints } from '../../../../core/api/endpoints';
 import type { CoverageGapsDTO } from '../../types';
 import { ReportSection } from './ReportSection';
 import { formatDateOnly, percentage, serviceLabel, DEFAULT_TIMEZONE } from './reportFormat';
-
-const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
+import { useAppStore } from '../../../../core/state/store';
 
 export interface ReportCoverageGapsSectionProps {
   start?: string;
@@ -18,14 +17,18 @@ export function ReportCoverageGapsSection({
 }: ReportCoverageGapsSectionProps = {}) {
   const [originFilter, setOriginFilter] = useState('');
 
+  // Evento activo del store global (`useActiveEvent`). Antes venía de
+  // `import.meta.env.VITE_EVENT_ID`, horneado en el bundle al compilar.
+  const eventId = useAppStore((s) => s.activeEventId) ?? '';
+
   const params = useMemo(
     () => ({ start, end, ...(originFilter ? { origin: originFilter } : {}) }),
     [start, end, originFilter]
   );
 
   const { data, isLoading, error, refresh } = useEventReport<CoverageGapsDTO>(
-    EVENT_ID,
-    endpoints.reports.coverageGaps(EVENT_ID),
+    eventId,
+    endpoints.reports.coverageGaps(eventId),
     { params }
   );
 

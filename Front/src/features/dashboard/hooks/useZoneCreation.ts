@@ -4,8 +4,6 @@ import { apiClient } from '../../../core/api/client';
 import { endpoints } from '../../../core/api/endpoints';
 import type { Zone } from '../types';
 
-const DEFAULT_EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
-
 interface CreateZoneInput {
   name: string;
   type: string;
@@ -27,7 +25,16 @@ interface ApiZone {
   longitude: number | null;
 }
 
-export function useZoneCreation(eventId: string = DEFAULT_EVENT_ID) {
+/**
+ * Creación de zonas contra el evento activo.
+ *
+ * `eventId` es opcional: si no se pasa, se usa el del store global (`activeEventId`,
+ * resuelto por `useActiveEvent()` desde la jornada activa que configuró el operador).
+ * Antes el default venía de `import.meta.env.VITE_EVENT_ID`.
+ */
+export function useZoneCreation(eventId?: string) {
+  const activeEventId = useAppStore((state) => state.activeEventId);
+  const resolvedEventId = eventId ?? activeEventId;
   const addZone = useAppStore((state) => state.addZone);
   const removeZone = useAppStore((state) => state.removeZone);
   const [loading, setLoading] = useState(false);
@@ -62,7 +69,16 @@ export function useZoneCreation(eventId: string = DEFAULT_EVENT_ID) {
       for (const key of ['disponibilidad', 'espera_min', 'calle', 'subtipo', 'tipo_culinario', 'x', 'y', 'direccion', 'horario', 'telefono', 'transporte', 'capacidad_estimada', 'es_embudo']) {
         if (data[key] !== undefined) body[key] = data[key];
       }
-      const res = await apiClient.post<ApiZone>(endpoints.zones.create(eventId), body);
+      if (!resolvedEventId) {
+        removeZone(optimisticZone.id);
+        setError('No hay evento activo configurado. Marcá una jornada como activa desde el dashboard.');
+        setLoading(false);
+        return null;
+      }
+      const res = await apiClient.post<ApiZone>(
+        endpoints.zones.create(resolvedEventId),
+        body
+      );
 
       removeZone(optimisticZone.id);
       addZone({

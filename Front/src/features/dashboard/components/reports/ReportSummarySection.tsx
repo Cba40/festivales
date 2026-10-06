@@ -6,8 +6,7 @@ import type { EventSummaryDTO } from '../../types';
 import { MetricMini } from './MetricMini';
 import { ReportSection } from './ReportSection';
 import { RESULT_STATUS_LABELS } from './reportFormat';
-
-const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
+import { useAppStore } from '../../../../core/state/store';
 
 export interface ReportSummarySectionProps {
   start?: string;
@@ -18,11 +17,14 @@ export function ReportSummarySection({
   start,
   end,
 }: ReportSummarySectionProps = {}) {
+  // Evento activo del store global (`useActiveEvent`). Antes venía de
+  // `import.meta.env.VITE_EVENT_ID`, horneado en el bundle al compilar.
+  const eventId = useAppStore((s) => s.activeEventId) ?? '';
   const params = useMemo(() => ({ start, end }), [start, end]);
 
   const { data, isLoading, error, refresh } = useEventReport<EventSummaryDTO>(
-    EVENT_ID,
-    endpoints.reports.summary(EVENT_ID),
+    eventId,
+    endpoints.reports.summary(eventId),
     { params }
   );
 

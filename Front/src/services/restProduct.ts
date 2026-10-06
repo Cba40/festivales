@@ -3,8 +3,7 @@ import { apiClient, originHeaders, type RequestOrigin } from '@/core/api/client'
 import { endpoints } from '@/core/api/endpoints'
 import { readThroughCache, productCacheKey, PRODUCT_TTL_MS } from '@/core/cache/memoryCache'
 import { useAppStore } from '@/core/state/store'
-
-const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id'
+import { requireActiveEventId } from '@/services/activeEvent'
 
 export interface ZonaRestItem {
   zone_id: string
@@ -81,12 +80,13 @@ export function useRestRecommendations() {
           ? { latitude: locationSnapshot[0], longitude: locationSnapshot[1] }
           : {}),
       }
+      const eventId = requireActiveEventId()
       const data = await readThroughCache<RestRecommendationResponse>(
-        productCacheKey(EVENT_ID, 'rest'),
+        productCacheKey(eventId, 'rest'),
         PRODUCT_TTL_MS,
         async () => {
           const { data } = await apiClient.get<RestRecommendationResponse>(
-            endpoints.products.rest(EVENT_ID),
+            endpoints.products.rest(eventId),
             {
               params,
               ...(requestOrigin ? { headers: originHeaders(requestOrigin) } : {}),

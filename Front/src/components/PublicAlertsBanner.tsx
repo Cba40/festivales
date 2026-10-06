@@ -1,9 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Info, AlertTriangle, X } from 'lucide-react';
 import { usePublicAlerts } from '@/features/public/hooks/usePublicAlerts';
+import { useResolvedEventId } from '@/hooks/useActiveEvent';
 import type { AlertType, MessagePriority } from '@/features/dashboard/types';
-
-const DEFAULT_EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 
 interface Notice {
   key: string;
@@ -64,8 +63,10 @@ interface PublicAlertsBannerProps {
   className?: string;
 }
 
-const PublicAlertsBanner = ({ eventId = DEFAULT_EVENT_ID, className }: PublicAlertsBannerProps) => {
-  const { data } = usePublicAlerts(eventId);
+const PublicAlertsBanner = ({ eventId, className }: PublicAlertsBannerProps) => {
+  // Evento activo del store global (`useActiveEvent`), no `VITE_EVENT_ID`.
+  const activeEventId = useResolvedEventId();
+  const { data } = usePublicAlerts(eventId ?? activeEventId);
   const [dismissed, setDismissed] = useState<string[]>([]);
 
   const notices = useMemo<Notice[]>(() => {

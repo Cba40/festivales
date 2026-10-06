@@ -3,6 +3,7 @@ import { apiClient, originHeaders, type RequestOrigin } from '@/core/api/client'
 import { endpoints } from '@/core/api/endpoints'
 import { readThroughCache, productCacheKey, PRODUCT_TTL_MS } from '@/core/cache/memoryCache'
 import { useAppStore } from '@/core/state/store'
+import { requireActiveEventId } from '@/services/activeEvent'
 import type { SaturationLevel } from '@/features/dashboard/types'
 
 /**
@@ -34,30 +35,6 @@ export const ACCESSIBILITY_REQUIRED = false
  * reemplazar cuando exista auth en el frente público.
  */
 export const ANONYMOUS_USER_ID = '00000000-0000-0000-0000-000000000000'
-
-/**
- * Evento contra el que se piden recomendaciones.
- *
- * `VITE_EVENT_ID` es obligatorio en cualquier entorno real: si falta, todas las
- * requests van a `/api/events/default-event-id/...`, que no existe, y la pantalla
- * cae en el estado "sin opciones" sin decir por qué. El fallback se conserva para
- * que el dev server no se rompa, pero ahora avisa en consola en vez de fallar en
- * silencio.
- *
- * Nota: `.env.production` hoy no define `VITE_EVENT_ID`, así que en ese entorno
- * esta función entra siempre por la rama del fallback.
- */
-function resolveEventId(): string {
-  const configured = import.meta.env.VITE_EVENT_ID
-  if (configured) return configured
-  console.warn(
-    '[parking] VITE_EVENT_ID no configurado: se usará el fallback ' +
-      "'default-event-id'. Las consultas devolverán 0 zonas en un entorno real."
-  )
-  return 'default-event-id'
-}
-
-const EVENT_ID = resolveEventId()
 
 /**
  * Cuántas zonas de estacionamiento pide el hook.
@@ -174,8 +151,16 @@ export function useParkingRecommendations() {
       // el orden de `zonas` dependen de dónde esté el usuario y de su zona actual.
       // Con la clave por evento sola, moverse dentro de los 30 s de TTL devolvía
       // la respuesta de la posición anterior.
+      // Evento activo del store global (`useActiveEvent`), no `VITE_EVENT_ID`.
+      //
+      // Antes: `const EVENT_ID = resolveEventId()`, con el ID horneado en el bundle
+      // y un fallback `'default-event-id'` que pedía zonas de un evento inexistente.
+      // Ahora se resuelve acá, en el momento de la request, porque el store se
+      // puebla en runtime y una constante leída al importar el módulo quedaría
+      // congelada en null.
+      const eventId = requireActiveEventId()
       const cacheKey = [
-        productCacheKey(EVENT_ID, 'parking'),
+        productCacheKey(eventId, 'parking'),
         zoneIdSnapshot || 'no-zone',
         coordCachePart(locationSnapshot?.[0]),
         coordCachePart(locationSnapshot?.[1]),
@@ -185,7 +170,7 @@ export function useParkingRecommendations() {
         PRODUCT_TTL_MS,
         async () => {
           const { data } = await apiClient.get<ParkingRecommendationResponse>(
-            endpoints.products.parking(EVENT_ID),
+            endpoints.products.parking(eventId),
             {
               params,
               ...(requestOrigin ? { headers: originHeaders(requestOrigin) } : {}),

@@ -14,6 +14,7 @@ import {
   useTransportAlerts,
 } from '../hooks/useTransportAlerts';
 import { useOperatorMessages } from '../hooks/useOperatorMessages';
+import { useResolvedEventId } from '@/hooks/useActiveEvent';
 import type {
   AlertType,
   OperatorMessageDTO,
@@ -23,8 +24,6 @@ import type {
   TransportAlertCreatePayload,
   TransportAlertUpdatePayload,
 } from '../types';
-
-const DEFAULT_EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 
 interface LineOption {
   id: string;
@@ -151,6 +150,8 @@ function AlertFormModal({
   saving: boolean;
 }) {
   const [form, setForm] = useState<AlertFormData>(initial);
+  // Evento activo del store global (`useActiveEvent`), no `VITE_EVENT_ID`.
+  const eventId = useResolvedEventId();
 
   const temporalOk =
     !!form.valid_from && !!form.valid_until
@@ -185,7 +186,7 @@ function AlertFormModal({
       onSave(payload);
     } else {
       const payload: TransportAlertCreatePayload = {
-        event_id: DEFAULT_EVENT_ID,
+        event_id: eventId,
         alert_type: form.alert_type as AlertType,
         title: form.title.trim(),
         description: form.description.trim(),
@@ -352,6 +353,8 @@ function MessageFormModal({
   saving: boolean;
 }) {
   const [form, setForm] = useState<MessageFormData>(initial);
+  // Evento activo del store global (`useActiveEvent`), no `VITE_EVENT_ID`.
+  const eventId = useResolvedEventId();
 
   const temporalOk =
     form.expires_at.trim() === '' ||
@@ -383,7 +386,7 @@ function MessageFormModal({
       onSave(payload);
     } else {
       const payload: OperatorMessageCreatePayload = {
-        event_id: DEFAULT_EVENT_ID,
+        event_id: eventId,
         title: form.title.trim(),
         description: form.description.trim(),
         priority: form.priority as OperatorMessageCreatePayload['priority'],
@@ -502,6 +505,8 @@ function MessageFormModal({
 }
 
 export function AlertManagementScreen() {
+  // Evento activo del store global (`useActiveEvent`), no `VITE_EVENT_ID`.
+  const eventId = useResolvedEventId();
   const {
     alerts,
     loading: loadingAlerts,
@@ -513,7 +518,7 @@ export function AlertManagementScreen() {
     deactivate: deactivateAlert,
     saving,
     actionError,
-  } = useTransportAlerts(DEFAULT_EVENT_ID);
+  } = useTransportAlerts(eventId);
   const {
     messages,
     loading: loadingMessages,
@@ -526,7 +531,7 @@ export function AlertManagementScreen() {
     remove: removeMessage,
     saving: savingMessages,
     actionError: messagesActionError,
-  } = useOperatorMessages(DEFAULT_EVENT_ID);
+  } = useOperatorMessages(eventId);
 
   const [activeSection, setActiveSection] = useState<'alerts' | 'messages'>('alerts');
   const [searchTerm, setSearchTerm] = useState('');
@@ -541,15 +546,19 @@ export function AlertManagementScreen() {
   const [lines, setLines] = useState<LineOption[]>([]);
 
   const loadLines = useCallback(async () => {
+    if (!eventId) {
+      setLines([]);
+      return;
+    }
     try {
       const res = await apiClient.get<LineOption[]>(
-        endpoints.transportAdmin.lines.list(DEFAULT_EVENT_ID)
+        endpoints.transportAdmin.lines.list(eventId)
       );
       setLines(res.data.filter((l) => l && l.id && l.name));
     } catch {
       setLines([]);
     }
-  }, []);
+  }, [eventId]);
 
   useEffect(() => {
     void loadLines();

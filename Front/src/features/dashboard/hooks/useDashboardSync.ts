@@ -5,8 +5,6 @@ import { endpoints } from '../../../core/api/endpoints';
 import { readThroughCache, zoneCacheKey, ZONES_TTL_MS } from '../../../core/cache/memoryCache';
 import type { Zone } from '../types';
 
-const DEFAULT_EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
-
 interface ApiZone {
   id: string;
   name: string;
@@ -61,21 +59,40 @@ function mapZone(api: ApiZone): Zone {
   };
 }
 
-export function useDashboardSync(eventId: string = DEFAULT_EVENT_ID) {
+/**
+ * Sincroniza las zonas del evento activo.
+ *
+ * `eventId` es opcional: sin argumento usa el del store global (`activeEventId`,
+ * resuelto por `useActiveEvent()` desde la jornada activa). Antes el default venía
+ * de `import.meta.env.VITE_EVENT_ID`, horneado en el bundle al compilar.
+ */
+export function useDashboardSync(eventId?: string) {
+  const activeEventId = useAppStore((state) => state.activeEventId);
+  const resolvedEventId = eventId ?? activeEventId;
   const setZones = useAppStore((state) => state.setZones);
   const zones = useAppStore((state) => state.zones);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async (force = false) => {
+    // Sin evento resuelto todavía (o sin jornada configurada) no hay contra qué
+    // consultar. Se sale sin `setError` porque es un estado transitorio esperado:
+    // `refresh` corre en varios mounts y volver a setear el error en cada uno
+    // pisaría el mensaje real de una request que sí falló.
+    if (!resolvedEventId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
       const zones = await readThroughCache<ApiZone[]>(
-        zoneCacheKey(eventId),
+        zoneCacheKey(resolvedEventId),
         ZONES_TTL_MS,
         async () => {
-          const zonesRes = await apiClient.get<ApiZone[]>(endpoints.zones.list(eventId));
+          const zonesRes = await apiClient.get<ApiZone[]>(
+            endpoints.zones.list(resolvedEventId)
+          );
           return zonesRes.data;
         },
         force
@@ -89,7 +106,7 @@ export function useDashboardSync(eventId: string = DEFAULT_EVENT_ID) {
     } finally {
       setLoading(false);
     }
-  }, [eventId, setZones]);
+  }, [resolvedEventId, setZones]);
 
   return { zones, loading, error, refresh };
 }

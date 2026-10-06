@@ -3,8 +3,7 @@ import { apiClient, originHeaders, type RequestOrigin } from '@/core/api/client'
 import { endpoints } from '@/core/api/endpoints'
 import { readThroughCache, productCacheKey, PRODUCT_TTL_MS } from '@/core/cache/memoryCache'
 import { useAppStore } from '@/core/state/store'
-
-const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id'
+import { requireActiveEventId } from '@/services/activeEvent'
 
 export type AccommodationType = 'hotel' | 'hostel' | 'camping' | 'other'
 
@@ -77,12 +76,13 @@ export function useAccommodationRecommendations(
         ...(type ? { type } : {}),
       }
       const cacheProductType = type ? `accommodation:${type}` : 'accommodation'
+      const eventId = requireActiveEventId()
       const data = await readThroughCache<AccommodationRecommendationResponse>(
-        productCacheKey(EVENT_ID, cacheProductType),
+        productCacheKey(eventId, cacheProductType),
         PRODUCT_TTL_MS,
         async () => {
           const { data } = await apiClient.get<AccommodationRecommendationResponse>(
-            endpoints.products.accommodation(EVENT_ID),
+            endpoints.products.accommodation(eventId),
             {
               params,
               ...(requestOrigin ? { headers: originHeaders(requestOrigin) } : {}),

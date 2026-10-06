@@ -10,8 +10,18 @@ export const PRODUCT_TTL_MS = 30_000
 
 const cache = new Map<string, CacheEntry<unknown>>()
 
+/**
+ * Parte de clave para un `eventId` ausente.
+ *
+ * Antes devolvía `'default-event-id'`. Era un problema de colisión, no de estilo:
+ * todas las llamadas hechas sin `event_id` (las que corren antes de que resuelva el
+ * store global, o cuando no hay jornada configurada) compartían una única entrada
+ * `zones:default-event-id`. Una request fallida guardaba `[]` y la siguiente leía ese
+ * `[]` como si fuera del evento real, durante el TTL entero. Con `'sin-evento'` cada
+ * estado ausente tiene su propia entrada y no puede pisar datos de otro `event_id`.
+ */
 function normalizeEventId(eventId: string): string {
-  return eventId || 'default-event-id'
+  return eventId || 'sin-evento'
 }
 
 export function zoneCacheKey(eventId: string): string {

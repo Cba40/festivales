@@ -7,6 +7,7 @@ import { AdminMapSelector } from '@/components/AdminMapSelector';
 import { useOperationalEvents } from '../hooks/useOperationalEvents';
 import { useOperationalEventMutations } from '../hooks/useOperationalEventMutations';
 import { useEventDays } from '../hooks/useEventDays';
+import { useResolvedEventId } from '@/hooks/useActiveEvent';
 import { FlowRestrictionSection } from '../components/FlowRestrictionSection';
 import { DashboardHeader } from '../components/DashboardHeader';
 import { AppFooter } from '@/components/AppFooter';
@@ -22,8 +23,6 @@ import type {
   OperationalEventUpdatePayload,
   OperationalEffectType,
 } from '../types';
-
-const DEFAULT_EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
 
 interface ZoneOption {
   id: string;
@@ -641,7 +640,9 @@ function EventFormModal({
 }
 
 export function OperationalEventScreen() {
-  const { eventDays, loading: loadingDays } = useEventDays(DEFAULT_EVENT_ID);
+  // Evento activo del store global (`useActiveEvent`), no `VITE_EVENT_ID`.
+  const eventId = useResolvedEventId();
+  const { eventDays, loading: loadingDays } = useEventDays(eventId);
   const [selectedDayId, setSelectedDayId] = useState<string | null>(null);
   const { events, loading, error, refresh } = useOperationalEvents(selectedDayId);
   const { create, update, remove, deactivate, saving, error: mutationError } = useOperationalEventMutations();
@@ -654,13 +655,17 @@ export function OperationalEventScreen() {
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const loadZones = useCallback(async () => {
+    if (!eventId) {
+      setZones([]);
+      return;
+    }
     try {
-      const res = await apiClient.get<ZoneOption[]>(endpoints.zones.list(DEFAULT_EVENT_ID));
+      const res = await apiClient.get<ZoneOption[]>(endpoints.zones.list(eventId));
       setZones(res.data.filter((z) => z && z.id && z.name));
     } catch {
       setZones([]);
     }
-  }, []);
+  }, [eventId]);
 
   useEffect(() => {
     void loadZones();

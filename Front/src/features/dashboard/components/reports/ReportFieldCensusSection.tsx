@@ -6,8 +6,7 @@ import type { FieldCensusDTO } from '../../types';
 import { ReportSection } from './ReportSection';
 import { MetricMini } from './MetricMini';
 import { DEFAULT_TIMEZONE, formatLocalDateTime, percentage, serviceLabel } from './reportFormat';
-
-const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
+import { useAppStore } from '../../../../core/state/store';
 
 /** Traduccion de las alertas del protocolo de muestreo (ver crud/operational_observation). */
 const WARNING_LABELS: Record<string, string> = {
@@ -35,11 +34,14 @@ export function ReportFieldCensusSection({
   start,
   end,
 }: ReportFieldCensusSectionProps = {}) {
+  // Evento activo del store global (`useActiveEvent`). Antes venía de
+  // `import.meta.env.VITE_EVENT_ID`, horneado en el bundle al compilar.
+  const eventId = useAppStore((s) => s.activeEventId) ?? '';
   const params = useMemo(() => ({ start, end }), [start, end]);
 
   const { data, isLoading, error, refresh } = useEventReport<FieldCensusDTO>(
-    EVENT_ID,
-    endpoints.reports.fieldCensus(EVENT_ID),
+    eventId,
+    endpoints.reports.fieldCensus(eventId),
     { params }
   );
 

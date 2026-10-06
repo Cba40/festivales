@@ -64,6 +64,31 @@ interface AppState {
     isLoadingUser: boolean;
   };
 
+  /**
+   * Evento contra el que se piden todos los datos.
+   *
+   * Antes venía de `import.meta.env.VITE_EVENT_ID`, que Vite hornea en el bundle
+   * al compilar: cambiar de evento exigía redeploy, y un valor viejo en `.env`
+   * hacía que la app pidiera zonas de un evento inexistente sin avisar
+   * ("No se encontraron zonas para el evento").
+   *
+   * Ahora lo resuelve el backend desde la jornada activa que configuró el
+   * operador (`GET /api/events/active`), así que marcar una jornada en el
+   * dashboard basta para cambiar de evento.
+   *
+   * `null` hasta que resuelva y también cuando el backend responde 404 (no hay
+   * jornada activa). No hay valor de respaldo hardcodeado a propósito: un ID
+   * inventado produce 404 opaco en cada request, mientras que `null` deja
+   * distinguir "todavía cargando" de "no hay evento configurado".
+   */
+  activeEventId: string | null;
+  eventDayId: string | null;
+  activeEventName: string | null;
+  /** true mientras se consulta `/events/active`. Evita pedir datos sin event_id. */
+  isLoadingActiveEvent: boolean;
+  /** true si la resolución terminó y no hay jornada activa configurada. */
+  activeEventMissing: boolean;
+
   // Data
   zones: Zone[];
 
@@ -75,6 +100,14 @@ interface AppState {
   login: (token: string) => void;
   logout: () => void;
   setUser: (user: AuthUser | null) => void;
+
+  // Actions — Evento activo
+  setActiveEvent: (
+    eventId: string,
+    eventDayId: string | null,
+    eventName: string | null,
+  ) => void;
+  setActiveEventMissing: (missing: boolean) => void;
 
   // Actions — Zones
   setZones: (zones: Zone[]) => void;
@@ -125,6 +158,32 @@ export const useAppStore = create<AppState>((set, get) => ({
         user,
         isLoadingUser: false,
       },
+    }),
+
+  // Evento activo: lo inicializa `useActiveEvent()` al montar la app.
+  activeEventId: null,
+  eventDayId: null,
+  activeEventName: null,
+  isLoadingActiveEvent: true,
+  activeEventMissing: false,
+
+  setActiveEvent: (eventId, eventDayId, eventName) =>
+    set({
+      activeEventId: eventId,
+      eventDayId,
+      activeEventName: eventName,
+      isLoadingActiveEvent: false,
+      activeEventMissing: false,
+    }),
+
+  setActiveEventMissing: (missing) =>
+    set({
+      activeEventMissing: missing,
+      isLoadingActiveEvent: false,
+      // Sólo se limpia el ID si faltaba. Un 404 con un ID ya resuelto no debe
+      // invalidar el evento en uso: el operador puede estar reconfigurando desde
+      // el dashboard y vaciar el ID tiraría abajo todas las pantallas.
+      ...(missing ? { activeEventId: null } : {}),
     }),
 
   // User location

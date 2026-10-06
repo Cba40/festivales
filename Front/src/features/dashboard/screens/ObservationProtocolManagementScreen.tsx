@@ -27,8 +27,8 @@ import { Card } from '@/features/dashboard/components/ui/Card';
 import { Button } from '@/features/dashboard/components/ui/Button';
 import { ConfirmDialog } from '@/features/dashboard/components/ui/ConfirmDialog';
 import { RefreshButton } from '@/features/dashboard/components/ui';
+import { useResolvedEventId } from '@/hooks/useActiveEvent';
 
-const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'test-event-1';
 
 interface ZoneTypeOption {
   id: string;
@@ -75,6 +75,8 @@ function emptyForm(metric: TriggerMetric = 'saturation_level'): ProtocolForm {
 }
 
 export function ObservationProtocolManagementScreen() {
+  // Evento activo del store global (`useActiveEvent`), no `VITE_EVENT_ID`.
+  const eventId = useResolvedEventId();
   const [protocols, setProtocols] = useState<ObservationProtocolDTO[]>([]);
   const [suggestions, setSuggestions] = useState<ProtocolSuggestionDTO[]>([]);
   const [selectedSuggestions, setSelectedSuggestions] = useState<string[]>([]);
@@ -97,14 +99,14 @@ export function ObservationProtocolManagementScreen() {
   const cargar = useCallback(async () => {
     setIsLoading(true);
     try {
-      setProtocols(await listProtocols(EVENT_ID, showInactive));
+      setProtocols(await listProtocols(eventId, showInactive));
       setError(null);
     } catch {
       setError('No se pudieron cargar los protocolos de observación.');
     } finally {
       setIsLoading(false);
     }
-  }, [showInactive]);
+  }, [showInactive, eventId]);
 
   useEffect(() => {
     void cargar();
@@ -126,14 +128,17 @@ export function ObservationProtocolManagementScreen() {
     };
   }, []);
 
+// `eventId` en las deps: hasta que el store resuelve el evento activo no hay
+  // jornadas que consultar, y cuando resuelve hay que pedirlas para ese evento.
   useEffect(() => {
+    if (!eventId) return;
     let cancelado = false;
     // Antes: apiClient.get('/event-days?event_id=...') → 404. La ruta real es
     // /api/events/{event_id}/event-days (app/api/routes/event_days.py:40) y
     // apiClient ya antepone /api, asi que lo correcto es usar el helper de
     // endpoints en vez de escribir la URL a mano.
     apiClient
-      .get<EventDayOption[]>(endpoints.eventDays.list(EVENT_ID))
+      .get<EventDayOption[]>(endpoints.eventDays.list(eventId))
       .then((res) => {
         if (cancelado) return;
         setEventDays(res.data ?? []);
@@ -145,14 +150,14 @@ export function ObservationProtocolManagementScreen() {
         // Sin este aviso el dropdown "Jornadas" queda con la unica opcion
         // "Todas las jornadas" y el operador no tiene forma de saber que le
         // falta cargar el catalogo: pareceria que el evento no tiene jornadas.
-        setReferenceDataError(
+setReferenceDataError(
           'No se pudieron cargar las jornadas del evento. No vas a poder acotar una regla a una jornada.'
         );
       });
     return () => {
       cancelado = true;
     };
-  }, []);
+  }, [eventId]);
 
   useEffect(() => {
     let cancelado = false;
@@ -253,7 +258,7 @@ export function ObservationProtocolManagementScreen() {
         await updateProtocol(modal.protocol.id, payload);
         setResult('Protocolo actualizado.');
       } else {
-        await createProtocol({ event_id: EVENT_ID, order: protocols.length, ...payload });
+        await createProtocol({ event_id: eventId, order: protocols.length, ...payload });
         setResult('Protocolo creado.');
       }
       setModal(null);
@@ -263,13 +268,13 @@ export function ObservationProtocolManagementScreen() {
     } finally {
       setModalSaving(false);
     }
-  }, [form, modal, protocols.length, cargar]);
+  }, [form, modal, protocols.length, cargar, eventId]);
 
   const handleApplySuggestions = useCallback(async () => {
     if (selectedSuggestions.length === 0) return;
     setApplying(true);
     try {
-      const res = await applySuggestions(EVENT_ID, selectedSuggestions);
+      const res = await applySuggestions(eventId, selectedSuggestions);
       setResult(
         `Se crearon ${res.created} protocolo(s)` +
           (res.skipped > 0 ? ` y ${res.skipped} ya existían.` : '.')
@@ -281,7 +286,7 @@ export function ObservationProtocolManagementScreen() {
     } finally {
       setApplying(false);
     }
-  }, [selectedSuggestions, cargar]);
+  }, [selectedSuggestions, cargar, eventId]);
 
   const handleConfirmDelete = useCallback(async () => {
     if (!pendingDeleteId) return;
@@ -317,7 +322,7 @@ export function ObservationProtocolManagementScreen() {
         </div>
       )}
 
-      <ComplianceAlertsPanel eventId={EVENT_ID} />
+      <ComplianceAlertsPanel eventId={eventId} />
 
       {suggestions.length > 0 && (
         <Card variant="standard">

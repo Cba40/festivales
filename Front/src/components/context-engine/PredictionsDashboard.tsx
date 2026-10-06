@@ -17,7 +17,7 @@ import {
   MapPin,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { EVENT_ID } from './constants';
+import { useResolvedEventId } from '../../hooks/useActiveEvent';
 import { useTerritorialPrediction, useAutoRefresh } from '../../hooks/useContextEngine';
 import type { ZoneStateItem } from '../../hooks/useContextEngine';
 import { apiClient } from '../../core/api/client';
@@ -111,7 +111,9 @@ interface PredictionsDashboardProps {
 }
 
 export function PredictionsDashboard({ eventId, autoRefreshMs = 15000 }: PredictionsDashboardProps) {
-  const eid = eventId || EVENT_ID;
+  // Evento activo del store global (`useActiveEvent`), no `VITE_EVENT_ID`.
+  const activeEventId = useResolvedEventId();
+  const eid = eventId || activeEventId;
   const { data, loading, error, refresh } = useTerritorialPrediction(eid);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [zonesById, setZonesById] = useState<Record<string, { name: string; type: string }>>({});

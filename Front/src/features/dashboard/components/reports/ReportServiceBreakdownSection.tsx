@@ -16,8 +16,7 @@ import {
   requestModeLabel,
   serviceLabel,
 } from './reportFormat';
-
-const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
+import { useAppStore } from '../../../../core/state/store';
 
 // La PWA pública monta el módulo de emergencias con este contexto (Emergencia.tsx),
 // así que es el único que puede haber emitted `protocolo=<id>`.
@@ -48,6 +47,10 @@ function TemporalBreakdown({
 }: TemporalBreakdownProps) {
   const [category, setCategory] = useState('');
 
+  // Evento activo del store global (`useActiveEvent`). Antes venía de
+  // `import.meta.env.VITE_EVENT_ID`, horneado en el bundle al compilar.
+  const eventId = useAppStore((s) => s.activeEventId) ?? '';
+
   const params = useMemo(
     () => ({
       start,
@@ -60,8 +63,8 @@ function TemporalBreakdown({
   );
 
   const { data, isLoading, error } = useEventReport<TemporalDistributionDTO>(
-    EVENT_ID,
-    endpoints.reports.temporalDistribution(EVENT_ID),
+    eventId,
+    endpoints.reports.temporalDistribution(eventId),
     { params }
   );
 
@@ -197,14 +200,17 @@ export function ReportServiceBreakdownSection({
   start,
   end,
 }: ReportServiceBreakdownSectionProps = {}) {
+  // Evento activo del store global (`useActiveEvent`). Antes venía de
+  // `import.meta.env.VITE_EVENT_ID`, horneado en el bundle al compilar.
+  const eventId = useAppStore((s) => s.activeEventId) ?? '';
   const params = useMemo(() => ({ start, end }), [start, end]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [protocolTitles, setProtocolTitles] = useState<Record<string, string>>({});
   const [zoneNames, setZoneNames] = useState<Record<string, string>>({});
 
   const { data, isLoading, error, refresh } = useEventReport<ServiceBreakdownDTO>(
-    EVENT_ID,
-    endpoints.reports.serviceBreakdown(EVENT_ID),
+    eventId,
+    endpoints.reports.serviceBreakdown(eventId),
     { params }
   );
 
@@ -231,9 +237,10 @@ export function ReportServiceBreakdownSection({
   // El clic en una zona se emite como `request_mode='zona=<zone_id>'`. Sin este
   // catálogo el desglose muestra UUIDs crudos al operador.
   useEffect(() => {
+    if (!eventId) return;
     let cancelled = false;
     apiClient
-      .get<ZoneCatalogItem[]>(endpoints.zones.list(EVENT_ID))
+      .get<ZoneCatalogItem[]>(endpoints.zones.list(eventId))
       .then(({ data: list }) => {
         if (cancelled) return;
         const names: Record<string, string> = {};
@@ -244,7 +251,7 @@ export function ReportServiceBreakdownSection({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [eventId]);
 
   const total = data?.services.reduce((sum, service) => sum + service.total_consultas, 0) ?? 0;
   const filterGroups = useMemo(

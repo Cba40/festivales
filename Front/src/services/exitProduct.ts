@@ -3,8 +3,7 @@ import { apiClient, originHeaders, type RequestOrigin } from '@/core/api/client'
 import { endpoints } from '@/core/api/endpoints'
 import { readThroughCache, productCacheKey, PRODUCT_TTL_MS } from '@/core/cache/memoryCache'
 import { useAppStore } from '@/core/state/store'
-
-const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id'
+import { requireActiveEventId } from '@/services/activeEvent'
 
 // Canónica RFC-EXIT-V1 / migración c9d3e7f1a5b8 (zones.transporte)
 export type TransporteMode = 'peatonal' | 'vehicular' | 'transporte'
@@ -91,12 +90,13 @@ export function useExitRecommendations(
         ...(mode ? [mode] : []),
         ...(destinationId ? [destinationId] : []),
       ].join(':')
+      const eventId = requireActiveEventId()
       const data = await readThroughCache<ExitRecommendationResponse>(
-        productCacheKey(EVENT_ID, cacheProductType),
+        productCacheKey(eventId, cacheProductType),
         PRODUCT_TTL_MS,
         async () => {
           const { data } = await apiClient.get<ExitRecommendationResponse>(
-            endpoints.products.exit(EVENT_ID),
+            endpoints.products.exit(eventId),
             {
               params,
               ...(requestOrigin ? { headers: originHeaders(requestOrigin) } : {}),

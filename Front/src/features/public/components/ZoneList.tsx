@@ -4,9 +4,8 @@ import { useTerritorialPrediction, useAutoRefresh } from '../../../hooks/useCont
 import { apiClient } from '../../../core/api/client';
 import { endpoints } from '../../../core/api/endpoints';
 import { readThroughCache, zoneCacheKey, ZONES_TTL_MS } from '../../../core/cache/memoryCache';
+import { useAppStore } from '../../../core/state/store';
 import { ZoneCard } from './ZoneCard';
-
-const EVENT_ID = import.meta.env.VITE_EVENT_ID || '';
 
 interface ZoneInfo {
   id: string;
@@ -20,20 +19,26 @@ interface ZoneListProps {
 }
 
 export function ZoneList({ autoRefreshMs = 30000 }: ZoneListProps) {
-  const { data, loading, error, refresh } = useTerritorialPrediction(EVENT_ID);
+  // Evento activo del store global, resuelto por `useActiveEvent()`. Antes venía de
+  // `import.meta.env.VITE_EVENT_ID`, horneado en el bundle al compilar.
+  const eventId = useAppStore((s) => s.activeEventId);
+  const { data, loading, error, refresh } = useTerritorialPrediction(eventId ?? undefined);
   const [zonesById, setZonesById] = useState<Record<string, { name: string; type: string; subtipo?: string | null }>>({});
 
   useEffect(() => {
     refresh();
   }, [refresh]);
 
+  // `eventId` en las deps: hasta que resuelve, no hay lista que pedir, y cuando
+  // resuelve hay que consultarla para ese evento.
   useEffect(() => {
+    if (!eventId) return;
     let cancelled = false;
     readThroughCache<ZoneInfo[]>(
-      zoneCacheKey(EVENT_ID),
+      zoneCacheKey(eventId),
       ZONES_TTL_MS,
       async () => {
-        const res = await apiClient.get<ZoneInfo[]>(endpoints.zones.list(EVENT_ID));
+        const res = await apiClient.get<ZoneInfo[]>(endpoints.zones.list(eventId));
         return res.data ?? [];
       }
     )
@@ -49,9 +54,9 @@ export function ZoneList({ autoRefreshMs = 30000 }: ZoneListProps) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [eventId]);
 
-  useAutoRefresh(refresh, autoRefreshMs, !!EVENT_ID);
+  useAutoRefresh(refresh, autoRefreshMs, !!eventId);
 
   if (loading && !data) {
     return (

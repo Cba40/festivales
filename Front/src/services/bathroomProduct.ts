@@ -3,8 +3,7 @@ import { apiClient, originHeaders, type RequestOrigin } from '@/core/api/client'
 import { endpoints } from '@/core/api/endpoints'
 import { readThroughCache, productCacheKey, PRODUCT_TTL_MS } from '@/core/cache/memoryCache'
 import { useAppStore } from '@/core/state/store'
-
-const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id'
+import { requireActiveEventId } from '@/services/activeEvent'
 
 export interface ZonaSanitaryItem {
   zone_id: string
@@ -81,12 +80,13 @@ export function useBathroomRecommendations() {
           ? { latitude: locationSnapshot[0], longitude: locationSnapshot[1] }
           : {}),
       }
+      const eventId = requireActiveEventId()
       const data = await readThroughCache<BathroomRecommendationResponse>(
-        productCacheKey(EVENT_ID, 'bathroom'),
+        productCacheKey(eventId, 'bathroom'),
         PRODUCT_TTL_MS,
         async () => {
           const { data } = await apiClient.get<BathroomRecommendationResponse>(
-            endpoints.products.bathroom(EVENT_ID),
+            endpoints.products.bathroom(eventId),
             {
               params,
               ...(requestOrigin ? { headers: originHeaders(requestOrigin) } : {}),

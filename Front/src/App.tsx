@@ -19,6 +19,8 @@ import {
   type ActivityServiceCategory,
 } from './services/activity';
 import ProtectedRoute from './shared/components/ProtectedRoute';
+import { useActiveEvent } from './hooks/useActiveEvent';
+import { requireActiveEventId } from './services/activeEvent';
 
 const Home = lazy(() => import('./screens/Home'));
 const Estacionar = lazy(() => import('./screens/Estacionar'));
@@ -109,42 +111,53 @@ function AppLayout() {
   const requestLocation = useAppStore(s => s.requestLocation);
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
 
-  const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
+  // Evento activo, resuelto desde la jornada que configuró el operador.
+  //
+  // Antes era `import.meta.env.VITE_EVENT_ID`, horneado en el bundle: cambiar de
+  // evento exigía redeploy y un valor viejo en `.env` hacía pedir zonas de un evento
+  // inexistente. `requireActiveEventId()` se llama dentro de cada `useCallback`, o
+  // sea en el momento de prefetchear y no al montar, así que un `throw` por evento
+  // ausente cae en el `.catch(() => {})` de cada prefetch en vez de romper el render.
+  const {
+    activeEventId,
+    isMissing: isActiveEventMissing,
+    resolve: resolveActiveEvent,
+  } = useActiveEvent();
 
   const preloadParking = useCallback(() => {
-    getParkingRecommendations(EVENT_ID, { ...buildProductParams(), limit: 4 }, 'prefetch').catch(() => {});
-  }, [EVENT_ID]);
+    getParkingRecommendations(requireActiveEventId(), { ...buildProductParams(), limit: 4 }, 'prefetch').catch(() => {});
+  }, []);
 
   const preloadGastronomy = useCallback(() => {
-    getGastronomyRecommendations(EVENT_ID, { ...buildProductParams(), limit: 6 }, 'prefetch').catch(() => {});
-  }, [EVENT_ID]);
+    getGastronomyRecommendations(requireActiveEventId(), { ...buildProductParams(), limit: 6 }, 'prefetch').catch(() => {});
+  }, []);
 
   const preloadBathroom = useCallback(() => {
-    getBathroomRecommendations(EVENT_ID, { ...buildProductParams(), limit: 10 }, 'prefetch').catch(() => {});
-  }, [EVENT_ID]);
+    getBathroomRecommendations(requireActiveEventId(), { ...buildProductParams(), limit: 10 }, 'prefetch').catch(() => {});
+  }, []);
 
   const preloadRest = useCallback(() => {
-    getRestRecommendations(EVENT_ID, { ...buildProductParams(), limit: 10 }, 'prefetch').catch(() => {});
-  }, [EVENT_ID]);
+    getRestRecommendations(requireActiveEventId(), { ...buildProductParams(), limit: 10 }, 'prefetch').catch(() => {});
+  }, []);
 
   const preloadHydration = useCallback(() => {
-    getHydrationRecommendations(EVENT_ID, { ...buildProductParams(), limit: 10 }, 'prefetch').catch(() => {});
-  }, [EVENT_ID]);
+    getHydrationRecommendations(requireActiveEventId(), { ...buildProductParams(), limit: 10 }, 'prefetch').catch(() => {});
+  }, []);
 
   const preloadAccommodation = useCallback(() => {
     const { userLocation } = useAppStore.getState();
-    getAccommodationRecommendations(EVENT_ID, {
+    getAccommodationRecommendations(requireActiveEventId(), {
       limit: 100,
       ...(userLocation ? { latitude: userLocation[0], longitude: userLocation[1] } : {}),
     }, 'prefetch').catch(() => {});
-  }, [EVENT_ID]);
+  }, []);
 
   const preloadExit = useCallback(() => {
     const { userLocation } = useAppStore.getState();
-    getExitRecommendations(EVENT_ID, {
+    getExitRecommendations(requireActiveEventId(), {
       ...(userLocation ? { latitude: userLocation[0], longitude: userLocation[1] } : {}),
     }, 'prefetch').catch(() => {});
-  }, [EVENT_ID]);
+  }, []);
 
   const preloadEmergency = useCallback(() => {
     getCities('prefetch').catch(() => {});
@@ -162,10 +175,14 @@ function AppLayout() {
     };
   }, []);
 
+  // Todo el prefetch y el contexto de jornada cuelgan de `activeEventId`: antes de
+  // que resuelva, no hay contra qué consultar y cada request saldría con el ID
+  // equivocado. Al resolverse, este efecto corre solo porque `activeEventId` cambió.
   useEffect(() => {
+    if (!activeEventId) return;
     refresh();
     refreshPredictions();
-    loadEventDayContext(EVENT_ID).then(() => recargarFases());
+    loadEventDayContext(activeEventId).then(() => recargarFases());
     preloadParking();
     preloadGastronomy();
     preloadBathroom();
@@ -177,10 +194,14 @@ function AppLayout() {
       preloadEmergency();
     }, 500);
     return () => clearTimeout(t2);
-  }, [refresh, refreshPredictions, preloadParking, preloadGastronomy, preloadBathroom, preloadRest, preloadHydration, preloadAccommodation, preloadExit, preloadEmergency, EVENT_ID]);
+  }, [refresh, refreshPredictions, preloadParking, preloadGastronomy, preloadBathroom, preloadRest, preloadHydration, preloadAccommodation, preloadExit, preloadEmergency, activeEventId]);
 
+  // Sondeo periódico. El evento activo se re-resuelve acá para que una jornada que
+  // el operador marque a mitad de una sesión abierta se tome sin recargar la página.
   useEffect(() => {
+    if (!activeEventId) return;
     const id = setInterval(() => {
+      void resolveActiveEvent();
       refresh();
       preloadParking();
       preloadGastronomy();
@@ -193,6 +214,7 @@ function AppLayout() {
     }, 30000);
     const onVisibility = () => {
       if (document.visibilityState === 'visible') {
+        void resolveActiveEvent();
         refresh();
         preloadParking();
         preloadGastronomy();
@@ -205,6 +227,7 @@ function AppLayout() {
       }
     };
     const onFocus = () => {
+      void resolveActiveEvent();
       refresh();
       preloadParking();
       preloadGastronomy();
@@ -222,7 +245,7 @@ function AppLayout() {
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('focus', onFocus);
     };
-  }, [refresh, preloadParking, preloadGastronomy, preloadBathroom, preloadRest, preloadHydration, preloadAccommodation, preloadExit, preloadEmergency]);
+  }, [refresh, preloadParking, preloadGastronomy, preloadBathroom, preloadRest, preloadHydration, preloadAccommodation, preloadExit, preloadEmergency, activeEventId, resolveActiveEvent]);
 
   // 1. Escuchar el estado de los permisos de geolocalización de manera reactiva
   useEffect(() => {
@@ -312,6 +335,18 @@ function AppLayout() {
     });
   }, [location.pathname, isDashboard]);
 
+  // Aviso de evento no configurado. `requireActiveEventId()` lanza en cada prefetch
+  // cuando no hay jornada activa, y esos errores se tragan con `.catch(() => {})`
+  // (son prefetch, no datos que el usuario pidió). Sin este banner el operador vería
+  // pantallas vacías sin explicación; con él, la causa queda a la vista.
+  const activeEventBanner =
+    isActiveEventMissing && !isDashboard ? (
+      <div className="print:hidden bg-amber-500 text-black text-center text-sm p-1">
+        No hay evento activo configurado. Marcá una jornada como activa desde el
+        dashboard.
+      </div>
+    ) : null;
+
   if (isDashboard) {
     return (
       <>
@@ -320,6 +355,7 @@ function AppLayout() {
             Modo sin conexión. Se mostrarán datos disponibles localmente.
           </div>
         )}
+        {activeEventBanner}
         <Suspense fallback={<ScreenLoading />}>
         <Routes>
         <Route path="/dashboard/login" element={<LoginScreen />} />
@@ -370,6 +406,7 @@ function AppLayout() {
           Modo sin conexión. Se mostrarán datos disponibles localmente.
         </div>
       )}
+      {activeEventBanner}
       <div className="min-h-screen bg-slate-50 flex justify-center">
         <div className="w-full max-w-md bg-white min-h-screen relative shadow-lg">
           <Suspense fallback={<ScreenLoading />}>
