@@ -446,7 +446,9 @@ const Estacionar = () => {
         )}
       </div>
 
-{gpsPrompt}
+      {gpsPrompt}
+
+      {renderBottomSheet}
 
       <AppFooter variant="public" />
     </div>
