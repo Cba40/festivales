@@ -3,11 +3,11 @@
  * baños, usos/persona-hora).
  *
  * El campo vive en `service_configs`, a nivel del default global por
- * (zone_type_id, subtipo). Los tres formularios que lo editan
- * (CreateZoneForm, ZoneConfigModal y ServiceConfigForm) leen y escriben la
- * MISMA fila vía `fetchDefaultServiceConfig`, así que quedan sincronizados por
- * construcción. Estas funciones centralizan la detección de bathrooms y la
- * validación para que las tres pantallas se comporten igual.
+ * (zone_type_id, subtipo). Los dos modales que lo editan (CreateZoneForm y
+ * ZoneConfigModal) leen y escriben la MISMA fila vía `fetchDefaultServiceConfig`,
+ * así que quedan sincronizados por construcción. Estas funciones centralizan la
+ * detección de bathrooms y la validación para que ambas pantallas se comporten
+ * igual.
  *
  * Contrato (ver `app/api/routes/service_configs.py` y el CHECK de la tabla):
  * solo aplica a `subtipo = 'banos'` y debe ser >= 0.

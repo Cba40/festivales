@@ -270,12 +270,6 @@ export interface ServiceConfigCreatePayload {
   bathroom_use_rate_per_person_hour?: number | null;
 }
 
-export interface ServiceConfigFilters {
-  zone_type_id?: string;
-  subtipo?: string;
-  event_day_id?: string;
-}
-
 export interface OperationalObservationDTO {
   id: string;
   event_day_id: string;
