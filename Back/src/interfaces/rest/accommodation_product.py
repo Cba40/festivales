@@ -54,6 +54,7 @@ async def get_accommodation_product_adapter(
     user_latitude: float | None = None,
     user_longitude: float | None = None,
     limit: int = 20,
+    event_day_id: str | None = None,
 ) -> AccommodationRecommendationResponse:
     """Recomendaciones determinísticas de alojamiento.
 

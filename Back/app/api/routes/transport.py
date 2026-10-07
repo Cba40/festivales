@@ -62,6 +62,10 @@ async def transport_recommendations(
     access_level: str | None = Query(None),
     current_zone_id: str | None = Query(None),
     x_request_origin: str | None = Header(default=None, alias=REQUEST_ORIGIN_HEADER),
+    event_day_id: str | None = Query(
+        default=None,
+        description="Jornada explicita; reservado para uso futuro en este modulo",
+    ),
     db: AsyncSession = Depends(get_async_db),
 ):
     now = datetime.now(timezone.utc)

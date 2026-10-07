@@ -40,6 +40,7 @@ async def get_exit_product_adapter(
     mode: str | None = None,
     latitude: float | None = None,
     longitude: float | None = None,
+    event_day_id: str | None = None,
 ) -> ExitRecommendationResponse:
     # ── 1. Destinos activos del evento ──
     destinos_rows = (

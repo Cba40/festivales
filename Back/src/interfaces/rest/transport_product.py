@@ -76,6 +76,7 @@ async def get_transport_product_adapter(
     user_latitude: float | None = None,
     user_longitude: float | None = None,
     limit: int = 5,
+    event_day_id: str | None = None,
 ) -> TransportRecommendationResponse:
     """Deterministic transport recommendations from real schedule data.
 

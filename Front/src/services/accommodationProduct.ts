@@ -7,6 +7,13 @@ import { requireActiveEventId } from '@/services/activeEvent'
 
 export type AccommodationType = 'hotel' | 'hostel' | 'camping' | 'other'
 
+/**
+ * Cuantos alojamientos pide el hook. Es una lista de inventario, no un
+ * ranking curado: el orden por defecto del backend es por nombre, asi que
+ * un limite chico cortaria el catalogo sin motivo.
+ */
+export const ACCOMMODATION_LIMIT = 100
+
 export interface AccommodationItem {
   id: string
   event_id: string
@@ -61,6 +68,7 @@ export function useAccommodationRecommendations(
 
   const userLocation = useAppStore(s => s.userLocation)
 
+  const eventDayId = useAppStore((s) => s.eventDayId)
   const ctxRef = useRef({ userLocation })
 
   const refresh = useCallback(async (force = false, requestOrigin?: RequestOrigin) => {
@@ -74,6 +82,7 @@ export function useAccommodationRecommendations(
           ? { latitude: locationSnapshot[0], longitude: locationSnapshot[1] }
           : {}),
         ...(type ? { type } : {}),
+        ...(eventDayId ? { event_day_id: eventDayId } : {}),
       }
       const cacheProductType = type ? `accommodation:${type}` : 'accommodation'
       const eventId = requireActiveEventId()
@@ -99,7 +108,7 @@ export function useAccommodationRecommendations(
     } finally {
       setLoading(false)
     }
-  }, [type])
+  }, [type, eventDayId])
 
   return { data, loading, error, refresh }
 }

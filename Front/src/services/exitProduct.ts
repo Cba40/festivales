@@ -71,6 +71,7 @@ export function useExitRecommendations(
 
   const userLocation = useAppStore(s => s.userLocation)
 
+  const eventDayId = useAppStore((s) => s.eventDayId)
   const ctxRef = useRef({ userLocation })
 
   const refresh = useCallback(async (force = false, requestOrigin?: RequestOrigin) => {
@@ -81,6 +82,7 @@ export function useExitRecommendations(
       const params: Record<string, unknown> = {
         ...(destinationId ? { destination_id: destinationId } : {}),
         ...(mode ? { mode } : {}),
+        ...(eventDayId ? { event_day_id: eventDayId } : {}),
         ...(locationSnapshot
           ? { latitude: locationSnapshot[0], longitude: locationSnapshot[1] }
           : {}),
@@ -115,7 +117,7 @@ export function useExitRecommendations(
     } finally {
       setLoading(false)
     }
-  }, [destinationId, mode])
+  }, [destinationId, mode, eventDayId])
 
   return { data, loading, error, refresh }
 }

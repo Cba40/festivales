@@ -30,6 +30,10 @@ async def accommodation_recommendations(
     longitude: float | None = Query(None, ge=-180.0, le=180.0),
     limit: int = Query(20, ge=1, le=100),
     x_request_origin: str | None = Header(default=None, alias=REQUEST_ORIGIN_HEADER),
+    event_day_id: str | None = Query(
+        default=None,
+        description="Jornada explicita; reservado para uso futuro en este modulo",
+    ),
     db: AsyncSession = Depends(get_async_db),
 ):
     """Recomendaciones determinísticas de alojamiento para un evento.

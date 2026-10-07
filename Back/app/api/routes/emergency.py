@@ -43,6 +43,10 @@ async def emergency_recommendations(
     latitude: float | None = Query(None, ge=-90.0, le=90.0),
     longitude: float | None = Query(None, ge=-180.0, le=180.0),
     limit: int = Query(20, ge=1, le=100),
+    event_day_id: str | None = Query(
+        default=None,
+        description="Jornada explicita; reservado para uso futuro en este modulo",
+    ),
     db: AsyncSession = Depends(get_async_db),
 ):
     """Recomendaciones determinísticas de emergencias de una ciudad.

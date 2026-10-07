@@ -57,6 +57,7 @@ async def get_emergency_product_adapter(
     user_latitude: float | None = None,
     user_longitude: float | None = None,
     limit: int = 20,
+    event_day_id: str | None = None,
 ) -> EmergencyRecommendationResponse:
     """Recomendaciones determinísticas de emergencias para una ciudad.
 

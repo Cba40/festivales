@@ -35,6 +35,11 @@ export type EmergencyType =
   | 'numero_emergencia'
   | 'otro'
 
+/**
+ * Cuantas emergencias pide el hook.
+ */
+export const EMERGENCY_LIMIT = 20
+
 export interface EmergencyItem {
   id: string
   name: string
@@ -178,6 +183,7 @@ export function useEmergencyRecommendations(
   const [error, setError] = useState<string | null>(null)
 
   const userLocation = useAppStore(s => s.userLocation)
+  const eventDayId = useAppStore((s) => s.eventDayId)
 
   const refresh = useCallback(async (requestOrigin?: RequestOrigin) => {
     if (!cityId) {
@@ -204,11 +210,12 @@ export function useEmergencyRecommendations(
             {
               params: {
                 city_id: cityId,
-                limit: 20,
+                limit: EMERGENCY_LIMIT,
                 ...(type && type !== 'todos' ? { type } : {}),
                 ...(userLocation
                   ? { latitude: userLocation[0], longitude: userLocation[1] }
                   : {}),
+                ...(eventDayId ? { event_day_id: eventDayId } : {}),
               },
               ...(requestOrigin ? { headers: originHeaders(requestOrigin) } : {}),
             }
@@ -234,7 +241,7 @@ export function useEmergencyRecommendations(
     } finally {
       setLoading(false)
     }
-  }, [cityId, type, userLocation])
+  }, [cityId, type, userLocation, eventDayId])
 
   return { data, loading, error, refresh }
 }

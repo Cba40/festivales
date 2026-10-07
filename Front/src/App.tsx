@@ -11,7 +11,7 @@ import { getGastronomyRecommendations, GASTRONOMY_LIMIT } from './services/gastr
 import { getBathroomRecommendations, BATHROOM_LIMIT } from './services/bathroomProduct';
 import { getRestRecommendations, REST_LIMIT } from './services/restProduct';
 import { getHydrationRecommendations, HYDRATION_LIMIT } from './services/hydrationProduct';
-import { getAccommodationRecommendations } from './services/accommodationProduct';
+import { getAccommodationRecommendations, ACCOMMODATION_LIMIT } from './services/accommodationProduct';
 import { getExitRecommendations } from './services/exitProduct';
 import { getCities, getProtocols } from './services/emergencyProduct';
 import {
@@ -167,18 +167,19 @@ function AppLayout() {
   }, []);
 
   const preloadAccommodation = useCallback(() => {
-    const { userLocation } = useAppStore.getState();
-    getAccommodationRecommendations(requireActiveEventId(), {
-      limit: 100,
-      ...(userLocation ? { latitude: userLocation[0], longitude: userLocation[1] } : {}),
-    }, 'prefetch').catch(() => {});
+    getAccommodationRecommendations(
+      requireActiveEventId(),
+      { ...buildProductParams(), limit: ACCOMMODATION_LIMIT },
+      'prefetch',
+    ).catch(() => {});
   }, []);
 
   const preloadExit = useCallback(() => {
-    const { userLocation } = useAppStore.getState();
-    getExitRecommendations(requireActiveEventId(), {
-      ...(userLocation ? { latitude: userLocation[0], longitude: userLocation[1] } : {}),
-    }, 'prefetch').catch(() => {});
+    getExitRecommendations(
+      requireActiveEventId(),
+      { ...buildProductParams() },
+      'prefetch',
+    ).catch(() => {});
   }, []);
 
   const preloadEmergency = useCallback(() => {

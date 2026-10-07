@@ -4,6 +4,11 @@ import { endpoints } from '@/core/api/endpoints'
 import { useAppStore } from '@/core/state/store'
 import { requireActiveEventId } from '@/services/activeEvent'
 
+/**
+ * Cuantas lineas de transporte pide el hook.
+ */
+export const TRANSPORT_LIMIT = 4
+
 export interface ScheduleItem {
   day_type: string
   departure_time: string
@@ -57,6 +62,7 @@ export function useTransportRecommendations(
   const userLocation = useAppStore(s => s.userLocation)
   const currentZoneId = useAppStore(s => s.zones[0]?.id)
 
+  const eventDayId = useAppStore((s) => s.eventDayId)
   const ctxRef = useRef({ currentZoneId, userLocation })
 
   const refresh = useCallback(async (requestOrigin?: RequestOrigin) => {
@@ -70,10 +76,11 @@ export function useTransportRecommendations(
           params: {
             speed: 1.5,
             accessibility_required: false,
-            limit: 10,
+            limit: TRANSPORT_LIMIT,
             current_zone_id: zoneIdSnapshot || undefined,
             user_id: '00000000-0000-0000-0000-000000000000',
             access_level: 'STANDARD',
+            ...(eventDayId ? { event_day_id: eventDayId } : {}),
             ...(locationSnapshot
               ? { latitude: locationSnapshot[0], longitude: locationSnapshot[1] }
               : {}),
@@ -89,7 +96,7 @@ export function useTransportRecommendations(
     } finally {
       setLoading(false)
     }
-  }, [destination, transportType])
+  }, [destination, transportType, eventDayId])
 
   return { data, loading, error, refresh }
 }
