@@ -75,7 +75,13 @@ export function ServiceConfigForm({
       const parsedUseRate = Number(bathroomUseRate);
       if (!Number.isFinite(parsedUseRate) || parsedUseRate < 0) {
         setValidationError(
-          'La tasa de uso de baños debe ser un número mayor o igual a 0'
+          'La tasa de uso debe ser un número mayor o igual a 0'
+        );
+        return;
+      }
+      if (!/^\d+(\.\d{1,2})?$/.test(bathroomUseRate.trim())) {
+        setValidationError(
+          'La tasa de uso admite máximo 2 decimales (ej: 0.1, 0.25)'
         );
         return;
       }
@@ -157,20 +163,21 @@ export function ServiceConfigForm({
       {isBathroom && (
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">
-            Usos de baño por persona-hora (u) *
+            Tasa de uso (usos/persona-hora) *
           </label>
           <input
             type="number"
             min={0}
-            step="any"
+            step="0.01"
             value={bathroomUseRate}
             onChange={(e) => setBathroomUseRate(e.target.value)}
             required
+            title="Hipótesis inicial: 0.1. Calibrar con observaciones reales"
             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <p className="text-[10px] text-slate-400 mt-0.5">
-            0.1 es una hipótesis inicial de modelado pendiente de calibración con observaciones
-            reales; no es un valor empírico validado.
+            Hipótesis inicial: 0.1. Calibrar con observaciones reales; no es un valor empírico
+            validado. Máximo 2 decimales.
           </p>
         </div>
       )}
