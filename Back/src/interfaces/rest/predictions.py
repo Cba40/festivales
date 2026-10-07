@@ -14,9 +14,11 @@ async def get_territorial_prediction_adapter(
     *,
     timestamp: datetime,
     event_id: str,
+    event_day_id: str | None = None,
 ) -> TerritorialPrediction | None:
     module = PredictionModule(db=db)
     return await module.execute(
         timestamp=timestamp,
         event_id=event_id,
+        event_day_id=event_day_id,
     )

@@ -7,10 +7,10 @@ import { useTerritorialPrediction } from './hooks/useContextEngine';
 import { loadEventDayContext } from './utils/contextoEvento';
 import { recargarFases } from './config/eventoConfig';
 import { getParkingRecommendations } from './services/parkingProduct';
-import { getGastronomyRecommendations } from './services/gastronomyProduct';
+import { getGastronomyRecommendations, GASTRONOMY_LIMIT } from './services/gastronomyProduct';
 import { getBathroomRecommendations, BATHROOM_LIMIT } from './services/bathroomProduct';
-import { getRestRecommendations } from './services/restProduct';
-import { getHydrationRecommendations } from './services/hydrationProduct';
+import { getRestRecommendations, REST_LIMIT } from './services/restProduct';
+import { getHydrationRecommendations, HYDRATION_LIMIT } from './services/hydrationProduct';
 import { getAccommodationRecommendations } from './services/accommodationProduct';
 import { getExitRecommendations } from './services/exitProduct';
 import { getCities, getProtocols } from './services/emergencyProduct';
@@ -60,13 +60,17 @@ const ForbiddenScreen = lazy(() => import('./features/auth/screens/ForbiddenScre
 const UserManagementScreen = lazy(() => import('./features/dashboard/screens/UserManagementScreen'));
 
 function buildProductParams(): Record<string, unknown> {
-  const { userLocation, zones } = useAppStore.getState();
+  const { userLocation, zones, eventDayId } = useAppStore.getState();
   return {
     speed: 1.5,
     accessibility_required: false,
     current_zone_id: zones[0]?.id || undefined,
     user_id: '00000000-0000-0000-0000-000000000000',
     access_level: 'STANDARD',
+    // El backend resuelve la jornada activa por reloj si no recibe esto. Sin
+    // `event_day_id` el dashboard veria la configuracion global de
+    // `service_configs` en vez de la de la jornada que estas mirando.
+    ...(eventDayId ? { event_day_id: eventDayId } : {}),
     ...(userLocation ? { latitude: userLocation[0], longitude: userLocation[1] } : {}),
   };
 }
@@ -147,7 +151,7 @@ function AppLayout() {
   }, []);
 
   const preloadGastronomy = useCallback(() => {
-    getGastronomyRecommendations(requireActiveEventId(), { ...buildProductParams(), limit: 6 }, 'prefetch').catch(() => {});
+    getGastronomyRecommendations(requireActiveEventId(), { ...buildProductParams(), limit: GASTRONOMY_LIMIT }, 'prefetch').catch(() => {});
   }, []);
 
   const preloadBathroom = useCallback(() => {
@@ -155,11 +159,11 @@ function AppLayout() {
   }, []);
 
   const preloadRest = useCallback(() => {
-    getRestRecommendations(requireActiveEventId(), { ...buildProductParams(), limit: 10 }, 'prefetch').catch(() => {});
+    getRestRecommendations(requireActiveEventId(), { ...buildProductParams(), limit: REST_LIMIT }, 'prefetch').catch(() => {});
   }, []);
 
   const preloadHydration = useCallback(() => {
-    getHydrationRecommendations(requireActiveEventId(), { ...buildProductParams(), limit: 10 }, 'prefetch').catch(() => {});
+    getHydrationRecommendations(requireActiveEventId(), { ...buildProductParams(), limit: HYDRATION_LIMIT }, 'prefetch').catch(() => {});
   }, []);
 
   const preloadAccommodation = useCallback(() => {

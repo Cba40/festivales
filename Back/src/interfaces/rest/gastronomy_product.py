@@ -39,6 +39,7 @@ async def get_gastronomy_product_adapter(
     user_context,
     mobility_context,
     limit: int = 5,
+    event_day_id: str | None = None,
 ) -> GastronomyRecommendationResponse:
     requested_action = RequestedAction(action_type=ActionType.SEEK_FOOD)
 
@@ -50,6 +51,7 @@ async def get_gastronomy_product_adapter(
         mobility_context=mobility_context,
         requested_action=requested_action,
         limit=limit,
+        event_day_id=event_day_id,
     )
 
     zone_meta = await load_zone_metadata(

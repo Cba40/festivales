@@ -477,6 +477,30 @@ async def _load_operational_phases(
     }
 
 
+async def _find_event_day_by_id(
+    db: AsyncSession,
+    event_id: str,
+    event_day_id: str,
+) -> EventDay | None:
+    """Carga el EventDay por id, exigiendo que pertenezca al evento.
+
+    El filtro por `event_id` no es decorativo: evita que un `event_day_id` de
+    otro evento se use para leer `service_configs` contra este evento. Si no
+    coincide, devuelve None y el llamador cae a la resolucion por ventana.
+    """
+    ed_row = (
+        await db.execute(
+            select(EventDayORM)
+            .where(EventDayORM.id == event_day_id)
+            .where(EventDayORM.event_id == event_id)
+            .options(selectinload(EventDayORM.phases))
+        )
+    ).scalar_one_or_none()
+    if ed_row is None:
+        return None
+    return await _map_event_day_row(db, ed_row)
+
+
 async def _find_event_day_for_date(
     db: AsyncSession,
     event_id: str,
@@ -494,6 +518,11 @@ async def _find_event_day_for_date(
     if ed_row is None:
         return None
 
+    return await _map_event_day_row(db, ed_row)
+
+
+async def _map_event_day_row(db: AsyncSession, ed_row) -> EventDay:
+    """Mapea la fila ORM de EventDay (con fases) a entidad de dominio."""
     operational_profile_id = ed_row.operational_profile_id
     if operational_profile_id is None:
         operational_profile_id = await _load_default_operational_profile_id(db)
@@ -571,6 +600,7 @@ class PredictionModule:
         timestamp: datetime,
         event_id: str,
         persist: bool = False,
+        event_day_id: str | None = None,
     ) -> TerritorialPrediction | None:
         local_ts = timestamp.astimezone(LOCAL_TZ)
         type_map = await _load_zone_type_map(self._db)
@@ -581,10 +611,17 @@ class PredictionModule:
 
         zone_behaviors = await _load_zone_behaviors(self._db, event_id)
 
-        event_day = await resolve_active_event_day(
-            local_ts,
-            lambda d: _find_event_day_for_date(self._db, event_id, d),
+        # Jornada explicita si viene; si no, la que contiene el instante.
+        event_day = (
+            await _find_event_day_by_id(self._db, event_id, event_day_id)
+            if event_day_id
+            else None
         )
+        if event_day is None:
+            event_day = await resolve_active_event_day(
+                local_ts,
+                lambda d: _find_event_day_for_date(self._db, event_id, d),
+            )
         if event_day is None:
             return None
 

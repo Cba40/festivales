@@ -30,6 +30,10 @@ async def bathroom_recommendations(
     speed: float = Query(..., ge=0.0, le=10.0),
     accessibility_required: bool = Query(...),
     limit: int = Query(5, ge=1, le=50),
+    event_day_id: str | None = Query(
+        default=None,
+        description="Jornada explicita; si se omite se resuelve por ventana operativa",
+    ),
     current_zone_id: str | None = Query(None),
     user_id: str = Query(...),
     access_level: AccessLevel = Query(default=AccessLevel.STANDARD),

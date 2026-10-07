@@ -73,6 +73,7 @@ export function useBathroomRecommendations() {
   const userLocation = useAppStore(s => s.userLocation)
   const currentZoneId = useAppStore(s => s.zones[0]?.id)
 
+  const eventDayId = useAppStore((s) => s.eventDayId)
   const ctxRef = useRef({ currentZoneId, userLocation })
 
   const refresh = useCallback(async (force = false, requestOrigin?: RequestOrigin) => {
@@ -87,6 +88,7 @@ export function useBathroomRecommendations() {
         current_zone_id: zoneIdSnapshot || undefined,
         user_id: '00000000-0000-0000-0000-000000000000',
         access_level: 'STANDARD',
+        ...(eventDayId ? { event_day_id: eventDayId } : {}),
         ...(locationSnapshot
           ? { latitude: locationSnapshot[0], longitude: locationSnapshot[1] }
           : {}),
@@ -114,7 +116,7 @@ export function useBathroomRecommendations() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [eventDayId])
 
   return { data, loading, error, refresh }
 }

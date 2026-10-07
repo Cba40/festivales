@@ -30,6 +30,7 @@ async def get_bathroom_product_adapter(
     user_context,
     mobility_context,
     limit: int = 5,
+    event_day_id: str | None = None,
 ) -> BathroomRecommendationResponse:
     requested_action = RequestedAction(action_type=ActionType.SEEK_BATHROOM)
 
@@ -41,6 +42,7 @@ async def get_bathroom_product_adapter(
         mobility_context=mobility_context,
         requested_action=requested_action,
         limit=limit,
+        event_day_id=event_day_id,
     )
 
     zone_meta = await load_zone_metadata(

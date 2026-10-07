@@ -64,7 +64,11 @@ from src.infrastructure.composition.bathroom_module import (
 from src.infrastructure.composition.adapters.operational_event_adapter import (
     OperationalEventAdapter,
 )
-from src.infrastructure.composition.prediction_module import _resolve_zone_type_id
+from src.infrastructure.composition.prediction_module import (
+    _find_event_day_by_id,
+    _find_event_day_for_date,
+    _resolve_zone_type_id,
+)
 from src.infrastructure.persistence.repositories.zone_recommendation_repository import (
     SQLZoneRecommendationRepository,
 )
@@ -265,51 +269,6 @@ async def _load_operational_phases(
     }
 
 
-async def _find_event_day_for_date(
-    db: AsyncSession,
-    event_id: str,
-    target_date: date,
-) -> EventDay | None:
-    """Carga el EventDay de una fecha civil y lo mapea a entidad de dominio."""
-    ed_row = (
-        await db.execute(
-            select(EventDayORM)
-            .where(EventDayORM.event_id == event_id)
-            .where(EventDayORM.date == target_date)
-            .options(selectinload(EventDayORM.phases))
-        )
-    ).scalar_one_or_none()
-    if ed_row is None:
-        return None
-
-    operational_profile_id = ed_row.operational_profile_id
-    if operational_profile_id is None:
-        operational_profile_id = await _load_default_operational_profile_id(db)
-
-    eid = UUID(ed_row.id)
-    return EventDay(
-        id=eid,
-        event_date=ed_row.date,
-        operational_profile_id=operational_profile_id,
-        attendance_level_id=_to_uuid_or_none(ed_row.attendance_level_id),
-        operational_start_min=ed_row.operational_start_min,
-        operational_end_min=ed_row.operational_end_min,
-        estimated_vehicles=ed_row.estimated_vehicles,
-        average_parking_duration=ed_row.average_parking_duration,
-        phases=tuple(
-            EventDayPhase(
-                id=UUID(str(p.id)),
-                event_day_id=eid,
-                operational_phase_id=UUID(str(p.operational_phase_id)),
-                start_min=p.start_min,
-                end_min=p.end_min,
-                intensity=p.intensity,
-            )
-            for p in ed_row.phases
-        ),
-    )
-
-
 # ---------------------------------------------------------------------------
 # Private in-memory repository implementations (adapter-level)
 # ---------------------------------------------------------------------------
@@ -418,6 +377,7 @@ class RecommendationModule:
         mobility_context: MobilityContext,
         requested_action: RequestedAction,
         limit: int = 5,
+        event_day_id: str | None = None,
     ) -> tuple[list[ZoneRecommendation], TerritorialPrediction | None]:
         local_ts = timestamp.astimezone(LOCAL_TZ)
 
@@ -426,10 +386,27 @@ class RecommendationModule:
         zones = await _load_zones(self._db, event_id, type_map, ref_lat, ref_lng)
         zone_behaviors = await _load_zone_behaviors(self._db, event_id)
 
-        event_day = await resolve_active_event_day(
-            local_ts,
-            lambda d: _find_event_day_for_date(self._db, event_id, d),
-        )
+        # La jornada explicita manda sobre la del reloj: es lo que permite que
+        # el dashboard vea las configuraciones por dia de `service_configs`.
+        # Si no viene, o si el id no pertenece a este evento, se resuelve por
+        # ventana operativa como antes.
+        event_day: EventDay | None = None
+        if event_day_id:
+            event_day = await _find_event_day_by_id(
+                self._db, event_id, event_day_id
+            )
+            if event_day is None:
+                logger.warning(
+                    "[RECS] event_day_id=%s no existe o no pertenece a event=%s; "
+                    "se resuelve la jornada por ventana operativa",
+                    event_day_id,
+                    event_id,
+                )
+        if event_day is None:
+            event_day = await resolve_active_event_day(
+                local_ts,
+                lambda d: _find_event_day_for_date(self._db, event_id, d),
+            )
         if event_day is None:
             return [], None
 
@@ -496,6 +473,7 @@ class RecommendationModule:
             bathroom_result = await BathroomModule(self._db).execute(
                 timestamp=local_ts,
                 event_id=event_id,
+                event_day_id=event_day_id,
             )
             combined = merge_bathroom_into_prediction(combined, bathroom_result)
 

@@ -2,7 +2,7 @@
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -146,11 +146,13 @@ async def _build_prediction_response(
     db: AsyncSession,
     event_id: str,
     timestamp: datetime,
+    event_day_id: str | None = None,
 ) -> dict:
     prediction = await get_territorial_prediction_adapter(
         db,
         timestamp=timestamp,
         event_id=event_id,
+        event_day_id=event_day_id,
     )
     reason = await _log_prediction_debug(db, event_id, timestamp, prediction)
     if prediction is None:
@@ -196,12 +198,18 @@ async def _build_prediction_response(
 async def get_predictions(
     request: Request,
     event_id: str,
+    event_day_id: str | None = Query(
+        default=None,
+        description="Jornada explicita; si se omite se resuelve por ventana operativa",
+    ),
     db: AsyncSession = Depends(get_async_db),
 ):
     """Endpoint público para Visitor App. No requiere autenticación."""
     timestamp = datetime.now(timezone.utc)
     try:
-        return await _build_prediction_response(db, event_id, timestamp)
+        return await _build_prediction_response(
+            db, event_id, timestamp, event_day_id=event_day_id
+        )
     except Exception:
         logger.exception(
             "Prediction endpoint failed | event_id=%s",

@@ -36,6 +36,7 @@ async def get_parking_product_adapter(
     user_context: UserContext,
     mobility_context: MobilityContext,
     limit: int = 5,
+    event_day_id: str | None = None,
 ) -> ParkingRecommendationResponse:
     requested_action = RequestedAction(action_type=ActionType.SEEK_PARKING)
 
@@ -47,6 +48,7 @@ async def get_parking_product_adapter(
         mobility_context=mobility_context,
         requested_action=requested_action,
         limit=limit,
+        event_day_id=event_day_id,
     )
 
     zone_meta = await load_zone_metadata(db, [r.zone_id for r in recs])

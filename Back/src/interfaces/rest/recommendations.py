@@ -25,6 +25,7 @@ async def get_recommendations_adapter(
     mobility_context: MobilityContext,
     requested_action: RequestedAction,
     limit: int = 5,
+    event_day_id: str | None = None,
 ) -> tuple[list[ZoneRecommendation], TerritorialPrediction | None]:
     module = RecommendationModule(db=db)
     recs, prediction = await module.execute(
@@ -34,6 +35,7 @@ async def get_recommendations_adapter(
         mobility_context=mobility_context,
         requested_action=requested_action,
         limit=limit,
+        event_day_id=event_day_id,
     )
 
     logger.info(

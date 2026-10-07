@@ -46,6 +46,7 @@ from src.domain.value_objects.zone_state import ZoneState
 from src.infrastructure.composition.prediction_module import (
     SUBTIPO_TO_ZONE_TYPE_SLUG,
     _distance_to_reference,
+    _find_event_day_by_id,
     _load_attendance_level,
     _load_event_reference_point,
     _load_zone_type_map,
@@ -206,6 +207,7 @@ class BathroomModule:
         timestamp: datetime,
         event_id: str,
         alpha: float | None = None,
+        event_day_id: str | None = None,
     ) -> BathroomSimulationResult | None:
         local_ts = timestamp.astimezone(LOCAL_TZ)
 
@@ -217,10 +219,19 @@ class BathroomModule:
         if not bathroom_zones:
             return None
 
-        event_day = await resolve_active_event_day(
-            local_ts,
-            lambda d: _find_event_day_for_date(self._db, event_id, d),
+        # Jornada explicita si viene; si no, la que contiene el instante segun
+        # la ventana operativa. La explicita es la que usa el dashboard y la que
+        # decide que fila de `service_configs` se lee.
+        event_day = (
+            await _find_event_day_by_id(self._db, event_id, event_day_id)
+            if event_day_id
+            else None
         )
+        if event_day is None:
+            event_day = await resolve_active_event_day(
+                local_ts,
+                lambda d: _find_event_day_for_date(self._db, event_id, d),
+            )
         if event_day is None:
             return None
         if not event_day.phases:

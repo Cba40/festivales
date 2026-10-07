@@ -5,6 +5,14 @@ import { readThroughCache, productCacheKey, PRODUCT_TTL_MS } from '@/core/cache/
 import { useAppStore } from '@/core/state/store'
 import { requireActiveEventId } from '@/services/activeEvent'
 
+/**
+ * Cuantas zonas pide el hook: los puntos de hidratación.
+ *
+ * El backend usa seleccion curada por rol para `servicios`, asi que el set
+ * util ya viene recortado a 4; pedir mas no agrega informacion.
+ */
+export const HYDRATION_LIMIT = 4
+
 export interface ZonaHidratacionItem {
   zone_id: string
   name: string
@@ -62,6 +70,7 @@ export function useHydrationRecommendations() {
   const userLocation = useAppStore(s => s.userLocation)
   const currentZoneId = useAppStore(s => s.zones[0]?.id)
 
+  const eventDayId = useAppStore((s) => s.eventDayId)
   const ctxRef = useRef({ currentZoneId, userLocation })
 
   const refresh = useCallback(async (force = false, requestOrigin?: RequestOrigin) => {
@@ -72,10 +81,11 @@ export function useHydrationRecommendations() {
       const params: Record<string, unknown> = {
         speed: 1.5,
         accessibility_required: false,
-        limit: 10,
+        limit: HYDRATION_LIMIT,
         current_zone_id: zoneIdSnapshot || undefined,
         user_id: '00000000-0000-0000-0000-000000000000',
         access_level: 'STANDARD',
+        ...(eventDayId ? { event_day_id: eventDayId } : {}),
         ...(locationSnapshot
           ? { latitude: locationSnapshot[0], longitude: locationSnapshot[1] }
           : {}),
@@ -103,7 +113,7 @@ export function useHydrationRecommendations() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [eventDayId])
 
   return { data, loading, error, refresh }
 }
