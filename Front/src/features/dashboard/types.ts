@@ -257,6 +257,7 @@ export interface ServiceConfigDTO {
   subtipo: string | null;
   event_day_id: string | null;
   average_duration_min: number;
+  bathroom_use_rate_per_person_hour: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -266,6 +267,7 @@ export interface ServiceConfigCreatePayload {
   subtipo?: string | null;
   event_day_id?: string | null;
   average_duration_min: number;
+  bathroom_use_rate_per_person_hour?: number | null;
 }
 
 export interface ServiceConfigFilters {

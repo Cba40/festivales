@@ -70,7 +70,9 @@ _EARTH_RADIUS_M = 6_371_000.0
 _DEFAULT_OPERATIONAL_PROFILE_NAME = "ActividadExtendida"
 
 
-def _build_model_selector() -> ModelSelector:
+def _build_model_selector(
+    bathroom_use_rate_per_person_hour: float | None = None,
+) -> ModelSelector:
     """Registro de modelos especializados que el Context Engine puede ejecutar.
 
     Antes vivían escrito y testeado (`ParkingV1Model`, `BathroomV1Model`) pero
@@ -95,7 +97,14 @@ def _build_model_selector() -> ModelSelector:
     contrato de `ZoneState`, así que esos cuatro campos siguen en `None` hasta
     que se mapeen. Ver `docs/Architecture/Current/ADR-004.md`.
     """
-    return ModelSelector([ParkingV1Model(), BathroomV1Model()])
+    return ModelSelector(
+        [
+            ParkingV1Model(),
+            BathroomV1Model(
+                use_rate_per_person_hour=bathroom_use_rate_per_person_hour
+            ),
+        ]
+    )
 
 
 def _to_uuid_or_none(value: str | UUID | None) -> UUID | None:
@@ -188,6 +197,54 @@ async def _resolve_service_duration(
         "ServiceConfig must define average_duration_min "
         f"for (zone_type_id={zone_type_id}, subtipo={subtipo!r})"
     )
+
+
+async def _resolve_bathroom_use_rate(
+    db: AsyncSession,
+    *,
+    zone_type_id: UUID,
+    event_day_id: UUID | str | None,
+) -> float:
+    """Resuelve `u` (usos/persona-hora), prefiriendo override sobre default."""
+    normalized_subtipo = "banos"
+    if event_day_id is not None:
+        stmt = select(ServiceConfigORM).where(
+            ServiceConfigORM.zone_type_id == str(zone_type_id),
+            func.coalesce(ServiceConfigORM.subtipo, "") == normalized_subtipo,
+            ServiceConfigORM.event_day_id == str(event_day_id),
+        )
+        row = (await db.execute(stmt)).scalar_one_or_none()
+        rate = (
+            row.bathroom_use_rate_per_person_hour
+            if row is not None
+            else None
+        )
+        if rate is not None:
+            return _validate_bathroom_use_rate(rate)
+
+    stmt = select(ServiceConfigORM).where(
+        ServiceConfigORM.zone_type_id == str(zone_type_id),
+        func.coalesce(ServiceConfigORM.subtipo, "") == normalized_subtipo,
+        ServiceConfigORM.event_day_id.is_(None),
+    )
+    row = (await db.execute(stmt)).scalar_one_or_none()
+    rate = row.bathroom_use_rate_per_person_hour if row is not None else None
+    if rate is None:
+        raise ValueError(
+            "ServiceConfig must define bathroom_use_rate_per_person_hour "
+            f"for (zone_type_id={zone_type_id}, subtipo='banos')"
+        )
+    return _validate_bathroom_use_rate(rate)
+
+
+def _validate_bathroom_use_rate(value: float) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError("bathroom_use_rate_per_person_hour must be a number")
+    if not math.isfinite(float(value)) or value < 0:
+        raise ValueError(
+            "bathroom_use_rate_per_person_hour must be finite and >= 0"
+        )
+    return float(value)
 
 
 async def _resolve_service_durations_by_zone(
@@ -553,7 +610,27 @@ class PredictionModule:
 
         stage4_config = await get_stage4_config(self._db)
 
-        model_selector = _build_model_selector()
+        bathroom_use_rate: float | None = None
+        if any(
+            zone.type == "servicios" and zone.subtipo == "banos"
+            for zone in zones
+        ):
+            try:
+                bathroom_zone_type_id = _resolve_zone_type_id(
+                    type_map, "servicios", "banos"
+                )
+                bathroom_use_rate = await _resolve_bathroom_use_rate(
+                    self._db,
+                    zone_type_id=bathroom_zone_type_id,
+                    event_day_id=event_day.id,
+                )
+            except ValueError as exc:
+                logger.info(
+                    "Sin bathroom_use_rate_per_person_hour en service_configs: "
+                    "las zonas de banos degradan sin saturacion: %s",
+                    exc,
+                )
+        model_selector = _build_model_selector(bathroom_use_rate)
         service_durations = await _resolve_service_durations_by_zone(
             self._db,
             type_map=type_map,

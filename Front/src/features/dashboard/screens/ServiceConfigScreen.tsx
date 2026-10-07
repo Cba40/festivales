@@ -52,6 +52,7 @@ export function ServiceConfigScreen() {
       subtipo?: string | null;
       event_day_id?: string | null;
       average_duration_min: number;
+      bathroom_use_rate_per_person_hour?: number | null;
     }) => {
       setFormError(null);
       const result = editing

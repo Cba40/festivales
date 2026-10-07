@@ -40,6 +40,7 @@ export function ServiceConfigList({
             <th className="pb-2 font-medium">Subtipo</th>
             <th className="pb-2 font-medium">Jornada</th>
             <th className="pb-2 font-medium">Permanencia</th>
+            <th className="pb-2 font-medium">Tasa de uso (baños)</th>
             <th className="pb-2 font-medium text-right">Acciones</th>
           </tr>
         </thead>
@@ -62,6 +63,11 @@ export function ServiceConfigList({
                 )}
               </td>
               <td className="py-3 text-slate-600">{config.average_duration_min} min</td>
+              <td className="py-3 text-slate-600">
+                {config.bathroom_use_rate_per_person_hour == null
+                  ? '—'
+                  : `${config.bathroom_use_rate_per_person_hour} usos/persona-hora`}
+              </td>
               <td className="py-3 text-right">
                 <button
                   onClick={() => onEdit(config)}

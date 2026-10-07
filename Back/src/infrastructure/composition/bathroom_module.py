@@ -36,7 +36,11 @@ from src.application.context_engine.stage1_context_resolution import (
 from src.domain.entities.event_day import EventDay
 from src.domain.entities.event_day_phase import EventDayPhase
 from src.domain.entities.zone import Zone
-from src.domain.models.bathroom_v1_model import BathroomPhaseState, BathroomV1Model
+from src.domain.models.bathroom_v1_model import (
+    DEFAULT_ALPHA,
+    BathroomPhaseState,
+    BathroomV1Model,
+)
 from src.domain.value_objects.territorial_prediction import TerritorialPrediction
 from src.domain.value_objects.zone_state import ZoneState
 from src.infrastructure.composition.prediction_module import (
@@ -45,6 +49,7 @@ from src.infrastructure.composition.prediction_module import (
     _load_attendance_level,
     _load_event_reference_point,
     _load_zone_type_map,
+    _resolve_bathroom_use_rate,
     _resolve_service_duration,
     _resolve_zone_type_id,
     _to_uuid_or_none,
@@ -87,6 +92,7 @@ class BathroomSimulationResult:
     phases: tuple[EventDayPhase, ...]
     max_people: int
     average_duration_min: int
+    bathroom_use_rate_per_person_hour: float
     duration_hours: float
     phase_results: tuple[BathroomPhaseState, ...]
 
@@ -240,9 +246,15 @@ class BathroomModule:
             subtipo=BATHROOM_SUBTIPO,
             event_day_id=event_day.id,
         )
+        bathroom_use_rate_per_person_hour = await _resolve_bathroom_use_rate(
+            self._db,
+            zone_type_id=zone_type_id,
+            event_day_id=event_day.id,
+        )
 
-        model = (
-            BathroomV1Model(alpha=alpha) if alpha is not None else BathroomV1Model()
+        model = BathroomV1Model(
+            alpha=DEFAULT_ALPHA if alpha is None else alpha,
+            use_rate_per_person_hour=bathroom_use_rate_per_person_hour,
         )
         duration_hours = model.duration_hours(average_duration_min)
         phase_results = model.simulate(
@@ -259,6 +271,7 @@ class BathroomModule:
             phases=event_day.phases,
             max_people=attendance_level.max_people,
             average_duration_min=average_duration_min,
+            bathroom_use_rate_per_person_hour=bathroom_use_rate_per_person_hour,
             duration_hours=duration_hours,
             phase_results=tuple(phase_results),
         )
@@ -308,7 +321,6 @@ def derive_bathroom_zone_state(
       produce; no se fabrican valores sintéticos).
     * `model_result` conserva el dict completo de métricas del modelo.
     """
-    resolved_model = model if model is not None else BathroomV1Model()
     occupied = phase_state.occupied.get(zone.id, 0.0)
 
     # Eventos imprevistos (RFC §10.2): la fuente de verdad de la ocupación

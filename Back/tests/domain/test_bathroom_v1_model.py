@@ -1,16 +1,6 @@
-"""Tests del modelo especializado Baños V1 (modelo de FLUJO, Little's law).
-
-Cubre la matemática cerrada de `SERVICIOS_PERSONAS_DISENO.md §7` adaptada a
-servicios de ALTA ROTACIÓN: `v_expected = max_people × intensity`,
-`concurrent_occupancy = v_expected × (D_hours / Δt_hours)`, `stock` =
-ocupación concurrente (no acumula entre fases), `unabsorbed` = demanda que
-excede la capacidad de servicio de la fase (`capacity × Δt / D`) y NO
-incrementa stock. A diferencia de Parking V1 (stock concurrente), la
-saturación es un gradiente, no un colapso binario.
-"""
+"""Tests de Bathroom V1: flujo por fase, Ley de Little y distribución espacial."""
 from __future__ import annotations
 
-import math
 from datetime import datetime
 from uuid import UUID
 
@@ -30,6 +20,7 @@ from src.domain.models.specialized_model import (
 )
 
 SCENARIO_A_INTENSITIES = (0.20, 0.35, 0.50, 0.65, 0.85, 1.00, 0.90, 0.70, 0.40, 0.15)
+TEST_USE_RATE_PER_PERSON_HOUR = 0.1
 
 
 def make_zone(
@@ -110,6 +101,16 @@ def make_context(
     )
 
 
+def make_model(
+    alpha: float = DEFAULT_ALPHA,
+    use_rate_per_person_hour: float = TEST_USE_RATE_PER_PERSON_HOUR,
+) -> BathroomV1Model:
+    return BathroomV1Model(
+        alpha=alpha,
+        use_rate_per_person_hour=use_rate_per_person_hour,
+    )
+
+
 class TestContrato:
     def test_model_id(self) -> None:
         assert BathroomV1Model().model_id == "bathroom_v1"
@@ -143,29 +144,29 @@ class TestContrato:
 
     def test_execute_returns_model_specific_result(self) -> None:
         zone = make_zone("a0000000-0000-0000-0000-000000000001", 500, 100.0)
-        result = BathroomV1Model().execute(make_context(zone))
+        result = make_model().execute(make_context(zone))
         assert isinstance(result, ModelSpecificResult)
         assert result.model_id == "bathroom_v1"
         assert result.zone_id == zone.id
 
     def test_execute_single_zone_phase_1(self) -> None:
-        zone = make_zone("a0000000-0000-0000-0000-000000000001", 500, 100.0)
-        result = BathroomV1Model().execute(
+        zone = make_zone("a0000000-0000-0000-0000-000000000001", 2000, 100.0)
+        result = make_model().execute(
             make_context(zone, intensity=0.25, start=0, end=60)
         )
         data = result.data
         assert data["bathroom_id"] == str(zone.id)
-        assert data["occupied"] == pytest.approx(500.0)
-        assert data["capacity"] == 500
-        assert data["occupancy_ratio"] == pytest.approx(1.0)
-        assert data["free_ratio"] == pytest.approx(0.0)
-        assert data["free_spaces"] == pytest.approx(0.0)
+        assert data["occupied"] == pytest.approx(800.0)
+        assert data["capacity"] == 2000
+        assert data["occupancy_ratio"] == pytest.approx(0.4)
+        assert data["free_ratio"] == pytest.approx(0.6)
+        assert data["free_spaces"] == pytest.approx(1200.0)
         assert data["distance"] == pytest.approx(100.0)
-        assert data["unabsorbed"] == pytest.approx(1875.0)
+        assert data["unabsorbed"] == pytest.approx(0.0)
 
     def test_execute_does_not_invent_extra_outputs(self) -> None:
         zone = make_zone("a0000000-0000-0000-0000-000000000001", 500, 100.0)
-        data = BathroomV1Model().execute(make_context(zone)).data
+        data = make_model().execute(make_context(zone)).data
         forbidden = {
             "availability",
             "availability_level",
@@ -218,16 +219,52 @@ class TestContrato:
             BathroomV1Model().execute(without_duration)
 
 
-class TestFormulasPrincipales:
-    def test_v_expected(self) -> None:
+class TestFormulaFlujoContinuo:
+    def test_people_present_is_max_people_times_intensity(self) -> None:
         model = BathroomV1Model()
-        assert model.v_expected(8000, 0.25) == pytest.approx(2000.0)
-        assert model.v_expected(8000, 0.50) == pytest.approx(4000.0)
-        assert model.v_expected(8000, 1.00) == pytest.approx(8000.0)
-        assert model.v_expected(8000, 0.0) == pytest.approx(0.0)
+        assert model.people_present(8000, 0.25) == pytest.approx(2000.0)
+        assert model.people_present(8000, 0.5) == pytest.approx(4000.0)
+        assert model.people_present(8000, 1.25) == pytest.approx(10000.0)
 
-    def test_v_expected_intensity_above_one(self) -> None:
-        assert BathroomV1Model().v_expected(8000, 1.25) == pytest.approx(10000.0)
+    def test_arrival_rate_is_people_present_times_configured_u(self) -> None:
+        model = make_model(use_rate_per_person_hour=0.1)
+        people_present = model.people_present(5000, 0.8)
+        assert model.arrival_rate_per_hour(people_present) == pytest.approx(400.0)
+
+    def test_littles_law_occupancy_with_real_scenario(self) -> None:
+        model = make_model(use_rate_per_person_hour=0.1)
+        people_present = model.people_present(5000, 0.8)
+        arrival_rate = model.arrival_rate_per_hour(people_present)
+        duration_hours = model.duration_hours(5)
+        assert model.concurrent_occupancy(arrival_rate, duration_hours) == pytest.approx(
+            33.3333333333
+        )
+
+    def test_occupancy_scales_with_intensity_use_rate_and_duration(self) -> None:
+        base = make_model(use_rate_per_person_hour=0.1)
+        n = base.people_present(5000, 0.5)
+        base_l = base.concurrent_occupancy(base.arrival_rate_per_hour(n), 5 / 60)
+
+        higher_intensity = base.people_present(5000, 1.0)
+        intensity_l = base.concurrent_occupancy(
+            base.arrival_rate_per_hour(higher_intensity), 5 / 60
+        )
+        higher_u = make_model(use_rate_per_person_hour=0.2)
+        use_rate_l = higher_u.concurrent_occupancy(
+            higher_u.arrival_rate_per_hour(n), 5 / 60
+        )
+        longer_use = base.concurrent_occupancy(
+            base.arrival_rate_per_hour(n), 10 / 60
+        )
+
+        assert intensity_l == pytest.approx(2 * base_l)
+        assert use_rate_l == pytest.approx(2 * base_l)
+        assert longer_use == pytest.approx(2 * base_l)
+
+    def test_zero_use_rate_produces_zero_occupancy(self) -> None:
+        model = make_model(use_rate_per_person_hour=0.0)
+        rate = model.arrival_rate_per_hour(model.people_present(5000, 1.0))
+        assert model.concurrent_occupancy(rate, 5 / 60) == 0.0
 
     def test_duration_hours_conversion(self) -> None:
         model = BathroomV1Model()
@@ -235,103 +272,25 @@ class TestFormulasPrincipales:
         assert model.duration_hours(240) == pytest.approx(4.0)
         assert model.duration_hours(5) == pytest.approx(5 / 60.0)
 
-    def test_retention(self) -> None:
-        model = BathroomV1Model()
-        assert model.retention(1.0, 4.0) == pytest.approx(math.exp(-1 / 4), abs=1e-9)
-        assert model.retention(2.0, 4.0) == pytest.approx(math.exp(-2 / 4), abs=1e-9)
+    def test_phase_duration_does_not_change_simultaneous_occupancy(self) -> None:
+        model = make_model()
+        one_hour = model.temporal_step(100.0, 1.0, 5 / 60)
+        two_hours = model.temporal_step(100.0, 2.0, 5 / 60)
+        assert one_hour.stock == pytest.approx(two_hours.stock)
+        assert two_hours.v_expected == pytest.approx(2 * one_hour.v_expected)
 
-    def test_retention_zero_delta(self) -> None:
-        assert BathroomV1Model().retention(0.0, 4.0) == pytest.approx(1.0)
-
-    def test_temporal_step_first_phase(self) -> None:
-        result = BathroomV1Model().temporal_step(0.0, 1600.0, 10000.0, 1.0, 4.0)
-        assert result.remain == pytest.approx(0.0)
-        assert result.exits == pytest.approx(0.0)
-        assert result.entries == pytest.approx(1600.0)
-        assert result.stock == pytest.approx(1600.0 * 4.0)
-        assert result.unabsorbed == pytest.approx(0.0)
-
-    def test_temporal_step_scenario_a_phase_2(self) -> None:
-        result = BathroomV1Model().temporal_step(1600.0, 2800.0, 10000.0, 1.0, 4.0)
-        assert result.remain == pytest.approx(1246.08, abs=0.1)
-        assert result.exits == pytest.approx(353.92, abs=0.1)
-        # Capacidad de servicio de la fase = 10000 × (1/4) = 2500.
-        assert result.entries == pytest.approx(2500.0, abs=0.1)
-        assert result.stock == pytest.approx(2800.0 * 4.0, abs=0.1)
-        assert result.unabsorbed == pytest.approx(300.0, abs=0.1)
-
-
-class TestPermanenciaCorta:
-    """D corto (minutos) con fases de horas: `r_t = exp(-Δt/D) ≈ 0` entre fases.
-
-    NOTA TERMINOLÓGICA: esto NO es "flujo instantáneo"; significa que el stock
-    de una fase prácticamente no se conserva hacia la siguiente. El servicio en
-    sí conserva su permanencia real (minutos) por uso.
-    """
-
-    D5_MIN_HOURS = 5 / 60.0
-
-    def test_retention_5min_en_fase_de_1h(self) -> None:
-        r = BathroomV1Model().retention(1.0, self.D5_MIN_HOURS)
-        assert r == pytest.approx(math.exp(-60 / 5), abs=1e-9)
-        assert r == pytest.approx(0.0, abs=1e-4)
-
-    def test_stock_no_se_conserva_entre_fases(self) -> None:
+    def test_simulation_does_not_carry_occupancy_between_phases(self) -> None:
         zone = make_zone("a0000000-0000-0000-0000-000000000001", 10000, 100.0)
-        phases = make_ten_phases(SCENARIO_A_INTENSITIES)
-        results = BathroomV1Model().simulate(
-            phases, [zone], 8000, self.D5_MIN_HOURS
+        phases = make_ten_phases((1.0, 0.1))
+        model = make_model()
+        results = model.simulate(phases, [zone], 8000, 5 / 60)
+        expected_second_phase = model.distribute(
+            {}, [zone], results[1].stock
         )
-        # Primera fase: ocupación concurrente (Little) = v × D/Δt.
-        assert results[0].stock == pytest.approx(1600.0 * (5 / 60.0))
-        # Hacia la siguiente fase el stock prácticamente no se conserva: la
-        # fracción retenida es exp(-12) ≈ 6e-6, despreciable frente al stock.
-        for first, second in zip(results, results[1:]):
-            assert second.remain == pytest.approx(
-                first.stock * math.exp(-60 / 5), rel=1e-9
-            )
-            assert second.remain < second.stock * 1e-3
-
-    def test_servicio_no_instantaneo_por_uso(self) -> None:
-        # La permanencia por uso sigue siendo real (5 minutos): se refleja en
-        # que la retención con fases cortas (Δt pequeño) se acerca a 1.0.
-        r_1min = BathroomV1Model().retention(5 / 60.0, self.D5_MIN_HOURS)
-        assert r_1min == pytest.approx(math.exp(-1.0), abs=1e-9)
-        assert 0.3 < r_1min < 0.5
-
-    def test_stock_concurrente_little_vs_v_expected(self) -> None:
-        zone = make_zone("a0000000-0000-0000-0000-000000000001", 10000, 100.0)
-        phases = make_ten_phases(SCENARIO_A_INTENSITIES)
-        results = BathroomV1Model().simulate(phases, [zone], 8000, self.D5_MIN_HOURS)
-        # Alta rotación: la ocupación concurrente es v × (D/Δt) = v/12, una
-        # fracción de las llegadas, NO se clava en v_expected.
-        for phase in results:
-            assert phase.stock == pytest.approx(
-                phase.v_expected * self.D5_MIN_HOURS, abs=1e-6
-            )
-            # Capacidad de servicio = 10000 × (1 / (5/60)) = 120000 ≫ v: todo
-            # se absorbe.
-            assert phase.entries == pytest.approx(phase.v_expected, abs=1e-3)
-            assert phase.unabsorbed == pytest.approx(0.0)
-
-
-class TestLimitesDeCapacidad:
-    def test_stock_concurrente_puede_superar_capacidad(self) -> None:
-        model = BathroomV1Model()
-        for expected in (4000.0, 5200.0, 6800.0, 8000.0):
-            result = model.temporal_step(2180.64, expected, 3500.0, 1.0, 4.0)
-            # stock = ocupación concurrente (Little's law): puede exceder la
-            # capacidad física; la capacidad se aplica en distribute().
-            assert result.stock == pytest.approx(expected * 4.0)
-
-    def test_entrada_acotada_por_capacidad_de_servicio(self) -> None:
-        result = BathroomV1Model().temporal_step(2800.0, 4000.0, 3500.0, 1.0, 4.0)
-        assert result.remain == pytest.approx(2180.64, abs=0.1)
-        assert result.exits == pytest.approx(619.36, abs=0.1)
-        # Capacidad de servicio de la fase = 3500 × (1/4) = 875.
-        assert result.entries == pytest.approx(875.0, abs=0.1)
-        assert result.stock == pytest.approx(4000.0 * 4.0, abs=0.1)
-        assert result.unabsorbed == pytest.approx(4000.0 - 875.0, abs=0.1)
+        assert dict(results[1].occupied) == pytest.approx(expected_second_phase)
+        assert results[1].remain == 0.0
+        assert results[1].exits == 0.0
+        assert results[1].unabsorbed == 0.0
 
 
 class TestDistribucionEspacial:
@@ -400,19 +359,15 @@ class TestInvariantes:
         zones = self._zones_abc()
         capacities = {zone.id: zone.capacity for zone in zones}
         total_capacity = sum(capacities.values())
-        results = BathroomV1Model().simulate(
+        results = make_model().simulate(
             make_ten_phases(SCENARIO_A_INTENSITIES), zones, 8000, 4.0
         )
         for phase in results:
             occupied_sum = sum(phase.occupied.values())
-            # El stock (ocupación concurrente) puede superar la capacidad;
-            # la ocupación física se acota en distribute() a la capacidad total.
             assert occupied_sum == pytest.approx(
                 min(phase.stock, total_capacity), abs=1e-6
             )
-            assert phase.unabsorbed == pytest.approx(
-                max(0.0, phase.v_expected - phase.entries), abs=1e-6
-            )
+            assert phase.unabsorbed == pytest.approx(0.0)
             for zone_id, occupied in phase.occupied.items():
                 assert 0.0 <= occupied <= capacities[zone_id]
 
@@ -427,7 +382,7 @@ class TestInvariantes:
 class TestDeterminismo:
     def test_execute_determinista(self) -> None:
         zone = make_zone("a0000000-0000-0000-0000-000000000001", 500, 100.0)
-        model = BathroomV1Model()
+        model = make_model()
         context = make_context(zone)
         first = model.execute(context).data
         for _ in range(5):
@@ -439,7 +394,7 @@ class TestDeterminismo:
             make_zone("a0000000-0000-0000-0000-000000000002", 1000, 400.0),
             make_zone("a0000000-0000-0000-0000-000000000003", 2000, 900.0),
         ]
-        model = BathroomV1Model()
+        model = make_model()
         first = model.simulate(
             make_ten_phases(SCENARIO_A_INTENSITIES), zones, 8000, 4.0
         )
@@ -451,18 +406,12 @@ class TestDeterminismo:
 
 
 class TestBathroomFlowGradient:
-    """Modelo de FLUJO (Little's law): gradiente de saturación por intensidad.
-
-    Escenario de producción: max_people=40000, D=5 min, 4 zonas × 50 = 200 de
-    capacidad, fases de 60 min. Con stock concurrente cualquier v_expected ≥
-    200 colapsaba (modo binario); con flujo la saturación es un gradiente.
-    """
+    """La saturación varía con la población, u y permanencia según Little."""
 
     MAX_PEOPLE = 40000
     D5_MIN_HOURS = 5 / 60.0
     ZONE_CAPACITY = 50
     PHASE_MINUTES = 60
-    ROTATIONS = 60 / 5  # Δt / D = 12 usos por sitio en la fase
 
     def _zones(self) -> list[Zone]:
         return [
@@ -475,7 +424,7 @@ class TestBathroomFlowGradient:
         ]
 
     def _phase(self, intensity: float):
-        model = BathroomV1Model()
+        model = make_model()
         phases = [make_phase(0, self.PHASE_MINUTES, intensity, sequence=1)]
         return model, model.simulate(
             phases, self._zones(), self.MAX_PEOPLE, self.D5_MIN_HOURS
@@ -487,87 +436,31 @@ class TestBathroomFlowGradient:
             for occupied in phase.occupied.values()
         ]
 
-    def test_gradient_low_intensity_no_collapse(self) -> None:
-        model, phase = self._phase(0.005)
-        assert phase.v_expected == pytest.approx(200.0)
-        # concurrent_occupancy = 200 × (5/60) / 1 = 16.67
-        assert phase.stock == pytest.approx(200.0 * self.D5_MIN_HOURS)
-        # saturation ≈ (16.67/4) / 50 = 0.083 → NO colapsado
-        saturations = self._saturations(model, phase)
-        assert all(s < 0.75 for s in saturations)
-        assert saturations[0] == pytest.approx(
-            200.0 * self.D5_MIN_HOURS / 4 / self.ZONE_CAPACITY
-        )
-        # capacidad de servicio = 200 × 12 = 2400 ≥ 200 → nada no atendido
-        assert phase.unabsorbed == pytest.approx(0.0)
-
-    def test_gradient_threshold_intensity(self) -> None:
-        model, phase = self._phase(0.045)
-        assert phase.v_expected == pytest.approx(1800.0)
-        # concurrent_occupancy = 1800 × (5/60) = 150
-        assert phase.stock == pytest.approx(1800.0 * self.D5_MIN_HOURS)
-        # saturation = (150/4) / 50 = 0.75 → umbral de colapso
-        saturations = self._saturations(model, phase)
-        assert saturations[0] == pytest.approx(0.75)
-        # capacidad de servicio = 200 × 12 = 2400 ≥ 1800 → nada no atendido
-        assert phase.unabsorbed == pytest.approx(0.0)
-
-    def test_gradient_pre_collapse(self) -> None:
-        model, phase = self._phase(0.03)
-        assert phase.v_expected == pytest.approx(1200.0)
-        # concurrent_occupancy = 1200 × (5/60) = 100 → saturación ≈ 0.50
-        assert phase.stock == pytest.approx(1200.0 * self.D5_MIN_HOURS)
-        saturations = self._saturations(model, phase)
-        assert all(s < 0.75 for s in saturations)
-        assert saturations[0] == pytest.approx(0.50)
-        assert phase.unabsorbed == pytest.approx(0.0)
-
-    def test_gradient_collapse_threshold(self) -> None:
-        # El umbral de "colapsado" es saturation_level >= 0.75: 0.045 lo
-        # cruza (saturación física = capacidad total), 0.03 no.
-        _, collapse = self._phase(0.045)
-        _, pre_collapse = self._phase(0.03)
-        # 0.045 → 0.7499999999999999 (arte de coma flotante); cruza el umbral
-        assert all(
-            s + 1e-9 >= 0.75
-            for s in self._saturations(BathroomV1Model(), collapse)
-        )
-        assert all(
-            s < 0.75
-            for s in self._saturations(BathroomV1Model(), pre_collapse)
+    def test_saturation_scales_proportionally_below_capacity(self) -> None:
+        low_model, low = self._phase(0.3)
+        high_model, high = self._phase(0.45)
+        assert low.stock == pytest.approx(100.0)
+        assert high.stock == pytest.approx(150.0)
+        assert self._saturations(high_model, high)[0] == pytest.approx(
+            1.5 * self._saturations(low_model, low)[0]
         )
 
-    def test_gradient_high_intensity_collapse(self) -> None:
-        model, phase = self._phase(0.1)
-        assert phase.v_expected == pytest.approx(4000.0)
-        # concurrent_occupancy = 4000 × (5/60) = 333.33 > capacidad física 200
-        assert phase.stock == pytest.approx(4000.0 * self.D5_MIN_HOURS)
-        # la ocupación física se acota en distribute() a la capacidad total
+    def test_zone_capacities_still_bound_occupancy(self) -> None:
+        model, phase = self._phase(0.6)
+        assert phase.stock == pytest.approx(200.0)
         assert sum(phase.occupied.values()) == pytest.approx(200.0)
-        saturations = self._saturations(model, phase)
-        assert all(s == pytest.approx(1.0) for s in saturations)
-        # demanda no atendida: 4000 - 200×12 = 1600
-        assert phase.unabsorbed == pytest.approx(1600.0)
+        assert all(
+            occupied <= self.ZONE_CAPACITY
+            for occupied in phase.occupied.values()
+        )
+        assert all(s == pytest.approx(1.0) for s in self._saturations(model, phase))
 
-    def test_unabsorbed_does_not_increment_stock(self) -> None:
-        _, phase = self._phase(0.1)
-        concurrent = 4000.0 * self.D5_MIN_HOURS
-        # stock == concurrent_occupancy (NO stock + unabsorbed)
-        assert phase.stock == pytest.approx(concurrent)
-        assert phase.stock != pytest.approx(concurrent + phase.unabsorbed)
-        occupied_sum = sum(phase.occupied.values())
-        assert occupied_sum == pytest.approx(min(concurrent, 200.0), abs=1e-6)
-        assert occupied_sum != pytest.approx(concurrent + phase.unabsorbed)
-
-    def test_monotonicity_gradient(self) -> None:
-        saturations: list[float] = []
-        unabsorbed: list[float] = []
-        for intensity in (0.001, 0.01, 0.03, 0.06, 0.1, 0.2):
+    def test_intensity_monotonicity(self) -> None:
+        saturations = []
+        for intensity in (0.01, 0.1, 0.3, 0.45):
             model, phase = self._phase(intensity)
             saturations.append(max(self._saturations(model, phase)))
-            unabsorbed.append(phase.unabsorbed)
         assert all(a <= b for a, b in zip(saturations, saturations[1:]))
-        assert all(a <= b for a, b in zip(unabsorbed, unabsorbed[1:]))
 
     def test_parking_v1_unchanged(self) -> None:
         from src.domain.models.parking_v1_model import ParkingV1Model
@@ -588,25 +481,38 @@ class TestBathroomFlowGradient:
 
 
 class TestInputsInvalidos:
-    def test_v_expected_sin_max_people(self) -> None:
+    def test_people_present_sin_max_people(self) -> None:
         with pytest.raises(ValueError):
-            BathroomV1Model().v_expected(None, 0.25)
+            BathroomV1Model().people_present(None, 0.25)
 
-    def test_v_expected_max_people_negativo(self) -> None:
+    def test_people_present_max_people_negativo(self) -> None:
         with pytest.raises(ValueError):
-            BathroomV1Model().v_expected(-1, 0.25)
+            BathroomV1Model().people_present(-1, 0.25)
 
-    def test_v_expected_sin_intensity(self) -> None:
+    def test_people_present_sin_intensity(self) -> None:
         with pytest.raises(ValueError):
-            BathroomV1Model().v_expected(8000, None)
+            BathroomV1Model().people_present(8000, None)
 
-    def test_v_expected_intensity_negativa(self) -> None:
+    def test_people_present_intensity_negativa(self) -> None:
         with pytest.raises(ValueError):
-            BathroomV1Model().v_expected(8000, -0.1)
+            BathroomV1Model().people_present(8000, -0.1)
 
-    def test_v_expected_tipo_invalido(self) -> None:
+    def test_people_present_tipo_invalido(self) -> None:
         with pytest.raises(TypeError):
-            BathroomV1Model().v_expected("8000", 0.25)
+            BathroomV1Model().people_present("8000", 0.25)
+
+    def test_missing_use_rate_is_not_defaulted(self) -> None:
+        model = BathroomV1Model()
+        with pytest.raises(ValueError, match="bathroom_use_rate_per_person_hour"):
+            model.arrival_rate_per_hour(100.0)
+
+    def test_use_rate_negative_rejected(self) -> None:
+        with pytest.raises(ValueError):
+            BathroomV1Model(use_rate_per_person_hour=-0.1)
+
+    def test_use_rate_non_finite_rejected(self) -> None:
+        with pytest.raises(ValueError):
+            BathroomV1Model(use_rate_per_person_hour=float("nan"))
 
     def test_duration_hours_none(self) -> None:
         with pytest.raises(ValueError):
@@ -624,25 +530,13 @@ class TestInputsInvalidos:
         with pytest.raises(TypeError):
             BathroomV1Model().duration_hours(True)
 
-    def test_retention_delta_negativo(self) -> None:
+    def test_concurrent_occupancy_rejects_negative_rate(self) -> None:
         with pytest.raises(ValueError):
-            BathroomV1Model().retention(-1.0, 4.0)
+            BathroomV1Model().concurrent_occupancy(-1.0, 4.0)
 
-    def test_retention_duration_cero(self) -> None:
+    def test_temporal_step_rejects_nonpositive_phase_duration(self) -> None:
         with pytest.raises(ValueError):
-            BathroomV1Model().retention(1.0, 0.0)
-
-    def test_retention_duration_none(self) -> None:
-        with pytest.raises(TypeError):
-            BathroomV1Model().retention(1.0, None)
-
-    def test_temporal_step_prev_stock_negativo(self) -> None:
-        with pytest.raises(ValueError):
-            BathroomV1Model().temporal_step(-1.0, 1000.0, 3500.0, 1.0, 4.0)
-
-    def test_temporal_step_capacidad_cero(self) -> None:
-        with pytest.raises(ValueError):
-            BathroomV1Model().temporal_step(0.0, 1000.0, 0.0, 1.0, 4.0)
+            BathroomV1Model().temporal_step(100.0, 0.0, 4.0)
 
     def test_distribute_stock_negativo(self) -> None:
         zone = make_zone("a0000000-0000-0000-0000-000000000001", 500, 100.0)
@@ -677,17 +571,17 @@ class TestInputsInvalidos:
     def test_simulate_sin_fases(self) -> None:
         zone = make_zone("a0000000-0000-0000-0000-000000000001", 500, 100.0)
         with pytest.raises(ValueError):
-            BathroomV1Model().simulate([], [zone], 8000, 4.0)
+            make_model().simulate([], [zone], 8000, 4.0)
 
     def test_simulate_sin_zonas(self) -> None:
         with pytest.raises(ValueError):
-            BathroomV1Model().simulate(
+            make_model().simulate(
                 make_ten_phases(SCENARIO_A_INTENSITIES), [], 8000, 4.0
             )
 
     def test_simulate_max_people_none(self) -> None:
         zone = make_zone("a0000000-0000-0000-0000-000000000001", 500, 100.0)
         with pytest.raises(ValueError):
-            BathroomV1Model().simulate(
+            make_model().simulate(
                 make_ten_phases(SCENARIO_A_INTENSITIES), [zone], None, 4.0
             )

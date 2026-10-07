@@ -10,7 +10,6 @@ simulate() se ejecuta con sus invariantes y determinismo.
 """
 from __future__ import annotations
 
-import math
 from datetime import date, datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
@@ -72,6 +71,8 @@ ZONE_SPECS = {
 MAX_PEOPLE = 25000
 DURATION_MIN = 5
 DEFAULT_DURATION_MIN = 8
+USE_RATE_PER_PERSON_HOUR = 0.1
+DEFAULT_USE_RATE_PER_PERSON_HOUR = 0.05
 PHASES_SPEC = [
     (PHASE_IDS["p1"], 600, 720, 0.25),
     (PHASE_IDS["p2"], 720, 840, 0.50),
@@ -227,8 +228,6 @@ def _mock_session(
         reference_point_latitude=REF_LAT,
         reference_point_longitude=REF_LNG,
     )
-    service_config_calls = {"count": 0}
-
     async def fake_execute(stmt, *args, **kwargs):
         captured_stmts.append(stmt)
         sql = str(stmt)
@@ -243,9 +242,14 @@ def _mock_session(
         if "attendance_levels" in sql:
             return _scalar_one_result(attendance_row)
         if "service_configs" in sql:
-            n = service_config_calls["count"]
-            service_config_calls["count"] += 1
-            row = override_row if n == 0 else default_row
+            row = default_row if "event_day_id IS NULL" in sql else override_row
+            if row is not None and not hasattr(
+                row, "bathroom_use_rate_per_person_hour"
+            ):
+                row = SimpleNamespace(
+                    **vars(row),
+                    bathroom_use_rate_per_person_hour=USE_RATE_PER_PERSON_HOUR,
+                )
             return _scalar_one_result(row)
         raise AssertionError(f"unexpected statement: {sql}")
 
@@ -413,6 +417,10 @@ class TestBathroomModuleDataFlow:
         )
         assert result is not None
         assert result.average_duration_min == DURATION_MIN
+        assert (
+            result.bathroom_use_rate_per_person_hour
+            == USE_RATE_PER_PERSON_HOUR
+        )
 
     async def test_duration_converted_min_to_hours(self) -> None:
         session = _mock_session(
@@ -433,8 +441,14 @@ class TestBathroomModuleDataFlow:
             _bathroom_zone_rows(),
             _ed_row(),
             attendance_row=_attendance_row(),
-            override_row=SimpleNamespace(average_duration_min=DURATION_MIN),
-            default_row=SimpleNamespace(average_duration_min=DEFAULT_DURATION_MIN),
+            override_row=SimpleNamespace(
+                average_duration_min=DURATION_MIN,
+                bathroom_use_rate_per_person_hour=0.2,
+            ),
+            default_row=SimpleNamespace(
+                average_duration_min=DEFAULT_DURATION_MIN,
+                bathroom_use_rate_per_person_hour=DEFAULT_USE_RATE_PER_PERSON_HOUR,
+            ),
         )
         result = await BathroomModule(session).execute(
             timestamp=TIMESTAMP,
@@ -442,6 +456,7 @@ class TestBathroomModuleDataFlow:
         )
         assert result is not None
         assert result.average_duration_min == DURATION_MIN
+        assert result.bathroom_use_rate_per_person_hour == pytest.approx(0.2)
 
     async def test_service_config_falls_back_to_default(self) -> None:
         session = _mock_session(
@@ -449,7 +464,10 @@ class TestBathroomModuleDataFlow:
             _ed_row(),
             attendance_row=_attendance_row(),
             override_row=None,
-            default_row=SimpleNamespace(average_duration_min=DEFAULT_DURATION_MIN),
+            default_row=SimpleNamespace(
+                average_duration_min=DEFAULT_DURATION_MIN,
+                bathroom_use_rate_per_person_hour=DEFAULT_USE_RATE_PER_PERSON_HOUR,
+            ),
         )
         result = await BathroomModule(session).execute(
             timestamp=TIMESTAMP,
@@ -457,6 +475,10 @@ class TestBathroomModuleDataFlow:
         )
         assert result is not None
         assert result.average_duration_min == DEFAULT_DURATION_MIN
+        assert (
+            result.bathroom_use_rate_per_person_hour
+            == DEFAULT_USE_RATE_PER_PERSON_HOUR
+        )
 
     async def test_service_config_lookup_uses_normalized_subtipo(self) -> None:
         session = _mock_session(
@@ -579,9 +601,15 @@ class TestBathroomModuleSimulation:
         assert result is not None
         first = result.phase_results[0]
         assert first.remain == pytest.approx(0.0, abs=1e-9)
-        # FLUJO: stock = ocupación concurrente = v × (D / Δt), con Δt = 2 h.
         assert first.stock == pytest.approx(
-            first.v_expected * (_duration_hours() / 2.0), abs=1e-6
+            MAX_PEOPLE
+            * PHASES_SPEC[0][3]
+            * USE_RATE_PER_PERSON_HOUR
+            * _duration_hours(),
+            abs=1e-6,
+        )
+        assert first.v_expected == pytest.approx(
+            MAX_PEOPLE * PHASES_SPEC[0][3] * USE_RATE_PER_PERSON_HOUR * 2.0
         )
         assert first.occupied[UUID(BATHROOM_IDS["G"])] >= 0.0
 
@@ -602,23 +630,14 @@ class TestBathroomModuleSimulation:
             zone.id: zone.capacity for zone in result.bathroom_zones
         }
         total_capacity = _total_capacity()
-        duration_hours = _duration_hours()
-        initial_occupied = BathroomV1Model().initial_occupied(result.bathroom_zones)
-        prev_stock = sum(initial_occupied.values())
-        assert prev_stock == pytest.approx(0.0)
         for phase in result.phase_results:
             occupied_sum = sum(phase.occupied.values())
-            assert occupied_sum == pytest.approx(phase.stock)
-            assert phase.stock <= total_capacity
-            assert phase.unabsorbed == pytest.approx(
-                max(0.0, phase.v_expected - phase.entries)
-            )
+            assert occupied_sum == pytest.approx(min(phase.stock, total_capacity))
+            assert phase.remain == 0.0
+            assert phase.exits == 0.0
+            assert phase.unabsorbed == 0.0
             for zone_id, occupied in phase.occupied.items():
                 assert 0.0 <= occupied <= capacities[zone_id]
-            delta_hours = (PHASES_SPEC[phase.index - 1][2] - PHASES_SPEC[phase.index - 1][1]) / 60.0
-            r = math.exp(-delta_hours / duration_hours)
-            assert phase.remain == pytest.approx(prev_stock * r)
-            prev_stock = phase.stock
 
     async def test_determinism(self) -> None:
         session_a = _mock_session(

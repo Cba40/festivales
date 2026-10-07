@@ -212,6 +212,7 @@ async def escenario39(engine, test_engine):
                 subtipo="banos",
                 event_day_id=None,
                 average_duration_min=DURACION_BANOS_MIN,
+                bathroom_use_rate_per_person_hour=0.1,
             )
         )
         await db.commit()

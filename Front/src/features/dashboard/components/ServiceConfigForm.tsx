@@ -10,6 +10,7 @@ interface ServiceConfigFormProps {
     subtipo?: string | null;
     event_day_id?: string | null;
     average_duration_min: number;
+    bathroom_use_rate_per_person_hour?: number | null;
   }) => Promise<void>;
   onCancel: () => void;
   saving: boolean;
@@ -27,7 +28,9 @@ export function ServiceConfigForm({
   const [subtipo, setSubtipo] = useState('');
   const [eventDayId, setEventDayId] = useState('');
   const [duration, setDuration] = useState('');
+  const [bathroomUseRate, setBathroomUseRate] = useState('0.1');
   const [validationError, setValidationError] = useState<string | null>(null);
+  const isBathroom = subtipo.trim().toLowerCase() === 'banos';
 
   useEffect(() => {
     if (initial) {
@@ -35,11 +38,15 @@ export function ServiceConfigForm({
       setSubtipo(initial.subtipo ?? '');
       setEventDayId(initial.event_day_id ?? '');
       setDuration(initial.average_duration_min.toString());
+      setBathroomUseRate(
+        initial.bathroom_use_rate_per_person_hour?.toString() ?? '0.1'
+      );
     } else {
       setZoneTypeId('');
       setSubtipo('');
       setEventDayId('');
       setDuration('');
+      setBathroomUseRate('0.1');
     }
   }, [initial]);
 
@@ -58,12 +65,27 @@ export function ServiceConfigForm({
       return;
     }
 
-    await onSave({
+    const payload = {
       zone_type_id: zoneTypeId,
       subtipo: subtipo.trim() || null,
       event_day_id: eventDayId || null,
       average_duration_min: parsedDuration,
-    });
+    };
+    if (isBathroom) {
+      const parsedUseRate = Number(bathroomUseRate);
+      if (!Number.isFinite(parsedUseRate) || parsedUseRate < 0) {
+        setValidationError(
+          'La tasa de uso de baños debe ser un número mayor o igual a 0'
+        );
+        return;
+      }
+      await onSave({
+        ...payload,
+        bathroom_use_rate_per_person_hour: parsedUseRate,
+      });
+      return;
+    }
+    await onSave(payload);
   };
 
   return (
@@ -128,9 +150,30 @@ export function ServiceConfigForm({
       </div>
 
       <p className="text-[10px] text-slate-400 mt-0.5">
-        Permanencia promedio del servicio en minutos. El modelo la usa para calcular la duración de
-        la fase (D_hours = average_duration_min / 60).
+        Permanencia media del servicio en minutos; Bathroom V1 la convierte a horas para la Ley de
+        Little.
       </p>
+
+      {isBathroom && (
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            Usos de baño por persona-hora (u) *
+          </label>
+          <input
+            type="number"
+            min={0}
+            step="any"
+            value={bathroomUseRate}
+            onChange={(e) => setBathroomUseRate(e.target.value)}
+            required
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <p className="text-[10px] text-slate-400 mt-0.5">
+            0.1 es una hipótesis inicial de modelado pendiente de calibración con observaciones
+            reales; no es un valor empírico validado.
+          </p>
+        </div>
+      )}
 
       {validationError && (
         <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">

@@ -21,9 +21,15 @@ from app.schemas.service_config import (
 
 router = APIRouter(prefix="/api/service-configs", tags=["Service Config"])
 
+INITIAL_BATHROOM_USE_RATE_PER_PERSON_HOUR = 0.1
+
 
 def _subtipokey(subtipo: str | None) -> str:
     return subtipo or ""
+
+
+def _is_bathroom_subtype(subtipo: str | None) -> bool:
+    return (subtipo or "").strip().lower() == "banos"
 
 
 async def _exists(
@@ -92,6 +98,11 @@ async def create_service_config(
     _: TokenPayload = Depends(verify_token),
 ):
     subtipo = obj_in.subtipo or None
+    if obj_in.bathroom_use_rate_per_person_hour is not None and not _is_bathroom_subtype(subtipo):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="bathroom_use_rate_per_person_hour solo aplica al subtipo 'banos'",
+        )
     if await _exists(db, obj_in.zone_type_id, subtipo, obj_in.event_day_id):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -103,6 +114,15 @@ async def create_service_config(
         subtipo=subtipo,
         event_day_id=obj_in.event_day_id,
         average_duration_min=obj_in.average_duration_min,
+        bathroom_use_rate_per_person_hour=(
+            obj_in.bathroom_use_rate_per_person_hour
+            if obj_in.bathroom_use_rate_per_person_hour is not None
+            else (
+                INITIAL_BATHROOM_USE_RATE_PER_PERSON_HOUR
+                if _is_bathroom_subtype(subtipo)
+                else None
+            )
+        ),
     )
     db.add(config)
     await db.commit()
@@ -118,7 +138,19 @@ async def update_service_config(
     _: TokenPayload = Depends(verify_token),
 ):
     config = await _get_or_404(db, config_id)
+    if (
+        obj_in.bathroom_use_rate_per_person_hour is not None
+        and not _is_bathroom_subtype(config.subtipo)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="bathroom_use_rate_per_person_hour solo aplica al subtipo 'banos'",
+        )
     config.average_duration_min = obj_in.average_duration_min
+    if obj_in.bathroom_use_rate_per_person_hour is not None:
+        config.bathroom_use_rate_per_person_hour = (
+            obj_in.bathroom_use_rate_per_person_hour
+        )
     await db.commit()
     await db.refresh(config)
     return config

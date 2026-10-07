@@ -10,10 +10,16 @@ class ServiceConfigCreate(BaseModel):
     subtipo: Optional[str] = None
     event_day_id: Optional[str] = None
     average_duration_min: int = Field(gt=0)
+    bathroom_use_rate_per_person_hour: Optional[float] = Field(
+        default=None, ge=0, allow_inf_nan=False
+    )
 
 
 class ServiceConfigUpdate(BaseModel):
     average_duration_min: int = Field(gt=0)
+    bathroom_use_rate_per_person_hour: Optional[float] = Field(
+        default=None, ge=0, allow_inf_nan=False
+    )
 
 
 class ServiceConfigRead(BaseModel):
@@ -22,6 +28,7 @@ class ServiceConfigRead(BaseModel):
     subtipo: Optional[str] = None
     event_day_id: Optional[str] = None
     average_duration_min: int
+    bathroom_use_rate_per_person_hour: Optional[float] = None
     created_at: datetime
     updated_at: datetime
 

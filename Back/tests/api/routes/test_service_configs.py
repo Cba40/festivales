@@ -63,6 +63,7 @@ DEFAULT_CONFIG = {
     "subtipo": None,
     "event_day_id": None,
     "average_duration_min": 15,
+    "bathroom_use_rate_per_person_hour": None,
     "created_at": NOW,
     "updated_at": NOW,
 }
@@ -72,6 +73,7 @@ OVERRIDE_CONFIG = {
     "id": "c0000000-0000-0000-0000-000000000002",
     "event_day_id": "b0000000-0000-0000-0000-000000000001",
     "average_duration_min": 25,
+    "bathroom_use_rate_per_person_hour": 0.1,
 }
 
 
@@ -183,6 +185,7 @@ class TestCreateServiceConfig:
         assert data["subtipo"] is None
         assert data["event_day_id"] is None
         assert data["average_duration_min"] == 15
+        assert data["bathroom_use_rate_per_person_hour"] is None
         assert UUID(data["id"])
         created = mock_async_db.add.call_args[0][0]
         assert created.id == data["id"]
@@ -201,6 +204,9 @@ class TestCreateServiceConfig:
         data = response.json()
         assert data["event_day_id"] == OVERRIDE_CONFIG["event_day_id"]
         assert data["average_duration_min"] == 25
+        assert data["bathroom_use_rate_per_person_hour"] == 0.1
+        created = mock_async_db.add.call_args[0][0]
+        assert created.bathroom_use_rate_per_person_hour == 0.1
 
     def test_409_when_default_exists(self, client, auth_headers, mock_async_db):
         _mock_scalar_result(mock_async_db, _as_model_attrs(DEFAULT_CONFIG))
@@ -238,6 +244,41 @@ class TestCreateServiceConfig:
         response = client.post(BASE_URL, json=payload, headers=auth_headers)
         assert response.status_code == 422
 
+    def test_422_negative_bathroom_use_rate(self, client, auth_headers):
+        payload = {
+            "zone_type_id": DEFAULT_CONFIG["zone_type_id"],
+            "subtipo": "banos",
+            "average_duration_min": 5,
+            "bathroom_use_rate_per_person_hour": -0.1,
+        }
+        response = client.post(BASE_URL, json=payload, headers=auth_headers)
+        assert response.status_code == 422
+
+    def test_zero_bathroom_use_rate_is_valid(self, client, auth_headers, mock_async_db):
+        _mock_scalar_result(mock_async_db, None)
+        _enable_refresh_timestamps(mock_async_db)
+        payload = {
+            "zone_type_id": DEFAULT_CONFIG["zone_type_id"],
+            "subtipo": "banos",
+            "average_duration_min": 5,
+            "bathroom_use_rate_per_person_hour": 0,
+        }
+        response = client.post(BASE_URL, json=payload, headers=auth_headers)
+        assert response.status_code == 201
+        assert response.json()["bathroom_use_rate_per_person_hour"] == 0
+
+    def test_rejects_bathroom_rate_for_other_subtypes(
+        self, client, auth_headers
+    ):
+        payload = {
+            "zone_type_id": DEFAULT_CONFIG["zone_type_id"],
+            "subtipo": "hidratacion",
+            "average_duration_min": 3,
+            "bathroom_use_rate_per_person_hour": 0.1,
+        }
+        response = client.post(BASE_URL, json=payload, headers=auth_headers)
+        assert response.status_code == 422
+
     def test_401_without_auth(self, client):
         payload = {"zone_type_id": DEFAULT_CONFIG["zone_type_id"], "average_duration_min": 15}
         response = client.post(BASE_URL, json=payload)
@@ -254,6 +295,46 @@ class TestUpdateServiceConfig:
         assert response.status_code == 200
         data = response.json()
         assert data["average_duration_min"] == 30
+
+    def test_updates_bathroom_use_rate(self, client, auth_headers, mock_async_db):
+        bathroom = {
+            **DEFAULT_CONFIG,
+            "subtipo": "banos",
+            "bathroom_use_rate_per_person_hour": 0.1,
+        }
+        _mock_scalar_result(mock_async_db, _as_model_attrs(bathroom))
+        _enable_refresh_timestamps(mock_async_db)
+        response = client.put(
+            self.URL,
+            json={
+                "average_duration_min": 5,
+                "bathroom_use_rate_per_person_hour": 0.2,
+            },
+            headers=auth_headers,
+        )
+        assert response.status_code == 200
+        assert response.json()["bathroom_use_rate_per_person_hour"] == 0.2
+
+    def test_zero_bathroom_use_rate_is_valid_on_update(
+        self, client, auth_headers, mock_async_db
+    ):
+        bathroom = {
+            **DEFAULT_CONFIG,
+            "subtipo": "banos",
+            "bathroom_use_rate_per_person_hour": 0.1,
+        }
+        _mock_scalar_result(mock_async_db, _as_model_attrs(bathroom))
+        _enable_refresh_timestamps(mock_async_db)
+        response = client.put(
+            self.URL,
+            json={
+                "average_duration_min": 5,
+                "bathroom_use_rate_per_person_hour": 0,
+            },
+            headers=auth_headers,
+        )
+        assert response.status_code == 200
+        assert response.json()["bathroom_use_rate_per_person_hour"] == 0
 
     def test_404_when_not_found(self, client, auth_headers, mock_async_db):
         _mock_scalar_result(mock_async_db, None)

@@ -1,26 +1,9 @@
-"""Modelo probabilístico Baños V1 (contrato `SpecializedModel`).
+"""Modelo probabilístico Baños V1 usando flujo continuo y la Ley de Little.
 
-Baños V1 usa un modelo de FLUJO basado en Little's law, NO de stock
-concurrente (a diferencia de Parking V1):
-
-    concurrent_occupancy = v_expected × (D_hours / Δt_hours)
-
-Inputs:
-* Magnitud base: `AttendanceLevel.max_people` (llegadas esperadas durante la
-  fase: `v_expected = max_people × intensity`).
-* Permanencia: `ServiceConfig.average_duration_min` en MINUTOS, convertida a
-  horas internamente (`D_hours = average_duration_min / 60.0`) para coincidir
-  con `_phase_duration_hours` (Δt en horas).
-
-Con permanencias cortas (minutos) y fases de horas, `exp(-Δt/D) ≈ 0` entre
-fases: el stock de una fase NO se conserva hacia la siguiente (alta rotación).
-`stock` representa personas SIMULTÁNEAS estimadas por Little's law (no
-acumulado entre fases) y `unabsorbed` es la demanda que excede la capacidad de
-servicio de la fase (`capacity × Δt / D`); NO incrementa stock ni occupied.
-
-La matemática interna es sistémica (multi-zona, multi-fase): `simulate` evalúa
-la evolución completa y `distribute` reparte la ocupación concurrente entre
-todas las zonas de servicios/baños.
+Por fase calcula `N = max_people × intensity`, `λ = N × u` y `L = λ × W`,
+donde `u` (usos/persona-hora) viene de `service_configs` y `W` (horas) es la
+permanencia media. Cada fase se distribuye independientemente entre las zonas
+físicas, sin acumular ocupación de fases anteriores.
 """
 from __future__ import annotations
 
@@ -37,15 +20,17 @@ from src.domain.models.specialized_model import (
     ModelSpecificResult,
 )
 
-# Baños V1 usa modelo de FLUJO (Little's law), no de STOCK.
-# concurrent_occupancy = llegadas × permanencia / duración_fase.
-# Esto difiere de Parking V1 que acumula stock entre fases.
 DEFAULT_ALPHA = 0.001
 
 
 @dataclass(frozen=True)
 class BathroomTemporalPhase:
-    """Capa temporal de una fase: demanda esperada, retención, stock."""
+    """Resultado temporal por fase.
+
+    `remain`, `exits` y `unabsorbed` se conservan para compatibilidad con
+    consumidores existentes, pero ya no participan en el cálculo. `v_expected`
+    y `entries` representan los usos esperados durante la fase.
+    """
 
     v_expected: float
     remain: float
@@ -57,7 +42,7 @@ class BathroomTemporalPhase:
 
 @dataclass(frozen=True)
 class BathroomPhaseState:
-    """Estado completo de una fase: capa temporal + distribución espacial."""
+    """Estado de una fase: métricas de flujo y distribución espacial."""
 
     index: int
     v_expected: float
@@ -77,7 +62,8 @@ class BathroomV1Model:
     (multi-zona, multi-fase): `simulate` evalúa la evolución completa y
     `distribute` reparte el stock entre todas las zonas de servicios/baños.
 
-    Faltan datos (sin `average_duration_min`, sin `attendance_level`) NO se
+    Faltan datos (sin `average_duration_min`, sin `attendance_level` o sin
+    `bathroom_use_rate_per_person_hour`) NO se
     inventan: `execute` eleva `MissingModelInputError` y la etapa 4 degrada esa
     zona sola, dejándola sin `occupancy_ratio` y por lo tanto sin
     `saturation_level`, como cualquier zona sin modelo.
@@ -85,16 +71,31 @@ class BathroomV1Model:
 
     model_id = "bathroom_v1"
 
-    def __init__(self, alpha: float = DEFAULT_ALPHA) -> None:
+    def __init__(
+        self,
+        alpha: float = DEFAULT_ALPHA,
+        use_rate_per_person_hour: float | None = None,
+    ) -> None:
         if isinstance(alpha, bool) or not isinstance(alpha, (int, float)):
             raise TypeError("alpha must be a number")
         if alpha < 0:
             raise ValueError("alpha must be >= 0")
         self._alpha = float(alpha)
+        if use_rate_per_person_hour is not None:
+            self._validate_use_rate(use_rate_per_person_hour)
+        self._use_rate_per_person_hour = (
+            None
+            if use_rate_per_person_hour is None
+            else float(use_rate_per_person_hour)
+        )
 
     @property
     def alpha(self) -> float:
         return self._alpha
+
+    @property
+    def use_rate_per_person_hour(self) -> float | None:
+        return self._use_rate_per_person_hour
 
     def supports(self, zone: Zone) -> bool:
         return zone.type == "servicios" and zone.subtipo == "banos"
@@ -110,12 +111,12 @@ class BathroomV1Model:
         delta_hours = self._phase_duration_hours(context.active_event_day_phase)
         max_people = self._require_max_people(context.attendance_level)
         duration_hours = self.duration_hours(context.average_duration_min)
-        v_expected = self.v_expected(max_people, intensity)
+        people_present = self.people_present(max_people, intensity)
+        arrival_rate = self.arrival_rate_per_hour(people_present)
         capacity = zone.capacity
         prev = self.initial_occupied([zone])
-        prev_stock = prev.get(zone.id, 0.0)
         temporal = self.temporal_step(
-            prev_stock, v_expected, float(capacity), delta_hours, duration_hours
+            arrival_rate, delta_hours, duration_hours
         )
         occupied = self.distribute(prev, [zone], temporal.stock)
         zone_occupied = occupied.get(zone.id, temporal.stock)
@@ -136,8 +137,10 @@ class BathroomV1Model:
             model_id=self.model_id, zone_id=zone.id, data=data
         )
 
-    def v_expected(self, max_people: int | None, intensity: float | None) -> float:
-        """`V_expected(t) = max_people × Intensity` (espejo de Parking V1 §9)."""
+    def people_present(
+        self, max_people: int | None, intensity: float | None
+    ) -> float:
+        """Calcula `N = max_people × intensity` en personas presentes."""
         if max_people is None:
             raise ValueError("max_people is required")
         if isinstance(max_people, bool) or not isinstance(max_people, int):
@@ -151,6 +154,19 @@ class BathroomV1Model:
         if intensity < 0:
             raise ValueError("intensity must be >= 0")
         return float(max_people) * float(intensity)
+
+    def arrival_rate_per_hour(self, people_present: float) -> float:
+        """Calcula `λ = N × u` en usos de baño por hora."""
+        self._require_nonnegative(people_present, "people_present")
+        return float(people_present) * self._require_use_rate()
+
+    def concurrent_occupancy(
+        self, arrival_rate_per_hour: float, duration_hours: float
+    ) -> float:
+        """Calcula `L = λ × W` en personas simultáneas."""
+        self._require_nonnegative(arrival_rate_per_hour, "arrival_rate_per_hour")
+        self._require_positive(duration_hours, "duration_hours")
+        return float(arrival_rate_per_hour) * float(duration_hours)
 
     def duration_hours(self, average_duration_min: float | None) -> float:
         """Convierte la permanencia de MINUTOS a HORAS: `D_hours = min / 60.0`.
@@ -171,94 +187,28 @@ class BathroomV1Model:
             raise ValueError("average_duration_min must be > 0")
         return float(average_duration_min) / 60.0
 
-    def retention(self, delta_hours: float, duration: float) -> float:
-        """Proporción del stock previo que continúa: `r_t = exp(-Δt/D)`.
-
-        Con permanencias cortas (minutos) y fases de horas, `r_t ≈ 0`: el stock
-        de una fase prácticamente no se conserva hacia la siguiente.
-        """
-        if isinstance(delta_hours, bool) or not isinstance(
-            delta_hours, (int, float)
-        ):
-            raise TypeError("delta_hours must be a number")
-        if delta_hours < 0:
-            raise ValueError("delta_hours must be >= 0")
-        if isinstance(duration, bool) or not isinstance(duration, (int, float)):
-            raise TypeError("duration must be a number")
-        if duration <= 0:
-            raise ValueError("duration must be > 0")
-        if delta_hours == 0:
-            return 1.0
-        return math.exp(-float(delta_hours) / float(duration))
-
     def temporal_step(
         self,
-        prev_stock: float,
-        v_expected: float,
-        total_capacity: float,
+        arrival_rate_per_hour: float,
         delta_hours: float,
-        duration: float,
+        duration_hours: float,
     ) -> BathroomTemporalPhase:
-        """Capa temporal de una fase — modelo de FLUJO (Little's law).
+        """Calcula `L = λ × W`, sin retención ni acumulación entre fases.
 
-        `V_expected` representa las PERSONAS QUE LLEGAN durante la fase (no un
-        stock objetivo). Para servicios de alta rotación (D ≪ Δt):
-
-        * `concurrent_occupancy = V_expected × (D / Δt)` — personas
-          simultáneas estimadas por Little's law.
-        * `stock = concurrent_occupancy` — NO acumula entre fases (no es
-          `remain + entries`).
-        * `service_capacity_phase = total_capacity × (Δt / D)` — cuántas
-          personas puede atender el sistema completo durante la fase.
-        * `entries = min(V_expected, service_capacity_phase)` — llegadas
-          efectivamente absorbidas por la capacidad de servicio.
-        * `unabsorbed = max(0, V_expected - entries)` — demanda NO atendida;
-          NO incrementa stock ni occupied.
-        * `remain = O_(t-1) × r` con `r = exp(-Δt/D)` — retención entre
-          fases (≈ 0 cuando D ≪ Δt; no se hardcodea 0).
-
-        NOTA: `remain` y `exits` se calculan por compatibilidad estructural con
-        `BathroomTemporalPhase`, pero NO intervienen en `stock`, `occupied` ni
-        `unabsorbed` en el régimen de alta rotación. `stock` =
-        `concurrent_occupancy` directamente (Little's law), NO es
-        `remain + entries`.
+        `delta_hours` solo permite conservar el total de usos esperados de la
+        fase; no interviene en la ocupación simultánea.
         """
-        self._require_nonnegative(prev_stock, "prev_stock")
-        self._require_nonnegative(v_expected, "v_expected")
-        if isinstance(total_capacity, bool) or not isinstance(
-            total_capacity, (int, float)
-        ):
-            raise TypeError("total_capacity must be a number")
-        if total_capacity <= 0:
-            raise ValueError("total_capacity must be > 0")
-        if isinstance(delta_hours, bool) or not isinstance(
-            delta_hours, (int, float)
-        ):
-            raise TypeError("delta_hours must be a number")
-        if delta_hours <= 0:
-            raise ValueError("delta_hours must be > 0")
-
-        concurrent_occupancy = float(v_expected) * (
-            float(duration) / float(delta_hours)
-        )
-        service_capacity_phase = float(total_capacity) * (
-            float(delta_hours) / float(duration)
-        )
-        entries = min(float(v_expected), service_capacity_phase)
-        unabsorbed = max(0.0, float(v_expected) - entries)
-
-        r = self.retention(delta_hours, duration)
-        remain = float(prev_stock) * r
-        exits = float(prev_stock) - remain
-
-        stock = concurrent_occupancy
+        self._require_nonnegative(arrival_rate_per_hour, "arrival_rate_per_hour")
+        self._require_positive(delta_hours, "delta_hours")
+        stock = self.concurrent_occupancy(arrival_rate_per_hour, duration_hours)
+        expected_uses = float(arrival_rate_per_hour) * float(delta_hours)
         return BathroomTemporalPhase(
-            v_expected=float(v_expected),
-            remain=remain,
-            exits=exits,
-            entries=entries,
+            v_expected=expected_uses,
+            remain=0.0,
+            exits=0.0,
+            entries=expected_uses,
             stock=stock,
-            unabsorbed=unabsorbed,
+            unabsorbed=0.0,
         )
 
     def distribute(
@@ -325,31 +275,27 @@ class BathroomV1Model:
     ) -> list[BathroomPhaseState]:
         """Evolución temporal + espacial completa por fases.
 
-        `O_0 = 0`: cada jornada comienza con ocupación cero en todas las zonas
-        (espejo de Parking V1 §38). Las fases se evalúan en orden cronológico.
-        Devuelve un estado por fase, reutilizable para los tests.
+        Cada fase se calcula y distribuye desde ocupación cero, sin transferir
+        estado espacial de la fase anterior.
         """
         if not phases:
             raise ValueError("phases must not be empty")
         if not zones:
             raise ValueError("zones must not be empty")
         ordered = sorted(phases, key=lambda p: (p.start_min, str(p.id)))
-        total_capacity = sum(zone.capacity for zone in zones)
-        prev_occupied = self.initial_occupied(zones)
-        prev_stock = float(sum(prev_occupied.values()))
+        use_rate = self._require_use_rate()
         results: list[BathroomPhaseState] = []
         for index, phase in enumerate(ordered, start=1):
             intensity = phase.intensity
             delta_hours = self._phase_duration_hours(phase)
-            expected = self.v_expected(max_people, intensity)
+            people_present = self.people_present(max_people, intensity)
+            arrival_rate = people_present * use_rate
             temporal = self.temporal_step(
-                prev_stock,
-                expected,
-                float(total_capacity),
+                arrival_rate,
                 delta_hours,
                 duration_hours,
             )
-            occupied = self.distribute(prev_occupied, zones, temporal.stock)
+            occupied = self.distribute({}, zones, temporal.stock)
             results.append(
                 BathroomPhaseState(
                     index=index,
@@ -362,8 +308,6 @@ class BathroomV1Model:
                     occupied=dict(occupied),
                 )
             )
-            prev_stock = temporal.stock
-            prev_occupied = occupied
         return results
 
     def indices(
@@ -457,6 +401,30 @@ class BathroomV1Model:
             raise TypeError(f"{name} must be a number")
         if value < 0:
             raise ValueError(f"{name} must be >= 0")
+
+    @staticmethod
+    def _require_positive(value: float, name: str) -> None:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise TypeError(f"{name} must be a number")
+        if value <= 0:
+            raise ValueError(f"{name} must be > 0")
+
+    @staticmethod
+    def _validate_use_rate(value: float) -> None:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise TypeError("use_rate_per_person_hour must be a number")
+        if not math.isfinite(float(value)):
+            raise ValueError("use_rate_per_person_hour must be finite")
+        if value < 0:
+            raise ValueError("use_rate_per_person_hour must be >= 0")
+
+    def _require_use_rate(self) -> float:
+        if self._use_rate_per_person_hour is None:
+            raise MissingModelInputError(
+                "bathroom_use_rate_per_person_hour is required from "
+                "service_configs; Bathroom V1 cannot calculate without it"
+            )
+        return self._use_rate_per_person_hour
 
     @staticmethod
     def _require_max_people(attendance_level: object | None) -> int:

@@ -168,7 +168,7 @@ def _base_prediction(all_zones: list[Zone]) -> TerritorialPrediction:
 
 def _bathroom_result(bathroom_zones: list[Zone]) -> BathroomSimulationResult:
     phases = _phases()
-    model = BathroomV1Model()
+    model = BathroomV1Model(use_rate_per_person_hour=0.1)
     duration_hours = model.duration_hours(DURATION_MIN)
     phase_results = model.simulate(
         phases, bathroom_zones, MAX_PEOPLE, duration_hours
@@ -180,6 +180,7 @@ def _bathroom_result(bathroom_zones: list[Zone]) -> BathroomSimulationResult:
         phases=phases,
         max_people=MAX_PEOPLE,
         average_duration_min=DURATION_MIN,
+        bathroom_use_rate_per_person_hour=0.1,
         duration_hours=duration_hours,
         phase_results=tuple(phase_results),
     )
@@ -350,7 +351,10 @@ def _mock_bridge_session(*, bathroom_request: bool) -> AsyncMock:
     phase_rows = [
         SimpleNamespace(id=OP_ID, name="Activa", sort_order=1),
     ]
-    service_config_row = SimpleNamespace(average_duration_min=DURATION_MIN)
+    service_config_row = SimpleNamespace(
+        average_duration_min=DURATION_MIN,
+        bathroom_use_rate_per_person_hour=0.1,
+    )
 
     # ── Router por tabla (no side_effect posicional) ──────────────────────
     #
