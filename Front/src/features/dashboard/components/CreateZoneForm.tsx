@@ -5,7 +5,7 @@ import { useZoneSubtypes } from '../hooks/useZoneSubtypes';
 import {
   useServiceConfigMutations,
 } from '../hooks/useServiceConfigMutations';
-import { fetchDefaultServiceConfig } from '../hooks/useServiceConfigs';
+import { resolveServiceConfigForEventDay } from '../hooks/useServiceConfigs';
 import {
   isBathroomSubtipo,
   parseBathroomUseRate,
@@ -17,6 +17,7 @@ import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { BathroomUseRateField } from './ui/BathroomUseRateField';
 import type { ServiceConfigCreatePayload } from '../types';
+import { useAppStore } from '@/core/state/store';
 
 interface DynamicField {
   name: string;
@@ -68,6 +69,7 @@ interface Props {
 export function CreateZoneForm({ onSuccess, onCancel }: Props) {
   const { createZone, loading, error } = useZoneCreation();
   const { zoneTypes: catalogZoneTypes } = useZoneTypes();
+  const eventDayId = useAppStore((s) => s.eventDayId);
   const [name, setName] = useState('');
   const [type, setType] = useState('estacionamiento');
   const [capacity, setCapacity] = useState('');
@@ -95,8 +97,8 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
     zoneTypeId !== null && (subtipos.length > 0 || subtiposLoading || subtiposError !== null);
   const isBathroom = showSubtipoField && isBathroomSubtipo(subtipo);
 
-  // Al elegir subtipo: precarga la permanencia existente en service_configs
-  // (default global) o el default sugerido si aún no hay config.
+  // Al elegir subtipo: precarga la permanencia y la tasa de la JORNADA ACTIVA
+  // (override si existe, si no el default global como referencia visual).
   const handleSubtipoChange = async (slug: string) => {
     setSubtipo(slug);
     setServiceError(null);
@@ -107,7 +109,8 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
       return;
     }
     try {
-      const config = await fetchDefaultServiceConfig(zoneTypeId, slug);
+      const { config } =
+        await resolveServiceConfigForEventDay(zoneTypeId, slug, eventDayId);
       if (config) {
         setPermanencia(config.average_duration_min.toString());
         setUseRate(formatUseRate(config.bathroom_use_rate_per_person_hour));
@@ -173,11 +176,12 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
     const permanenciaValue = Number(permanencia);
     if (subtipo && zoneTypeId && permanencia !== '' && permanenciaValue > 0) {
       try {
-        const existing = await fetchDefaultServiceConfig(zoneTypeId, subtipo);
+        const { config: existing, targetEventDayId: target } =
+          await resolveServiceConfigForEventDay(zoneTypeId, subtipo, eventDayId);
         const payload: ServiceConfigCreatePayload = {
           zone_type_id: zoneTypeId,
           subtipo,
-          event_day_id: null,
+          event_day_id: target,
           average_duration_min: permanenciaValue,
           ...(useRateValue !== null
             ? { bathroom_use_rate_per_person_hour: useRateValue }
@@ -186,7 +190,12 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
         const useRateChanged =
           useRateValue !== null &&
           existing?.bathroom_use_rate_per_person_hour !== useRateValue;
-        if (!existing) {
+        // `ServiceConfigUpdate` no acepta `event_day_id`, así que un PUT sobre
+        // el default global jamás crearía el override de la jornada. Solo se
+        // actualiza cuando la fila encontrada ya es del ámbito destino; en
+        // cualquier otro caso hay que crear.
+        const isSameScope = existing !== null && existing.event_day_id === target;
+        if (!isSameScope) {
           const ok = await createConfig(payload);
           if (!ok) {
             setServiceError('La zona se creó, pero no se pudo guardar la permanencia.');
