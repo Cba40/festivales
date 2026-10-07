@@ -5,6 +5,17 @@ import { readThroughCache, productCacheKey, PRODUCT_TTL_MS } from '@/core/cache/
 import { useAppStore } from '@/core/state/store'
 import { requireActiveEventId } from '@/services/activeEvent'
 
+/**
+ * Cuántas zonas de baño pide el hook.
+ *
+ * El backend selecciona sugerencias curadas por rol para `servicios`
+ * (`WeightedScoringStrategy._select_curated_options`) y devuelve como máximo 4:
+ * más lugares libres, mejor balance disponibilidad/distancia, más cerca de vos
+ * y cerca del epicentro. Pedir más de 4 no agrega información: el backend
+ * trunca al set curado, no al `limit`.
+ */
+export const BATHROOM_LIMIT = 4
+
 export interface ZonaSanitaryItem {
   zone_id: string
   name: string
@@ -72,7 +83,7 @@ export function useBathroomRecommendations() {
       const params: Record<string, unknown> = {
         speed: 1.5,
         accessibility_required: false,
-        limit: 10,
+        limit: BATHROOM_LIMIT,
         current_zone_id: zoneIdSnapshot || undefined,
         user_id: '00000000-0000-0000-0000-000000000000',
         access_level: 'STANDARD',

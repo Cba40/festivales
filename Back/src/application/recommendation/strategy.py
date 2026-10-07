@@ -16,6 +16,24 @@ from src.domain.value_objects.zone_state import ZoneState
 
 PARKING_TYPE = "estacionamiento"
 
+# Roles de la selección curada: (label, marca como "más cerca de vos").
+# El orden es el de preferencia; el texto va atado al ROL y no a la posición,
+# para que si un rol no produce opción (p. ej. sin GPS del usuario) los demás
+# conserven su etiqueta y el truncado por `max_recommendations` no desalinee.
+CURATED_ROLES: tuple[tuple[str, bool], ...] = (
+    ("Mejor opción con más lugares libres", False),
+    ("Mejor balance de disponibilidad y cercanía", False),
+    ("Más cerca de vos", True),
+    ("Cerca del epicentro del evento", False),
+)
+CURATED_MAX = len(CURATED_ROLES)
+
+# Tipos de zona que usan la selección curada por rol en lugar del ranking por
+# score global. `servicios` cubre baños, hidratación y descanso: comparten el
+# mismo criterio de "disponibilidad + cercanía", así que la misma plantilla
+# curada les aplica sin duplicar lógica.
+CURATED_TYPES: frozenset[str] = frozenset({PARKING_TYPE, "comida", "servicios"})
+
 
 @runtime_checkable
 class RecommendationStrategy(Protocol):
@@ -48,9 +66,14 @@ class WeightedScoringStrategy:
             zone_states, requested_action, mobility_context, config
         )
 
-        if requested_action.type == PARKING_TYPE or requested_action.type == "comida":
-            return self._select_four_options(
-                viable, user_context, mobility_context, config, zone_coordinates
+        if requested_action.type in CURATED_TYPES:
+            return self._select_curated_options(
+                viable,
+                user_context,
+                mobility_context,
+                config,
+                zone_coordinates,
+                max_recommendations=CURATED_MAX,
             )
 
         scored = self._calculate_scores(
@@ -125,13 +148,27 @@ class WeightedScoringStrategy:
         ]
 
     @staticmethod
-    def _select_four_options(
+    def _select_curated_options(
         viable_zones: list[ZoneState],
         user_context: UserContext,
         mobility_context: MobilityContext,
         config: RecommendationConfig,
         zone_coordinates: Mapping[UUID, tuple[float, float]] | None,
+        max_recommendations: int = CURATED_MAX,
     ) -> list[ZoneRecommendation]:
+        """Selecciona sugerencias curadas por rol, no por score global.
+
+        Cada rol ocupa una posición semántica fija: más lugares libres, mejor
+        balance disponibilidad/distancia, más cerca del usuario y más cerca del
+        epicentro. Así dos bathrooms con igual saturación no se ordenan
+        arbitrariamente por score.
+
+        `max_recommendations` recorta el set curado. Con el valor por defecto
+        (`CURATED_MAX`) el comportamiento es el de siempre; con menos, se
+        devuelven los primeros N roles y el resto se descarta. Si un rol no
+        tiene candidato (sin GPS del usuario, por ejemplo) se omite y los
+        siguientes conservan su etiqueta.
+        """
         candidates: list[tuple[ZoneState, float]] = []
         for zone in viable_zones:
             if zone.saturation_level is not None:
@@ -244,16 +281,17 @@ class WeightedScoringStrategy:
         else:
             selected = []
 
-        selected = [s for s in selected if s is not None]
+        # Empareja por rol, no por índice: si un rol no produjo opción, los
+        # demás conservan su label correcto.
+        curated: list[tuple[ZoneState, str, bool]] = []
+        for option, (label, is_nearest) in zip(selected, CURATED_ROLES):
+            if option is not None:
+                curated.append((option[0], label, is_nearest))
+
+        capped = max(0, min(max_recommendations, CURATED_MAX))
 
         recommendations: list[ZoneRecommendation] = []
-        labels: list[str] = [
-            "Mejor opción con más lugares libres",
-            "Mejor balance de disponibilidad y cercanía",
-            "Más cerca de vos",
-            "Cerca del epicentro del evento",
-        ]
-        for i, (zone, _fr) in enumerate(selected):
+        for zone, label, is_nearest in curated[:capped]:
             score = WeightedScoringStrategy._calculate_scores(
                 [zone], user_context, mobility_context, config
             )[0][1]
@@ -264,8 +302,8 @@ class WeightedScoringStrategy:
                 ZoneRecommendation(
                     zone_id=zone.zone_id,
                     score=score,
-                    reasoning=[labels[i]] + contextual_reasoning,
-                    is_nearest=(i == 2),
+                    reasoning=[label] + contextual_reasoning,
+                    is_nearest=is_nearest,
                 )
             )
 

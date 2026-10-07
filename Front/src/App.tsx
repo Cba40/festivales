@@ -8,7 +8,7 @@ import { loadEventDayContext } from './utils/contextoEvento';
 import { recargarFases } from './config/eventoConfig';
 import { getParkingRecommendations } from './services/parkingProduct';
 import { getGastronomyRecommendations } from './services/gastronomyProduct';
-import { getBathroomRecommendations } from './services/bathroomProduct';
+import { getBathroomRecommendations, BATHROOM_LIMIT } from './services/bathroomProduct';
 import { getRestRecommendations } from './services/restProduct';
 import { getHydrationRecommendations } from './services/hydrationProduct';
 import { getAccommodationRecommendations } from './services/accommodationProduct';
@@ -151,7 +151,7 @@ function AppLayout() {
   }, []);
 
   const preloadBathroom = useCallback(() => {
-    getBathroomRecommendations(requireActiveEventId(), { ...buildProductParams(), limit: 10 }, 'prefetch').catch(() => {});
+    getBathroomRecommendations(requireActiveEventId(), { ...buildProductParams(), limit: BATHROOM_LIMIT }, 'prefetch').catch(() => {});
   }, []);
 
   const preloadRest = useCallback(() => {
