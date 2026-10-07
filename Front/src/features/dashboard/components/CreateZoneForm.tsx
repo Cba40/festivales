@@ -6,10 +6,17 @@ import {
   useServiceConfigMutations,
 } from '../hooks/useServiceConfigMutations';
 import { fetchDefaultServiceConfig } from '../hooks/useServiceConfigs';
+import {
+  isBathroomSubtipo,
+  parseBathroomUseRate,
+  formatUseRate,
+} from '../utils/bathroomUseRate';
 import { DEFAULTS_POR_SUBTIPO, TRANSPORTE_OPTIONS, ZONE_TYPES } from '../constants';
 import { AdminMapSelector } from '../../../components/AdminMapSelector';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
+import { BathroomUseRateField } from './ui/BathroomUseRateField';
+import type { ServiceConfigCreatePayload } from '../types';
 
 interface DynamicField {
   name: string;
@@ -68,6 +75,8 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
   const [lng, setLng] = useState('');
   const [subtipo, setSubtipo] = useState('');
   const [permanencia, setPermanencia] = useState('');
+  const [useRate, setUseRate] = useState('');
+  const [useRateError, setUseRateError] = useState<string | null>(null);
   const [serviceError, setServiceError] = useState<string | null>(null);
   const [extra, setExtra] = useState<Record<string, string>>({});
   const { create: createConfig, update: updateConfig } =
@@ -84,28 +93,34 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
 
   const showSubtipoField =
     zoneTypeId !== null && (subtipos.length > 0 || subtiposLoading || subtiposError !== null);
+  const isBathroom = showSubtipoField && isBathroomSubtipo(subtipo);
 
   // Al elegir subtipo: precarga la permanencia existente en service_configs
   // (default global) o el default sugerido si aún no hay config.
   const handleSubtipoChange = async (slug: string) => {
     setSubtipo(slug);
     setServiceError(null);
+    setUseRateError(null);
     if (!slug || !zoneTypeId) {
       setPermanencia('');
+      setUseRate('');
       return;
     }
     try {
       const config = await fetchDefaultServiceConfig(zoneTypeId, slug);
       if (config) {
         setPermanencia(config.average_duration_min.toString());
+        setUseRate(formatUseRate(config.bathroom_use_rate_per_person_hour));
       } else {
         setPermanencia(
           (DEFAULTS_POR_SUBTIPO[slug] ?? '').toString()
         );
+        setUseRate(isBathroomSubtipo(slug) ? formatUseRate(null) : '');
       }
     } catch (err) {
       console.error('[CreateZoneForm] lookup service_config falló:', err);
       setPermanencia((DEFAULTS_POR_SUBTIPO[slug] ?? '').toString());
+      setUseRate(isBathroomSubtipo(slug) ? formatUseRate(null) : '');
     }
   };
 
@@ -113,6 +128,19 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
     e.preventDefault();
     if (!name.trim() || !capacity || Number(capacity) <= 0) return;
     if (type === 'salida' && !extra.transporte) return;
+
+    // Validar la tasa ANTES de crear la zona: si fallara después, la zona
+    // quedaría creada sin su service_config.
+    let useRateValue: number | null = null;
+    if (isBathroom) {
+      const parsed = parseBathroomUseRate(useRate);
+      if (!parsed.ok) {
+        setUseRateError(parsed.error);
+        return;
+      }
+      setUseRateError(null);
+      useRateValue = parsed.value;
+    }
 
     const extraPayload: Record<string, string | number | boolean> = {};
     for (const [k, v] of Object.entries(extra)) {
@@ -146,22 +174,32 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
     if (subtipo && zoneTypeId && permanencia !== '' && permanenciaValue > 0) {
       try {
         const existing = await fetchDefaultServiceConfig(zoneTypeId, subtipo);
+        const payload: ServiceConfigCreatePayload = {
+          zone_type_id: zoneTypeId,
+          subtipo,
+          event_day_id: null,
+          average_duration_min: permanenciaValue,
+          ...(useRateValue !== null
+            ? { bathroom_use_rate_per_person_hour: useRateValue }
+            : {}),
+        };
+        const useRateChanged =
+          useRateValue !== null &&
+          existing?.bathroom_use_rate_per_person_hour !== useRateValue;
         if (!existing) {
-          const ok = await createConfig({
-            zone_type_id: zoneTypeId,
-            subtipo,
-            event_day_id: null,
-            average_duration_min: permanenciaValue,
-          });
+          const ok = await createConfig(payload);
           if (!ok) {
             setServiceError('La zona se creó, pero no se pudo guardar la permanencia.');
           }
-        } else if (existing.average_duration_min !== permanenciaValue) {
-          const ok = await updateConfig(existing.id, {
-            average_duration_min: permanenciaValue,
-          });
+        } else if (
+          existing.average_duration_min !== permanenciaValue ||
+          useRateChanged
+        ) {
+          const ok = await updateConfig(existing.id, payload);
           if (!ok) {
-            setServiceError('La zona se creó, pero no se pudo actualizar la permanencia.');
+            setServiceError(
+              'La zona se creó, pero no se pudo actualizar la configuración del servicio.'
+            );
           }
         }
         // e) Si existe y el valor no cambió: no hacer nada.
@@ -178,6 +216,8 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
     setLng('');
     setSubtipo('');
     setPermanencia('');
+    setUseRate('');
+    setUseRateError(null);
     setExtra({});
     if (onSuccess) onSuccess();
   };
@@ -255,6 +295,17 @@ export function CreateZoneForm({ onSuccess, onCancel }: Props) {
             Se guarda globalmente para este subtipo (service_configs), no por zona.
           </p>
         </div>
+      )}
+
+      {isBathroom && (
+        <BathroomUseRateField
+          value={useRate}
+          onChange={(v) => {
+            setUseRate(v);
+            if (useRateError) setUseRateError(null);
+          }}
+          error={useRateError}
+        />
       )}
 
       <div>

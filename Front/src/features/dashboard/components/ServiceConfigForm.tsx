@@ -1,5 +1,11 @@
 import { useState, useEffect } from 'react';
 import type { EventDaySummary, ServiceConfigDTO, ZoneTypeDTO } from '../types';
+import {
+  isBathroomSubtipo,
+  parseBathroomUseRate,
+  formatUseRate,
+} from '../utils/bathroomUseRate';
+import { BathroomUseRateField } from './ui/BathroomUseRateField';
 
 interface ServiceConfigFormProps {
   initial?: ServiceConfigDTO | null;
@@ -28,9 +34,9 @@ export function ServiceConfigForm({
   const [subtipo, setSubtipo] = useState('');
   const [eventDayId, setEventDayId] = useState('');
   const [duration, setDuration] = useState('');
-  const [bathroomUseRate, setBathroomUseRate] = useState('0.1');
+  const [bathroomUseRate, setBathroomUseRate] = useState(formatUseRate(null));
   const [validationError, setValidationError] = useState<string | null>(null);
-  const isBathroom = subtipo.trim().toLowerCase() === 'banos';
+  const isBathroom = isBathroomSubtipo(subtipo);
 
   useEffect(() => {
     if (initial) {
@@ -39,14 +45,14 @@ export function ServiceConfigForm({
       setEventDayId(initial.event_day_id ?? '');
       setDuration(initial.average_duration_min.toString());
       setBathroomUseRate(
-        initial.bathroom_use_rate_per_person_hour?.toString() ?? '0.1'
+        formatUseRate(initial.bathroom_use_rate_per_person_hour)
       );
     } else {
       setZoneTypeId('');
       setSubtipo('');
       setEventDayId('');
       setDuration('');
-      setBathroomUseRate('0.1');
+      setBathroomUseRate(formatUseRate(null));
     }
   }, [initial]);
 
@@ -72,22 +78,14 @@ export function ServiceConfigForm({
       average_duration_min: parsedDuration,
     };
     if (isBathroom) {
-      const parsedUseRate = Number(bathroomUseRate);
-      if (!Number.isFinite(parsedUseRate) || parsedUseRate < 0) {
-        setValidationError(
-          'La tasa de uso debe ser un número mayor o igual a 0'
-        );
-        return;
-      }
-      if (!/^\d+(\.\d{1,2})?$/.test(bathroomUseRate.trim())) {
-        setValidationError(
-          'La tasa de uso admite máximo 2 decimales (ej: 0.1, 0.25)'
-        );
+      const parsedUseRate = parseBathroomUseRate(bathroomUseRate);
+      if (!parsedUseRate.ok) {
+        setValidationError(parsedUseRate.error);
         return;
       }
       await onSave({
         ...payload,
-        bathroom_use_rate_per_person_hour: parsedUseRate,
+        bathroom_use_rate_per_person_hour: parsedUseRate.value,
       });
       return;
     }
@@ -161,25 +159,11 @@ export function ServiceConfigForm({
       </p>
 
       {isBathroom && (
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
-            Tasa de uso (usos/persona-hora) *
-          </label>
-          <input
-            type="number"
-            min={0}
-            step="0.01"
-            value={bathroomUseRate}
-            onChange={(e) => setBathroomUseRate(e.target.value)}
-            required
-            title="Hipótesis inicial: 0.1. Calibrar con observaciones reales"
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <p className="text-[10px] text-slate-400 mt-0.5">
-            Hipótesis inicial: 0.1. Calibrar con observaciones reales; no es un valor empírico
-            validado. Máximo 2 decimales.
-          </p>
-        </div>
+        <BathroomUseRateField
+          value={bathroomUseRate}
+          onChange={setBathroomUseRate}
+          tone="blue"
+        />
       )}
 
       {validationError && (
