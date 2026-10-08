@@ -89,7 +89,11 @@ async def get_transport_product_adapter(
     5. For each stop, find the next departure after *timestamp* for the
        current day_type (civil calendar in Argentina time).
     6. Sort by distance ascending (stops without coordinates go last).
-    7. Mark ``is_nearest=True`` on the first stop with valid coordinates.
+    7. Mark ``is_nearest=True`` on the first stop, but ONLY when the user's
+       own coordinates were supplied. Without them every distance is ``inf``,
+       the sort is a no-op and the "nearest" badge would land on an arbitrary
+       stop: the query has no natural order, so the row order is whatever the
+       Postgres plan returned.
     """
     now_local = timestamp.astimezone(ARGENTINA_TZ)
     day_type = _resolve_day_type(now_local)
@@ -97,6 +101,13 @@ async def get_transport_product_adapter(
     tomorrow_day_type = _resolve_day_type(now_local + timedelta(days=1))
 
     # --- 1. Load line_stops with line + zone metadata (single query) ---
+    # El `ORDER BY` es explícito a propósito: la lista completa se muestra al
+    # público, y sin un orden declarado Postgres garantiza el que le salga del
+    # plan de ejecución. Eso hacía que dos requests idénticos devolvieran
+    # paradas en distinto orden, y que elemma de "más cercana" cayera en una
+    # parada arbitraria cuando el usuario no había dado GPS. Se usa el nombre
+    # de la zona y el id de la línea como desempate para que el orden sea
+    # total y estable entre llamadas.
     stmt = (
         select(
             TransportLineStop.id.label("line_stop_id"),
@@ -114,6 +125,7 @@ async def get_transport_product_adapter(
         .join(Zone, TransportLineStop.zone_id == Zone.id)
         .where(TransportLine.event_id == event_id)
         .where(TransportLine.active == True)
+        .order_by(Zone.name, TransportLine.name, TransportLineStop.stop_order)
     )
     if transport_type is not None:
         stmt = stmt.where(TransportLine.type == transport_type)
@@ -232,13 +244,26 @@ async def get_transport_product_adapter(
         ))
 
     # --- 5. Sort by distance (None/inf last) ---
-    items.sort(key=lambda z: z.distancia_min if z.distancia_min is not None else float("inf"))
+    # El nombre va de desempate: sin GPS todas las distancias son `inf` y
+    # `list.sort` es estable, así que el orden termina siendo el de la query
+    # (nombre de zona). Con GPS desempata por nombre entre paradas a igual
+    # distancia, que antes quedaba al azar.
+    items.sort(key=lambda z: (
+        z.distancia_min if z.distancia_min is not None else float("inf"),
+        z.name,
+    ))
 
-    # --- 6. Mark is_nearest on first item with valid coordinates ---
-    for item in items:
-        if item.lat is not None and item.lng is not None:
-            item.is_nearest = True
-            break
+    # --- 6. Mark is_nearest: sólo si el usuario dio GPS ---
+    # Antes se marcaba la primera parada con coordenadas de zona, que dice
+    # "la parada más cercana" sin que el usuario haya dicho dónde está. Como
+    # el GPS del cliente puede no llegar, esa marca era falsa casi siempre.
+    # Sin coordenadas del usuario no se marca ninguna: es preferible no
+    # ofrecer el badge antes que ofrecerlo sobre una parada arbitraria.
+    if user_latitude is not None and user_longitude is not None:
+        for item in items:
+            if item.distancia_min is not None:
+                item.is_nearest = True
+                break
 
     # --- 7. Truncate to limit ---
     items = items[:limit]

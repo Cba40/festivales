@@ -1,9 +1,10 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback } from 'react'
 import { apiClient, originHeaders, type RequestOrigin } from '@/core/api/client'
 import { endpoints } from '@/core/api/endpoints'
 import { readThroughCache, productCacheKey, PRODUCT_TTL_MS } from '@/core/cache/memoryCache'
 import { useAppStore } from '@/core/state/store'
 import { requireActiveEventId } from '@/services/activeEvent'
+import { coordsCacheSuffix } from '@/utils/coordsCache'
 
 /**
  * Cuantas zonas pide el hook: los espacios de descanso.
@@ -71,28 +72,28 @@ export function useRestRecommendations() {
   const currentZoneId = useAppStore(s => s.zones[0]?.id)
 
   const eventDayId = useAppStore((s) => s.eventDayId)
-  const ctxRef = useRef({ currentZoneId, userLocation })
 
   const refresh = useCallback(async (force = false, requestOrigin?: RequestOrigin) => {
     setLoading(true)
     setError(null)
     try {
-      const { currentZoneId: zoneIdSnapshot, userLocation: locationSnapshot } = ctxRef.current
       const params: Record<string, unknown> = {
         speed: 1.5,
         accessibility_required: false,
         limit: REST_LIMIT,
-        current_zone_id: zoneIdSnapshot || undefined,
+        current_zone_id: currentZoneId || undefined,
         user_id: '00000000-0000-0000-0000-000000000000',
         access_level: 'STANDARD',
         ...(eventDayId ? { event_day_id: eventDayId } : {}),
-        ...(locationSnapshot
-          ? { latitude: locationSnapshot[0], longitude: locationSnapshot[1] }
+        ...(userLocation
+          ? { latitude: userLocation[0], longitude: userLocation[1] }
           : {}),
       }
       const eventId = requireActiveEventId()
       const data = await readThroughCache<RestRecommendationResponse>(
-        productCacheKey(eventId, 'rest'),
+        [productCacheKey(eventId, 'rest'), coordsCacheSuffix(userLocation?.[0], userLocation?.[1])]
+          .filter(Boolean)
+          .join('|'),
         PRODUCT_TTL_MS,
         async () => {
           const { data } = await apiClient.get<RestRecommendationResponse>(
@@ -113,7 +114,7 @@ export function useRestRecommendations() {
     } finally {
       setLoading(false)
     }
-  }, [eventDayId])
+  }, [eventDayId, currentZoneId, userLocation])
 
   return { data, loading, error, refresh }
 }

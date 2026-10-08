@@ -1,9 +1,10 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback } from 'react'
 import { apiClient, originHeaders, type RequestOrigin } from '@/core/api/client'
 import { endpoints } from '@/core/api/endpoints'
 import { readThroughCache, productCacheKey, PRODUCT_TTL_MS } from '@/core/cache/memoryCache'
 import { useAppStore } from '@/core/state/store'
 import { requireActiveEventId } from '@/services/activeEvent'
+import { coordsCacheSuffix } from '@/utils/coordsCache'
 import type { SaturationLevel } from '@/features/dashboard/types'
 
 /**
@@ -50,21 +51,6 @@ export const PARKING_LIMIT = 4
  * el usuario tiene GPS. Documentado para no dejarlo en un `?? 5` suelto.
  */
 export const DISTANCIA_FALLBACK_MIN = 5
-
-/**
- * Parte de clave de caché para una coordenada opcional.
- *
- * Mismo criterio que el `coordCachePart` de `emergencyProduct.ts`: redondeo a 4
- * decimales (~11 m) para que el ruido del GPS no genere entradas distintas, y
- * `'none'` para distinguir "sin coordenada" de una coordenada 0 válida.
- *
- * Duplicado de 1 línea a propósito: son dos servicios de producto
- * independientes y no conviene que Parking dependa de Emergency. Cuando
- * aparezca un tercer consumidor, esto sube a `src/utils/`.
- */
-function coordCachePart(value?: number): string {
-  return value == null ? 'none' : value.toFixed(4)
-}
 
 export async function getParkingRecommendations(
   eventId: string,
@@ -129,22 +115,19 @@ export function useParkingRecommendations() {
   const userLocation = useAppStore(s => s.userLocation)
   const currentZoneId = useAppStore(s => s.zones[0]?.id)
 
-  const ctxRef = useRef({ currentZoneId, userLocation })
-
   const refresh = useCallback(async (force = false, requestOrigin?: RequestOrigin) => {
     setLoading(true)
     setError(null)
     try {
-      const { currentZoneId: zoneIdSnapshot, userLocation: locationSnapshot } = ctxRef.current
       const params: Record<string, unknown> = {
         speed: WALKING_SPEED,
         accessibility_required: ACCESSIBILITY_REQUIRED,
         limit: PARKING_LIMIT,
-        current_zone_id: zoneIdSnapshot || undefined,
+        current_zone_id: currentZoneId || undefined,
         user_id: ANONYMOUS_USER_ID,
         access_level: DEFAULT_ACCESS_LEVEL,
-        ...(locationSnapshot
-          ? { latitude: locationSnapshot[0], longitude: locationSnapshot[1] }
+        ...(userLocation
+          ? { latitude: userLocation[0], longitude: userLocation[1] }
           : {}),
       }
       // La clave tiene que incluir todo lo que cambia el resultado: el ranking y
@@ -161,10 +144,11 @@ export function useParkingRecommendations() {
       const eventId = requireActiveEventId()
       const cacheKey = [
         productCacheKey(eventId, 'parking'),
-        zoneIdSnapshot || 'no-zone',
-        coordCachePart(locationSnapshot?.[0]),
-        coordCachePart(locationSnapshot?.[1]),
-      ].join('|')
+        currentZoneId || 'no-zone',
+        coordsCacheSuffix(userLocation?.[0], userLocation?.[1]),
+      ]
+        .filter(Boolean)
+        .join('|')
       const data = await readThroughCache<ParkingRecommendationResponse>(
         cacheKey,
         PRODUCT_TTL_MS,
@@ -199,7 +183,7 @@ export function useParkingRecommendations() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [currentZoneId, userLocation])
 
   return { data, loading, error, refresh }
 }

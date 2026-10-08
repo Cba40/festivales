@@ -1,9 +1,10 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback } from 'react'
 import { apiClient, originHeaders, type RequestOrigin } from '@/core/api/client'
 import { endpoints } from '@/core/api/endpoints'
 import { readThroughCache, productCacheKey, PRODUCT_TTL_MS } from '@/core/cache/memoryCache'
 import { useAppStore } from '@/core/state/store'
 import { requireActiveEventId } from '@/services/activeEvent'
+import { coordsCacheSuffix } from '@/utils/coordsCache'
 
 /**
  * Cuántas zonas de baño pide el hook.
@@ -74,28 +75,28 @@ export function useBathroomRecommendations() {
   const currentZoneId = useAppStore(s => s.zones[0]?.id)
 
   const eventDayId = useAppStore((s) => s.eventDayId)
-  const ctxRef = useRef({ currentZoneId, userLocation })
 
   const refresh = useCallback(async (force = false, requestOrigin?: RequestOrigin) => {
     setLoading(true)
     setError(null)
     try {
-      const { currentZoneId: zoneIdSnapshot, userLocation: locationSnapshot } = ctxRef.current
       const params: Record<string, unknown> = {
         speed: 1.5,
         accessibility_required: false,
         limit: BATHROOM_LIMIT,
-        current_zone_id: zoneIdSnapshot || undefined,
+        current_zone_id: currentZoneId || undefined,
         user_id: '00000000-0000-0000-0000-000000000000',
         access_level: 'STANDARD',
         ...(eventDayId ? { event_day_id: eventDayId } : {}),
-        ...(locationSnapshot
-          ? { latitude: locationSnapshot[0], longitude: locationSnapshot[1] }
+        ...(userLocation
+          ? { latitude: userLocation[0], longitude: userLocation[1] }
           : {}),
       }
       const eventId = requireActiveEventId()
       const data = await readThroughCache<BathroomRecommendationResponse>(
-        productCacheKey(eventId, 'bathroom'),
+        [productCacheKey(eventId, 'bathroom'), coordsCacheSuffix(userLocation?.[0], userLocation?.[1])]
+          .filter(Boolean)
+          .join('|'),
         PRODUCT_TTL_MS,
         async () => {
           const { data } = await apiClient.get<BathroomRecommendationResponse>(
@@ -116,7 +117,7 @@ export function useBathroomRecommendations() {
     } finally {
       setLoading(false)
     }
-  }, [eventDayId])
+  }, [eventDayId, currentZoneId, userLocation])
 
   return { data, loading, error, refresh }
 }

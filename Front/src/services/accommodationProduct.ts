@@ -1,9 +1,10 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback } from 'react'
 import { apiClient, originHeaders, type RequestOrigin } from '@/core/api/client'
 import { endpoints } from '@/core/api/endpoints'
 import { readThroughCache, productCacheKey, PRODUCT_TTL_MS } from '@/core/cache/memoryCache'
 import { useAppStore } from '@/core/state/store'
 import { requireActiveEventId } from '@/services/activeEvent'
+import { coordsCacheSuffix } from '@/utils/coordsCache'
 
 export type AccommodationType = 'hotel' | 'hostel' | 'camping' | 'other'
 
@@ -69,17 +70,15 @@ export function useAccommodationRecommendations(
   const userLocation = useAppStore(s => s.userLocation)
 
   const eventDayId = useAppStore((s) => s.eventDayId)
-  const ctxRef = useRef({ userLocation })
 
   const refresh = useCallback(async (force = false, requestOrigin?: RequestOrigin) => {
     setLoading(true)
     setError(null)
     try {
-      const { userLocation: locationSnapshot } = ctxRef.current
       const params: Record<string, unknown> = {
         limit: 100,
-        ...(locationSnapshot
-          ? { latitude: locationSnapshot[0], longitude: locationSnapshot[1] }
+        ...(userLocation
+          ? { latitude: userLocation[0], longitude: userLocation[1] }
           : {}),
         ...(type ? { type } : {}),
         ...(eventDayId ? { event_day_id: eventDayId } : {}),
@@ -87,7 +86,9 @@ export function useAccommodationRecommendations(
       const cacheProductType = type ? `accommodation:${type}` : 'accommodation'
       const eventId = requireActiveEventId()
       const data = await readThroughCache<AccommodationRecommendationResponse>(
-        productCacheKey(eventId, cacheProductType),
+        [productCacheKey(eventId, cacheProductType), coordsCacheSuffix(userLocation?.[0], userLocation?.[1])]
+          .filter(Boolean)
+          .join('|'),
         PRODUCT_TTL_MS,
         async () => {
           const { data } = await apiClient.get<AccommodationRecommendationResponse>(
@@ -108,7 +109,7 @@ export function useAccommodationRecommendations(
     } finally {
       setLoading(false)
     }
-  }, [type, eventDayId])
+  }, [type, eventDayId, userLocation])
 
   return { data, loading, error, refresh }
 }

@@ -1,9 +1,10 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback } from 'react'
 import { apiClient, originHeaders, type RequestOrigin } from '@/core/api/client'
 import { endpoints } from '@/core/api/endpoints'
 import { readThroughCache, productCacheKey, PRODUCT_TTL_MS } from '@/core/cache/memoryCache'
 import { useAppStore } from '@/core/state/store'
 import { requireActiveEventId } from '@/services/activeEvent'
+import { coordsCacheSuffix } from '@/utils/coordsCache'
 
 // Canónica RFC-EXIT-V1 / migración c9d3e7f1a5b8 (zones.transporte)
 export type TransporteMode = 'peatonal' | 'vehicular' | 'transporte'
@@ -72,19 +73,17 @@ export function useExitRecommendations(
   const userLocation = useAppStore(s => s.userLocation)
 
   const eventDayId = useAppStore((s) => s.eventDayId)
-  const ctxRef = useRef({ userLocation })
 
   const refresh = useCallback(async (force = false, requestOrigin?: RequestOrigin) => {
     setLoading(true)
     setError(null)
     try {
-      const { userLocation: locationSnapshot } = ctxRef.current
       const params: Record<string, unknown> = {
         ...(destinationId ? { destination_id: destinationId } : {}),
         ...(mode ? { mode } : {}),
         ...(eventDayId ? { event_day_id: eventDayId } : {}),
-        ...(locationSnapshot
-          ? { latitude: locationSnapshot[0], longitude: locationSnapshot[1] }
+        ...(userLocation
+          ? { latitude: userLocation[0], longitude: userLocation[1] }
           : {}),
       }
       const cacheProductType = [
@@ -94,7 +93,9 @@ export function useExitRecommendations(
       ].join(':')
       const eventId = requireActiveEventId()
       const data = await readThroughCache<ExitRecommendationResponse>(
-        productCacheKey(eventId, cacheProductType),
+        [productCacheKey(eventId, cacheProductType), coordsCacheSuffix(userLocation?.[0], userLocation?.[1])]
+          .filter(Boolean)
+          .join('|'),
         PRODUCT_TTL_MS,
         async () => {
           const { data } = await apiClient.get<ExitRecommendationResponse>(
@@ -117,7 +118,7 @@ export function useExitRecommendations(
     } finally {
       setLoading(false)
     }
-  }, [destinationId, mode, eventDayId])
+  }, [destinationId, mode, eventDayId, userLocation])
 
   return { data, loading, error, refresh }
 }
