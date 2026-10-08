@@ -26,6 +26,32 @@ CURATED_ROLES: tuple[tuple[str, bool], ...] = (
     ("Más cerca de vos", True),
     ("Cerca del epicentro del evento", False),
 )
+
+# Roles para cuando NINGUNA zona trae señal de ocupación (sin modelo
+# especializado). No hay disponibilidad que comparar, así que decir "la que
+# tiene más lugares libres" sería mentira y, con todos los `free_ratio` en el
+# mismo valor sintético, la elección caería al desempate por `zone_id`. Se
+# ordena por cercanía real, que es lo único que se sabe.
+CURATED_ROLES_PROXIMITY: tuple[tuple[str, bool], ...] = (
+    ("Más cerca de vos", True),
+    ("Mejor balance de cercanía", False),
+    ("Cerca del epicentro del evento", False),
+    ("Opción alternativa", False),
+)
+
+# Sin GPS del usuario no se puede afirmar "más cerca de vos": se cae a un
+# orden por cercanía al epicentro, con etiquetas que dicen eso.
+CURATED_ROLES_PROXIMITY_NO_GPS: tuple[tuple[str, bool], ...] = (
+    ("Cerca del epicentro del evento", False),
+    ("Segunda más cercana al epicentro", False),
+    ("Tercera más cercana al epicentro", False),
+    ("Cuarta más cercana al epicentro", False),
+)
+
+# `free_ratio` sintético para zonas sin modelo y sin proxy computable. NO
+# ordena nada por sí solo: dispara el modo de roles por cercanía.
+FALLBACK_FREE_RATIO = 0.9
+
 CURATED_MAX = len(CURATED_ROLES)
 
 # Tipos de zona que usan la selección curada por rol en lugar del ranking por
@@ -59,6 +85,7 @@ class WeightedScoringStrategy:
         requested_action: RequestedAction,
         config: RecommendationConfig,
         zone_coordinates: Mapping[UUID, tuple[float, float]] | None = None,
+        reference_point: tuple[float, float] | None = None,
     ) -> list[ZoneRecommendation]:
         zone_states = prediction.zone_states
 
@@ -74,6 +101,7 @@ class WeightedScoringStrategy:
                 config,
                 zone_coordinates,
                 max_recommendations=CURATED_MAX,
+                reference_point=reference_point,
             )
 
         scored = self._calculate_scores(
@@ -153,52 +181,61 @@ class WeightedScoringStrategy:
         user_context: UserContext,
         mobility_context: MobilityContext,
         config: RecommendationConfig,
-        zone_coordinates: Mapping[UUID, tuple[float, float]] | None,
+zone_coordinates: Mapping[UUID, tuple[float, float]] | None,
         max_recommendations: int = CURATED_MAX,
+        reference_point: tuple[float, float] | None = None,
     ) -> list[ZoneRecommendation]:
         """Selecciona sugerencias curadas por rol, no por score global.
 
-        Cada rol ocupa una posición semántica fija: más lugares libres, mejor
-        balance disponibilidad/distancia, más cerca del usuario y más cerca del
-        epicentro. Así dos bathrooms con igual saturación no se ordenan
-        arbitrariamente por score.
+        Dos modos, elegidos por los DATOS y no por el tipo de zona:
 
-        `max_recommendations` recorta el set curado. Con el valor por defecto
-        (`CURATED_MAX`) el comportamiento es el de siempre; con menos, se
-        devuelven los primeros N roles y el resto se descarta. Si un rol no
-        tiene candidato (sin GPS del usuario, por ejemplo) se omite y los
-        siguientes conservan su etiqueta.
+        * Con señal de ocupación (Parking, Baños) se usan `CURATED_ROLES`: más
+          lugares libres, balance disponibilidad/distancia, más cerca del
+          usuario y cerca del epicentro.
+        * Sin señal (Gastronomía, y lo que venga sin modelo) se usan los roles
+          por cercanía. No es una preferencia: sin `saturation_level` ni proxy
+          todos los `free_ratio` valen lo mismo, así que "la que tiene más
+          lugares libres" no distinguiría nada y se resolvería por `zone_id`.
+          Cuando exista un modelo para comida, el modo cambia solo.
+
+        `max_recommendations` recorta el set curado. Si un rol no tiene
+        candidato se omite y los demás conservan su etiqueta.
         """
-        candidates: list[tuple[ZoneState, float]] = []
+        candidates: list[tuple[ZoneState, float, bool]] = []
         for zone in viable_zones:
             if zone.saturation_level is not None:
-                free_ratio = 1.0 - zone.saturation_level
-            else:
-                # P3.0 §5.4: sin señal de saturación (modelo especializado), usar
-                # projected_density como proxy de densidad. Genérico: vale para
-                # comida, hidratación, descanso, etc. `capacity` no vive en
-                # ZoneState, se intenta desde model_result; si no se puede
-                # computar el proxy, se asume zona operativa (free_ratio=0.9).
-                capacity = (
-                    zone.model_result.get("capacity")
-                    if zone.model_result is not None
-                    else None
+                candidates.append((zone, 1.0 - zone.saturation_level, True))
+                continue
+            # P3.0 §5.4: sin señal de saturación (modelo especializado), usar
+            # projected_density como proxy de densidad. Genérico: vale para
+            # comida, hidratación, descanso, etc. `capacity` no vive en
+            # ZoneState, se intenta desde model_result.
+            capacity = (
+                zone.model_result.get("capacity")
+                if zone.model_result is not None
+                else None
+            )
+            if (
+                zone.projected_density is not None
+                and capacity
+                and capacity > 0
+            ):
+                candidates.append(
+                    (zone, 1.0 - min(zone.projected_density / capacity, 1.0), True)
                 )
-                if (
-                    zone.projected_density is not None
-                    and capacity
-                    and capacity > 0
-                ):
-                    free_ratio = 1.0 - min(zone.projected_density / capacity, 1.0)
-                else:
-                    free_ratio = 0.9
-            candidates.append((zone, free_ratio))
+            else:
+                candidates.append((zone, FALLBACK_FREE_RATIO, False))
 
         available = [
             (zone, free_ratio)
-            for zone, free_ratio in candidates
+            for zone, free_ratio, _measured in candidates
             if free_ratio > config.min_availability_threshold
         ]
+
+        # El modo depende de si ALGUNA zona trae disponibilidad medida. Si
+        # ninguna, el ranking por disponibilidad no tiene información y se pasa
+        # a cercanía.
+        has_availability_signal = any(m for _z, _fr, m in candidates)
 
         has_user_gps = (
             zone_coordinates is not None
@@ -220,71 +257,43 @@ class WeightedScoringStrategy:
             )
 
         def _dist_to_reference(zone: ZoneState) -> float | None:
-            if zone.model_result is None:
+            if zone.model_result is not None:
+                d = zone.model_result.get("distance")
+                if d is not None:
+                    return float(d)
+            # Las zonas sin modelo no traen `model_result`, así que la distancia
+            # al epicentro se calcula desde el punto de referencia del evento.
+            if reference_point is None or zone_coordinates is None:
                 return None
-            d = zone.model_result.get("distance")
-            return float(d) if d is not None else None
+            coords = zone_coordinates.get(zone.zone_id)
+            if coords is None:
+                return None
+            return WeightedScoringStrategy._calculate_distance(
+                reference_point[0],
+                reference_point[1],
+                coords[0],
+                coords[1],
+            )
 
-        zd = ZoneRecommendation
-
-        # Opción 1: mayor disponibilidad (free_ratio más alto)
-        option1 = max(available, key=lambda t: (t[1], str(t[0].zone_id))) if available else None
-
-        if option1 is not None:
-            option2: tuple[ZoneState, float] | None
-            chosen_ids = {option1[0].zone_id}
-            rest = [t for t in available if t[0].zone_id not in chosen_ids]
-
-            # Opción 2: mejor balance disponibilidad/distancia al usuario.
-            # score = free_ratio * (1000 / max(dist_to_user, 100)) para normalizar.
-            if has_user_gps:
-                def _balance_key(t: tuple[ZoneState, float]) -> tuple[float, str]:
-                    zone, fr = t
-                    d = _dist_to_user(zone)
-                    balance = fr * (1000.0 / (max(d, 100.0) if d is not None else 1000.0))
-                    return (balance, str(zone.zone_id))
-                option2 = max(rest, key=_balance_key) if rest else None
-            else:
-                # Sin GPS de usuario: segunda mayor disponibilidad como fallback.
-                option2 = max(rest, key=lambda t: (t[1], str(t[0].zone_id))) if rest else None
-
-            if option2 is not None:
-                chosen_ids.add(option2[0].zone_id)
-            rest2 = [t for t in available if t[0].zone_id not in chosen_ids]
-
-            # Opción 3: más cercana al usuario con free_ratio > 0.20
-            option3: tuple[ZoneState, float] | None = None
-            if has_user_gps:
-                candidates_3 = [
-                    (z, fr) for z, fr in rest2
-                    if fr > 0.20 and _dist_to_user(z) is not None
-                ]
-                if candidates_3:
-                    option3 = min(
-                        candidates_3, key=lambda t: (_dist_to_user(t[0]), str(t[0].zone_id))
-                    )
-                    chosen_ids.add(option3[0].zone_id)
-
-            # Opción 4: más cercana al epicentro con free_ratio > 0.20
-            option4: tuple[ZoneState, float] | None = None
-            rest3 = [t for t in rest2 if t[0].zone_id not in chosen_ids]
-            candidates_4 = [
-                (z, fr) for z, fr in rest3
-                if fr > 0.20 and _dist_to_reference(z) is not None
-            ]
-            if candidates_4:
-                option4 = min(
-                    candidates_4, key=lambda t: (_dist_to_reference(t[0]), str(t[0].zone_id))
-                )
-
-            selected = [option1, option2, option3, option4]
+        if not has_availability_signal:
+            roles = (
+                CURATED_ROLES_PROXIMITY
+                if has_user_gps
+                else CURATED_ROLES_PROXIMITY_NO_GPS
+            )
+            selected = WeightedScoringStrategy._pick_by_proximity(
+                available, roles, has_user_gps, _dist_to_user, _dist_to_reference
+            )
         else:
-            selected = []
+            roles = CURATED_ROLES
+            selected = WeightedScoringStrategy._pick_by_availability(
+                available, has_user_gps, _dist_to_user, _dist_to_reference
+            )
 
         # Empareja por rol, no por índice: si un rol no produjo opción, los
         # demás conservan su label correcto.
         curated: list[tuple[ZoneState, str, bool]] = []
-        for option, (label, is_nearest) in zip(selected, CURATED_ROLES):
+        for option, (label, is_nearest) in zip(selected, roles):
             if option is not None:
                 curated.append((option[0], label, is_nearest))
 
@@ -308,6 +317,125 @@ class WeightedScoringStrategy:
             )
 
         return recommendations
+
+    @staticmethod
+    def _pick_by_availability(
+        available: list[tuple[ZoneState, float]],
+        has_user_gps: bool,
+        _dist_to_user,
+        _dist_to_reference,
+    ) -> list[tuple[ZoneState, float] | None]:
+        """Roles con señal de ocupación: disponibilidad primero, distancia después."""
+        option1 = (
+            max(available, key=lambda t: (t[1], str(t[0].zone_id)))
+            if available
+            else None
+        )
+        if option1 is None:
+            return [None, None, None, None]
+
+        chosen_ids = {option1[0].zone_id}
+        rest = [t for t in available if t[0].zone_id not in chosen_ids]
+
+        # Opción 2: mejor balance disponibilidad/distancia al usuario.
+        # score = free_ratio * (1000 / max(dist_to_user, 100)) para normalizar.
+        if has_user_gps:
+
+            def _balance_key(t: tuple[ZoneState, float]) -> tuple[float, str]:
+                zone, fr = t
+                d = _dist_to_user(zone)
+                balance = fr * (1000.0 / (max(d, 100.0) if d is not None else 1000.0))
+                return (balance, str(zone.zone_id))
+
+            option2 = max(rest, key=_balance_key) if rest else None
+        else:
+            # Sin GPS de usuario: segunda mayor disponibilidad como fallback.
+            option2 = max(rest, key=lambda t: (t[1], str(t[0].zone_id))) if rest else None
+
+        if option2 is not None:
+            chosen_ids.add(option2[0].zone_id)
+        rest2 = [t for t in available if t[0].zone_id not in chosen_ids]
+
+        # Opción 3: más cercana al usuario con free_ratio > 0.20
+        option3: tuple[ZoneState, float] | None = None
+        if has_user_gps:
+            candidates_3 = [
+                (z, fr) for z, fr in rest2 if fr > 0.20 and _dist_to_user(z) is not None
+            ]
+            if candidates_3:
+                option3 = min(
+                    candidates_3, key=lambda t: (_dist_to_user(t[0]), str(t[0].zone_id))
+                )
+                chosen_ids.add(option3[0].zone_id)
+
+        # Opción 4: más cercana al epicentro con free_ratio > 0.20
+        option4: tuple[ZoneState, float] | None = None
+        rest3 = [t for t in rest2 if t[0].zone_id not in chosen_ids]
+        candidates_4 = [
+            (z, fr) for z, fr in rest3 if fr > 0.20 and _dist_to_reference(z) is not None
+        ]
+        if candidates_4:
+            option4 = min(
+                candidates_4, key=lambda t: (_dist_to_reference(t[0]), str(t[0].zone_id))
+            )
+
+        return [option1, option2, option3, option4]
+
+    @staticmethod
+    def _pick_by_proximity(
+        available: list[tuple[ZoneState, float]],
+        roles: tuple[tuple[str, bool], ...],
+        has_user_gps: bool,
+        _dist_to_user,
+        _dist_to_reference,
+    ) -> list[tuple[ZoneState, float] | None]:
+        """Roles sin señal de ocupación: todo se decide por cercanía real.
+
+        Cada rol se resuelve por mínima distancia con su propia métrica y nunca
+        repite una zona ya elegida.
+        """
+        if not available:
+            return [None] * len(roles)
+
+        chosen: set[UUID] = set()
+
+        def _sum(*dists: float | None) -> float | None:
+            """Suma de distancias, o None si falta alguna."""
+            if any(d is None for d in dists):
+                return None
+            return sum(d for d in dists if d is not None)
+
+        def take(minimise) -> tuple[ZoneState, float] | None:
+            pool = [t for t in available if t[0].zone_id not in chosen]
+            if not pool:
+                return None
+            usable = [(t, minimise(t[0])) for t in pool]
+            usable = [(t, d) for t, d in usable if d is not None]
+            if not usable:
+                return None
+            best = min(usable, key=lambda td: (td[1], str(td[0][0].zone_id)))[0]
+            chosen.add(best[0].zone_id)
+            return best
+
+        def _d_user(zone: ZoneState) -> float | None:
+            return _dist_to_user(zone) if has_user_gps else None
+
+        def _d_ref(zone: ZoneState) -> float | None:
+            return _dist_to_reference(zone)
+
+        picked: list[tuple[ZoneState, float] | None] = []
+        for index, (_label, _is_nearest) in enumerate(roles):
+            if index == 0 and has_user_gps:
+                picked.append(take(_d_user))
+            elif index == 1 and has_user_gps:
+                # "Mejor balance": minimiza la suma de las dos distancias, o sea
+                # la más céntrica respecto del usuario y del evento.
+                picked.append(take(lambda z: _sum(_d_user(z), _d_ref(z))))
+            elif index == 2:
+                picked.append(take(_d_ref))
+            else:
+                picked.append(take(_d_ref if not has_user_gps else _d_user))
+        return picked
 
     @staticmethod
     def _calculate_distance(

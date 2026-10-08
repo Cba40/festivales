@@ -496,6 +496,14 @@ class RecommendationModule:
             limit=limit,
             config=recommendation_config,
             zone_coordinates=zone_coordinates,
+            # Las zonas sin modelo no traen `model_result`, así que la
+            # distancia al epicentro hay que calcularla desde el punto de
+            # referencia del evento.
+            reference_point=(
+                (ref_lat, ref_lng)
+                if ref_lat is not None and ref_lng is not None
+                else None
+            ),
         )
 
         recommendations = await self._enrich_with_operational_context(

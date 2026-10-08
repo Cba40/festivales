@@ -29,6 +29,7 @@ class RecommendationService:
         limit: int = 5,
         config: RecommendationConfig | None = None,
         zone_coordinates: Mapping[UUID, tuple[float, float]] | None = None,
+        reference_point: tuple[float, float] | None = None,
     ) -> list[ZoneRecommendation]:
         resolved_config = (
             config if config is not None else RecommendationConfig()
@@ -46,6 +47,8 @@ class RecommendationService:
         }
         if zone_coordinates is not None:
             evaluate_kwargs["zone_coordinates"] = zone_coordinates
+        if reference_point is not None:
+            evaluate_kwargs["reference_point"] = reference_point
 
         recommendations = self._strategy.evaluate(**evaluate_kwargs)
 

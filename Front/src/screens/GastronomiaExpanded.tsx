@@ -22,17 +22,39 @@ interface CorredorGastronomico {
   updatedAt: number
 }
 
-const toSaturacion = (level: number | null): CorredorGastronomico['saturacion'] => {
-  if (level === null) return 'desconocida'
-  if (level < 0.6) return 'baja'
-  if (level < 0.8) return 'media'
-  return 'alta'
+/**
+ * Umbrales de estado.
+ *
+ * Se toma `zona.estado`, que el backend ya calcula con los cortes canónicos
+ * (<0.25 / <0.50 / <0.75 en `product_helpers.saturation_to_estado`), en vez de
+ * recalcular la saturación acá. Antes esta pantalla usaba cortes propios
+ * (<0.6 / <0.8), así que un mismo puesto podía verse "Bajo" en
+ * `/servicios/comer` y "media" acá, con datos idénticos.
+ */
+type EstadoZona = 'bajo' | 'medio' | 'alto' | 'colapsado'
+
+const SATURACION_POR_ESTADO: Record<EstadoZona, CorredorGastronomico['saturacion']> = {
+  bajo: 'baja',
+  medio: 'media',
+  alto: 'alta',
+  colapsado: 'alta',
 }
 
-const toSentarse = (level: number | null): 'alta' | 'media' | 'baja' => {
-  if (level === null || level < 0.5) return 'alta'
-  if (level < 0.8) return 'media'
-  return 'baja'
+const SENTARSE_POR_ESTADO: Record<EstadoZona, CorredorGastronomico['posibilidadSentarse']> = {
+  bajo: 'alta',
+  medio: 'media',
+  alto: 'baja',
+  colapsado: 'baja',
+}
+
+const toSaturacion = (estado: string | null | undefined): CorredorGastronomico['saturacion'] => {
+  if (!estado) return 'desconocida'
+  return SATURACION_POR_ESTADO[estado as EstadoZona] ?? 'desconocida'
+}
+
+const toSentarse = (estado: string | null | undefined): CorredorGastronomico['posibilidadSentarse'] => {
+  if (!estado) return 'media'
+  return SENTARSE_POR_ESTADO[estado as EstadoZona] ?? 'media'
 }
 
 const getCategoriaLabel = (categoria: string): string => {
@@ -103,9 +125,9 @@ const GastronomiaExpanded = () => {
         return {
           id: z.zone_id,
           nombre: z.name,
-          saturacion: toSaturacion(z.saturation_level),
+          saturacion: toSaturacion(z.estado),
           categoriaLabel: getCategoriaLabel(z.categoria),
-          posibilidadSentarse: toSentarse(z.saturation_level),
+          posibilidadSentarse: toSentarse(z.estado),
           distancia: z.distancia_min,
           x: pos?.x ?? 50,
           y: pos?.y ?? 50,
