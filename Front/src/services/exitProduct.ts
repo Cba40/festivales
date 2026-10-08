@@ -21,7 +21,7 @@ export interface ExitZoneItem {
   transporte: string
   lat: number | null
   lng: number | null
-  status: string
+  status: import('@/features/dashboard/types').ZoneStatus
   is_nearest: boolean
   destinations: ExitDestinationItem[]
 }

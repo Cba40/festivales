@@ -1,5 +1,6 @@
 # backend/app/models/zone.py
 
+from enum import Enum
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -9,6 +10,42 @@ from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, JSON, Stri
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
+
+
+class ZoneStatus(str, Enum):
+    ACTIVA = "activa"
+    RESTRINGIDA = "restringida"
+    ALERTA = "alerta"
+    CERRADA = "cerrada"
+
+
+def normalize_zone_status(value: str | None) -> str | None:
+    """Normaliza valores legacy de `zones.status` al Enum canónico.
+
+    - Normaliza a minúsculas y recorta espacios.
+    - Mapea alias conocidos: 'cerrado' -> CERRADA, 'activo' -> ACTIVA, etc.
+    - Desconocidos -> None (para que el validador falle si es obligatorio).
+    """
+    if value is None:
+        return None
+    normalized = value.strip().lower()
+    mapping = {
+        "activa": "activa",
+        "active": "activa",
+        "restringida": "restringida",
+        "restricted": "restringida",
+        "con_limites": "restringida",
+        "con_límites": "restringida",
+        "alerta": "alerta",
+        "alert": "alerta",
+        "warning": "alerta",
+        "cerrada": "cerrada",
+        "cerrado": "cerrada",
+        "closed": "cerrada",
+        "canceled": "cerrada",
+        "cancelled": "cerrada",
+    }
+    return mapping.get(normalized)
 
 
 class Zone(Base):

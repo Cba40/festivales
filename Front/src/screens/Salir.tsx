@@ -371,3 +371,4 @@ const Salir = () => {
 }
 
 export default Salir
+

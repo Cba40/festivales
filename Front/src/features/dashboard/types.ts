@@ -1,5 +1,13 @@
 export type SaturationLevel = 'bajo' | 'medio' | 'alto' | 'colapsado';
-export type StatusLevel = 'activa' | 'restringida' | 'cerrada';
+
+/**
+ * Estados canónicos de una zona, alineados con el Enum `ZoneStatus` del backend.
+ * Ver `app/models/zone.py` -> `ZoneStatus`.
+ */
+export type ZoneStatus = 'activa' | 'restringida' | 'alerta' | 'cerrada';
+
+/** @deprecated Usar `ZoneStatus` en su lugar. */
+export type StatusLevel = ZoneStatus;
 
 export interface Zone {
   id: string;

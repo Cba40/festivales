@@ -3,7 +3,17 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
+
+
+def _validar_zone_status(v: str | None) -> str | None:
+    if v is None:
+        return v
+    # Los valores válidos son los definidos en ZoneStatus (sin el Enum para no acoplar)
+    valores_validos = {"activa", "restringida", "alerta", "cerrada"}
+    if v.lower() not in valores_validos:
+        raise ValueError(f"status inválido: '{v}'. Valores permitidos: {sorted(valores_validos)}")
+    return v.lower()
 
 
 class ZoneResponse(BaseModel):
@@ -57,6 +67,9 @@ class ZoneCreateRequest(BaseModel):
     transporte: Optional[str] = None
     capacidad_estimada: Optional[int] = None
     es_embudo: Optional[bool] = None
+    status: str = "activa"
+
+    _validar_status = field_validator("status", mode="before")(_validar_zone_status)
 
 
 class ZoneUpdateRequest(BaseModel):
@@ -77,6 +90,8 @@ class ZoneUpdateRequest(BaseModel):
     transporte: Optional[str] = None
     capacidad_estimada: Optional[int] = None
     es_embudo: Optional[bool] = None
+
+    _validar_status = field_validator("status", mode="before")(_validar_zone_status)
 
 
 class ZoneConfigUpdateRequest(BaseModel):
