@@ -16,6 +16,35 @@ from app.api.deps import verify_token
 
 router = APIRouter(prefix="/api/events/{event_id}/zones", tags=["zones"])
 
+# Tipo de zona para el que la modalidad de salida es obligatoria. Canónica
+# RFC-EXIT-V1 / Parte 3: peatonal | vehicular | transporte.
+TIPO_SALIDA = "salida"
+
+MODALIDADES_SALIDA = ("peatonal", "vehicular", "transporte")
+
+
+def _exigir_modalidad_si_salida(zona_type: str | None, transporte: str | None) -> None:
+    """Rechaza con 422 una zona `salida` sin modalidad de transporte.
+
+    El formulario del dashboard ya deshabilita el submit cuando `type` es
+    `salida` y no se eligió modalidad, pero nada impedía crearla por API, seed o
+    edición manual de la base. Esa fila se persistía y después reventaba
+    `/products/exit` con un 500 para todo el evento. Se valida acá para que la
+    restricción quede del lado del servidor.
+    """
+    if zona_type != TIPO_SALIDA:
+        return
+    if transporte is not None and str(transporte).strip():
+        return
+    raise HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail=(
+            "Una zona de tipo 'salida' requiere 'transporte' "
+            f"({', '.join(MODALIDADES_SALIDA)}). Sin modalidad la salida no se "
+            "puede consultar desde /products/exit."
+        ),
+    )
+
 
 @router.get("", response_model=list[ZoneResponse])
 def list_zones(event_id: str, db: Session = Depends(get_db)):
@@ -40,6 +69,7 @@ def create_zone(
     zone_data["available_capacity"] = zone_data.get("available_capacity", cap)
     zone_data["saturation"] = Zone.calcular_saturation(cap, zone_data["available_capacity"])
     zone_data.setdefault("status", "activa")
+    _exigir_modalidad_si_salida(zone_data.get("type"), zone_data.get("transporte"))
     zone = Zone(**zone_data)
     db.add(zone)
     db.commit()
@@ -61,6 +91,14 @@ def update_zone(
 
     update_data = body.model_dump(exclude_unset=True)
     print(f"[update_zone] PATCH recibido: {body.model_dump()}, update_data: {update_data}")
+
+    # Solo se valida cuando el request toca `transporte`: una fila `salida` sin
+    # modalidad que ya quedó en la base (creada antes de esta validación) debe
+    # seguir siendo editable en otros campos sin quedar bloqueada.
+    if "transporte" in update_data:
+        _exigir_modalidad_si_salida(
+            zone.type, update_data["transporte"]
+        )
 
     for field, value in update_data.items():
         setattr(zone, field, value)
@@ -95,6 +133,12 @@ def update_zone_config(
         update_data["latitude"] = body.latitude
     if "longitude" in update_data:
         update_data["longitude"] = body.longitude
+
+    # Este endpoint sí puede cambiar `type` (a diferencia del PATCH) pero no
+    # acepta `transporte`, así que la modalidad se toma de la fila existente:
+    # no se puede convertir una zona en `salida` si no tiene modalidad previa.
+    if update_data.get("type") == TIPO_SALIDA:
+        _exigir_modalidad_si_salida(TIPO_SALIDA, zone.transporte)
 
     for field, value in update_data.items():
         setattr(zone, field, value)

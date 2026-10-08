@@ -24,6 +24,7 @@ from app.models.exit_destination import ExitDestination
 from app.models.exit_zone_destination import exit_zone_destinations_table
 from app.models.zone import Zone
 from app.schemas.exit_product import (
+    TRANSPORTE_NO_ESPECIFICADO,
     ExitDestinationItem,
     ExitRecommendationResponse,
     ExitZoneItem,
@@ -107,7 +108,13 @@ async def get_exit_product_adapter(
         item = ExitZoneItem(
             zone_id=row.id,
             name=row.name,
-            transporte=row.transporte,
+            # `zones.transporte` es nullable y este DTO se llenaba con el valor
+            # crudo: una sola salida sin modalidad hacía fallar el ValidationError
+            # y devolvía 500 para todo el evento, no solo para esa zona.
+            # Se sustituye por un texto legible en vez de descartar la zona: en un
+            # producto de egreso, ocultar una salida es peor que mostrarla sin
+            # modalidad, así que se conserva visible y el operador la ve.
+            transporte=(row.transporte or "").strip() or TRANSPORTE_NO_ESPECIFICADO,
             lat=row.latitude,
             lng=row.longitude,
             status=row.status,
