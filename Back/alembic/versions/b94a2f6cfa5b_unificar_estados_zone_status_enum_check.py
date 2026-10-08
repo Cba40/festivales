@@ -18,34 +18,6 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
-# Valores canónicos (minúsculas, sin espacios) según ZoneStatus
-ESTADOS_VALIDOS = ("activa", "restringida", "alerta", "cerrada")
-ESTADOS_SET = set(ESTADOS_VALIDOS)
-
-
-def _normalizar(valor: str | None) -> str | None:
-    if valor is None:
-        return None
-    normalizado = valor.strip().lower()
-    mapping = {
-        "activa": "activa",
-        "active": "activa",
-        "restringida": "restringida",
-        "restricted": "restringida",
-        "con_limites": "restringida",
-        "con_límites": "restringida",
-        "alerta": "alerta",
-        "alert": "alerta",
-        "warning": "alerta",
-        "cerrada": "cerrada",
-        "cerrado": "cerrada",
-        "closed": "cerrada",
-        "canceled": "cerrada",
-        "cancelled": "cerrada",
-    }
-    return mapping.get(normalizado)
-
-
 def _column_exists(bind, table: str, column: str) -> bool:
     """Verifica si una columna existe en la tabla."""
     result = bind.execute(sa.text("""
@@ -64,37 +36,88 @@ def upgrade() -> None:
         # La tabla no tiene la columna, nada que hacer
         return
 
-    # 1. Normalizar valores existentes en la tabla zones
-    result = bind.execute(sa.text("SELECT id, status FROM zones"))
-    rows = result.fetchall()
+    # ============================================================
+    # PASO 1: Normalización agresiva de valores legacy
+    # ============================================================
+    # Mapear variantes conocidas a sus valores canónicos
+    op.execute("""
+        UPDATE zones
+        SET status = 'activa'
+        WHERE LOWER(status) IN (
+            'abierto', 'open', 'activo', 'habilitada', 'activa'
+        )
+    """)
 
-    for row in rows:
-        zona_id, status_actual = row.id, row.status
-        if status_actual is not None:
-            normalizado = _normalizar(status_actual)
-            if normalizado is not None and normalizado != status_actual:
-                bind.execute(
-                    sa.text("UPDATE zones SET status = :val WHERE id = :id"),
-                    {"val": normalizado, "id": zona_id},
-                )
+    op.execute("""
+        UPDATE zones
+        SET status = 'cerrada'
+        WHERE LOWER(status) IN (
+            'cerrado', 'closed', 'inhabilitada', 'fuera de servicio',
+            'bloqueada', 'bloqueado', 'desactivada', 'desactivado'
+        )
+    """)
 
-    # 2. Cambiar el default a 'activa' (ya lo es, pero por claridad)
+    op.execute("""
+        UPDATE zones
+        SET status = 'restringida'
+        WHERE LOWER(status) IN (
+            'limitada', 'con limites', 'con límites', 'parcial',
+            'restringido', 'restricted', 'limitada'
+        )
+    """)
+
+    op.execute("""
+        UPDATE zones
+        SET status = 'alerta'
+        WHERE LOWER(status) IN (
+            'alerta', 'alert', 'warning', 'advertencia', 'aviso'
+        )
+    """)
+
+    # Normalizar mayúsculas/minúsculas en valores ya canónicos
+    op.execute("""
+        UPDATE zones
+        SET status = LOWER(status)
+        WHERE status IS NOT NULL
+    """)
+
+    # ============================================================
+    # PASO 2: Fallback de seguridad - convertir CUALQUIER valor
+    # no canónico a 'activa' (fallback seguro, evita ocultar zonas)
+    # ============================================================
+    op.execute("""
+        UPDATE zones
+        SET status = 'activa'
+        WHERE LOWER(status) NOT IN ('activa', 'restringida', 'alerta', 'cerrada')
+           OR status IS NULL
+    """)
+
+    # ============================================================
+    # PASO 3: Cambiar el default a 'activa' (ya lo es, pero por claridad)
+    # ============================================================
     op.alter_column("zones", "status",
                     existing_type=sa.String(20),
                     server_default="activa",
                     existing_nullable=False)
 
-    # 3. Agregar CHECK constraint para restringir valores a los 4 canónicos
+    # ============================================================
+    # PASO 4: Agregar CHECK constraint (case-insensitive)
+    # ============================================================
     op.create_check_constraint(
         constraint_name="ck_zones_status_valido",
         table_name="zones",
-        condition=sa.text("status IN ('activa', 'restringida', 'alerta', 'cerrada')"),
+        condition=sa.text("LOWER(status) IN ('activa', 'restringida', 'alerta', 'cerrada')"),
     )
 
 
 def downgrade() -> None:
     bind = op.get_bind()
-    if not _column_exists(bind, "zones", "status"):
+    # Verificar si la tabla tiene la columna antes de intentar borrar
+    result = bind.execute(sa.text("""
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'zones' AND column_name = 'status'
+    """))
+    if not result.fetchone():
         return
 
     # Eliminar el CHECK constraint
