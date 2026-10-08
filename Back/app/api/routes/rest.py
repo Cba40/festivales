@@ -65,6 +65,7 @@ async def rest_recommendations(
             user_context=user_ctx,
             mobility_context=mobility_ctx,
             limit=limit,
+            event_day_id=event_day_id,
         )
     except Exception:
         await log_service_interaction(

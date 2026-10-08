@@ -62,6 +62,7 @@ async def exit_recommendations(
             mode=mode,
             latitude=latitude,
             longitude=longitude,
+            event_day_id=event_day_id,
         )
     except Exception:
         await log_service_interaction(

@@ -63,6 +63,7 @@ async def emergency_recommendations(
         user_latitude=latitude,
         user_longitude=longitude,
         limit=limit,
+        event_day_id=event_day_id,
     )
 
     return result

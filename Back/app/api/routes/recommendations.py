@@ -27,6 +27,10 @@ async def recommend(
     limit: int = Query(5, ge=1, le=50),
     current_zone_id: str | None = Query(None),
     user_id: str = Query(...),
+    event_day_id: str | None = Query(
+        default=None,
+        description="Jornada explicita; si se omite, el motor la resuelve por reloj",
+    ),
     db: AsyncSession = Depends(get_async_db),
     _=Depends(verify_token),
 ):
@@ -51,6 +55,7 @@ async def recommend(
         mobility_context=mobility_ctx,
         requested_action=requested_action,
         limit=limit,
+        event_day_id=event_day_id,
     )
 
     if prediction is None:

@@ -56,6 +56,7 @@ async def accommodation_recommendations(
             user_latitude=latitude,
             user_longitude=longitude,
             limit=limit,
+            event_day_id=event_day_id,
         )
     except Exception:
         await log_service_interaction(
