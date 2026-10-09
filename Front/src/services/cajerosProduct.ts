@@ -3,6 +3,7 @@ import { apiClient } from '@/core/api/client'
 import { endpoints } from '@/core/api/endpoints'
 import { readThroughCache, zoneCacheKey, ZONES_TTL_MS } from '@/core/cache/memoryCache'
 import { requireActiveEventId } from '@/services/activeEvent'
+import { normalizeZoneStatus } from '@/utils/zoneStatus'
 
 export interface CajeroItem {
   zone_id: string
@@ -22,6 +23,7 @@ export interface CajeroItem {
 interface ZoneRow {
   id: string
   name: string
+  status?: string | null
   latitude?: number | null
   longitude?: number | null
   calle?: string | null
@@ -52,6 +54,16 @@ export function useCajeros() {
       )
       const cajeros = zones
         .filter((z) => z.subtipo === 'cajeros')
+        // `GET /zones` no filtra (ver `Back/app/api/routes/zones.py::list_zones`:
+        // devuelve todas las zonas del evento sin filtro). Baños, hidratación y
+        // descanso pasan por el motor de recomendaciones, que sí excluye las
+        // zonas cerradas; cajeros no, así que sin este filtro un cajero dado de
+        // baja por el operador seguía apareciendo en el listado.
+        //
+        // Se usa `normalizeZoneStatus` y no `z.status !== 'cerrada'` porque el
+        // backend puede devolver alias legacy (`cerrado`, `closed`, ...), que
+        // una comparación directa no reconocería.
+        .filter((z) => normalizeZoneStatus(z.status) !== 'cerrada')
         .map((z) => ({
           zone_id: z.id,
           name: z.name,

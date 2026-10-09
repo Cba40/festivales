@@ -96,6 +96,19 @@ def _build_model_selector(
     no `saturation_level` / `availability`. El endpoint lee las claves del
     contrato de `ZoneState`, así que esos cuatro campos siguen en `None` hasta
     que se mapeen. Ver `docs/Architecture/Current/ADR-004.md`.
+
+    TODO(ExitV1): el conteo de ocupacion de salidas (flujo de vehiculos hacia
+    `zones.transporte`) sigue siendo determinista en
+    `src/interfaces/rest/exit_product.py`, fuera del Context Engine. Cuando
+    exista `ExitV1Model`, el punto de registro es ESTA lista: basta con
+    instanciarlo y agregarlo, sin tocar `ModelSelector` ni `stage4`. Dos
+    condiciones a cumplir antes:
+      - `zones.type == 'salida'` no resuelve hoy contra el catalogo
+        (`_resolve_zone_type_id` lanza ValueError si el slug no existe), asi que
+        `ExitV1Model.supports()` no puede depender solo de `zone.zone_type_id`.
+      - `exit_product.py` lee `zones` con columnas explicitas; un modelo
+        especializado devuelve `ZoneState` y no `ExitZoneItem`, de modo que
+        conviven dos contratos hasta que se unifiquen.
     """
     return ModelSelector(
         [

@@ -20,6 +20,7 @@ import { GpsModal } from '@/components/GpsModal'
 import { formatUpdatedAt } from '@/utils/formatTime'
 import { getDistancias } from '@/utils/geo'
 import PublicAlertsBanner from '@/components/PublicAlertsBanner'
+import { getEstadoStyles, normalizeZoneStatus } from '@/utils/zoneStatus'
 
 const MODOS: { value: TransporteMode; label: string; icon: typeof Car }[] = [
   { value: 'vehicular', label: 'En auto', icon: Car },
@@ -27,12 +28,34 @@ const MODOS: { value: TransporteMode; label: string; icon: typeof Car }[] = [
   { value: 'transporte', label: 'Colectivo', icon: Bus },
 ]
 
-const getStatusChip = (status: string) => {
-  switch (status) {
-    case 'activa': return 'bg-success/20 text-success'
-    case 'alerta': return 'bg-warning/20 text-warning'
-    default: return 'bg-danger/20 text-danger'
+/**
+ * Badge de estado de zona.
+ *
+ * El color y la etiqueta salen de `@/utils/zoneStatus`, que es la única fuente
+ * de verdad del mapeo `estado -> estilo`. Antes esta pantalla traía su propio
+ * `getStatusChip` con un `switch` propio que solo cubría `activa` y `alerta`:
+ * `restringida` caía en el `default` y se pintaba con el rojo de `cerrada`, es
+ * decir, marcaba una zona restringida como si estuviera cerrada.
+ *
+ * `normalizeZoneStatus` tolera los alias legacy que puede devolver el backend
+ * (`cerrado`, `closed`, `con_limites`, ...). Un valor desconocido no se inventa:
+ * se muestra "—", el mismo fallback que usa `ZonaCardsList`.
+ */
+const StatusBadge = ({ status, className = '' }: { status: string; className?: string }) => {
+  const canonico = normalizeZoneStatus(status)
+  if (!canonico) {
+    return (
+      <span className={`px-2 py-0.5 rounded text-[10px] font-bold bg-gray-500/20 text-gray-500 dark:text-gray-300 ${className}`}>
+        —
+      </span>
+    )
   }
+  const { className: estilos, label } = getEstadoStyles(canonico)
+  return (
+    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${estilos} ${className}`}>
+      {label}
+    </span>
+  )
 }
 
 const Salir = () => {
@@ -114,9 +137,7 @@ const Salir = () => {
         </p>
         <span className="flex items-center gap-1.5 shrink-0">
           <NearestBadge visible={zona.is_nearest} />
-          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getStatusChip(zona.status)}`}>
-            {zona.status}
-          </span>
+          <StatusBadge status={zona.status} />
         </span>
       </div>
 
@@ -199,9 +220,7 @@ const Salir = () => {
           <p className="text-sm text-slate-600 dark:text-slate-300 capitalize">
             🚪 Modo de salida: {selectedZona.transporte}
           </p>
-          <p className={`inline-block px-2 py-0.5 rounded text-xs font-bold ${getStatusChip(selectedZona.status)}`}>
-            Estado: {selectedZona.status}
-          </p>
+          <StatusBadge status={selectedZona.status} className="inline-block" />
           {selectedZona.destinations.length > 0 && (
             <div className="text-sm text-slate-600 dark:text-slate-300">
               <p className="font-semibold mb-1">➡️ Destinos:</p>
