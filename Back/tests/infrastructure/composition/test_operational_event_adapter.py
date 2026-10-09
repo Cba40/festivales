@@ -21,6 +21,7 @@ import pytest
 
 from src.domain.entities.operational_event import OperationalEvent
 from src.infrastructure.composition.adapters.operational_event_adapter import (
+    CLOSURE_IMPACT_CANONICAL,
     OperationalEventAdapter,
     clamp_impact,
     compute_impact,
@@ -202,7 +203,29 @@ class TestImpactFormulas:
         assert compute_impact("reduccion_capacidad", 40, 100, 0.5) == -20
 
     def test_cierre_total(self) -> None:
-        assert compute_impact("cierre_total", None, 50, 0.8) == -40
+        # Opcion C: `cierre_total` devuelve el impacto canonico de cierre, que
+        # `stage3_zone_behavior_application` interpreta como
+        # `FlowRestriction.CLOSED` (`accumulated_impact <= -100`). Antes devolvia
+        # `-round(capacity * density_factor)`, con lo que una zona de 50 personas
+        # al 80% producia -40 y NUNCA se cerraba.
+        assert compute_impact("cierre_total", None, 50, 0.8) == CLOSURE_IMPACT_CANONICAL
+
+    @pytest.mark.parametrize(
+        ("capacity", "density_factor"),
+        [
+            (5, 0.01),    # zona minima: antes daba -0
+            (50, 0.5),   # antes daba -25  <- caso que fallaba
+            (100, 0.9),  # antes daba -90  <- no alcanzaba el centinela
+            (200, 0.7),  # antes daba -140 -> clamp -100
+            (1000, 0.3),  # antes daba -300 -> clamp -100
+        ],
+    )
+    def test_cierre_total_closes_regardless_of_capacity_and_density(
+        self, capacity: int, density_factor: float,
+    ) -> None:
+        assert compute_impact(
+            "cierre_total", None, capacity, density_factor,
+        ) == CLOSURE_IMPACT_CANONICAL
 
     def test_aumento_demanda_uses_effect_value(self) -> None:
         assert compute_impact("aumento_demanda", 25, 100, 0.9) == 25
@@ -329,7 +352,9 @@ class TestOperationalEventAdapter:
 
         events = await adapter.find_active_by_timestamp(TS)
 
-        assert [e.impact_value for e in events] == [-20, -40, 25, 0]
+        # El -40 del cierre_total era `-round(50 * 0.8)`; con la Opcion C el
+        # cierre total es siempre el impacto canonico -100.
+        assert [e.impact_value for e in events] == [-20, -100, 25, 0]
         assert [e.target_zone_id for e in events] == [
             UUID(ZONE_A),
             UUID(ZONE_B),

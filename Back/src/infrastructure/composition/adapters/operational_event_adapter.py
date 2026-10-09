@@ -6,17 +6,36 @@ traduciendo cada fila activa a una entidad de dominio `OperationalEvent` con el
 impacto calculado segun el RFC-OPERATIONAL-EVENTS-V1:
 
 - reduccion_capacidad  -> -round(capacity * density_factor * effect_value / 100)
-- cierre_total         -> -round(capacity * density_factor)
+- cierre_total         -> -100  (impacto canonico de cierre absoluto)
 - aumento_demanda      -> effect_value
 - incidente_sin_impacto -> 0
 
 `density_factor` se obtiene de `zone_behaviors` para el par
 (zone_type, fase operativa activa) en el timestamp; `capacity` desde `zones`.
 
-El impacto resultante se normaliza a [-100, 100] (restringido por la entidad de
+El impacto resultante se normaliza a [-100, 100] (restriccion de la entidad de
 dominio `OperationalEvent`). Los eventos con zone_id nulo o zona inexistente se
 omiten; si no hay zone_behavior ni fase activa se usa una densidad segura (1.0)
 para no subestimar el impacto.
+
+OPCIÓN C - `operational_events` es la única autoridad de cierre por zona.
+------------------------------------------------------------------
+`cierre_total` devuelve el impacto canónico de cierre (`-100`) en vez de
+`-round(capacity * density_factor)`. El valor `-100` es el centinela que
+`stage3_zone_behavior_application` ya interpreta como cierre:
+
+    if accumulated_impact <= -100:
+        active_restriction = FlowRestriction.CLOSED
+
+La fórmula anterior solo alcanzaba ese centinela cuando
+`capacity * density_factor >= 100`, por lo que una zona de 50 personas con
+`density_factor = 0.5` producía `-25` y NUNCA se cerraba. Peor aún, el impacto
+resultante está en PERSONAS (se suma a `projected_density`), mientras que `-100`
+funciona como centinela de estado: son magnitudes distintas y no comparables.
+
+Consecuencia buscada: `cierre_total` cierra la zona SIEMPRE, sea cual sea su
+capacidad u ocupación. Las fórmulas de `reduccion_capacidad`, `aumento_demanda` e
+`incidente_sin_impacto` quedan sin cambios.
 """
 from __future__ import annotations
 
@@ -40,6 +59,13 @@ from src.domain.ports import OperationalEventRepository
 LOCAL_TZ = ZoneInfo("America/Argentina/Buenos_Aires")
 
 DEFAULT_DENSITY_FACTOR = 1.0
+
+# Impacto canonico de cierre total. Es el centinela que
+# `stage3_zone_behavior_application.apply_zone_behaviors` ya interpreta como
+# cierre: `if accumulated_impact <= -100 -> FlowRestriction.CLOSED`.
+# Deliberadamente NO depende de capacity/density_factor: si dependiera, las zonas
+# cuya ocupacion proyectada no alcanza 100 personas nunca se cerrarian.
+CLOSURE_IMPACT_CANONICAL = -100
 
 _SUBTIPO_TO_ZONE_TYPE_SLUG = {
     "banos": "bano",
@@ -95,9 +121,16 @@ def compute_impact(
     capacity: int,
     density_factor: float,
 ) -> int:
-    """Impacto entero segun RFC-OPERATIONAL-EVENTS-V1 (antes del clamp [-100,100])."""
+    """Impacto entero segun RFC-OPERATIONAL-EVENTS-V1 (antes del clamp [-100,100]).
+
+    `cierre_total` devuelve CLOSURE_IMPACT_CANONICAL (-100), el centinela que
+    `stage3_zone_behavior_application` ya traduce a
+    `FlowRestriction.CLOSED`. Es independiente de `capacity` y `density_factor`
+    a proposito: un cierre total cierra siempre, incluso en zonas cuya
+    ocupacion proyectada no llega a 100 personas.
+    """
     if effect_type == "cierre_total":
-        return -round(capacity * density_factor)
+        return CLOSURE_IMPACT_CANONICAL
     if effect_type == "reduccion_capacidad":
         return -round(capacity * density_factor * (effect_value or 0) / 100)
     if effect_type == "aumento_demanda":

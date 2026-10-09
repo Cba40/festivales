@@ -10,6 +10,12 @@ from app.schemas.product import ZonaItemBase
 from src.domain.recommendation.zone_recommendation import ZoneRecommendation
 from src.domain.value_objects.zone_state import ZoneState
 
+# Restriccion de flujo reportada cuando no hay dato suficiente para afirmarla.
+# Deliberadamente distinta de "OPEN": `operational_events` es la autoridad de
+# cierre, asi que declarar "OPEN" por omision equivale a abrir el paso a una
+# zona que pudo haber sido clausurada por un incidente.
+UNKNOWN_RESTRICTION = "UNKNOWN"
+
 
 def saturation_to_estado(saturation_level: float) -> str:
     if saturation_level < 0.25:
@@ -85,7 +91,7 @@ def enrich_zone(
         active_restriction = (
             state.active_restriction.value
             if state.active_restriction is not None
-            else "OPEN"
+            else UNKNOWN_RESTRICTION
         )
         operational_state = state.operational_state
     else:
@@ -93,7 +99,12 @@ def enrich_zone(
         availability = None
         estimated_wait = None
         confidence = None
-        active_restriction = "OPEN"
+        # Opcion C: la ausencia de datos NO se reporta como "abierta".
+        # `operational_events` es la autoridad de cierre, asi que un default
+        # "OPEN" publicaba zonas como abiertas cuando el motor no habia
+        # producido ningun ZoneState (fallo parcial o zona sin configurar).
+        # Ante duda, el sistema declara que no sabe.
+        active_restriction = UNKNOWN_RESTRICTION
         operational_state = "UNKNOWN"
 
     estado = (

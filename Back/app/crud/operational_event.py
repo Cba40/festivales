@@ -3,17 +3,12 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import HTTPException, status
-import sqlalchemy as sa
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.event_day import EventDay
-from app.models.event_day_phase import EventDayPhase
 from app.models.operational_event import OperationalEvent
 from app.models.zone import Zone
-from app.models.zone_behavior import ZoneBehavior
-from app.models.zone_type import ZoneType
-from app.models.operational_event import OperationalEvent
 from app.schemas.operational_event import (
     OperationalEventCreate,
     OperationalEventUpdate,
@@ -42,74 +37,21 @@ async def _was_used_by_engine(db: AsyncSession, db_obj: OperationalEvent) -> boo
     return await db.scalar(stmt) is not None
 
 
-async def _sync_zone_behavior_for_cierre_total(
-    db: AsyncSession,
-    event_id: UUID,
-    zone_id: UUID,
-    event_day_id: str,
-    is_active: bool,
-    effect_type: str,
-) -> None:
-    """Sincroniza zone_behaviors.flow_restriction cuando hay un evento de cierre_total.
-
-    - Si el evento es "cierre_total" y está activo: pone flow_restriction = 'CLOSED'
-    - Si el evento se desactiva/termina: restaura a 'OPEN'
-    Solo afecta a zone_behaviors de la fase operativa activa del día actual.
-    """
-    if effect_type != "cierre_total":
-        return
-
-    try:
-        # Obtener el zone_type_id de la zona usando SQL directo
-        zt_result = await db.execute(
-            sa.text("""
-                SELECT zt.id FROM zone_types zt
-                JOIN zones z ON zt.slug = z.type
-                WHERE z.id = :zone_id
-            """),
-            {"zone_id": str(zone_id)}
-        )
-        zt_row = zt_result.first()
-        if not zt_row:
-            return
-        zt_id = str(zt_row[0])
-
-        # Buscar el EventDay activo del evento
-        event_day_result = await db.execute(
-            sa.text("SELECT id, is_active FROM event_days WHERE id = :id"),
-            {"id": event_day_id}
-        )
-        event_day_row = event_day_result.first()
-        if not event_day_row or not event_day_row[1]:  # is_active
-            return
-
-        # Obtener las fases del día activo
-        phase_ids_result = await db.execute(
-            sa.text("SELECT operational_phase_id FROM event_day_phases WHERE event_day_id = :ed_id"),
-            {"ed_id": event_day_id}
-        )
-        phase_ids = [str(p[0]) for p in phase_ids_result.all()]
-        if not phase_ids:
-            return
-
-        # Flujo objetivo según si el evento está activo
-        target_flow = "CLOSED" if is_active else "OPEN"
-
-        # Actualizar zone_behaviors que coincidan
-        await db.execute(
-            update(ZoneBehavior)
-            .where(
-                ZoneBehavior.operational_phase_id.in_(phase_ids),
-                ZoneBehavior.zone_type_id == zt_id,
-            )
-            .values(flow_restriction=target_flow)
-        )
-        await db.flush()  # No commit: dejar que el caller maneje la transacción
-    except Exception:
-        # En entornos de test con esquemas simplificados, las tablas pueden no tener
-        # todas las columnas esperadas. En ese caso, no hacemos nada y dejamos que el test
-        # continúe sin sincronizar. NO hacemos rollback para no expirar objetos de la sesión.
-        return
+# ─────────────────────────────────────────────────────────────────────────────
+# Opcion C: `operational_events` es la UNICA autoridad de cierre por zona.
+#
+# Se elimino `_sync_zone_behavior_for_cierre_total`, que replicaba el cierre
+# sobre `zone_behaviors.flow_restriction`. Era inviable por tres motivos:
+#   1. `zone_behaviors` esta indexada por (operational_phase_id, zone_type_id) y
+#      NO tiene `zone_id`: cerrar una zona cerraba TODAS las zonas de ese tipo.
+#   2. El UPDATE se emitia con `db.flush()` sin `commit`, y tras el `commit()` del
+#      INSERT, por lo que dependia del teardown de sesion para persistirse.
+#   3. `except Exception: return` ocultaba cualquier fallo, incluidos errores de
+#      esquema y de sesion.
+#
+# El cierre se deriva ahora en lectura: `compute_impact("cierre_total", ...) = -100`
+# y Stage3 lo traduce a `FlowRestriction.CLOSED`.
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 async def create(db: AsyncSession, data: OperationalEventCreate) -> OperationalEvent:
@@ -128,16 +70,6 @@ async def create(db: AsyncSession, data: OperationalEventCreate) -> OperationalE
     await db.flush()
     await db.commit()
     await db.refresh(db_obj)
-
-    # Sincronizar zone_behaviors si es un cierre_total
-    await _sync_zone_behavior_for_cierre_total(
-        db=db,
-        event_id=db_obj.id,
-        zone_id=db_obj.zone_id,
-        event_day_id=data.event_day_id,
-        is_active=db_obj.is_active,
-        effect_type=data.effect_type,
-    )
     return db_obj
 
 
@@ -182,10 +114,6 @@ async def update(
     new_effect_value = update_data.get("effect_value", db_obj.effect_value)
     validate_effect(new_effect_type, new_effect_value)
 
-    # Guardar estado anterior para sincronización
-    old_is_active = db_obj.is_active
-    old_effect_type = db_obj.effect_type
-
     for field, value in update_data.items():
         setattr(db_obj, field, value)
     db_obj.updated_at = _now()
@@ -193,17 +121,6 @@ async def update(
     await db.flush()
     await db.commit()
     await db.refresh(db_obj)
-
-    # Sincronizar zone_behaviors si es un cierre_total y cambió el estado activo
-    if db_obj.effect_type == "cierre_total" and db_obj.is_active != old_is_active:
-        await _sync_zone_behavior_for_cierre_total(
-            db=db,
-            event_id=db_obj.id,
-            zone_id=db_obj.zone_id,
-            event_day_id=str(db_obj.event_day_id),
-            is_active=db_obj.is_active,
-            effect_type=db_obj.effect_type,
-        )
     return db_obj
 
 
@@ -220,17 +137,6 @@ async def deactivate(db: AsyncSession, event_id: UUID) -> OperationalEvent:
     await db.flush()
     await db.commit()
     await db.refresh(db_obj)
-
-    # Sincronizar zone_behaviors si es un cierre_total
-    if db_obj.effect_type == "cierre_total":
-        await _sync_zone_behavior_for_cierre_total(
-            db=db,
-            event_id=db_obj.id,
-            zone_id=db_obj.zone_id,
-            event_day_id=str(db_obj.event_day_id),
-            is_active=False,
-            effect_type=db_obj.effect_type,
-        )
     return db_obj
 
 

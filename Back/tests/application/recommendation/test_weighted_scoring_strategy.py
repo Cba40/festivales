@@ -463,10 +463,14 @@ class TestFiltering:
         assert len(result) == 1
         assert result[0].zone_id == _zone_a().zone_id
 
-    def test_accessibility_keeps_closed_when_speed_positive(
+    def test_closed_is_filtered_even_when_accessibility_and_speed_positive(
         self,
         strategy: WeightedScoringStrategy,
     ) -> None:
+        # Opcion C: el cierre es GLOBAL e incondicional. Antes una zona CLOSED
+        # sobrevivia al filtro si el usuario no pedia accesibilidad o se movia a
+        # velocidad > 0, y podia reaparecer como `is_nearest` en SEEK_REST,
+        # SEEK_FOOD, SEEK_WATER, estacionamiento o Banos.
         result = strategy.evaluate(
             prediction=_prediction(zone_states=[_zone_a(), _zone_c()]),
             user_context=UserContext(
@@ -483,7 +487,43 @@ class TestFiltering:
         )
         zone_ids = {r.zone_id for r in result}
         assert _zone_a().zone_id in zone_ids
-        assert _zone_c().zone_id in zone_ids
+        assert _zone_c().zone_id not in zone_ids
+
+    @pytest.mark.parametrize(
+        "action_type",
+        [
+            ActionType.SEEK_REST,
+            ActionType.SEEK_FOOD,
+            ActionType.SEEK_WATER if hasattr(ActionType, "SEEK_WATER") else ActionType.SEEK_HYDRATION,
+            ActionType.SEEK_PARKING,
+            ActionType.SEEK_BATHROOM,
+            ActionType.SEEK_SERVICE,
+            ActionType.SEEK_LOW_DENSITY,
+            ActionType.SEEK_SECURITY,
+            ActionType.SEEK_INFORMATION,
+        ],
+    )
+    def test_closed_is_filtered_for_every_action_type(
+        self,
+        strategy: WeightedScoringStrategy,
+        action_type: ActionType,
+    ) -> None:
+        # Regresion de la Opcion C: el cierre no puede depender de la accion.
+        result = strategy.evaluate(
+            prediction=_prediction(zone_states=[_zone_a(), _zone_c()]),
+            user_context=UserContext(
+                user_id=UUID("00000000-0000-0000-0000-000000000001"),
+                access_level=AccessLevel.STANDARD,
+            ),
+            mobility_context=MobilityContext(
+                current_zone_id=None,
+                speed=1.0,
+                accessibility_required=False,
+            ),
+            requested_action=RequestedAction(action_type=action_type),
+            config=RecommendationConfig(),
+        )
+        assert _zone_c().zone_id not in {r.zone_id for r in result}
 
 
 class TestOrdering:

@@ -138,6 +138,20 @@ class WeightedScoringStrategy:
 
         # ── Behavioural filters ──────────────────────────────────────────────
 
+        # ── Cierre global (Opcion C) ─────────────────────────────────────────
+        # `operational_events` es la unica autoridad de cierre por zona: un
+        # incidente `cierre_total` produce el impacto canonico -100, que Stage3
+        # traduce a FlowRestriction.CLOSED. Una zona cerrada no es candidata
+        # para NINGUNA accion. Antes solo se excluia en SEEK_EXIT y en el caso
+        # `accessibility_required and speed == 0.0`, de modo que una zona
+        # cerrada podia reaparecer en las recomendaciones de descanso, comida,
+        # hidratacion o estacionamiento, incluso marcada como `is_nearest`.
+        #
+        # Se evalua despues del filtro de clasificacion para no alterar el
+        # orden de los filtros, y antes que cualquier puntuacion.
+        if zone.active_restriction == FlowRestriction.CLOSED:
+            return False
+
         if requested_action.action_type == ActionType.SEEK_EXIT:
             if zone.active_restriction == FlowRestriction.CLOSED:
                 return False
