@@ -49,7 +49,9 @@ ZT_REST = "00000000-0000-4000-8000-0000000e0004"
 ZT_SERV = "00000000-0000-4000-8000-0000000e0005"
 ZONE_TARGET = "00000000-0000-4000-8000-0000000e0006"   # recibe el cierre_total (capacity=50)
 ZONE_CONTROL = "00000000-0000-4000-8000-0000000e0007"  # control: NO recibe incidente (capacity=200)
-FIXTURE_IDS = (EVENT_ID, ED_ID, AL_ID, ZT_REST, ZT_SERV, ZONE_TARGET, ZONE_CONTROL)
+ZONE_BIG = "00000000-0000-4000-8000-0000000e0008"      # recibe reduccion_capacidad 50% (capacity=1000)
+FIXTURE_IDS = (EVENT_ID, ED_ID, AL_ID, ZT_REST, ZT_SERV,
+               ZONE_TARGET, ZONE_CONTROL, ZONE_BIG)
 
 LOCAL_TZ = timezone(timedelta(hours=-3))
 FAILURES: list[str] = []
@@ -87,14 +89,17 @@ def phase_a() -> None:
         v = compute_impact("cierre_total", None, cap, dens)
         check(f"A2 cierre_total(cap={cap}, dens={dens}) == -100", v == -100, f"-> {v}")
 
-    check("A3 reduccion_capacidad NO cambio (cap=200,dens=0.7,pct=50) == -70",
-          compute_impact("reduccion_capacidad", 50, 200, 0.7) == -70,
+    check("A3 reduccion_capacidad = porcentaje (50% -> -50, sin importar cap)",
+          compute_impact("reduccion_capacidad", 50, 200, 0.7) == -50,
           str(compute_impact("reduccion_capacidad", 50, 200, 0.7)))
-    check("A4 reduccion_capacidad 100% (cap=200,dens=0.7) == -140 (sin clamp)",
-          compute_impact("reduccion_capacidad", 100, 200, 0.7) == -140,
+    check("A4 reduccion_capacidad 100% -> -100 (cierra)",
+          compute_impact("reduccion_capacidad", 100, 200, 0.7) == -100,
           str(compute_impact("reduccion_capacidad", 100, 200, 0.7)))
-    check("A4b clamp_impact(-140) == -100",
-          clamp_impact(compute_impact("reduccion_capacidad", 100, 200, 0.7)) == -100)
+    check("A4b reduccion_capacidad 20% en zona grande NO llega al centinela",
+          clamp_impact(
+              compute_impact("reduccion_capacidad", 20, 1000, 0.5)
+          ) == -20,
+          "antes: -100 -> CLOSED FALSO")
     check("A5 aumento_demanda NO cambio (ev=40) == 40",
           compute_impact("aumento_demanda", 40, 200, 0.7) == 40)
     check("A6 incidente_sin_impacto == 0",
@@ -102,6 +107,11 @@ def phase_a() -> None:
 
 
 # ─────────────────────────── SEED / CLEANUP ─────────────────────────────
+# `zone_types` NO se inserta a ciegas: las migraciones de Alembic ya siembran
+# 'descanso' y 'servicios' y la columna `slug` tiene UNIQUE. Se resuelve por slug
+# y solo se crea si falta. Los ids resueltos se guardan para la limpieza.
+RESOLVED_ZONE_TYPE_IDS: list[str] = []
+
 SEED_SQL = [
     ("operational_profiles",
      f"INSERT INTO operational_profiles (id, name) VALUES (:prof, 'VERIFY_C Perfil')"),
@@ -114,12 +124,6 @@ SEED_SQL = [
     ("attendance_levels",
      f"INSERT INTO attendance_levels (id, event_id, name, min_people, max_people) "
      f"VALUES (:al, :ev, 'VERIFY_C Nivel', 0, 100000)"),
-    ("zone_types",
-     f"INSERT INTO zone_types (id, name, slug, icon, description, default_factors) "
-     f"VALUES (:zt1, 'Descanso', 'descanso', 'bed', 'VERIFY_C', '{{}}')"),
-    ("zone_types",
-     f"INSERT INTO zone_types (id, name, slug, icon, description, default_factors) "
-     f"VALUES (:zt2, 'Servicios', 'servicios', 'wc', 'VERIFY_C', '{{}}')"),
     ("zones",
      f"INSERT INTO zones (id, event_id, name, type, subtipo, saturation, status, capacity, "
      f"available_capacity, latitude, longitude) "
@@ -130,10 +134,16 @@ SEED_SQL = [
      f"available_capacity, latitude, longitude) "
      f"VALUES (:z2, :ev, 'VERIFY_C Descanso 2', 'servicios', 'descanso', 'bajo', 'activa', 200, 140, "
      f"-34.61, -58.39)"),
+    ("zones",
+     f"INSERT INTO zones (id, event_id, name, type, subtipo, saturation, status, capacity, "
+     f"available_capacity, latitude, longitude) "
+     f"VALUES (:z3, :ev, 'VERIFY_C Descanso 3', 'servicios', 'descanso', 'bajo', 'activa', 1000, 500, "
+     f"-34.62, -58.40)"),
     ("event_days",
      f"INSERT INTO event_days (id, event_id, date, day_of_week, is_active, "
-     f"attendance_level_id, operational_start_min, operational_end_min) "
-     f"VALUES (:ed, :ev, :today, 'lunes', true, :al, 0, 1440)"),
+     f"attendance_level_id, operational_profile_id, operational_start_min, "
+     f"operational_end_min) "
+     f"VALUES (:ed, :ev, :today, 'lunes', true, :al, :prof, 0, 1440)"),
     ("event_day_phases",
      f"INSERT INTO event_day_phases (event_day_id, operational_phase_id, start_min, "
      f"end_min, intensity) VALUES (:ed, :ph, 0, 1440, 1.0)"),
@@ -207,33 +217,61 @@ SEED_SQL += [
      "saturation_moderate_threshold) VALUES (900001, 0.9, 0.5)"),
 ]
 
+# Orden de borrado: primero las tablas hoja, despues las padre. `predictions` y
+# `zone_recommendations` tienen FK a `event_days` y a `zones`, asi que deben caer
+# antes que ellas o el DELETE choca con ForeignKeyViolation.
 CLEANUP_SQL = [
-    "DELETE FROM operational_events WHERE zone_id IN (%s)" % _ID_LIST,
-    f"DELETE FROM zone_behaviors WHERE zone_type_id IN ({_ID_LIST})",
-    f"DELETE FROM event_day_phases WHERE event_day_id IN ({_ID_LIST})",
-    f"DELETE FROM event_days WHERE id IN ({_ID_LIST})",
-    f"DELETE FROM zones WHERE id IN ({_ID_LIST})",
-    f"DELETE FROM attendance_levels WHERE id IN ({_ID_LIST})",
-    f"DELETE FROM zone_types WHERE id IN ({_ID_LIST})",
+    "DELETE FROM operational_events WHERE zone_id IN ({ids})",
+    "DELETE FROM zone_recommendations WHERE event_day_id IN ({ids})",
+    "DELETE FROM predictions WHERE event_day_id IN ({ids})",
+    "DELETE FROM zone_behaviors WHERE zone_type_id IN ({ids})",
+    "DELETE FROM event_day_phases WHERE event_day_id IN ({ids})",
+    "DELETE FROM service_configs WHERE event_day_id IN ({ids})",
+    "DELETE FROM observation_control_protocols WHERE event_day_id IN ({ids})",
+    "DELETE FROM exit_zone_destinations WHERE exit_zone_id IN ({ids})",
+    "DELETE FROM transport_line_stops WHERE zone_id IN ({ids})",
+    "DELETE FROM zones WHERE id IN ({ids})",
+    "DELETE FROM event_days WHERE id IN ({ids})",
+    "DELETE FROM attendance_levels WHERE id IN ({ids})",
     "DELETE FROM operational_phases WHERE name = 'VERIFY_C Fase'",
     "DELETE FROM operational_profiles WHERE name = 'VERIFY_C Perfil'",
-    f"DELETE FROM events WHERE id IN ({_ID_LIST})",
+    "DELETE FROM events WHERE id IN ({ids})",
     "DELETE FROM recommendation_config WHERE id = 900001",
     "DELETE FROM stage4_config WHERE id = 900001",
-    "DELETE FROM zone_recommendations WHERE event_day_id IN (%s)" % _ID_LIST,
-    "DELETE FROM predictions WHERE event_day_id IN (%s)" % _ID_LIST,
     "DELETE FROM knowledge_model_versions WHERE created_by = 'VERIFY_C'",
 ]
 
 
+async def _resolve_zone_type(db, slug: str, name: str, icon: str) -> str:
+    """Devuelve el id de `zone_types` para `slug`, creandolo solo si falta."""
+    found = (await db.execute(
+        text("SELECT id FROM zone_types WHERE slug = :s"), {"s": slug},
+    )).scalar()
+    if found:
+        return str(found)
+    new_id = str(uuid.uuid4())
+    await db.execute(
+        text("INSERT INTO zone_types (id, name, slug, icon, description, "
+             "default_factors) VALUES (:i, :n, :s, :ic, 'VERIFY_C', '{}')"),
+        {"i": new_id, "n": name, "s": slug, "ic": icon},
+    )
+    return new_id
+
+
 async def seed(db) -> None:
     prof_id, phase_id = uuid.uuid4(), uuid.uuid4()
+    RESOLVED_ZONE_TYPE_IDS.clear()
+    zt1 = await _resolve_zone_type(db, "descanso", "Descanso", "bed")
+    zt2 = await _resolve_zone_type(db, "servicios", "Servicios", "wc")
+    RESOLVED_ZONE_TYPE_IDS.extend([zt1, zt2])
+    print(f"  zone_types resueltos: descanso={zt1} servicios={zt2}")
     today = datetime.now(LOCAL_TZ).date()
     params = {
         "prof": prof_id, "ph": phase_id, "ev": EVENT_ID, "al": AL_ID,
         "zt1": ZT_REST, "zt2": ZT_SERV, "z1": ZONE_TARGET, "z2": ZONE_CONTROL,
-        "ed": ED_ID, "today": today,
+        "z3": ZONE_BIG, "ed": ED_ID, "today": today,
     }
+    params["zt1"], params["zt2"] = zt1, zt2
     for _, sql in SEED_SQL:
         await db.execute(text(sql), params)
     await db.commit()
@@ -241,24 +279,33 @@ async def seed(db) -> None:
 
 
 async def cleanup(db) -> None:
+    # Las zone_types resueltas pueden ser preexistentes (creadas por Alembic), asi
+    # que su limpieza debe usar SOLO los ids que creo este script.
+    ids = list(FIXTURE_IDS) + [z for z in RESOLVED_ZONE_TYPE_IDS if z not in FIXTURE_IDS]
+    id_list = ", ".join("'%s'" % i for i in ids)
     # La base puede no tener knowledge_model_versions todavia: se toleran las
-    # tablas ausentes para que la limpieza sea segura antes y despues del seed.
+    # tablas ausentes. El error se REPORTA en vez de tragarse en silencio: un
+    # cleanup que falla en silencio deja basura creyendo que limpio.
     for sql in CLEANUP_SQL:
         try:
-            await db.execute(text(sql))
-        except Exception:
+            await db.execute(text(sql.format(ids=id_list)))
+        except Exception as exc:  # noqa: BLE001
             await db.rollback()
+            print(f"  [cleanup] OMITIDO -> {sql.split('FROM')[1].split('WHERE')[0].strip()}: "
+                  f"{type(exc).__name__}: {str(exc).splitlines()[0][:90]}")
     await db.commit()
-    # comprobacion: no debe quedar rastro
+    # comprobacion: no debe quedar rastro de lo que creo este script
     left = {}
     for t, col in [("operational_events", "zone_id"), ("zones", "id"),
-                   ("event_days", "id"), ("zone_types", "id"), ("events", "id"),
-                   ("event_day_phases", "event_day_id"), ("zone_behaviors", "zone_type_id"),
+                   ("event_days", "id"), ("events", "id"),
+                   ("event_day_phases", "event_day_id"),
                    ("attendance_levels", "id")]:
-        n = (await db.execute(
+        left[t] = (await db.execute(
             text(f"SELECT COUNT(*) FROM {t} WHERE {col} IN ({_ID_LIST})")
         )).scalar()
-        left[t] = n
+    left["zone_behaviors"] = (await db.execute(
+        text(f"SELECT COUNT(*) FROM zone_behaviors WHERE zone_type_id IN ({id_list})")
+    )).scalar()
     print("  filas residuales:", {k: v for k, v in left.items() if v} or "NINGUNA")
 
 
@@ -405,6 +452,99 @@ async def main() -> int:
                   st2[tgt].active_restriction.value == "OPEN",
                   st2[tgt].active_restriction.value if tgt in st2 else "n/a")
             check("F2 zona objetivo vuelve al producto", tgt in names2)
+
+            # ---------- FASE G: reduccion_capacidad NO cierra ----------
+            header("FASE G - reduccion_capacidad 50% en zona GRANDE (capacity=1000)")
+            big = str(uuid.UUID(ZONE_BIG))
+            base_proj = st2[big].projected_density if big in st2 else None
+            base_proj_ctrl = st2[ctl].projected_density if ctl in st2 else None
+            print(f"  zona grande {ZONE_BIG[-8:]}: capacity=1000, density=0.5")
+            print(f"  projected_density baseline = {base_proj} personas")
+            print("  impacto ANTES del fix = -round(1000 * 0.5 * 50 / 100) = -250")
+            print("            -> clamp_impact lo recortaba a -100")
+            print("            -> stage3 leia -100 <= -100 y la CERRABA (falso positivo)")
+
+            now_g = datetime.now(timezone.utc)
+            red_id = await db.execute(
+                text("""
+                INSERT INTO operational_events
+                    (event_day_id, zone_id, event_type, description, effect_type,
+                     effect_value, is_incident, start_timestamp, end_timestamp, is_active)
+                VALUES (:ed, :z, 'congestion_extraordinaria',
+                        'VERIFY_C reduccion de capacidad 50%',
+                        'reduccion_capacidad', 50, false, :s, :e, true)
+                RETURNING id
+                """),
+                {"ed": ED_ID, "z": ZONE_BIG,
+                 "s": now_g - timedelta(minutes=5), "e": now_g + timedelta(hours=2)},
+            )
+            red_inc = red_id.scalar_one()
+            await db.commit()
+            print(f"  incidente creado: {red_inc}  (reduccion_capacidad, effect_value=50)")
+
+            # el impacto que vera el motor
+            from src.infrastructure.composition.adapters.operational_event_adapter import (
+                clamp_impact,
+                compute_impact,
+            )
+            impact = clamp_impact(
+                compute_impact("reduccion_capacidad", 50, 1000, 0.5)
+            )
+            print(f"  impacto AHORA      = {impact}")
+            check("G1 impacto de reduccion_capacidad(50%) == -50", impact == -50,
+                  str(impact))
+            check("G2 el impacto NO alcanza el centinela de cierre (<= -100)",
+                  impact > -100)
+
+            st3, names3, _ = await observe(db, "con reduccion_capacidad 50%")
+            check("G3 zona grande sigue OPEN (no CLOSED)",
+                  st3[big].active_restriction.value == "OPEN",
+                  st3[big].active_restriction.value if big in st3 else "n/a")
+            check("G4 operational_state NO es CLOSED",
+                  st3[big].operational_state != "CLOSED",
+                  st3[big].operational_state if big in st3 else "n/a")
+            check("G5 zona grande SIGUE en /products/rest (no desaparece)",
+                  big in names3,
+                  f"lista={[n[-8:] for n in names3]}")
+            check("G6 projected_density bajo respecto del baseline",
+                  big in st3 and base_proj is not None
+                  and st3[big].projected_density < base_proj,
+                  f"{base_proj} -> {st3[big].projected_density if big in st3 else 'n/a'}")
+            check("G7 la reduccion NO contamina otras zonas (control intacta)",
+                  st3[ctl].active_restriction.value == "OPEN"
+                  and st3[ctl].projected_density == base_proj_ctrl,
+                  f"control {st3[ctl].active_restriction.value}, "
+                  f"projected {st3[ctl].projected_density} (base {base_proj_ctrl})")
+
+            # 100% si debe cerrar
+            await db.execute(text("DELETE FROM operational_events WHERE id = :i"),
+                             {"i": red_inc})
+            await db.commit()
+            now_h = datetime.now(timezone.utc)
+            full_id = await db.execute(
+                text("""
+                INSERT INTO operational_events
+                    (event_day_id, zone_id, event_type, description, effect_type,
+                     effect_value, is_incident, start_timestamp, end_timestamp, is_active)
+                VALUES (:ed, :z, 'corte_calle', 'VERIFY_C reduccion 100%',
+                        'reduccion_capacidad', 100, true, :s, :e, true)
+                RETURNING id
+                """),
+                {"ed": ED_ID, "z": ZONE_BIG,
+                 "s": now_h - timedelta(minutes=5), "e": now_h + timedelta(hours=2)},
+            )
+            full_inc = full_id.scalar_one()
+            await db.commit()
+
+            st4, names4, _ = await observe(db, "con reduccion_capacidad 100%")
+            check("G8 reduccion_capacidad al 100% SI cierra",
+                  st4[big].active_restriction.value == "CLOSED",
+                  st4[big].active_restriction.value if big in st4 else "n/a")
+            check("G9 zona con 100% desaparece del producto", big not in names4)
+
+            await db.execute(text("DELETE FROM operational_events WHERE id = :i"),
+                             {"i": full_inc})
+            await db.commit()
 
         finally:
             header("LIMPIEZA")

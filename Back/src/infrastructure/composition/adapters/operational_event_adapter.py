@@ -5,13 +5,36 @@ tabla `operational_events` de Esquema A (modelo V1 de `app.models`) y
 traduciendo cada fila activa a una entidad de dominio `OperationalEvent` con el
 impacto calculado segun el RFC-OPERATIONAL-EVENTS-V1:
 
-- reduccion_capacidad  -> -round(capacity * density_factor * effect_value / 100)
+- reduccion_capacidad  -> -effect_value          (porcentaje de reduccion)
 - cierre_total         -> -100  (impacto canonico de cierre absoluto)
-- aumento_demanda      -> effect_value
+- aumento_demanda      -> effect_value          (delta absoluto de personas)
 - incidente_sin_impacto -> 0
 
-`density_factor` se obtiene de `zone_behaviors` para el par
-(zone_type, fase operativa activa) en el timestamp; `capacity` desde `zones`.
+Escala e impacto sobre `projected_density`:
+
+`stage3_zone_behavior_application.apply_zone_behaviors` interpreta el impacto
+acumulado asi:
+
+    projected_density = round(capacity * density_factor) + accumulated_impact
+    if accumulated_impact <= -100 -> FlowRestriction.CLOSED
+
+Es decir, -100 es un CENTINELA DE ESTADO, no una cantidad. Todo lo que quede
+entre -99 y -1 es una degradacion de servicio y la zona sigue abierta.
+
+Por eso los cuatro efectos viven en esa escala y no en un conteo absoluto de
+personas:
+
+* `cierre_total` emite el centinela directamente, sin mirar `capacity`.
+* `reduccion_capacidad` emite el porcentaje con signo negativo: 20% -> -20,
+  100% -> -100 (cierra, que es lo correcto). La version anterior multiplicaba
+  por `capacity * density_factor` y devolvia personas; en una zona de 1000 al
+  50% daba -250, el clamp lo recortaba a -100 y el motor cerraba una zona que
+  solo habia perdido la mitad de su capacidad.
+* `aumento_demanda` emite un delta de personas y se acota por abajo en 0 para
+  que jamas pueda producir un cierre.
+
+`capacity` y `density_factor` siguen siendo parametros de la firma por
+compatibilidad con los llamadores; ningun tipo de efecto depende ya de ellos.
 
 El impacto resultante se normaliza a [-100, 100] (restriccion de la entidad de
 dominio `OperationalEvent`). Los eventos con zone_id nulo o zona inexistente se
@@ -20,22 +43,11 @@ para no subestimar el impacto.
 
 OPCIÓN C - `operational_events` es la única autoridad de cierre por zona.
 ------------------------------------------------------------------
-`cierre_total` devuelve el impacto canónico de cierre (`-100`) en vez de
-`-round(capacity * density_factor)`. El valor `-100` es el centinela que
-`stage3_zone_behavior_application` ya interpreta como cierre:
-
-    if accumulated_impact <= -100:
-        active_restriction = FlowRestriction.CLOSED
-
-La fórmula anterior solo alcanzaba ese centinela cuando
-`capacity * density_factor >= 100`, por lo que una zona de 50 personas con
-`density_factor = 0.5` producía `-25` y NUNCA se cerraba. Peor aún, el impacto
-resultante está en PERSONAS (se suma a `projected_density`), mientras que `-100`
-funciona como centinela de estado: son magnitudes distintas y no comparables.
-
-Consecuencia buscada: `cierre_total` cierra la zona SIEMPRE, sea cual sea su
-capacidad u ocupación. Las fórmulas de `reduccion_capacidad`, `aumento_demanda` e
-`incidente_sin_impacto` quedan sin cambios.
+El cierre se deriva en lectura, no se replica en `zone_behaviors`:
+`compute_impact("cierre_total", ...) = -100` y Stage3 lo traduce a
+`FlowRestriction.CLOSED`. Las funciones que replicaban el cierre sobre
+`zone_behaviors` se eliminaron por ser inviables (esa tabla no tiene `zone_id`,
+asi que cerraba todas las zonas del mismo tipo) y por perder la transaccion.
 """
 from __future__ import annotations
 
@@ -121,20 +133,54 @@ def compute_impact(
     capacity: int,
     density_factor: float,
 ) -> int:
-    """Impacto entero segun RFC-OPERATIONAL-EVENTS-V1 (antes del clamp [-100,100]).
+    """Impacto entero de un evento operativo, antes del clamp de `clamp_impact`.
 
-    `cierre_total` devuelve CLOSURE_IMPACT_CANONICAL (-100), el centinela que
-    `stage3_zone_behavior_application` ya traduce a
-    `FlowRestriction.CLOSED`. Es independiente de `capacity` y `density_factor`
-    a proposito: un cierre total cierra siempre, incluso en zonas cuya
-    ocupacion proyectada no llega a 100 personas.
+    Convencion de escala (Opcion C)
+    ------------------------------
+    El impacto es un escalar en la misma escala que el centinela de cierre que
+    lee `stage3_zone_behavior_application`:
+
+        if accumulated_impact <= -100 -> FlowRestriction.CLOSED
+
+    Por eso -100 significa "cerrada" y cualquier valor entre -99 y -1 significa
+    "degradacion de servicio, la zona sigue abierta". Ese es TODO el contrato.
+
+    - `cierre_total`        -> CLOSURE_IMPACT_CANONICAL (-100). Cierra siempre.
+    - `reduccion_capacidad` -> `-effect_value`, es decir, el PORCENTAJE de
+                               reduccion con signo negativo. Un 20% da -20 y un
+                               100% da -100 (cierra). Antes se computaba
+                               `-round(capacity * density_factor * pct / 100)`,
+                               un conteo absoluto de personas: en una zona de
+                               1000 al 50% daba -250, el clamp lo recortaba a
+                               -100 y el motor leia ese -100 como cierre total.
+                               Una reduccion moderada hacia desaparecer la zona.
+    - `aumento_demanda`     -> `+effect_value` como delta absoluto de personas,
+                               acotado por abajo en 0 para que NUNCA pueda
+                               producir un cierre.
+    - resto                -> 0 (`incidente_sin_impacto` cae aqui).
+
+    Nota de unidades: `stage3` suma el impacto a `projected_density`, que esta
+    en personas. Con la escala de porcentaje, un -50 resta 50 personas reales
+    de la ocupacion proyectada. Es el criterio pedido (desacoplar el impacto del
+    tamano de la zona), pero implica que la reduccion efectiva en una zona
+    grande es menor que el porcentaje pedido. Ver REPORTE.
+
+    `capacity` y `density_factor` se conservan en la firma por compatibilidad
+    con los llamadores y la suite; ningun tipo de efecto depende ya de ellos.
     """
     if effect_type == "cierre_total":
         return CLOSURE_IMPACT_CANONICAL
     if effect_type == "reduccion_capacidad":
-        return -round(capacity * density_factor * (effect_value or 0) / 100)
+        # Porcentaje de reduccion con signo negativo, no conteo de personas.
+        # `validate_effect` acota effect_value a 1..100, asi que el resultado
+        # cae en [-100, -1] y solo el 100% alcanza el centinela de cierre.
+        return -int(effect_value or 0)
     if effect_type == "aumento_demanda":
-        return effect_value or 0
+        # Delta absoluto de personas. El max(0, ...) es defensivo: impide que
+        # un `effect_value` negativo (insertado por SQL en una base sin el CHECK
+        # `ck_operational_events_effect_value`) genere un impacto negativo y,
+        # con el, un cierre fantasma.
+        return max(0, effect_value or 0)
     return 0
 
 

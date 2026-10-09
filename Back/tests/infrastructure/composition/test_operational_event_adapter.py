@@ -199,8 +199,53 @@ def _default_behavior_rows():
 
 
 class TestImpactFormulas:
-    def test_reduccion_capacidad(self) -> None:
-        assert compute_impact("reduccion_capacidad", 40, 100, 0.5) == -20
+    def test_reduccion_capacidad_es_el_porcentaje(self) -> None:
+        # El impacto es el PORCENTAJE de reduccion con signo negativo, no un
+        # conteo de personas. Antes era `-round(capacity * density * pct / 100)`.
+        assert compute_impact("reduccion_capacidad", 40, 100, 0.5) == -40
+
+    @pytest.mark.parametrize(
+        ("pct", "capacity", "density_factor", "esperado"),
+        [
+            # (pct, capacity, density, impacto)
+            (20, 1000, 0.5, -20),   # antes -100 -> CLOSED FALSO
+            (50, 1000, 0.5, -50),   # antes -250 -> clamp -100 -> CLOSED FALSO
+            (50, 1000, 0.3, -50),   # antes -150 -> clamp -100 -> CLOSED FALSO
+            (50, 50, 0.5, -50),     # antes -13
+            (20, 200, 0.7, -20),    # antes -28
+            (99, 1000, 0.3, -99),   # antes -297 -> CLOSED FALSO
+            (100, 1000, 0.5, -100),  # 100% si cierra
+            (100, 50, 0.5, -100),    # 100% cierra tambien en zona chica
+        ],
+    )
+    def test_reduccion_capacidad_no_dispara_cierre_antes_del_100_por_ciento(
+        self, pct: int, capacity: int, density_factor: float, esperado: int,
+    ) -> None:
+        assert compute_impact(
+            "reduccion_capacidad", pct, capacity, density_factor,
+        ) == esperado
+
+    @pytest.mark.parametrize("pct", [1, 20, 50, 99])
+    def test_reduccion_capacidad_parcial_no_alcanza_el_centinela_de_cierre(
+        self, pct: int,
+    ) -> None:
+        # El centinela que `stage3` lee como cierre es `<= -100`. Cualquier
+        # reduccion parcial debe quedar estrictamente por encima.
+        for capacity, density in [(50, 0.5), (200, 0.7), (1000, 0.3), (5000, 1.0)]:
+            impact = clamp_impact(
+                compute_impact("reduccion_capacidad", pct, capacity, density),
+            )
+            assert impact > -100, (
+                f"pct={pct} cap={capacity} dens={density} produjo {impact}, "
+                "que stage3 interpretaria como cierre total"
+            )
+
+    def test_reduccion_capacidad_al_100_por_ciento_cierra(self) -> None:
+        # El unico caso en que la reduccion debe equivaler a cierre.
+        for capacity, density in [(50, 0.5), (200, 0.7), (1000, 0.3)]:
+            assert compute_impact(
+                "reduccion_capacidad", 100, capacity, density,
+            ) == CLOSURE_IMPACT_CANONICAL
 
     def test_cierre_total(self) -> None:
         # Opcion C: `cierre_total` devuelve el impacto canonico de cierre, que
@@ -228,7 +273,31 @@ class TestImpactFormulas:
         ) == CLOSURE_IMPACT_CANONICAL
 
     def test_aumento_demanda_uses_effect_value(self) -> None:
+        # Delta absoluto de personas: `stage3` lo suma a `projected_density`.
         assert compute_impact("aumento_demanda", 25, 100, 0.9) == 25
+
+    @pytest.mark.parametrize(
+        ("effect_value", "esperado"),
+        [(1, 1), (40, 40), (100, 100), (200, 200), (999_999, 999_999)],
+    )
+    def test_aumento_demanda_no_depende_de_capacity_ni_density(
+        self, effect_value: int, esperado: int,
+    ) -> None:
+        for capacity, density in [(50, 0.5), (200, 0.7), (1000, 0.3)]:
+            assert compute_impact(
+                "aumento_demanda", effect_value, capacity, density,
+            ) == esperado
+
+    @pytest.mark.parametrize("effect_value", [-1, -50, -100, -500])
+    def test_aumento_demanda_nunca_produce_cierre(
+        self, effect_value: int,
+    ) -> None:
+        # Guarda defensiva: un `effect_value` negativo (por SQL, en una base sin
+        # el CHECK `ck_operational_events_effect_value`) no debe convertirse en un
+        # cierre fantasma. `validate_effect` ya exige `>= 1`, esto es la segunda
+        # linea de defensa.
+        assert compute_impact("aumento_demanda", effect_value, 200, 0.7) == 0
+        assert compute_impact("aumento_demanda", effect_value, 200, 0.7) > -100
 
     def test_incidente_sin_impacto_is_zero(self) -> None:
         assert compute_impact("incidente_sin_impacto", None, 100, 0.9) == 0
@@ -308,7 +377,7 @@ class TestOperationalEventAdapter:
         assert "operational_events.start_timestamp <=" in events_sql
         assert "operational_events.end_timestamp >" in events_sql
 
-    async def test_maps_formulas_density_and_skips(self) -> None:
+    async def test_maps_formulas_and_skips(self) -> None:
         event_rows = [
             _event_row(
                 "eeeeeeee-0000-0000-0000-000000000001",
@@ -352,9 +421,9 @@ class TestOperationalEventAdapter:
 
         events = await adapter.find_active_by_timestamp(TS)
 
-        # El -40 del cierre_total era `-round(50 * 0.8)`; con la Opcion C el
-        # cierre total es siempre el impacto canonico -100.
-        assert [e.impact_value for e in events] == [-20, -100, 25, 0]
+        # reduccion_capacidad(40) es el porcentaje con signo negativo: -40.
+        # El cierre_total es el centinela -100 y el aumento_demanda su delta.
+        assert [e.impact_value for e in events] == [-40, -100, 25, 0]
         assert [e.target_zone_id for e in events] == [
             UUID(ZONE_A),
             UUID(ZONE_B),
@@ -456,7 +525,10 @@ class TestOperationalEventAdapter:
         events = await adapter.find_active_by_timestamp(TS)
         assert events == []
 
-    async def test_default_density_when_no_zone_behavior(self) -> None:
+    async def test_impact_does_not_depend_on_density_fallback(self) -> None:
+        # Antes: sin `zone_behavior` caia a DEFAULT_DENSITY_FACTOR=1.0 y el
+        # impacto era -round(capacity * 1.0 * 50 / 100) = -30. Ahora el impacto
+        # es el porcentaje, asi que el fallback de densidad no interviene.
         event_rows = [
             _event_row(
                 "eeeeeeee-0000-0000-0000-000000000041",
@@ -470,14 +542,14 @@ class TestOperationalEventAdapter:
             zone_rows=_default_zone_rows(),
             zone_type_rows=_default_zone_type_rows(),
             day_phase_rows=_default_day_phase_rows(),
-            behavior_rows=_default_behavior_rows(),
+            behavior_rows=[],
         )
         adapter = OperationalEventAdapter(session)
 
         events = await adapter.find_active_by_timestamp(TS)
-        assert [e.impact_value for e in events] == [-30]
+        assert [e.impact_value for e in events] == [-50]
 
-    async def test_default_density_when_no_active_phase(self) -> None:
+    async def test_impact_does_not_depend_on_active_phase(self) -> None:
         event_rows = [
             _event_row(
                 "eeeeeeee-0000-0000-0000-000000000051",
@@ -505,7 +577,7 @@ class TestOperationalEventAdapter:
         )
 
         events = await adapter.find_active_by_timestamp(TS)
-        assert [e.impact_value for e in events] == [-30]
+        assert [e.impact_value for e in events] == [-50]
 
     async def test_impact_is_clamped_to_domain_range(self) -> None:
         event_rows = [
@@ -571,8 +643,11 @@ class TestOperationalEventAdapter:
 
         assert len(events) == 2
         assert [e.target_zone_id for e in events] == [UUID(ZONE_A), UUID(ZONE_A)]
-        assert [e.impact_value for e in events] == [-25, 30]
-        assert sum(e.impact_value for e in events) == 5
+        # reduccion_capacidad(50) -> -50 (porcentaje), aumento_demanda(30) -> +30
+        assert [e.impact_value for e in events] == [-50, 30]
+        assert sum(e.impact_value for e in events) == -20
+        # Un -50 parcial no cierra: sigue por encima del centinela de stage3.
+        assert sum(e.impact_value for e in events) > -100
 
     async def test_latitude_longitude_do_not_affect_calculation(self) -> None:
         coordenadas = (-31.4201, -64.1888)
@@ -607,7 +682,7 @@ class TestOperationalEventAdapter:
         events = await adapter.find_active_by_timestamp(TS)
 
         assert len(events) == 2
-        assert [e.impact_value for e in events] == [-20, -20]
+        assert [e.impact_value for e in events] == [-40, -40]
 
     async def test_save_raises_not_implemented(self) -> None:
         adapter = OperationalEventAdapter(_make_session([]))
