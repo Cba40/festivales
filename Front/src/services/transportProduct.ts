@@ -89,8 +89,10 @@ export function useTransportRecommendations(
         }
       )
       setData(res)
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Error al obtener recomendaciones de transporte')
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: string } } })
+        ?.response?.data?.detail
+      setError(detail || 'Error al obtener recomendaciones de transporte')
     } finally {
       setLoading(false)
     }
@@ -119,8 +121,10 @@ export function useAvailableDestinations(transportType?: TransportType) {
         }
       )
       setDestinations(data.destinations ?? [])
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Error al obtener destinos de transporte')
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: string } } })
+        ?.response?.data?.detail
+      setError(detail || 'Error al obtener destinos de transporte')
     } finally {
       setLoading(false)
     }

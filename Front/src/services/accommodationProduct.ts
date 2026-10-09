@@ -104,8 +104,10 @@ export function useAccommodationRecommendations(
         true
       )
       setData(data)
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Error al obtener recomendaciones de hospedaje')
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: string } } })
+        ?.response?.data?.detail
+      setError(detail || 'Error al obtener recomendaciones de hospedaje')
     } finally {
       setLoading(false)
     }

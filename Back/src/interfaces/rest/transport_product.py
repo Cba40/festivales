@@ -125,6 +125,12 @@ async def get_transport_product_adapter(
         .join(Zone, TransportLineStop.zone_id == Zone.id)
         .where(TransportLine.event_id == event_id)
         .where(TransportLine.active == True)
+        # Paradas dadas de baja: mismo criterio que `exit_product.py`. Sin esto
+        # una parada cuya zona quedo `cerrada` seguia apareciendo en el listado
+        # publico, y el DTO la reportaba ademas con `active_restriction="OPEN"`
+        # porque ese campo venia hardcodeado. Filtrando aqui, todo lo que llega
+        # al DTO esta abierto por construccion y el "OPEN" es cierto.
+        .where(Zone.status != "cerrada")
         .order_by(Zone.name, TransportLine.name, TransportLineStop.stop_order)
     )
     if transport_type is not None:
@@ -226,6 +232,10 @@ async def get_transport_product_adapter(
             availability=None,
             estimated_wait=mins_until,
             confidence=None,
+            # Tras el filtro `Zone.status != "cerrada"` de la query, toda zona
+            # que llega aca esta abierta: el literal es correcto por
+            # construccion. No es un valor informativo, es una invariante.
+            # Ver nota en la query del paso 1.
             active_restriction="OPEN",
             operational_state="HAS_SERVICE" if next_dep is not None else "NO_SERVICE",
             lat=lat,
