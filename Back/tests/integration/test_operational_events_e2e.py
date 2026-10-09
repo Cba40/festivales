@@ -42,6 +42,7 @@ from src.domain.entities.zone import Zone
 from src.domain.entities.zone_behavior import FlowRestriction, ZoneBehavior
 from src.domain.value_objects.territorial_prediction import TerritorialPrediction
 from src.infrastructure.composition.adapters.operational_event_adapter import (
+    CLOSURE_IMPACT_CANONICAL,
     OperationalEventAdapter,
     compute_impact,
 )
@@ -155,17 +156,20 @@ ZONES = {
 # Infraestructura simulada (patrón F2/F3: sesión AsyncMock, sin SQL/postgis)
 # ---------------------------------------------------------------------------
 
-def _scalars_result(models):
-    result = MagicMock()
-    scalars = MagicMock()
-    scalars.all.return_value = list(models)
-    result.scalars = MagicMock(return_value=scalars)
-    return result
+def _mappings_result(rows):
+    """Result para consultas que usan `.mappings().all()`.
 
-
-def _all_result(rows):
+    El adapter es serverless-safe: lee COLUMNAS con `.mappings()`, nunca
+    entidades. `_scalars_result` / `_all_result` no sirven aca porque su
+    accessor inexistente devuelve un MagicMock truthy en vez de fallar.
+    """
     result = MagicMock()
-    result.all = MagicMock(return_value=list(rows))
+    mappings = MagicMock()
+    mappings.all.return_value = [
+        r if isinstance(r, dict) else dict(vars(r)) for r in rows
+    ]
+    mappings.__iter__.return_value = iter(mappings.all.return_value)
+    result.mappings = MagicMock(return_value=mappings)
     return result
 
 
@@ -177,15 +181,20 @@ def _make_session(
 ):
     """Sesión con despacho por tabla; replica el predicado temporal+is_active
     del SQL emitido por `OperationalEventAdapter.find_active_by_timestamp`.
+
+    Todas las consultas devuelven `.mappings()`: el adapter consulta COLUMNAS y
+    lee con `row["columna"]` (serverless-safe, sin objetos ORM). Con
+    `_scalars_result` el `.mappings()` devolvería un MagicMock truthy, el
+    cortocircuito `if not rows` no se dispararía y las filas se leerían mal.
     """
     day_rows = [SimpleNamespace(id=EVENT_DAY_ID, date=datetime(2026, 8, 30).date())]
 
     def fake_execute(stmt, *args, **kwargs):
         sql = str(stmt)
         if "zone_behaviors" in sql:
-            return _scalars_result([])
+            return _mappings_result([])
         if "zone_types" in sql:
-            return _scalars_result(zone_type_rows)
+            return _mappings_result(zone_type_rows)
         if "operational_events" in sql:
             active = [
                 row
@@ -194,13 +203,13 @@ def _make_session(
                 and row.start_timestamp <= TS
                 and row.end_timestamp > TS
             ]
-            return _scalars_result(active)
+            return _mappings_result(active)
         if "zones" in sql:
-            return _all_result(zone_rows)
+            return _mappings_result(zone_rows)
         if "event_day_phases" in sql:
-            return _scalars_result(DAY_PHASE_ROWS)
+            return _mappings_result(DAY_PHASE_ROWS)
         if "event_days" in sql:
-            return _all_result(day_rows)
+            return _mappings_result(day_rows)
         raise AssertionError(f"unexpected statement: {sql}")
 
     async def async_fake_execute(stmt, *args, **kwargs):
@@ -391,10 +400,12 @@ class TestCaso2CierreTotalPorEvacuacion:
         )
 
         assert len(events) == 1
-        # Fórmula RFC §8.2: -round(capacity × density_factor).
-        assert compute_impact("cierre_total", None, 2000, 1.0) == -2000
+        # Opcion C: `cierre_total` es el impacto canonico de cierre y no depende
+        # de capacity ni density_factor. Antes era `-round(capacity * density)`
+        # (= -2000 aqui) y solo cerraba si `capacity * density >= 100`.
+        assert compute_impact("cierre_total", None, 2000, 1.0) == CLOSURE_IMPACT_CANONICAL
         # El adapter normaliza a [-100, 100]; un cierre satura el rango negativo.
-        assert events[0].impact_value == -100
+        assert events[0].impact_value == CLOSURE_IMPACT_CANONICAL
 
         state = _zone_state(prediction, UUID(ZONE_ESCENARIO))
         assert state is not None

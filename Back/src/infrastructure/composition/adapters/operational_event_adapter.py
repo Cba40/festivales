@@ -51,8 +51,9 @@ asi que cerraba todas las zonas del mismo tipo) y por perder la transaccion.
 """
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import date, datetime
+from typing import Any, NamedTuple
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
@@ -78,6 +79,20 @@ DEFAULT_DENSITY_FACTOR = 1.0
 # Deliberadamente NO depende de capacity/density_factor: si dependiera, las zonas
 # cuya ocupacion proyectada no alcanza 100 personas nunca se cerrarian.
 CLOSURE_IMPACT_CANONICAL = -100
+
+
+class EventDayPhaseRow(NamedTuple):
+    """Fase de un dia, materializada desde una fila de columnas.
+
+    Sustituye a la entidad `EventDayPhaseORM` en este adapter: son los mismos
+    campos que consume `resolve_active_phase_id`, pero sin estado de sesion que
+    pueda expirar. Es lo que hace que el pipeline sea seguro en serverless.
+    """
+
+    event_day_id: str
+    operational_phase_id: UUID
+    start_min: int
+    end_min: int
 
 _SUBTIPO_TO_ZONE_TYPE_SLUG = {
     "banos": "bano",
@@ -117,7 +132,7 @@ def resolve_zone_type_id(
 
 
 def resolve_active_phase_id(
-    day_phases: Sequence[EventDayPhaseORM],
+    day_phases: Sequence[EventDayPhaseRow],
     current_min: int,
 ) -> UUID | None:
     """Fase operativa activa para `current_min` (ventana [start_min, end_min))."""
@@ -203,15 +218,37 @@ class OperationalEventAdapter(OperationalEventRepository):
     async def find_active_by_timestamp(
         self, timestamp: datetime,
     ) -> Sequence[OperationalEvent]:
+        # ── serverless-safe: filas como Mapping, no objetos ORM ───────────────
+        # `select(Entidad).mappings()` NO sirve: el RowMapping resultante solo
+        # tiene la clave del nombre de la clase y su valor sigue siendo una
+        # instancia ORM. Hay que seleccionar COLUMNAS: asi el RowMapping tiene
+        # una clave por columna y ningun objeto con estado de sesion, que es lo
+        # que dispara lazy-loading (y MissingGreenlet) en Vercel.
+        #
+        # El bug concreto: mas abajo esta `commit()` (barrido de expirados). Con
+        # `expire_on_commit=True` —el default— ese commit expira los objetos ORM
+        # ya cargados, y el acceso posterior a `row.zone_id` intenta un refresh
+        # lazy desde un contexto sin greenlet -> MissingGreenlet. Con filas de
+        # columnas no hay estado que expirar.
         rows = (
             await self._db.execute(
-                select(OperationalEventORM).where(
+                select(
+                    OperationalEventORM.id,
+                    OperationalEventORM.event_day_id,
+                    OperationalEventORM.zone_id,
+                    OperationalEventORM.event_type,
+                    OperationalEventORM.effect_type,
+                    OperationalEventORM.effect_value,
+                    OperationalEventORM.is_incident,
+                    OperationalEventORM.start_timestamp,
+                    OperationalEventORM.end_timestamp,
+                ).where(
                     OperationalEventORM.is_active.is_(True),
                     OperationalEventORM.start_timestamp <= timestamp,
                     OperationalEventORM.end_timestamp > timestamp,
                 )
             )
-        ).scalars().all()
+        ).mappings().all()
 
         if not rows:
             return []
@@ -241,7 +278,7 @@ class OperationalEventAdapter(OperationalEventRepository):
 
     async def _build_domain_events(
         self,
-        rows: Sequence[OperationalEventORM],
+        rows: Sequence[Mapping[str, Any]],
         timestamp: datetime,
     ) -> list[OperationalEvent]:
         zones = await self._load_zones(rows)
@@ -268,113 +305,133 @@ class OperationalEventAdapter(OperationalEventRepository):
 
     async def _load_zones(
         self,
-        rows: Sequence[OperationalEventORM],
-    ) -> dict[str, object]:
-        zone_ids = {row.zone_id for row in rows if row.zone_id}
+        rows: Sequence[Mapping[str, Any]],
+    ) -> dict[str, dict[str, Any]]:
+        zone_ids = {row["zone_id"] for row in rows if row["zone_id"]}
         if not zone_ids:
             return {}
         stmt = (
             select(ZoneORM.id, ZoneORM.capacity, ZoneORM.type, ZoneORM.subtipo)
             .where(ZoneORM.id.in_(list(zone_ids)))
         )
-        zone_rows = (await self._db.execute(stmt)).all()
-        return {str(row.id): row for row in zone_rows}
+        zone_rows = (await self._db.execute(stmt)).mappings().all()
+        return {str(r["id"]): dict(r) for r in zone_rows}
 
     async def _load_zone_type_map(self) -> dict[str, UUID]:
-        rows = (await self._db.execute(select(ZoneTypeORM))).scalars().all()
-        return {row.slug: UUID(str(row.id)) for row in rows}
+        rows = (
+            await self._db.execute(select(ZoneTypeORM.id, ZoneTypeORM.slug))
+        ).mappings().all()
+        return {r["slug"]: UUID(str(r["id"])) for r in rows}
 
     async def _load_event_day_dates(
         self,
-        rows: Sequence[OperationalEventORM],
+        rows: Sequence[Mapping[str, Any]],
     ) -> dict[str, date]:
-        ed_ids = {row.event_day_id for row in rows if row.event_day_id}
+        ed_ids = {row["event_day_id"] for row in rows if row["event_day_id"]}
         if not ed_ids:
             return {}
         stmt = (
             select(EventDayORM.id, EventDayORM.date)
             .where(EventDayORM.id.in_(list(ed_ids)))
         )
-        ed_rows = (await self._db.execute(stmt)).all()
-        return {str(row.id): row.date for row in ed_rows}
+        ed_rows = (await self._db.execute(stmt)).mappings().all()
+        return {str(r["id"]): r["date"] for r in ed_rows}
 
     async def _load_event_day_phases(
         self,
-        rows: Sequence[OperationalEventORM],
-    ) -> dict[str, list[EventDayPhaseORM]]:
-        ed_ids = {row.event_day_id for row in rows if row.event_day_id}
+        rows: Sequence[Mapping[str, Any]],
+    ) -> dict[str, list[EventDayPhaseRow]]:
+        ed_ids = {row["event_day_id"] for row in rows if row["event_day_id"]}
         if not ed_ids:
             return {}
         stmt = (
-            select(EventDayPhaseORM)
+            select(
+                EventDayPhaseORM.event_day_id,
+                EventDayPhaseORM.operational_phase_id,
+                EventDayPhaseORM.start_min,
+                EventDayPhaseORM.end_min,
+            )
             .where(EventDayPhaseORM.event_day_id.in_(list(ed_ids)))
         )
-        phase_rows = (await self._db.execute(stmt)).scalars().all()
-        grouped: dict[str, list[EventDayPhaseORM]] = {}
-        for phase in phase_rows:
-            grouped.setdefault(str(phase.event_day_id), []).append(phase)
+        phase_rows = (await self._db.execute(stmt)).mappings().all()
+        grouped: dict[str, list[EventDayPhaseRow]] = {}
+        for r in phase_rows:
+            # Se materializa un record en vez de devolver la entidad ORM: evita
+            # arrastrar estado de sesion por el resto del pipeline. Sigue
+            # cumpliendo el contrato de `resolve_active_phase_id`, que solo
+            # lee `.operational_phase_id`, `.start_min` y `.end_min`.
+            grouped.setdefault(str(r["event_day_id"]), []).append(EventDayPhaseRow(
+                event_day_id=str(r["event_day_id"]),
+                operational_phase_id=UUID(str(r["operational_phase_id"])),
+                start_min=r["start_min"],
+                end_min=r["end_min"],
+            ))
         return grouped
 
     async def _load_zone_behaviors(
         self,
-        day_phases: dict[str, list[EventDayPhaseORM]],
+        day_phases: dict[str, list[EventDayPhaseRow]],
     ) -> dict[tuple[str, UUID | None], float]:
         phase_ids = {
-            UUID(str(phase.operational_phase_id))
+            phase.operational_phase_id
             for phases in day_phases.values()
             for phase in phases
         }
         if not phase_ids:
             return {}
         stmt = (
-            select(ZoneBehaviorORM)
+            select(
+                ZoneBehaviorORM.zone_type_id,
+                ZoneBehaviorORM.operational_phase_id,
+                ZoneBehaviorORM.density_factor,
+            )
             .where(ZoneBehaviorORM.operational_phase_id.in_(list(phase_ids)))
         )
-        behavior_rows = (await self._db.execute(stmt)).scalars().all()
+        behavior_rows = (await self._db.execute(stmt)).mappings().all()
         return {
-            (str(behavior.zone_type_id), UUID(str(behavior.operational_phase_id))): float(
-                behavior.density_factor,
+            (str(r["zone_type_id"]), UUID(str(r["operational_phase_id"]))): float(
+                r["density_factor"],
             )
-            for behavior in behavior_rows
+            for r in behavior_rows
         }
 
     def _to_domain_event(
         self,
-        row: OperationalEventORM,
+        row: Mapping[str, Any],
         timestamp: datetime,
-        zones: dict[str, object],
+        zones: dict[str, dict[str, Any]],
         type_map: dict[str, UUID],
         day_dates: dict[str, date],
-        day_phases: dict[str, list[EventDayPhaseORM]],
+        day_phases: dict[str, list[EventDayPhaseRow]],
         behaviors: dict[tuple[str, UUID | None], float],
     ) -> OperationalEvent | None:
-        if not row.zone_id:
+        if not row["zone_id"]:
             return None
-        zone = zones.get(str(row.zone_id))
+        zone = zones.get(str(row["zone_id"]))
         if zone is None:
             return None
-        zt_id = resolve_zone_type_id(type_map, zone.type, zone.subtipo)
+        zt_id = resolve_zone_type_id(type_map, zone["type"], zone["subtipo"])
         if zt_id is None:
             return None
-        event_day_date = day_dates.get(str(row.event_day_id))
+        event_day_date = day_dates.get(str(row["event_day_id"]))
         if event_day_date is None:
             return None
         current_min = minutes_in_local_day(event_day_date, timestamp)
         phase_id = resolve_active_phase_id(
-            day_phases.get(str(row.event_day_id), []),
+            day_phases.get(str(row["event_day_id"]), []),
             current_min,
         )
-        
+
         density = behaviors.get((str(zt_id), phase_id), DEFAULT_DENSITY_FACTOR)
         impact = clamp_impact(
-            compute_impact(row.effect_type, row.effect_value, zone.capacity, density)
+            compute_impact(row["effect_type"], row["effect_value"], zone["capacity"], density)
         )
-        
+
         return OperationalEvent(
-            id=UUID(str(row.id)) if row.id else None,
-            target_zone_id=UUID(str(row.zone_id)),
+            id=UUID(str(row["id"])) if row["id"] else None,
+            target_zone_id=UUID(str(row["zone_id"])),
             impact_value=impact,
-            is_incident=row.is_incident,
-            start_timestamp=row.start_timestamp,
-            end_timestamp=row.end_timestamp,
+            is_incident=row["is_incident"],
+            start_timestamp=row["start_timestamp"],
+            end_timestamp=row["end_timestamp"],
         )

@@ -1,4 +1,4 @@
-"""OperationalEventAdapter — Fase 3 RFC-OPERATIONAL-EVENTS-V1.
+﻿"""OperationalEventAdapter — Fase 3 RFC-OPERATIONAL-EVENTS-V1.
 
 Cubre el contrato `OperationalEventRepository` del Context Engine: filtro
 temporal + is_active, formulas de impacto (reduccion/cierre/aumento/sin
@@ -11,6 +11,7 @@ despacho por tabla (inmune al N de queries del adapter), sin base de datos.
 """
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -82,17 +83,23 @@ def _zone_row(zid: str, ztype: str, subtipo: str | None, capacity: int) -> Simpl
     return SimpleNamespace(id=zid, capacity=capacity, type=ztype, subtipo=subtipo)
 
 
-def _scalars_result(models):
-    result = MagicMock()
-    scalars_mock = MagicMock()
-    scalars_mock.all.return_value = list(models)
-    result.scalars = MagicMock(return_value=scalars_mock)
-    return result
+def _as_mapping(row):
+    """Convierte un SimpleNamespace de fixture en un dict tipo RowMapping.
+
+    El adapter lee con `row["columna"]` porque consulta COLUMNAS y usa
+    `.mappings()`; asi la sesion falsa devuelve filas con la misma forma que
+    las reales y los fixtures siguen siendo legibles como SimpleNamespace.
+    """
+    if isinstance(row, dict):
+        return row
+    return dict(vars(row))
 
 
-def _all_result(rows):
+def _mappings_result(rows):
     result = MagicMock()
-    result.all = MagicMock(return_value=list(rows))
+    mappings_mock = MagicMock()
+    mappings_mock.all.return_value = [_as_mapping(r) for r in rows]
+    result.mappings = MagicMock(return_value=mappings_mock)
     return result
 
 
@@ -111,6 +118,9 @@ def _make_session(
     test sea fiel a la semantica, el despacho de `operational_events` aplica
     el mismo predicado que emite el adapter. Las filas resultantes se devuelven
     en el orden en que fueron creadas.
+
+    Todas las consultas devuelven `.mappings()`: el adapter es serverless-safe
+    y no debe tocar objetos ORM, asi que la sesion falsa tampoco los produce.
     """
     zone_rows = zone_rows or []
     zone_type_rows = zone_type_rows or []
@@ -123,9 +133,9 @@ def _make_session(
         sql = str(stmt)
         captured_stmts.append(sql)
         if "zone_behaviors" in sql:
-            return _scalars_result(behavior_rows)
+            return _mappings_result(behavior_rows)
         if "zone_types" in sql:
-            return _scalars_result(zone_type_rows)
+            return _mappings_result(zone_type_rows)
         if "operational_events" in sql:
             active = [
                 row
@@ -134,13 +144,13 @@ def _make_session(
                 and row.start_timestamp <= ts
                 and row.end_timestamp > ts
             ]
-            return _scalars_result(active)
+            return _mappings_result(active)
         if "zones" in sql:
-            return _all_result(zone_rows)
+            return _mappings_result(zone_rows)
         if "event_day_phases" in sql:
-            return _scalars_result(day_phase_rows)
+            return _mappings_result(day_phase_rows)
         if "event_days" in sql:
-            return _all_result(day_rows)
+            return _mappings_result(day_rows)
         raise AssertionError(f"unexpected statement: {sql}")
 
     async def async_fake_execute(stmt, *args, **kwargs):
@@ -696,3 +706,114 @@ class TestOperationalEventAdapter:
                     end_timestamp=datetime(2026, 7, 15, 14, 0, tzinfo=AR),
                 )
             )
+
+
+class TestServerlessSafety:
+    """Regresion del `MissingGreenlet` que rompio produccion en Vercel.
+
+    Causa: `find_active_by_timestamp` hace `commit()` para el barrido de
+    expirados. Con `expire_on_commit=True` (default) ese commit expira los
+    objetos ORM ya cargados; el acceso posterior a `row.zone_id` intentaba un
+    refresh lazy desde un contexto sin greenlet ->
+    `sqlalchemy.exc.MissingGreenlet: greenlet_spawn has not been called`.
+
+    La defensa no es "no commitear" sino no arrastrar objetos ORM: filas de
+    columnas via `.mappings()`, que no tienen estado que expirar.
+    """
+
+    async def test_consulta_de_eventos_selecciona_columnas_no_la_entidad(self) -> None:
+        event_rows = [
+            _event_row("eeeeeeee-0000-0000-0000-0000000000a1", ZONE_A, "cierre_total", None),
+        ]
+        session = _make_session(
+            event_rows,
+            zone_rows=_default_zone_rows(),
+            zone_type_rows=_default_zone_type_rows(),
+            day_phase_rows=_default_day_phase_rows(),
+            behavior_rows=_default_behavior_rows(),
+        )
+        adapter = OperationalEventAdapter(session)
+        await adapter.find_active_by_timestamp(TS)
+        sql = session.captured_stmts[0]
+        # Una entidad completa generaria `FROM operational_events` con TODAS las
+        # columnas; lo que se busca es la proyeccion explicita.
+        assert "operational_events.id" in sql
+        assert "operational_events.zone_id" in sql
+        assert "operational_events.effect_type" in sql
+
+    async def test_ninguna_fila_devuelta_es_una_entidad_orm(self) -> None:
+        event_rows = [
+            _event_row("eeeeeeee-0000-0000-0000-0000000000b1", ZONE_A, "cierre_total", None),
+        ]
+        session = _make_session(
+            event_rows,
+            zone_rows=_default_zone_rows(),
+            zone_type_rows=_default_zone_type_rows(),
+            day_phase_rows=_default_day_phase_rows(),
+            behavior_rows=_default_behavior_rows(),
+        )
+        adapter = OperationalEventAdapter(session)
+        await adapter.find_active_by_timestamp(TS)
+
+        # La sesion solo expone `.mappings()`; si el adapter pidiera
+        # `.scalars()` recibiria un MagicMock y la asercion de abajo fallaria.
+        for sql in session.captured_stmts:
+            assert "scalars()" not in sql
+
+    async def test_sobrevive_a_un_commit_intermedio(self) -> None:
+        """El commit del barrido de expirados no debe invalidar las filas.
+
+        Antes, con objetos ORM, este commit expiraba `rows` y el acceso
+        posterior reventaba con MissingGreenlet. Con filas de columnas las
+        filas ya estan materializadas y el commit no las toca.
+        """
+        event_rows = [
+            _event_row("eeeeeeee-0000-0000-0000-0000000000c1", ZONE_A, "cierre_total", None),
+        ]
+
+        session = _make_session(
+            event_rows,
+            zone_rows=_default_zone_rows(),
+            zone_type_rows=_default_zone_type_rows(),
+            day_phase_rows=_default_day_phase_rows(),
+            behavior_rows=_default_behavior_rows(),
+        )
+        # Forzar el barrido: hace que el adapter ejecute el commit intermedio.
+        session.execute = _make_committing_session(
+            session,
+            on_table="operational_events",
+            committing_for={"operational_events"},
+        )
+        adapter = OperationalEventAdapter(session)
+
+        events = await adapter.find_active_by_timestamp(TS)
+
+        assert len(events) == 1
+        assert events[0].impact_value == CLOSURE_IMPACT_CANONICAL
+        assert str(events[0].target_zone_id) == ZONE_A
+
+
+def _make_committing_session(base_session, *, on_table: str, committing_for: set[str]):
+    """Envolve `execute` para que un `commit()` real ocurre en el medio.
+
+    Reproduce el entorno de produccion: `expire_on_commit=True` invalida los
+    objetos ORM ya leidos, que es exactamente lo que disparaba el bug.
+    """
+    original = base_session.execute
+
+    async def execute(stmt, *args, **kwargs):
+        sql = str(stmt)
+        result = await original(stmt, *args, **kwargs)
+        if on_table in sql and "UPDATE" in sql.upper():
+            await base_session.commit()
+        return result
+
+    base_session.commit = _async_commit()
+    return execute
+
+
+def _async_commit():
+    async def commit():
+        return None
+
+    return commit

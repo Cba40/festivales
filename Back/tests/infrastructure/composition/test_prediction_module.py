@@ -70,6 +70,21 @@ def _one_result(row):
     return result
 
 
+def _mappings_result(rows):
+    """Result para queries que usan `.mappings().all()`.
+
+    `OperationalEventAdapter` es serverless-safe: consulta COLUMNAS y lee con
+    `.mappings()`. `_scalars_result` no sirve para esa consulta: `.mappings()`
+    devolveria un MagicMock truthy y el adapter no cortaria en `if not rows`.
+    """
+    result = MagicMock()
+    mappings_mock = MagicMock()
+    mappings_mock.all.return_value = list(rows)
+    mappings_mock.__iter__.return_value = iter(rows)
+    result.mappings = MagicMock(return_value=mappings_mock)
+    return result
+
+
 def _first_result(model):
     """Result para queries que usan `.scalars().first()`."""
     result = MagicMock()
@@ -234,7 +249,11 @@ def _mock_full_flow_session(
     execute_calls.append(_scalar_one_result(None))  # service_configs override
     execute_calls.append(_scalar_one_result(None))  # service_configs default
     # operational_events (OperationalEventAdapter): sin eventos activos.
-    execute_calls.append(_scalars_result([]))
+    # `_mappings_result` y no `_scalars_result`: el adapter consulta COLUMNAS y
+    # lee con `.mappings()` desde el fix serverless-safe. Con `_scalars_result`
+    # el `.mappings()` devolveria un MagicMock truthy, el adapter no cortaria en
+    # `if not rows` y emitiria 5 consultas de mas, desalineando esta lista.
+    execute_calls.append(_mappings_result([]))
 
     session.execute = AsyncMock(side_effect=execute_calls)
     session.add = MagicMock()

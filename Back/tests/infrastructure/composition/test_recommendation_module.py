@@ -73,6 +73,23 @@ def _one_result(row):
     return result
 
 
+def _mappings_result(rows):
+    """Resultado con `.mappings().all()`.
+
+    Necesario desde que `OperationalEventAdapter` es serverless-safe: consulta
+    COLUMNAS y lee con `.mappings()`, nunca con `.scalars()`. Sin este helper,
+    `result.mappings()` devuelve un MagicMock truthy, `if not rows` no corta, el
+    adapter sigue y emite 5 consultas de mas, desalineando el `side_effect`
+    posicional a partir de ahi.
+    """
+    result = MagicMock()
+    mappings_mock = MagicMock()
+    mappings_mock.all.return_value = list(rows)
+    mappings_mock.__iter__.return_value = iter(rows)
+    result.mappings = MagicMock(return_value=mappings_mock)
+    return result
+
+
 class CapturingEngine:
     """Reemplaza ContextEngine para capturar los datos que llegan al dominio."""
 
@@ -240,7 +257,9 @@ def _mock_full_flow_session() -> AsyncMock:
             # 10. operational_events (OperationalEventAdapter): sin eventos activos.
             # Lista vacía ⇒ el adapter retorna temprano y no consulta los
             # expirados (`stale_result`), así que no se lista esa consulta.
-            _scalars_result([]),
+            # `_mappings_result` y no `_scalars_result`: el adapter lee con
+            # `.mappings()` desde el fix serverless-safe.
+            _mappings_result([]),
             # ETAPA 4 — puente Parking (ParkingModule.execute):
             # 11. type_map propio del módulo
             _scalars_result(zone_type_rows),
